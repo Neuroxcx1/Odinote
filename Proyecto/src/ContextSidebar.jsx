@@ -1,0 +1,907 @@
+// =====================================================
+// Odinote — Context Sidebar (left side when item selected)
+// =====================================================
+
+const EMOJI_OPTIONS = ['👍','❤️','🔥','💡','✨','🎉','👀','🤔','😂','😍','🙏','💯','⚡','🚀','🎯','🤝','👏','💪','😎','🥳'];
+
+// Icon choices for boards (Material Symbols names) — uses the shared list defined in items.jsx
+const BOARD_ICON_CHOICES = [
+  'dashboard','folder','work','lightbulb','rocket_launch','palette','code','sports_esports',
+  'movie','music_note','book','favorite','star','bolt','build','science','brush','terrain',
+  'map','group','flag','schedule','psychology','category',
+];
+
+// Color picker — separate background and header strip for columns
+const STICKY_PALETTE = [
+  { key: 'white',  hex: '#FFFFFF', label: 'Blanco' },
+  { key: 'mist',   hex: '#ECEBEB', label: 'Gris' },
+  { key: 'cream',  hex: '#FEF7E0', label: 'Crema' },
+  { key: 'yellow', hex: '#F7DA84', label: 'Amarillo' },
+  { key: 'orange', hex: '#F5A66B', label: 'Naranja' },
+  { key: 'rose',   hex: '#FBDFDD', label: 'Rosa' },
+  { key: 'red',    hex: '#E6544F', label: 'Rojo' },
+  { key: 'pink',   hex: '#E58AB8', label: 'Magenta' },
+  { key: 'purple', hex: '#B084D0', label: 'Púrpura' },
+  { key: 'sky',    hex: '#8AC1E8', label: 'Cielo' },
+  { key: 'sage',   hex: '#E8F0DA', label: 'Verde claro' },
+  { key: 'green',  hex: '#90B968', label: 'Verde' },
+  { key: 'dark',   hex: '#595459', label: 'Gris oscuro' },
+];
+
+// Deep saturated palette for column header strips & boards
+const STRIP_PALETTE = [
+  { key: 'navy',   hex: '#3D5A80' },
+  { key: 'indigo', hex: '#6C5FAF' },
+  { key: 'plum',   hex: '#955BA5' },
+  { key: 'wine',   hex: '#993844' },
+  { key: 'red',    hex: '#C24A45' },
+  { key: 'orange', hex: '#D88040' },
+  { key: 'gold',   hex: '#D5A949' },
+  { key: 'olive',  hex: '#6A8546' },
+  { key: 'forest', hex: '#1F4D3F' },
+  { key: 'dark',   hex: '#595459' },
+  { key: 'black',  hex: '#1A1A1A' },
+];
+
+function resolveStickyColor(key) {
+  const found = STICKY_PALETTE.find(p => p.key === key);
+  if (found) return found.hex;
+  return key && key.startsWith('#') ? key : '#FFFFFF';
+}
+function resolveStripColor(key) {
+  const found = STRIP_PALETTE.find(p => p.key === key);
+  if (found) return found.hex;
+  return key && key.startsWith('#') ? key : '#3D5A80';
+}
+
+function ContextSidebar({
+  item, lang, onUpdate, onDelete, onDuplicate, onOpen,
+  onClose,
+}) {
+  const [pane, setPane] = React.useState(null); // 'color' | 'emoji' | 'comments' | 'rename' | null
+  const [focusedRowVersion, setFocusedRowVersion] = React.useState(0);
+
+  React.useEffect(() => {
+    window._notifyFocusedRowChanged = () => setFocusedRowVersion(v => v + 1);
+    return () => { window._notifyFocusedRowChanged = null; };
+  }, []);
+
+  if (!item || window._calendarDayMenuOpen) return null;
+
+  const isText = ['note','comment','doc'].includes(item.type);
+  const isColumn = item.type === 'column';
+  const isBoard = item.type === 'board';
+  const isLink = item.type === 'link';
+  const isTodo = item.type === 'todo';
+  const isImage = item.type === 'image';
+  const isTable = item.type === 'table';
+  const isAudio = item.type === 'audio';
+  const isComment = item.type === 'comment';
+  const isCalendar = item.type === 'calendar';
+  const isColor = item.type === 'color';
+  const isFile = item.type === 'file';
+  const isDoc = item.type === 'doc';
+
+  const downloadDocPdf = () => {
+    if (!window.html2pdf) return;
+    const title = (window.pickLang ? window.pickLang(item.title, lang) : '') || 'documento';
+    const bodyHtml = (window.pickLang ? window.pickLang(item.body, lang) : '') || '';
+    const el = document.createElement('div');
+    el.style.cssText = 'padding:24px;font-family:Georgia,serif;color:#1a1a1a;line-height:1.55;';
+    el.innerHTML = `<h1 style="font-size:22px;margin:0 0 12px;">${title}</h1>` + bodyHtml;
+    window.html2pdf().set({ filename: `${title}.pdf`, margin: 12, html2canvas: { scale: 2 }, jsPDF: { unit: 'mm', format: 'a4' } }).from(el).save();
+  };
+  const tableCell = isTable && window._focusedTableCell && window._focusedTableCell.itemId === item.id
+    ? window._focusedTableCell : null;
+
+  const reactions = item.reactions || {};
+  const comments = item.comments || [];
+
+  const addReaction = (emoji) => {
+    const next = { ...reactions };
+    next[emoji] = (next[emoji] || 0) + 1;
+    onUpdate({ reactions: next });
+  };
+
+  const addComment = (text) => {
+    const t = text.trim();
+    if (!t) return;
+    const id = `cm-${Date.now()}-${Math.floor(Math.random()*9999)}`;
+    onUpdate({ comments: [...comments, {
+      id,
+      author: 'Anonymous',
+      text: t,
+      time: Date.now(),
+    }] });
+  };
+
+  return (
+    <>
+      <div className="ctx-side">
+        <button
+          className="ctx-close"
+          onClick={()=>{
+            // Step 1: if a sub-pane is open, just close it
+            if (pane) { setPane(null); return; }
+            // Step 2: if a table cell is focused, deselect cell to go back to table-level menu
+            if (tableCell && tableCell.clearCellSelection) { tableCell.clearCellSelection(); return; }
+            // Step 3: otherwise close the sidebar entirely
+            onClose();
+          }}
+          title={lang==='es'?'Atrás':'Back'}
+        >
+          <span className="material-symbols-rounded">arrow_back</span>
+        </button>
+
+        {!tableCell && !isImage && (
+          <button
+            className={`ctx-btn ${(pane === 'color' || pane === 'colorHex') ? 'active' : ''}`}
+            onClick={()=> isColor ? setPane(pane === 'colorHex' ? null : 'colorHex') : setPane(pane === 'color' ? null : 'color')}
+            title="Color"
+          >
+            <div className="ctx-color-chip" style={{ background: isColor ? (item.hex || '#56B3A7') : resolveStickyColor(item.color || 'white'), border: '1.5px solid var(--line-soft)' }}/>
+            <span>Color</span>
+          </button>
+        )}
+
+        <button
+          className={`ctx-btn ${pane === 'emoji' ? 'active' : ''}`}
+          onClick={()=>setPane(pane === 'emoji' ? null : 'emoji')}
+          title="Reacciones"
+        >
+          <span className="material-symbols-rounded">add_reaction</span>
+          <span>{lang==='es'?'Reacciones':'React'}</span>
+        </button>
+
+        <button
+          className={`ctx-btn ${pane === 'comments' ? 'active' : ''}`}
+          onClick={()=>setPane(pane === 'comments' ? null : 'comments')}
+          title="Comentarios"
+        >
+          <span className="material-symbols-rounded">chat_bubble</span>
+          <span>{lang==='es'?'Comentar':'Comment'}</span>
+          {comments.length > 0 && <div className="ctx-badge">{comments.length}</div>}
+        </button>
+
+        {isTodo && (
+          <>
+            <button
+              className={`ctx-btn ${item.showTitle !== false ? 'active' : ''}`}
+              onClick={()=>onUpdate({ showTitle: item.showTitle === false })}
+              title={lang==='es'?'Mostrar/ocultar título':'Toggle title'}
+            >
+              <span className="material-symbols-rounded">title</span>
+              <span>{lang==='es'?'Título':'Title'}</span>
+            </button>
+            <button
+              className={`ctx-btn ${pane === 'dueDate' ? 'active' : ''}`}
+              onClick={()=>setPane(pane === 'dueDate' ? null : 'dueDate')}
+              title={lang==='es'?'Fecha límite':'Due date'}
+            >
+              <span className="material-symbols-rounded">calendar_today</span>
+              <span>{lang==='es'?'Para':'Due'}</span>
+            </button>
+            <button
+              className={`ctx-btn ${pane === 'assign' ? 'active' : ''}`}
+              onClick={()=>setPane(pane === 'assign' ? null : 'assign')}
+              title={lang==='es'?'Asignar':'Assign'}
+            >
+              <span className="material-symbols-rounded">person</span>
+              <span>{lang==='es'?'Asignar':'Assign'}</span>
+            </button>
+            <div className="ctx-sep-h"/>
+            <button
+              className="ctx-btn"
+              onClick={()=>{
+                let activeRowIdx = -1;
+                if (window._focusedTodoRow && window._focusedTodoRow.todoId === item.id) {
+                  activeRowIdx = (item.items || []).findIndex(r => r.id === window._focusedTodoRow.rowId);
+                }
+                if (activeRowIdx === -1 && item.items && item.items.length > 0) {
+                  activeRowIdx = 0;
+                }
+                if (activeRowIdx !== -1) {
+                  const nextItems = (item.items || []).map((r, i) =>
+                    i === activeRowIdx ? { ...r, indent: Math.max(0, Math.min(2, (r.indent || 0) + 1)) } : r
+                  );
+                  onUpdate({ items: nextItems });
+                }
+              }}
+              title={lang==='es'?'Aumentar sangría':'Indent'}
+            >
+              <span className="material-symbols-rounded">format_indent_increase</span>
+              <span>{lang==='es'?'Indentar':'Indent'}</span>
+            </button>
+            <button
+              className="ctx-btn"
+              onClick={()=>{
+                let activeRowIdx = -1;
+                if (window._focusedTodoRow && window._focusedTodoRow.todoId === item.id) {
+                  activeRowIdx = (item.items || []).findIndex(r => r.id === window._focusedTodoRow.rowId);
+                }
+                if (activeRowIdx === -1 && item.items && item.items.length > 0) {
+                  activeRowIdx = 0;
+                }
+                if (activeRowIdx !== -1) {
+                  const nextItems = (item.items || []).map((r, i) =>
+                    i === activeRowIdx ? { ...r, indent: Math.max(0, Math.min(2, (r.indent || 0) - 1)) } : r
+                  );
+                  onUpdate({ items: nextItems });
+                }
+              }}
+              title={lang==='es'?'Reducir sangría':'Outdent'}
+            >
+              <span className="material-symbols-rounded">format_indent_decrease</span>
+              <span>{lang==='es'?'Desindentar':'Outdent'}</span>
+            </button>
+            <div className="ctx-sep-h"/>
+          </>
+        )}
+
+        {isLink && (
+          <>
+            <button
+              className={`ctx-btn ${item.showPreview !== false ? 'active' : ''}`}
+              onClick={()=>onUpdate({ showPreview: item.showPreview === false })}
+              title={lang==='es'?'Alternar vista previa':'Toggle preview'}
+            >
+              <span className="material-symbols-rounded">image</span>
+              <span>{lang==='es'?'Vista previa':'Preview'}</span>
+            </button>
+            <button
+              className={`ctx-btn ${item.showInfo !== false ? 'active' : ''}`}
+              onClick={()=>onUpdate({ showInfo: item.showInfo === false })}
+              title={lang==='es'?'Mostrar informacion':'Show info'}
+            >
+              <span className="material-symbols-rounded">link</span>
+              <span>Info</span>
+            </button>
+            <button
+              className={`ctx-btn ${item.showCaption === true ? 'active' : ''}`}
+              onClick={()=>{
+                const show = item.showCaption !== true;
+                onUpdate({ showCaption: show, h: show ? (item.h || 230) + 46 : Math.max(120, (item.h || 230) - 46) });
+              }}
+              title={lang==='es'?'Leyenda':'Caption'}
+            >
+              <span className="material-symbols-rounded">notes</span>
+              <span>{lang==='es'?'Leyenda':'Caption'}</span>
+            </button>
+            <button
+              className="ctx-btn"
+              onClick={()=>item.url && window.open(item.url, '_blank', 'noopener,noreferrer')}
+              title={lang==='es'?'Abrir enlace':'Open link'}
+            >
+              <span className="material-symbols-rounded">open_in_new</span>
+              <span>{lang==='es'?'Abrir':'Open'}</span>
+            </button>
+          </>
+        )}
+
+        {(isBoard || isColumn) && (
+          <button
+            className={`ctx-btn ${pane === 'boardIcon' ? 'active' : ''}`}
+            onClick={()=>setPane(pane === 'boardIcon' ? null : 'boardIcon')}
+            title={lang==='es'?'Cambiar icono':'Change icon'}
+          >
+            <span className="material-symbols-rounded">{item.icon || (isColumn ? 'view_column' : 'dashboard')}</span>
+            <span>{lang==='es'?'Icono':'Icon'}</span>
+          </button>
+        )}
+
+        {isAudio && (
+          <>
+            <button
+              className={`ctx-btn ${item.loop === true ? 'active' : ''}`}
+              onClick={()=>onUpdate({ loop: item.loop !== true })}
+              title={lang==='es'?'Bucle':'Loop'}
+            >
+              <span className="material-symbols-rounded">loop</span>
+              <span>{lang==='es'?'Bucle':'Loop'}</span>
+            </button>
+            <button
+              className={`ctx-btn ${item.showCaption === true ? 'active' : ''}`}
+              onClick={()=>{
+                const show = item.showCaption !== true;
+                onUpdate({ showCaption: show, h: show ? (item.h || 140) + 40 : Math.max(100, (item.h || 140) - 40) });
+              }}
+              title={lang==='es'?'Leyenda':'Caption'}
+            >
+              <span className="material-symbols-rounded">notes</span>
+              <span>{lang==='es'?'Leyenda':'Caption'}</span>
+            </button>
+          </>
+        )}
+
+        {/* Title toggle for the title-bearing nodes (table has its own below) */}
+        {(isLink || isAudio || isBoard || isColumn) && (
+          <button
+            className={`ctx-btn ${item.showTitle !== false ? 'active' : ''}`}
+            onClick={()=>onUpdate({ showTitle: item.showTitle === false })}
+            title={lang==='es'?'Mostrar/ocultar título':'Toggle title'}
+          >
+            <span className="material-symbols-rounded">title</span>
+            <span>{lang==='es'?'Título':'Title'}</span>
+          </button>
+        )}
+
+        {/* Color node: toggle showing the HEX code */}
+        {isColor && (
+          <button
+            className={`ctx-btn ${item.showHex !== false ? 'active' : ''}`}
+            onClick={()=>onUpdate({ showHex: item.showHex === false })}
+            title={lang==='es'?'Mostrar HEX':'Show HEX'}
+          >
+            <span className="ctx-letter" style={{fontWeight:800, fontSize:13}}>#</span>
+            <span>HEX</span>
+          </button>
+        )}
+
+        {/* File node: preview + info toggles (Info only matters with preview on) */}
+        {isFile && (
+          <>
+            <button
+              className={`ctx-btn ${item.showPreview === true ? 'active' : ''}`}
+              onClick={()=>{
+                const show = item.showPreview !== true;
+                if (show) {
+                  const ext = (item.fileType || (item.name ? item.name.split('.').pop() : '') || '').toLowerCase();
+                  const isXls = ['xlsx','xls','ods','csv'].includes(ext);
+                  if (isXls) onUpdate({ showPreview: true, w: 420, h: 280 });           // landscape sheet
+                  else onUpdate({ showPreview: true, h: Math.max(Math.round((item.w || 230) * 1.3), 300) });
+                } else {
+                  // back to a small square (compact icon) state
+                  onUpdate({ showPreview: false, showInfo: false, w: 200, h: 190 });
+                }
+              }}
+              title={lang==='es'?'Vista previa':'Preview'}
+            >
+              <span className="material-symbols-rounded">image</span>
+              <span>{lang==='es'?'Vista previa':'Preview'}</span>
+            </button>
+            {item.showPreview === true && (
+              <button
+                className={`ctx-btn ${item.showInfo === true ? 'active' : ''}`}
+                onClick={()=>onUpdate({ showInfo: item.showInfo !== true })}
+                title="Info"
+              >
+                <span className="material-symbols-rounded">info</span>
+                <span>Info</span>
+              </button>
+            )}
+          </>
+        )}
+
+        {/* Doc node: preview toggle (off → logo only) + download as PDF */}
+        {isDoc && (
+          <>
+            <button
+              className={`ctx-btn ${item.showPreview !== false ? 'active' : ''}`}
+              onClick={()=>onUpdate({ showPreview: item.showPreview === false })}
+              title={lang==='es'?'Vista previa':'Preview'}
+            >
+              <span className="material-symbols-rounded">image</span>
+              <span>{lang==='es'?'Vista previa':'Preview'}</span>
+            </button>
+            <button className="ctx-btn" onClick={downloadDocPdf} title={lang==='es'?'Descargar PDF':'Download PDF'}>
+              <span className="material-symbols-rounded">download</span>
+              <span>{lang==='es'?'Descargar':'Download'}</span>
+            </button>
+          </>
+        )}
+
+        {/* Caption ("leyenda") toggle for image / board / comment / calendar / color */}
+        {(isImage || isBoard || isComment || isCalendar || isColor) && (
+          <button
+            className={`ctx-btn ${item.showCaption === true ? 'active' : ''}`}
+            onClick={()=>{
+              const show = item.showCaption !== true;
+              const dH = isImage ? 0 : 44; // image caption is an overlay (no extra height)
+              onUpdate({ showCaption: show, h: show ? (item.h || 200) + dH : Math.max(80, (item.h || 200) - dH) });
+            }}
+            title={lang==='es'?'Leyenda':'Caption'}
+          >
+            <span className="material-symbols-rounded">notes</span>
+            <span>{lang==='es'?'Leyenda':'Caption'}</span>
+          </button>
+        )}
+
+        {/* Table — no cell selected: show table-level options */}
+        {isTable && !tableCell && (
+          <>
+            <button
+              className={`ctx-btn ${item.showTitle === true ? 'active' : ''}`}
+              onClick={()=>onUpdate({ showTitle: item.showTitle !== true })}
+              title={lang==='es'?'Mostrar/ocultar título':'Toggle title'}
+            >
+              <span className="material-symbols-rounded">title</span>
+              <span>{lang==='es'?'Título':'Title'}</span>
+            </button>
+          </>
+        )}
+
+        {/* Table — cell selected: show cell-level options */}
+        {isTable && tableCell && (
+          <>
+            <button
+              className={`ctx-btn ${pane === 'tblStyle' ? 'active' : ''}`}
+              onClick={()=>setPane(pane === 'tblStyle' ? null : 'tblStyle')}
+              title={lang==='es'?'Estilo':'Style'}
+            >
+              <span className="material-symbols-rounded">text_format</span>
+              <span>{lang==='es'?'Estilo':'Style'}</span>
+            </button>
+            <button
+              className={`ctx-btn ${pane === 'tblColor' ? 'active' : ''}`}
+              onClick={()=>setPane(pane === 'tblColor' ? null : 'tblColor')}
+              title="Color"
+            >
+              <div className="ctx-color-chip" style={{ background: tableCell.cellData?.color || '#FFFFFF', border: '1.5px solid var(--line-soft)' }}/>
+              <span>Color</span>
+            </button>
+            <button
+              className="ctx-btn"
+              onClick={()=>{ setPane(null); tableCell.startFormula && tableCell.startFormula(); }}
+              title={lang==='es'?'Fórmula (= en la celda)':'Formula (= in cell)'}
+            >
+              <span style={{fontFamily:'serif', fontStyle:'italic', fontWeight:700, fontSize:14}}>fx</span>
+              <span>{lang==='es'?'Fórmula':'Formula'}</span>
+            </button>
+            <button
+              className={`ctx-btn ${pane === 'tblAlign' ? 'active' : ''}`}
+              onClick={()=>setPane(pane === 'tblAlign' ? null : 'tblAlign')}
+              title={lang==='es'?'Alineación':'Alignment'}
+            >
+              <span className="material-symbols-rounded">format_align_center</span>
+              <span>{lang==='es'?'Alineación':'Align'}</span>
+            </button>
+            <div className="ctx-sep-h"/>
+            <button
+              className="ctx-btn"
+              onClick={()=>tableCell.addCol()}
+              title={lang==='es'?'Añadir columna':'Add column'}
+            >
+              <span className="material-symbols-rounded">add_box</span>
+              <span>{lang==='es'?'Columna':'Column'}</span>
+            </button>
+            <button
+              className="ctx-btn"
+              onClick={()=>tableCell.addRow()}
+              title={lang==='es'?'Añadir fila':'Add row'}
+            >
+              <span className="material-symbols-rounded">add_row_below</span>
+              <span>{lang==='es'?'Añadir fila':'Add row'}</span>
+            </button>
+            <div className="ctx-sep-h"/>
+            <button
+              className="ctx-btn danger"
+              onClick={()=>tableCell.removeCol()}
+              title={lang==='es'?'Eliminar columna':'Remove column'}
+            >
+              <span className="material-symbols-rounded">indeterminate_check_box</span>
+              <span>{lang==='es'?'Col -':'Col -'}</span>
+            </button>
+            <button
+              className="ctx-btn danger"
+              onClick={()=>tableCell.removeRow()}
+              title={lang==='es'?'Eliminar fila':'Remove row'}
+            >
+              <span className="material-symbols-rounded">remove</span>
+              <span>{lang==='es'?'Fila -':'Row -'}</span>
+            </button>
+          </>
+        )}
+
+        {isBoard && (
+          <button
+            className={`ctx-btn`}
+            onClick={()=>onOpen && onOpen()}
+            title={lang==='es'?'Abrir':'Open'}
+          >
+            <span className="material-symbols-rounded">open_in_full</span>
+            <span>{lang==='es'?'Abrir':'Open'}</span>
+          </button>
+        )}
+
+        {isImage && (
+          <>
+            <button
+              className="ctx-btn"
+              onClick={()=>onUpdate({ _triggerImagePick: true })}
+              title={lang==='es'?'Cambiar imagen':'Change image'}
+            >
+              <span className="material-symbols-rounded">swap_horiz</span>
+              <span>{lang==='es'?'Cambiar':'Change'}</span>
+            </button>
+          </>
+        )}
+
+        <div className="ctx-sep-h"/>
+
+        <button className="ctx-btn" onClick={onDuplicate} title={lang==='es'?'Duplicar':'Duplicate'}>
+          <span className="material-symbols-rounded">content_copy</span>
+          <span>{lang==='es'?'Duplicar':'Duplicate'}</span>
+        </button>
+        <button className="ctx-btn danger" onClick={onDelete} title={lang==='es'?'Eliminar':'Delete'}>
+          <span className="material-symbols-rounded">delete</span>
+          <span>{lang==='es'?'Eliminar':'Delete'}</span>
+        </button>
+      </div>
+
+      {/* Popout panes */}
+      {pane === 'color' && (
+        <div className="ctx-popout">
+          <div className="ctx-pop-section">
+            <div className="ctx-pop-title">{isColumn ? (lang==='es'?'Color de la franja':'Strip color') : (lang==='es'?'Color de fondo':'Background')}</div>
+            <div className="ctx-sticky-grid">
+              {STICKY_PALETTE.map(p => (
+                <button
+                  key={p.key}
+                  className={`ctx-sticky-swatch ${(item.color || 'white') === p.key ? 'active' : ''}`}
+                  style={{ background: p.hex, border: p.hex === '#FFFFFF' ? '1.5px solid var(--line-soft)' : '1.5px solid var(--line)' }}
+                  onClick={()=>onUpdate({ color: p.key })}
+                  title={p.label}
+                />
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {pane === 'colorHex' && (
+        <div className="ctx-popout">
+          <div className="ctx-pop-section">
+            <div className="ctx-pop-title">{lang==='es'?'Color':'Color'}</div>
+            <div className="ctx-colorhex">
+              <input
+                type="color"
+                value={/^#[0-9a-fA-F]{6}$/.test(item.hex||'') ? item.hex : '#56B3A7'}
+                onChange={(e)=>onUpdate({ hex: e.target.value.toUpperCase() })}
+              />
+              <input
+                type="text"
+                className="ctx-hex-input"
+                value={item.hex || '#56B3A7'}
+                onChange={(e)=>{ let v = e.target.value.trim().toUpperCase(); if (v && !v.startsWith('#')) v = '#' + v; onUpdate({ hex: v }); }}
+                onClick={(e)=>e.stopPropagation()}
+                onMouseDown={(e)=>e.stopPropagation()}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {pane === 'boardIcon' && (
+        <div className="ctx-popout">
+          <div className="ctx-pop-section">
+            <div className="ctx-pop-title">{lang==='es'?'Icono del tablero':'Board icon'}</div>
+            <div className="ctx-icon-grid">
+              {BOARD_ICON_CHOICES.map(ic => (
+                <button
+                  key={ic}
+                  className={`ctx-icon-btn ${(item.icon || 'dashboard') === ic ? 'active' : ''}`}
+                  onClick={()=>onUpdate({ icon: ic })}
+                  title={ic}
+                >
+                  <span className="material-symbols-rounded">{ic}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {pane === 'emoji' && (
+        <div className="ctx-popout">
+          <div className="ctx-pop-section">
+            <div className="ctx-pop-title">{lang==='es'?'Reacciones':'Reactions'}</div>
+            <div className="ctx-emoji-grid">
+              {EMOJI_OPTIONS.map(e => (
+                <button key={e} className="ctx-emoji-btn" onClick={()=>addReaction(e)}>{e}</button>
+              ))}
+            </div>
+            {Object.keys(reactions).length > 0 && (
+              <>
+                <div className="ctx-pop-sub">{lang==='es'?'Actuales':'Current'}</div>
+                <div className="ctx-reactions-current">
+                  {Object.entries(reactions).map(([emoji, count]) => (
+                    <button
+                      key={emoji}
+                      className="ctx-react-pill"
+                      onClick={()=>{
+                        const next = { ...reactions };
+                        if (count <= 1) delete next[emoji];
+                        else next[emoji] = count - 1;
+                        onUpdate({ reactions: next });
+                      }}
+                      title={lang==='es'?'Clic para quitar':'Click to remove'}
+                    >
+                      <span style={{fontSize:13}}>{emoji}</span>
+                      <span>{count}</span>
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {pane === 'comments' && (
+        <div className="ctx-popout">
+          <div className="ctx-pop-section">
+            <div className="ctx-pop-title">{lang==='es'?`Comentarios (${comments.length})`:`Comments (${comments.length})`}</div>
+            <div className="ctx-comments-list">
+              {comments.length === 0 && (
+                <div className="ctx-comments-empty">
+                  {lang==='es'?'Sin comentarios aún':'No comments yet'}
+                </div>
+              )}
+              {comments.map(c => (
+                <div key={c.id} className="ctx-comment">
+                  <div className="ctx-comment-head">
+                    <div className="ctx-comment-avatar">A</div>
+                    <span className="ctx-comment-author">{c.author}</span>
+                    <span className="ctx-comment-time">
+                      {new Date(c.time).toLocaleString(lang, { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                    <button
+                      className="ctx-comment-del"
+                      onClick={()=>onUpdate({ comments: comments.filter(cm => cm.id !== c.id) })}
+                      title={lang==='es'?'Eliminar comentario':'Delete comment'}
+                    >
+                      <span className="material-symbols-rounded">close</span>
+                    </button>
+                  </div>
+                  <div className="ctx-comment-body">{c.text}</div>
+                </div>
+              ))}
+            </div>
+            <CommentComposer onSubmit={addComment} lang={lang}/>
+          </div>
+        </div>
+      )}
+
+      {pane === 'dueDate' && (() => {
+        let activeRowIdx = -1;
+        if (window._focusedTodoRow && window._focusedTodoRow.todoId === item.id) {
+          activeRowIdx = (item.items || []).findIndex(r => r.id === window._focusedTodoRow.rowId);
+        }
+        if (activeRowIdx === -1 && item.items && item.items.length > 0) {
+          activeRowIdx = 0;
+        }
+        const hasActiveRow = activeRowIdx !== -1;
+        const liveRow = hasActiveRow ? item.items[activeRowIdx] : null;
+        const rowDate = liveRow?.dueDate || '';
+        const updateLiveRowMeta = (patch) => {
+          if (!hasActiveRow) return;
+          const nextItems = (item.items || []).map((r, i) => i === activeRowIdx ? { ...r, ...patch } : r);
+          onUpdate({ items: nextItems });
+        };
+        return (
+          <div className="ctx-popout">
+            <div className="ctx-pop-section">
+              <div className="ctx-pop-title">
+                {lang==='es'?'Fecha límite':'Due date'}
+                {!hasActiveRow && <div style={{fontSize:10,color:'var(--ink-3)',marginTop:2}}>{lang==='es'?'Enfoca una tarea primero':'Focus a task first'}</div>}
+              </div>
+              {hasActiveRow && (
+                <>
+                  <label className="ctx-field">
+                     <span>{lang==='es'?'Fecha':'Date'}</span>
+                     <input
+                       type="date"
+                       value={rowDate}
+                       onChange={(e)=>{ updateLiveRowMeta({ dueDate: e.target.value || null }); window._notifyFocusedRowChanged?.(); }}
+                     />
+                  </label>
+                  {rowDate && (
+                    <button className="ctx-btn danger" style={{marginTop:6}} onClick={()=>{ updateLiveRowMeta({ dueDate: null }); window._notifyFocusedRowChanged?.(); }}>
+                      <span className="material-symbols-rounded">close</span>
+                      <span>{lang==='es'?'Quitar':'Remove'}</span>
+                    </button>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+        );
+      })()}
+
+      {pane === 'assign' && (() => {
+        let activeRowIdx = -1;
+        if (window._focusedTodoRow && window._focusedTodoRow.todoId === item.id) {
+          activeRowIdx = (item.items || []).findIndex(r => r.id === window._focusedTodoRow.rowId);
+        }
+        if (activeRowIdx === -1 && item.items && item.items.length > 0) {
+          activeRowIdx = 0;
+        }
+        const hasActiveRow = activeRowIdx !== -1;
+        const liveRow = hasActiveRow ? item.items[activeRowIdx] : null;
+        const rowAssignee = liveRow?.assignee || '';
+        const updateLiveRowMeta = (patch) => {
+          if (!hasActiveRow) return;
+          const nextItems = (item.items || []).map((r, i) => i === activeRowIdx ? { ...r, ...patch } : r);
+          onUpdate({ items: nextItems });
+        };
+        return (
+          <div className="ctx-popout">
+            <div className="ctx-pop-section">
+              <div className="ctx-pop-title">
+                {lang==='es'?'Asignar a':'Assign to'}
+                {!hasActiveRow && <div style={{fontSize:10,color:'var(--ink-3)',marginTop:2}}>{lang==='es'?'Enfoca una tarea primero':'Focus a task first'}</div>}
+              </div>
+              {hasActiveRow && (
+                <label className="ctx-field">
+                  <span>{lang==='es'?'Persona':'Person'}</span>
+                  <input
+                     type="text"
+                     value={rowAssignee}
+                     placeholder={lang==='es'?'Nombre…':'Name…'}
+                     onChange={(e)=>{ updateLiveRowMeta({ assignee: e.target.value || null }); window._notifyFocusedRowChanged?.(); }}
+                  />
+                </label>
+              )}
+            </div>
+          </div>
+        );
+      })()}
+
+      {pane === 'tblStyle' && tableCell && (
+        <div className="ctx-popout">
+          <div className="ctx-pop-section">
+            <div className="ctx-pop-title">{lang==='es'?'Estilo':'Style'}</div>
+            <div style={{display:'flex', gap:4, flexWrap:'wrap'}}>
+              {[
+                { k: 'bold',      icon: 'format_bold', label: 'B' },
+                { k: 'italic',    icon: 'format_italic', label: 'I' },
+                { k: 'underline', icon: 'format_underlined', label: 'U' },
+                { k: 'strike',    icon: 'format_strikethrough', label: 'S' },
+              ].map(b => (
+                <button
+                  key={b.k}
+                  className={`ctx-btn ${tableCell.cellData?.[b.k] ? 'active' : ''}`}
+                  onClick={()=>tableCell.updateCell({ [b.k]: !tableCell.cellData?.[b.k] })}
+                  style={{minWidth: 36}}
+                  title={b.label}
+                >
+                  <span className="material-symbols-rounded">{b.icon}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {pane === 'tblColor' && tableCell && (
+        <div className="ctx-popout">
+          <div className="ctx-pop-section">
+            <div className="ctx-pop-title">{lang==='es'?'Color de celda':'Cell color'}</div>
+            <div className="ctx-sticky-grid">
+              <button
+                className={`ctx-sticky-swatch ${!tableCell.cellData?.color ? 'active' : ''}`}
+                style={{ background: 'transparent', border: '1.5px dashed var(--line-soft)' }}
+                onClick={()=>tableCell.updateCell({ color: null })}
+                title={lang==='es'?'Ninguno':'None'}
+              />
+              {STICKY_PALETTE.map(p => (
+                <button
+                  key={p.key}
+                  className={`ctx-sticky-swatch ${tableCell.cellData?.color === p.hex ? 'active' : ''}`}
+                  style={{ background: p.hex, border: p.hex === '#FFFFFF' ? '1.5px solid var(--line-soft)' : '1.5px solid var(--line)' }}
+                  onClick={()=>tableCell.updateCell({ color: p.hex })}
+                  title={p.label}
+                />
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {pane === 'tblAlign' && tableCell && (
+        <div className="ctx-popout">
+          <div className="ctx-pop-section">
+            <div className="ctx-pop-title">{lang==='es'?'Alineación':'Alignment'}</div>
+            <div style={{display:'flex', gap: 4}}>
+              {['left','center','right','justify'].map(a => (
+                <button
+                  key={a}
+                  className={`ctx-btn ${(tableCell.cellData?.align || 'left') === a ? 'active' : ''}`}
+                  onClick={()=>tableCell.updateCell({ align: a })}
+                  style={{minWidth: 36}}
+                  title={a}
+                >
+                  <span className="material-symbols-rounded">{`format_align_${a}`}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+
+    </>
+  );
+}
+
+function ColorTabs({ item, onUpdate }) {
+  const [tab, setTab] = React.useState('bg');
+  return (
+    <div className="ctx-pop-section">
+      <div className="ctx-color-tabs">
+        <button
+          className={tab === 'bg' ? 'active' : ''}
+          onClick={()=>setTab('bg')}
+        >
+          <div className="tab-chip" style={{background: resolveStickyColor(item.bgColor || item.color || 'white'), border:'1.5px solid var(--line-soft)'}}/>
+          <span>Fondo</span>
+        </button>
+        <button
+          className={tab === 'strip' ? 'active' : ''}
+          onClick={()=>setTab('strip')}
+        >
+          <div className="tab-chip" style={{background: resolveStripColor(item.color || 'navy')}}/>
+          <span>Franja</span>
+        </button>
+      </div>
+
+      {tab === 'bg' && (
+        <div className="ctx-sticky-grid">
+          {STICKY_PALETTE.map(p => (
+            <button
+              key={p.key}
+              className={`ctx-sticky-swatch ${(item.bgColor || 'white') === p.key ? 'active' : ''}`}
+              style={{ background: p.hex, border: p.hex === '#FFFFFF' ? '1.5px solid var(--line-soft)' : '1.5px solid var(--line)' }}
+              onClick={()=>onUpdate({ bgColor: p.key })}
+              title={p.label}
+            />
+          ))}
+        </div>
+      )}
+
+      {tab === 'strip' && (
+        <div className="ctx-strip-grid">
+          {STRIP_PALETTE.map(p => (
+            <button
+              key={p.key}
+              className={`ctx-strip-swatch ${(item.color || 'navy') === p.key ? 'active' : ''}`}
+              style={{ background: p.hex }}
+              onClick={()=>onUpdate({ color: p.key })}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function CommentComposer({ onSubmit, lang }) {
+  const [draft, setDraft] = React.useState('');
+  const submit = () => {
+    if (!draft.trim()) return;
+    onSubmit(draft);
+    setDraft('');
+  };
+  return (
+    <div className="ctx-comment-composer">
+      <textarea
+        value={draft}
+        onChange={(e)=>setDraft(e.target.value)}
+        placeholder={lang==='es'?'Escribe un comentario…':'Write a comment…'}
+        onKeyDown={(e)=>{
+          if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submit(); }
+        }}
+      />
+      <button className="btn btn-primary press" onClick={submit} disabled={!draft.trim()}>
+        {lang==='es'?'Enviar':'Send'}
+      </button>
+    </div>
+  );
+}
+
+window.ContextSidebar = ContextSidebar;
+window.STICKY_PALETTE = STICKY_PALETTE;
+window.STRIP_PALETTE = STRIP_PALETTE;
+window.resolveStickyColor = resolveStickyColor;
+window.resolveStripColor = resolveStripColor;
+window.EMOJI_OPTIONS = EMOJI_OPTIONS;

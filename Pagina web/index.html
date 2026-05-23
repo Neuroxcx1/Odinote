@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Odinote es una aplicación de lienzo infinito con canvases anidados. Diseñada para game devs, escritores y creativos que no caben en una sola pantalla.">
+  <title>Odinote — Tu Mente en Canvases Infinitos</title>
+  
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" href="../Proyecto/Icon/Icon.png">
+  
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@400;500;600;700;800&family=Geist:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  
+  <!-- Google Icons -->
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet">
+  
+  <!-- Stylesheets -->
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="theme-light">
+
+  <!-- Background Cyber Grid & Orbit Vectors (Image 3/4 Style) -->
+  <div class="vector-bg-container">
+    <div class="vector-grid"></div>
+    <div class="orbit-center">
+      <!-- Triangle Particle Canvas behind the logo (Image 2 style) -->
+      <canvas id="triangle-canvas" width="800" height="800" style="position: absolute; inset: 0; pointer-events: none; z-index: 1;"></canvas>
+      
+      <!-- Central Logo badge with Odinote text -->
+      <div class="orbit-logo-center">
+        <img src="../Proyecto/Icon/Icon.png" alt="Odinote Logo" class="center-logo-img">
+        <span class="center-logo-text">Odinote</span>
+      </div>
+
+      <div class="orbit-sphere-glow"></div>
+      <div class="orbit-ring ring-1"></div>
+      <div class="orbit-ring ring-2"></div>
+      <div class="orbit-ring ring-3"></div>
+      <div class="coordinate-axis axis-x"></div>
+      <div class="coordinate-axis axis-y"></div>
+    </div>
+  </div>
+
+  <!-- Header / Nav (Image 2 Style) -->
+  <header class="main-header">
+    <div class="header-container">
+      <a href="#" class="header-brand">
+        <div class="brand-logo">
+          <img src="../Proyecto/Icon/Icon.png" alt="Odinote Logo">
+        </div>
+        <span>Odinote</span>
+      </a>
+      
+      <nav class="header-nav">
+        <a href="#features" class="nav-link">¿Cómo funciona?</a>
+        <a href="#try-web" class="nav-link">Probar Web</a>
+        <a href="#support" class="nav-link">Apoyar</a>
+      </nav>
+      
+      <div class="header-actions">
+        <a href="#download" class="btn-download-top">
+          <span class="material-symbols-rounded">download</span>
+          <span>Descargar .exe</span>
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <!-- Hero Section (Image 2 + Image 3 Style) -->
+  <section class="hero-section">
+    <div class="container hero-grid">
+      <div class="hero-content">
+        <div class="hero-badge">
+          <span class="badge-dot"></span>
+          <span>100% Gratis y de Código Abierto</span>
+        </div>
+        <h1 class="hero-title">
+          Tu mente, ordenada en <span class="highlight-green">canvases anidados</span>.
+        </h1>
+        <p class="hero-subtitle">
+          Creado especialmente para game devs, escritores y mentes creativas que necesitan ir más allá de una sola pantalla. Crea notas, tableros, calendarios y recursos en un lienzo infinito verdaderamente recursivo.
+        </p>
+        <div class="hero-actions">
+          <a href="#download" class="btn btn-primary btn-red">
+            <span class="material-symbols-rounded">download_for_offline</span>
+            <span>Descargar para Windows (.exe)</span>
+          </a>
+          <a href="#try-web" class="btn btn-secondary btn-outline">
+            <span class="material-symbols-rounded">deployed_code</span>
+            <span>Probar en el Navegador</span>
+          </a>
+        </div>
+      </div>
+      
+      <!-- Interactive Showcase Frame (Image 4 Style) -->
+      <div class="hero-showcase">
+        <div class="cyber-window">
+          <div class="window-header">
+            <div class="window-dots">
+              <span class="dot-red"></span>
+              <span class="dot-gray"></span>
+              <span class="dot-green"></span>
+            </div>
+            <div class="window-title">ODINOTE_PREVIEW.EXE</div>
+            <div class="window-metric">LOC: [38.2, -12.4]</div>
+          </div>
+          
+          <div class="window-body">
+            <!-- Mock Nested Node Graphics -->
+            <div class="mock-node node-main">
+              <div class="node-badge">PROYECTO_RPG</div>
+              <div class="node-title">Diseño de Niveles</div>
+              <div class="node-desc">Mapeado del calabozo y scripts de enemigos enlazados.</div>
+              <div class="node-tags">
+                <span class="tag tag-red">Urgente</span>
+                <span class="tag tag-green">En Progreso</span>
+              </div>
+            </div>
+            
+            <div class="mock-node node-nested-1">
+              <div class="node-badge">NPC_AI</div>
+              <div class="node-title">Comportamiento Guardia</div>
+              <div class="node-desc">Patrulla diurna / nocturna.</div>
+            </div>
+
+            <div class="mock-node node-nested-2">
+              <div class="node-badge">ART_ASSETS</div>
+              <div class="node-title">Sprite Sheets</div>
+              <div class="node-desc">Modelos de rocas y cofres.</div>
+            </div>
+            
+            <!-- Tech Lines Overlay -->
+            <svg class="showcase-connectors" viewBox="0 0 400 300">
+              <path d="M 200 130 Q 120 180 110 210" stroke="var(--brand-green)" stroke-width="1.5" fill="none" stroke-dasharray="4 4" />
+              <path d="M 200 130 Q 300 120 310 160" stroke="var(--brand-red)" stroke-width="1.5" fill="none" stroke-dasharray="4 4" />
+              <circle cx="110" cy="210" r="3.5" fill="var(--brand-green)" />
+              <circle cx="310" cy="160" r="3.5" fill="var(--brand-red)" />
+              <circle cx="200" cy="130" r="4" fill="var(--brand-white)" stroke="var(--brand-gray-dark)" stroke-width="1.5" />
+            </svg>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Feature Panels Section (Image 5 Style with diagonal blocks and frames) -->
+  <section id="features" class="features-section">
+    <div class="container">
+      <div class="section-header">
+        <span class="section-tag">SISTEMA OPERATIVO</span>
+        <h2 class="section-title">Estructura tus ideas sin límites</h2>
+      </div>
+      
+      <div class="features-grid">
+        <!-- Card 1 -->
+        <div class="feature-card panel-green">
+          <div class="panel-border-glow"></div>
+          <div class="panel-tag">RECURSIÓN TOTAL</div>
+          <h3 class="panel-title">Canvases Anidados</h3>
+          <p class="panel-desc">Crea tableros dentro de notas, notas dentro de imágenes y vuelve a empezar. Todo se guarda de forma lógica y modular en carpetas locales.</p>
+          <a href="#try-web" class="panel-action">
+            <span>SABER MÁS</span>
+            <span class="material-symbols-rounded">arrow_right_alt</span>
+          </a>
+        </div>
+        
+        <!-- Card 2 -->
+        <div class="feature-card panel-gray">
+          <div class="panel-border-glow"></div>
+          <div class="panel-tag">EDITOR RÁPIDO</div>
+          <h3 class="panel-title">Simple & Con Trucos</h3>
+          <p class="panel-desc">Escribe código o notas de texto enriquecido con atajos del teclado avanzados (Shift+Tab multitab, markdown directo, autocompletado y más).</p>
+          <a href="#try-web" class="panel-action">
+            <span>EXPLORAR</span>
+            <span class="material-symbols-rounded">arrow_right_alt</span>
+          </a>
+        </div>
+        
+        <!-- Card 3 -->
+        <div class="feature-card panel-red">
+          <div class="panel-border-glow"></div>
+          <div class="panel-tag">PLANIFICACIÓN</div>
+          <h3 class="panel-title">Tareas y Agenda</h3>
+          <p class="panel-desc">Organiza tu calendario y listas To-do directamente en el lienzo. Pincha cualquier día para ver, editar y sincronizar tareas en un santiamén.</p>
+          <a href="#try-web" class="panel-action">
+            <span>PROBAR AHORA</span>
+            <span class="material-symbols-rounded">arrow_right_alt</span>
+          </a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Interactive Sandbox Preview Section ("Probar en la Web") -->
+  <section id="try-web" class="sandbox-section">
+    <div class="container">
+      <div class="sandbox-box">
+        <div class="sandbox-header">
+          <div class="header-indicator">
+            <span class="pulse-dot"></span>
+            <span>DEMO WEB INTERACTIVA</span>
+          </div>
+          <h2 class="sandbox-title">Prueba la versión web ahora mismo</h2>
+          <p class="sandbox-desc">Explora el entorno completo y crea tu primer tablero directamente desde el navegador, sin instalaciones.</p>
+        </div>
+        
+        <div class="sandbox-actions">
+          <a href="../Proyecto/index.html" class="btn btn-primary btn-green btn-large">
+            <span class="material-symbols-rounded">rocket_launch</span>
+            <span>Lanzar Odinote Web</span>
+          </a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Support / Donation Section (Image 3 Style with circular overlays and Ko-fi direct widgets) -->
+  <section id="support" class="support-section">
+    <div class="container support-grid">
+      <div class="support-content">
+        <span class="support-tag">CÓDIGO ABIERTO</span>
+        <h2 class="support-title">Apoya el desarrollo independiente</h2>
+        <p class="support-desc">
+          Odinote es una herramienta creada con amor por y para creativos, sin publicidad ni suscripciones de pago. Si te resulta útil para organizar tus proyectos, considera hacernos una donación. Cada taza de café nos ayuda a seguir implementando nuevas funciones.
+        </p>
+        
+        <!-- Kofi Small Widget buttons -->
+        <div class="support-widgets-row">
+          <a href="https://ko-fi.com/W3G31ZYE06" target="_blank" rel="noopener noreferrer" class="kofi-btn-link">
+            <img src="https://storage.ko-fi.com/cdn/kofi1.png?v=6" alt="Buy Me a Coffee at ko-fi.com" class="kofi-img-badge">
+          </a>
+        </div>
+      </div>
+
+      <!-- Embedded Payment Frame scaled nicely -->
+      <div class="support-showcase">
+        <div class="support-card-wrapper">
+          <div class="support-card-header">
+            <span class="material-symbols-rounded heart-icon">favorite</span>
+            <span>Donar de forma segura</span>
+          </div>
+          <div class="iframe-scaler-container">
+            <iframe
+              id="kofiframe-web"
+              src="https://ko-fi.com/neuroxcx/?hidefeed=true&widget=true&embed=true&preview=true"
+              scrolling="no"
+              title="Apoya en Ko-fi"
+            ></iframe>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Desktop EXE Packaging Research section -->
+  <section id="download" class="download-section">
+    <div class="container">
+      <div class="download-card">
+        <div class="download-grid">
+          <div class="download-info">
+            <span class="download-tag">EMPAQUETADO NATIVO</span>
+            <h2 class="download-title">Odinote para Escritorio</h2>
+            <p class="download-desc">
+              ¿Prefieres trabajar fuera del navegador? Puedes descargar la versión ejecutable nativa para Windows. Con ella, tus tableros se cargarán aún más rápido, con almacenamiento local aislado y soporte integrado sin depender de una conexión a internet.
+            </p>
+            
+            <div class="download-actions-group">
+              <a href="#" class="btn btn-primary btn-red btn-large">
+                <span class="material-symbols-rounded">download</span>
+                <span>Descargar Odinote.exe (Windows)</span>
+              </a>
+              <div class="download-subtext">Versión v1.0.2 · Licencia MIT · Código libre en Github</div>
+            </div>
+          </div>
+          
+          <div class="download-research">
+            <h3 class="research-title">Conectividad y Actualizaciones</h3>
+            <p class="research-desc">La versión de escritorio de Odinote está equipada con capacidades inteligentes para asegurar que tu entorno siempre esté optimizado.</p>
+            
+            <div class="research-steps">
+              <div class="step-item">
+                <span class="step-num">01</span>
+                <div>
+                  <h4>Verificación Automática</h4>
+                  <p>Al iniciar la aplicación, se realiza una comprobación automática en segundo plano para alertarte si hay una nueva actualización disponible en GitHub.</p>
+                </div>
+              </div>
+              <div class="step-item">
+                <span class="step-num">02</span>
+                <div>
+                  <h4>Actualización en un Clic</h4>
+                  <p>Las mejoras y correcciones se descargan e instalan de forma transparente, permitiendo que tu entorno de trabajo nunca quede desactualizado.</p>
+                </div>
+              </div>
+              <div class="step-item">
+                <span class="step-num">03</span>
+                <div>
+                  <h4>Privacidad Absoluta</h4>
+                  <p>Odinote no requiere cuentas. Tu información permanece estrictamente en tu máquina y puedes importar o exportar respaldos JSON completos cuando quieras.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="main-footer">
+    <div class="container footer-content">
+      <div class="footer-left">
+        <div class="footer-brand">
+          <img src="../Proyecto/Icon/Icon.png" alt="Odinote Logo">
+          <span>Odinote</span>
+        </div>
+        <p>Tu mente, organizada en canvases anidados libres e infinitos.</p>
+      </div>
+      <div class="footer-right">
+        <p>&copy; 2026 Odinote. Licencia MIT. Libre para copia y modificación.</p>
+        <p>Diseño premium desarrollado bajo la paleta cromática de Verde, Gris, Rojo y Blanco.</p>
+      </div>
+    </div>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
