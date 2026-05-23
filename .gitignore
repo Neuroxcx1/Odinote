@@ -27,3 +27,8 @@ Thumbs.db
 *.ntvs*
 *.njsproj
 *.sln
+
+# Exclude local marketing webpage from main Git repo
+Website/
+Pagina web/
+
