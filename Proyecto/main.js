@@ -113,8 +113,26 @@ ipcMain.handle('select-folder', async () => {
     logToFile('IPC select-folder: Canceled');
     return null;
   }
-  logToFile(`IPC select-folder: Selected ${result.filePaths[0]}`);
-  return result.filePaths[0];
+  
+  let selectedPath = result.filePaths[0];
+  const baseName = path.basename(selectedPath).toLowerCase();
+  
+  // Automatically create and target an 'Odinote' subfolder to keep user filesystem clean
+  if (baseName !== 'odinote') {
+    const subPath = path.join(selectedPath, 'Odinote');
+    try {
+      if (!fs.existsSync(subPath)) {
+        fs.mkdirSync(subPath, { recursive: true });
+        logToFile(`IPC select-folder: Created subfolder: ${subPath}`);
+      }
+      selectedPath = subPath;
+    } catch (e) {
+      logToFile(`IPC select-folder ERROR creating subfolder: ${e.message}`);
+    }
+  }
+  
+  logToFile(`IPC select-folder: Selected Final Path: ${selectedPath}`);
+  return selectedPath;
 });
 
 ipcMain.handle('read-vault', async (event, folderPath) => {
