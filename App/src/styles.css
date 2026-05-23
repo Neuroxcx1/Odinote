@@ -2372,4 +2372,16 @@ body.odi-busy iframe { pointer-events: none !important; }
   font-size: 14px;
 }
 
+@keyframes pulse-bell {
+  0% {
+    transform: scale(1);
+    opacity: 0.85;
+  }
+  100% {
+    transform: scale(1.18);
+    opacity: 1;
+    filter: drop-shadow(0 0 8px var(--wine));
+  }
+}
+
 

@@ -30,7 +30,7 @@ const COVER_PRESETS = [
 ];
 const EMOJI_PRESETS = ['⚔️','🌾','🚀','🧩','🎲','🗺️','🏰','🐉','🎮','🌙','🔥','💎','🎨','📚','💡','🎯'];
 
-function Home({ lang, setLang, theme, setTheme, onOpenProject, projects, onCreate, onDelete, onRestore, onPurge, onToggleStar, onExport, onImport, vaultPath, onOpenVault, onCloseVault }) {
+function Home({ lang, setLang, theme, setTheme, onOpenProject, projects, onCreate, onDelete, onRestore, onPurge, onToggleStar, onExport, onImport, vaultPath, onOpenVault, onCloseVault, updateAvailable, onUpdateClick }) {
   const t = window.TRANSLATIONS[lang];
   const [query, setQuery] = useStateHome('');
   const [modal, setModal] = useStateHome(false);
@@ -143,38 +143,38 @@ function Home({ lang, setLang, theme, setTheme, onOpenProject, projects, onCreat
 
         <div className="ms-side-spacer" style={{ flex: 1 }}/>
 
-        <div className="kofi-sidebar-card" style={{ padding: '8px', height: 'auto', display: 'flex', flexDirection: 'column', gap: '8px', overflow: 'hidden' }}>
-          <div className="kofi-card-title" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <span className="material-symbols-rounded">favorite</span>
-            <span>{lang === 'es' ? 'Apoya Odinote' : 'Support Odinote'}</span>
+        <div className="kofi-sidebar-card" style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: '10px', background: 'var(--bg-card, #FFFFFF)', borderRadius: '12px', border: '1.5px solid var(--line-soft, #E5E1DD)', marginTop: '8px' }}>
+          <div className="kofi-card-title" style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--wine, #7B2D26)', fontWeight: '600', fontSize: '14px' }}>
+            <span className="material-symbols-rounded" style={{ fontSize: '20px' }}>favorite</span>
+            <span style={{ fontWeight: '600', fontSize: '14px' }}>
+              {lang === 'es' ? 'Apoya Odinote' : 'Support Odinote'}
+            </span>
           </div>
+          
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '2px' }}>
+            <div style={{ width: '40px', height: '40px', borderRadius: '50%', overflow: 'hidden', border: '1.5px solid var(--wine, #7B2D26)', flexShrink: 0, background: '#fff', padding: '2px' }}>
+              <img src="./Icon/Icon.png" style={{ width: '100%', height: '100%', objectFit: 'contain' }} alt="Avatar" />
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              <span style={{ fontWeight: '600', fontSize: '13px', color: 'var(--text, #1A1A1A)', lineHeight: '1.2' }}>Neuroxcx</span>
+              <span style={{ fontSize: '11px', color: 'var(--text-soft, #595459)' }}>ko-fi.com/neuroxcx</span>
+            </div>
+          </div>
+
+          <p style={{ fontSize: '11px', color: 'var(--text-soft, #595459)', margin: 0, lineHeight: '1.4' }}>
+            {lang === 'es' 
+              ? 'Odinote es 100% gratuito. Si te ayuda en tus apuntes, considera hacernos una donación para apoyar el desarrollo independiente.' 
+              : 'Odinote is 100% free. If it helps you with your notes, consider supporting independent development.'}
+          </p>
+
           <button
-            className="kofi-card-btn"
-            style={{ flexShrink: 0 }}
-            onClick={() => window.open('https://ko-fi.com/W3G31ZYE06', '_blank', 'noopener,noreferrer')}
+            className="ms-new-btn"
+            style={{ width: '100%', padding: '8px 12px', fontSize: '13px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', background: 'var(--wine, #7B2D26)', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '500', marginTop: '2px' }}
+            onClick={() => window.open('https://ko-fi.com/neuroxcx', '_blank', 'noopener,noreferrer')}
           >
-            <span className="material-symbols-rounded">open_in_new</span>
-            <span>{lang === 'es' ? 'Abrir en navegador' : 'Open in browser'}</span>
+            <span className="material-symbols-rounded" style={{ fontSize: '18px' }}>coffee</span>
+            <span>{lang === 'es' ? 'Apoyar en Ko-fi' : 'Support on Ko-fi'}</span>
           </button>
-          <div style={{ position: 'relative', width: '100%', height: '425px', borderRadius: '4px', overflow: 'hidden', border: '1.5px solid var(--line-soft)', background: '#f9f9f9', flexShrink: 0 }}>
-            <iframe
-              id="kofiframe"
-              src="https://ko-fi.com/neuroxcx/?hidefeed=true&widget=true&embed=true&preview=true"
-              style={{
-                border: 'none',
-                width: '147.05%',
-                height: '625px',
-                transform: 'scale(0.68)',
-                transformOrigin: 'top left',
-                display: 'block',
-                position: 'absolute',
-                top: 0,
-                left: 0
-              }}
-              scrolling="no"
-              title="neuroxcx"
-            />
-          </div>
         </div>
 
       </aside>
@@ -191,6 +191,16 @@ function Home({ lang, setLang, theme, setTheme, onOpenProject, projects, onCreat
             />
           </div>
           <div className="ms-top-actions">
+            {updateAvailable && (
+              <button
+                className="icon-btn lift update-bell-btn"
+                style={{ color: 'var(--wine, #E6544F)', marginRight: 10, animation: 'pulse-bell 1s infinite alternate' }}
+                onClick={onUpdateClick}
+                title={lang === 'es' ? '¡Nueva actualización disponible! Haz clic para descargar de GitHub.' : 'New update available! Click to download from GitHub.'}
+              >
+                <span className="material-symbols-rounded">notifications_active</span>
+              </button>
+            )}
             <button
               className="icon-btn lift"
               onClick={()=>setTheme(theme === 'dark' ? 'light' : 'dark')}

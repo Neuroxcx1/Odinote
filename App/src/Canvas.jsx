@@ -184,7 +184,7 @@ function closestAnchor(item, x, y) {
   return opts[0].a;
 }
 
-function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn, setCanvases: setExtCanvases }) {
+function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn, setCanvases: setExtCanvases, updateAvailable, onUpdateClick }) {
   const [canvases, _setCanvases] = useStateCanvas(() => canvasesIn || JSON.parse(JSON.stringify(window.INITIAL_CANVASES)));
   // Stable ref to App's setter — avoids the infinite loop caused by it being a dep on every render
   const setExtCanvasesRef = useRefCanvas(setExtCanvases);
@@ -1793,6 +1793,8 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
         onUndo={undo} onRedo={redo}
         canUndo={historyIdx > 0} canRedo={historyIdx < history.length - 1}
         onToolDragStart={onToolDragStart}
+        updateAvailable={updateAvailable}
+        onUpdateClick={onUpdateClick}
       />
 
       {toolGhost && <ToolGhost {...toolGhost} lang={lang}/>}

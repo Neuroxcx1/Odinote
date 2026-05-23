@@ -31,6 +31,7 @@ function Topbar({
   onHome,
   onUndo, onRedo, canUndo, canRedo,
   onToolDragStart,
+  updateAvailable, onUpdateClick,
 }) {
   const t = window.TRANSLATIONS[lang];
 
@@ -128,6 +129,16 @@ function Topbar({
       </div>
 
       <div className="topbar-actions">
+        {updateAvailable && (
+          <button
+            className="icon-btn lift update-bell-btn"
+            style={{ color: 'var(--wine, #E6544F)', marginRight: 6, animation: 'pulse-bell 1s infinite alternate' }}
+            onClick={onUpdateClick}
+            title={lang === 'es' ? '¡Nueva actualización disponible! Haz clic para descargar de GitHub.' : 'New update available! Click to download from GitHub.'}
+          >
+            <span className="material-symbols-rounded">notifications_active</span>
+          </button>
+        )}
         <button className="icon-btn lift" title="Undo (⌘Z)" onClick={onUndo} style={{ opacity: canUndo ? 1 : 0.4 }}>
           <span className="material-symbols-rounded">undo</span>
         </button>

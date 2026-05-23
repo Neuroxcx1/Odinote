@@ -109,6 +109,51 @@ function App() {
   const [projects, setProjects] = useStateApp(window.SAMPLE_PROJECTS);
   const [canvases, setCanvases] = useStateApp(JSON.parse(JSON.stringify(window.INITIAL_CANVASES)));
   const [vaultPath, setVaultPath] = useStateApp(null);
+  const [updateAvailable, setUpdateAvailable] = useStateApp(false);
+
+  const ignoreNextPersistRef = React.useRef(false);
+
+  // Check for updates instantly on mount
+  useEffectApp(() => {
+    const checkUpdates = async () => {
+      try {
+        const res = await fetch('https://api.github.com/repos/Neuroxcx1/Odinote/releases/latest');
+        if (!res.ok) return;
+        const data = await res.json();
+        const latestVersion = data.tag_name;
+        if (!latestVersion) return;
+
+        const cleanLatest = latestVersion.replace(/^v/, '');
+        const cleanCurrent = '1.0.2'; // matches package.json
+
+        const latestParts = cleanLatest.split('.').map(Number);
+        const currentParts = cleanCurrent.split('.').map(Number);
+
+        let hasNew = false;
+        for (let i = 0; i < Math.max(latestParts.length, currentParts.length); i++) {
+          const l = latestParts[i] || 0;
+          const c = currentParts[i] || 0;
+          if (l > c) {
+            hasNew = true;
+            break;
+          } else if (l < c) {
+            break;
+          }
+        }
+
+        if (hasNew) {
+          setUpdateAvailable(true);
+        }
+      } catch (err) {
+        console.error('Failed to check for updates:', err);
+      }
+    };
+    checkUpdates();
+  }, []);
+
+  const handleUpdateClick = () => {
+    window.open('https://github.com/Neuroxcx1/Odinote/releases/latest', '_blank');
+  };
 
   // Load state on startup (Electron Local Folder Vault has precedence, falls back to browser IndexedDB)
   useEffectApp(() => {
@@ -117,6 +162,7 @@ function App() {
       setVaultPath(savedVault);
       window.electronAPI.readVault(savedVault).then(vaultState => {
         if (vaultState) {
+          ignoreNextPersistRef.current = true;
           if (vaultState.view) setView(vaultState.view);
           if (vaultState.lang) setLang(vaultState.lang);
           if (vaultState.theme) setTheme(vaultState.theme);
@@ -130,6 +176,7 @@ function App() {
         // load fallback from browser IndexedDB
         loadStateFromDB().then(dbState => {
           if (dbState) {
+            ignoreNextPersistRef.current = true;
             if (dbState.view) setView(dbState.view);
             if (dbState.lang) setLang(dbState.lang);
             if (dbState.theme) setTheme(dbState.theme);
@@ -142,6 +189,7 @@ function App() {
     } else {
       loadStateFromDB().then(dbState => {
         if (dbState) {
+          ignoreNextPersistRef.current = true;
           if (dbState.view) setView(dbState.view);
           if (dbState.lang) setLang(dbState.lang);
           if (dbState.theme) setTheme(dbState.theme);
@@ -153,6 +201,7 @@ function App() {
             const raw = localStorage.getItem(STORE_KEY);
             if (raw) {
               const localState = JSON.parse(raw);
+              ignoreNextPersistRef.current = true;
               if (localState.view) setView(localState.view);
               if (localState.lang) setLang(localState.lang);
               if (localState.theme) setTheme(localState.theme);
@@ -234,6 +283,10 @@ function App() {
   // persist — debounced so IndexedDB/Vault writes don't run on every single keystroke/drag frame.
   useEffectApp(() => {
     if (loading) return;
+    if (ignoreNextPersistRef.current) {
+      ignoreNextPersistRef.current = false;
+      return;
+    }
     const id = setTimeout(async () => {
       if (vaultPath && window.electronAPI) {
         const cleanCanvases = await saveBase64MediaLocally(canvases, vaultPath);
@@ -271,6 +324,7 @@ function App() {
     try {
       const vaultState = await window.electronAPI.readVault(path);
       if (vaultState) {
+        ignoreNextPersistRef.current = true;
         if (vaultState.view) setView(vaultState.view);
         if (vaultState.lang) setLang(vaultState.lang);
         if (vaultState.theme) setTheme(vaultState.theme);
@@ -295,6 +349,7 @@ function App() {
     // Reload original browser IndexedDB state
     loadStateFromDB().then(dbState => {
       if (dbState) {
+        ignoreNextPersistRef.current = true;
         if (dbState.view) setView(dbState.view);
         if (dbState.lang) setLang(dbState.lang);
         if (dbState.theme) setTheme(dbState.theme);
@@ -485,6 +540,8 @@ function App() {
       vaultPath={vaultPath}
       onOpenVault={openLocalVault}
       onCloseVault={closeLocalVault}
+      updateAvailable={updateAvailable}
+      onUpdateClick={handleUpdateClick}
     />;
   }
   return <window.Canvas
@@ -495,6 +552,8 @@ function App() {
     onHome={goHome}
     canvasesIn={canvases}
     setCanvases={setCanvases}
+    updateAvailable={updateAvailable}
+    onUpdateClick={handleUpdateClick}
   />;
 }
 

@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const http = require('http');
@@ -44,6 +44,25 @@ function createWindow() {
 
   // Hide default menu bar
   mainWindow.setMenuBarVisibility(false);
+
+  // Open external links in default browser instead of new Electron windows
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    if (url.startsWith('http:') || url.startsWith('https:')) {
+      shell.openExternal(url);
+      return { action: 'deny' };
+    }
+    return { action: 'allow' };
+  });
+
+  mainWindow.webContents.on('will-navigate', (event, url) => {
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      const localPrefix = 'http://127.0.0.1:';
+      if (!url.startsWith(localPrefix)) {
+        event.preventDefault();
+        shell.openExternal(url);
+      }
+    }
+  });
 
   // OPEN DEVTOOLS SO WE CAN IMMEDIATELY SEE THE CONSOLE ERRORS
   logToFile('Opening DevTools...');
