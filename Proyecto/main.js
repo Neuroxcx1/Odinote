@@ -115,20 +115,27 @@ ipcMain.handle('select-folder', async () => {
   }
   
   let selectedPath = result.filePaths[0];
-  const baseName = path.basename(selectedPath).toLowerCase();
   
-  // Automatically create and target an 'Odinote' subfolder to keep user filesystem clean
-  if (baseName !== 'odinote') {
-    const subPath = path.join(selectedPath, 'Odinote');
-    try {
-      if (!fs.existsSync(subPath)) {
-        fs.mkdirSync(subPath, { recursive: true });
-        logToFile(`IPC select-folder: Created subfolder: ${subPath}`);
+  // 1. If the selected folder already contains "odinote.json", load it directly to preserve saves
+  const hasExistingVault = fs.existsSync(path.join(selectedPath, 'odinote.json'));
+  
+  if (!hasExistingVault) {
+    const baseName = path.basename(selectedPath).toLowerCase();
+    // 2. Only isolate inside "Odinote" subfolder if the folder base name is not already "odinote"
+    if (baseName !== 'odinote') {
+      const subPath = path.join(selectedPath, 'Odinote');
+      try {
+        if (!fs.existsSync(subPath)) {
+          fs.mkdirSync(subPath, { recursive: true });
+          logToFile(`IPC select-folder: Created subfolder: ${subPath}`);
+        }
+        selectedPath = subPath;
+      } catch (e) {
+        logToFile(`IPC select-folder ERROR creating subfolder: ${e.message}`);
       }
-      selectedPath = subPath;
-    } catch (e) {
-      logToFile(`IPC select-folder ERROR creating subfolder: ${e.message}`);
     }
+  } else {
+    logToFile(`IPC select-folder: Existing vault detected in selected path: ${selectedPath}`);
   }
   
   logToFile(`IPC select-folder: Selected Final Path: ${selectedPath}`);
