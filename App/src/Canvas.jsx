@@ -64,6 +64,7 @@ function defaultDims(type) {
     default:         return { w: 260, h: 160 };
   }
 }
+window.defaultDims = defaultDims;
 
 function ToolGhost({ x, y, tool, lang }) {
   const t = window.TRANSLATIONS[lang];
@@ -196,6 +197,14 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
     if (document.body.classList.contains('odi-busy')) return;
     if (setExtCanvasesRef.current) setExtCanvasesRef.current(canvases);
   }, [canvases]);
+
+  // Sync external changes (e.g. from media saving or vault loading) into local canvas state
+  useEffectCanvas(() => {
+    if (canvasesIn) {
+      _setCanvases(canvasesIn);
+    }
+  }, [canvasesIn]);
+
   const setCanvases = (updater) => {
     _setCanvases(prev => {
       const next = typeof updater === 'function' ? updater(prev) : updater;
@@ -228,6 +237,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
 
   const [pan, setPan] = useStateCanvas({ x: 40, y: 20 });
   const [scale, setScale] = useStateCanvas(1);
+  const [showBgSelector, setShowBgSelector] = useStateCanvas(false);
 
   // Refs to always have the latest pan, scale, and currentId in cleanup effects
   const panRef = useRefCanvas(pan);
@@ -1472,24 +1482,43 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
     const sx = item.x, sy = item.y, sw = item.w, sh = item.h;
     const minW = 100, minH = 50;
     const aspectRatio = sw / sh;
+    
+    let resizeMaster = null; // Locked to 'x' or 'y' on first move to prevent jumps
+
     const onMove = (ev) => {
       const dx = (ev.clientX - startX) / scale;
       const dy = (ev.clientY - startY) / scale;
-      let nx = sx, ny = sy, nw = sw, nh = sh;
-      if (corner.includes('r')) nw = Math.max(minW, sw + dx);
-      if (corner.includes('b')) nh = Math.max(minH, sh + dy);
-      if (corner.includes('l')) { nw = Math.max(minW, sw - dx); nx = sx + (sw - nw); }
-      if (corner.includes('t')) { nh = Math.max(minH, sh - dy); ny = sy + (sh - nh); }
-      // Shift locks aspect ratio for any node; the file node ALWAYS keeps its ratio.
-      if (ev.shiftKey || item.type === 'file') {
-        if (Math.abs(nw - sw) >= Math.abs(nh - sh)) {
-          nh = Math.max(minH, Math.round(nw / aspectRatio));
-          if (corner.includes('t')) ny = sy + (sh - nh);
-        } else {
-          nw = Math.max(minW, Math.round(nh * aspectRatio));
-          if (corner.includes('l')) nx = sx + (sw - nw);
-        }
+      
+      // Determine master axis once past a tiny deadzone
+      if (resizeMaster === null && (Math.abs(dx) > 2 || Math.abs(dy) > 2)) {
+        resizeMaster = Math.abs(dx) >= Math.abs(dy) ? 'x' : 'y';
       }
+
+      let nx = sx, ny = sy, nw = sw, nh = sh;
+      
+      if (ev.shiftKey || item.type === 'file') {
+        const master = resizeMaster || 'x'; // default to x
+        if (master === 'x') {
+          if (corner.includes('r')) nw = Math.max(minW, sw + dx);
+          if (corner.includes('l')) nw = Math.max(minW, sw - dx);
+          nh = Math.max(minH, Math.round(nw / aspectRatio));
+        } else {
+          if (corner.includes('b')) nh = Math.max(minH, sh + dy);
+          if (corner.includes('t')) nh = Math.max(minH, sh - dy);
+          nw = Math.max(minW, Math.round(nh * aspectRatio));
+        }
+        
+        // Re-adjust top-left position if resizing left or top sides
+        if (corner.includes('l')) nx = sx + (sw - nw);
+        if (corner.includes('t')) ny = sy + (sh - nh);
+      } else {
+        // Free resize
+        if (corner.includes('r')) nw = Math.max(minW, sw + dx);
+        if (corner.includes('b')) nh = Math.max(minH, sh + dy);
+        if (corner.includes('l')) { nw = Math.max(minW, sw - dx); nx = sx + (sw - nw); }
+        if (corner.includes('t')) { nh = Math.max(minH, sh - dy); ny = sy + (sh - nh); }
+      }
+      
       updateItemSilent(itemId, { x: nx, y: ny, w: nw, h: nh });
     };
     const onUp = () => {
@@ -1640,7 +1669,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
     return { w: Math.max(2400, mx + 400), h: Math.max(1800, my + 400) };
   }, [current.items]);
 
-  const wrapClass = ['canvas-wrap'];
+  const wrapClass = ['canvas-wrap', `canvas-bg-${current.bgColor || 'default'}`];
   if (transition === 'entering') wrapClass.push('entering');
   if (activeTool && activeTool !== 'line') wrapClass.push('placing');
   if (activeTool === 'line') wrapClass.push('linking');
@@ -1943,7 +1972,17 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
         );
       })()}
 
-      <div ref={surfaceRef} className={wrapClass.join(' ')} onMouseDown={onSurfaceMouseDown} onDoubleClick={onSurfaceDoubleClick} onContextMenu={onSurfaceContextMenu}>
+      <div
+        ref={surfaceRef}
+        className={wrapClass.join(' ')}
+        style={{
+          backgroundSize: `${22 * scale}px ${22 * scale}px`,
+          backgroundPosition: `${pan.x}px ${pan.y}px`
+        }}
+        onMouseDown={onSurfaceMouseDown}
+        onDoubleClick={onSurfaceDoubleClick}
+        onContextMenu={onSurfaceContextMenu}
+      >
         <div
           className="canvas-surface"
           style={{ left: 0, top: 0, transform: `translate(${pan.x}px, ${pan.y}px) scale(${scale})`, transformOrigin: '0 0', width: bounds.w, height: bounds.h }}
@@ -2001,7 +2040,8 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
                   className={`item ${(selected === item.id || selectedIds.includes(item.id)) ? 'selected' : ''} ${item._dragging ? 'dragging' : ''} ${isEditing ? 'editing' : ''} ${item._new ? 'new-item' : ''} ${isDropTarget ? 'drop-target' : ''}`}
                   style={{
                     left: item.x, top: item.y,
-                    width: item.w, height: item.h,
+                    width: item.w !== undefined ? item.w : def.w,
+                    height: item.h !== undefined ? item.h : def.h,
                     '--node-scale': nodeScale,
                     zIndex: selected === item.id ? 100 : 2,
                     opacity: matches ? 1 : 0.18,
@@ -2159,6 +2199,90 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
           <button title="Zoom in" onClick={()=>setScale(s => Math.min(2.5, s + 0.1))}>
             <span className="material-symbols-rounded" style={{fontSize:15}}>add</span>
           </button>
+        </div>
+
+        {/* Background Color Selector */}
+        <div className="canvas-bg-selector" style={{ position: 'absolute', bottom: '16px', right: '160px', zIndex: 40 }}>
+          <button 
+            className="icon-btn lift" 
+            style={{ 
+              width: '32px', 
+              height: '32px', 
+              borderRadius: '2px', 
+              background: 'var(--paper)', 
+              border: '1.5px solid var(--line)', 
+              boxShadow: 'var(--pop-sm)', 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'center',
+              cursor: 'pointer'
+            }}
+            onClick={() => setShowBgSelector(!showBgSelector)}
+            title={lang === 'es' ? 'Color de fondo del lienzo' : 'Canvas background color'}
+          >
+            <span className="material-symbols-rounded" style={{ fontSize: '18px' }}>texture</span>
+          </button>
+          {showBgSelector && (
+            <div 
+              className="ctx-popout" 
+              style={{ 
+                position: 'absolute', 
+                bottom: '40px', 
+                right: '0', 
+                padding: '10px', 
+                display: 'flex', 
+                flexDirection: 'column', 
+                gap: '8px', 
+                minWidth: '130px',
+                borderRadius: '4px',
+                boxShadow: 'var(--pop-md)'
+              }}
+              onMouseDown={(e)=>e.stopPropagation()}
+            >
+              <div style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-soft, #595459)', marginBottom: '2px' }}>
+                {lang === 'es' ? 'Fondo del Lienzo' : 'Canvas Background'}
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px' }}>
+                {['default', 'gray', 'sand', 'mint', 'sky', 'pink'].map(bgOpt => {
+                  const colorsMap = {
+                    default: { light: '#FAF8F6', dark: '#2A282A', label: { es: 'Por defecto', en: 'Default' } },
+                    gray: { light: '#ECEAE6', dark: '#1E1C1E', label: { es: 'Gris', en: 'Gray' } },
+                    sand: { light: '#F4EFE6', dark: '#38322B', label: { es: 'Arena', en: 'Sand' } },
+                    mint: { light: '#EAF2EB', dark: '#25332A', label: { es: 'Menta', en: 'Mint' } },
+                    sky: { light: '#E6F0FA', dark: '#232F3D', label: { es: 'Celeste', en: 'Sky' } },
+                    pink: { light: '#FAEBEF', dark: '#3A232F', label: { es: 'Rosa', en: 'Pink' } }
+                  };
+                  const colorHex = theme === 'dark' ? colorsMap[bgOpt].dark : colorsMap[bgOpt].light;
+                  const active = (current.bgColor || 'default') === bgOpt;
+                  return (
+                    <button
+                      key={bgOpt}
+                      style={{
+                        width: '28px',
+                        height: '28px',
+                        borderRadius: '50%',
+                        background: colorHex,
+                        border: active ? '2.5px solid var(--wine, #7B2D26)' : '1px solid var(--line-soft, #E5E1DD)',
+                        cursor: 'pointer',
+                        boxShadow: active ? '0 0 4px rgba(0,0,0,0.2)' : 'none',
+                        transition: 'transform 100ms'
+                      }}
+                      onClick={() => {
+                        setCanvases(prev => ({
+                          ...prev,
+                          [currentId]: {
+                            ...prev[currentId],
+                            bgColor: bgOpt
+                          }
+                        }));
+                      }}
+                      title={lang === 'es' ? colorsMap[bgOpt].label.es : colorsMap[bgOpt].label.en}
+                    />
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Context menu */}

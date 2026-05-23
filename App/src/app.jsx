@@ -100,6 +100,53 @@ function cleanCanvases(canvases) {
   return next;
 }
 
+// Migrate old templates for web version or vault
+function migrateTemplates(state) {
+  if (!state) return state;
+
+  const currentVersion = 2;
+  const newTemplateIds = ['architecture', 'gamedev', 'marketing'];
+  const newTemplateCanvases = Object.keys(window.INITIAL_CANVASES || {});
+
+  // Check if we need migration: version mismatch, or has old templates, or missing new ones
+  const hasOldTemplates = state.projects && state.projects.some(p => !p.id.startsWith('proj-') && !newTemplateIds.includes(p.id));
+  const hasNewTemplates = state.projects && state.projects.some(p => newTemplateIds.includes(p.id));
+  const needsMigration = state.templatesVersion !== currentVersion || hasOldTemplates || !hasNewTemplates;
+
+  if (needsMigration) {
+    console.log('Migrating templates to version', currentVersion);
+    
+    // 1. Filter projects
+    let nextProjects = state.projects ? [...state.projects] : [];
+    // Remove all old and current templates (anything not starting with proj-)
+    nextProjects = nextProjects.filter(p => p.id.startsWith('proj-'));
+    
+    // Add the fresh templates at the beginning
+    const freshTemplates = JSON.parse(JSON.stringify(window.SAMPLE_PROJECTS || []));
+    nextProjects = [...freshTemplates, ...nextProjects];
+    state.projects = nextProjects;
+
+    // 2. Filter canvases
+    if (state.canvases) {
+      const nextCanvases = { ...state.canvases };
+      // Delete all template canvases (anything not starting with proj- and not starting with b-)
+      for (const cid of Object.keys(nextCanvases)) {
+        if (!cid.startsWith('proj-') && !cid.startsWith('b-')) {
+          delete nextCanvases[cid];
+        }
+      }
+      
+      // Inject fresh template canvases
+      for (const [cid, canvas] of Object.entries(window.INITIAL_CANVASES || {})) {
+        nextCanvases[cid] = JSON.parse(JSON.stringify(canvas));
+      }
+      state.canvases = nextCanvases;
+    }
+    state.templatesVersion = currentVersion;
+  }
+  return state;
+}
+
 function App() {
   const [loading, setLoading]   = useStateApp(true);
 
@@ -110,49 +157,99 @@ function App() {
   const [canvases, setCanvases] = useStateApp(JSON.parse(JSON.stringify(window.INITIAL_CANVASES)));
   const [vaultPath, setVaultPath] = useStateApp(null);
   const [updateAvailable, setUpdateAvailable] = useStateApp(false);
+  const [checkingUpdates, setCheckingUpdates] = useStateApp(false);
 
   const ignoreNextPersistRef = React.useRef(false);
 
+  const checkUpdates = async (manual = false) => {
+    if (checkingUpdates) return;
+    if (manual) setCheckingUpdates(true);
+    try {
+      const res = await fetch('https://api.github.com/repos/Neuroxcx1/Odinote/releases');
+      if (!res.ok) {
+        if (manual) {
+          alert(lang === 'es' 
+            ? 'No se pudieron comprobar las actualizaciones. Comprueba tu conexión.' 
+            : 'Could not check for updates. Please check your connection.');
+        }
+        return;
+      }
+      const data = await res.json();
+      if (!Array.isArray(data) || data.length === 0) {
+        if (manual) {
+          alert(lang === 'es'
+            ? '¡Estás al día! Odinote está en su versión más reciente (v1.0.2).'
+            : 'You are up to date! Odinote is on the latest version (v1.0.2).');
+        }
+        return;
+      }
+      const latestRelease = data[0];
+      const latestVersion = latestRelease.tag_name;
+      if (!latestVersion) {
+        if (manual) {
+          alert(lang === 'es'
+            ? '¡Estás al día! Odinote está en su versión más reciente (v1.0.2).'
+            : 'You are up to date! Odinote is on the latest version (v1.0.2).');
+        }
+        return;
+      }
+
+      const cleanLatest = latestVersion.replace(/^v/, '');
+      const cleanCurrent = '1.0.2'; // matches package.json
+
+      const latestParts = cleanLatest.split('.').map(Number);
+      const currentParts = cleanCurrent.split('.').map(Number);
+
+      let hasNew = false;
+      for (let i = 0; i < Math.max(latestParts.length, currentParts.length); i++) {
+        const l = latestParts[i] || 0;
+        const c = currentParts[i] || 0;
+        if (l > c) {
+          hasNew = true;
+          break;
+        } else if (l < c) {
+          break;
+        }
+      }
+
+      if (hasNew) {
+        setUpdateAvailable(true);
+        if (manual) {
+          alert(lang === 'es'
+            ? `¡Nueva versión disponible: v${cleanLatest}! Haz clic en la campana para descargarla.`
+            : `New version available: v${cleanLatest}! Click the bell to download it.`);
+        }
+      } else {
+        setUpdateAvailable(false);
+        if (manual) {
+          alert(lang === 'es'
+            ? '¡Estás al día! Odinote está en su versión más reciente (v1.0.2).'
+            : 'You are up to date! Odinote is on the latest version (v1.0.2).');
+        }
+      }
+    } catch (err) {
+      console.error('Failed to check for updates:', err);
+      if (manual) {
+        alert(lang === 'es'
+          ? 'Error al comprobar actualizaciones. Comprueba tu conexión a internet.'
+          : 'Error checking for updates. Please check your internet connection.');
+      }
+    } finally {
+      if (manual) setCheckingUpdates(false);
+    }
+  };
+
   // Check for updates instantly on mount
   useEffectApp(() => {
-    const checkUpdates = async () => {
-      try {
-        const res = await fetch('https://api.github.com/repos/Neuroxcx1/Odinote/releases/latest');
-        if (!res.ok) return;
-        const data = await res.json();
-        const latestVersion = data.tag_name;
-        if (!latestVersion) return;
-
-        const cleanLatest = latestVersion.replace(/^v/, '');
-        const cleanCurrent = '1.0.2'; // matches package.json
-
-        const latestParts = cleanLatest.split('.').map(Number);
-        const currentParts = cleanCurrent.split('.').map(Number);
-
-        let hasNew = false;
-        for (let i = 0; i < Math.max(latestParts.length, currentParts.length); i++) {
-          const l = latestParts[i] || 0;
-          const c = currentParts[i] || 0;
-          if (l > c) {
-            hasNew = true;
-            break;
-          } else if (l < c) {
-            break;
-          }
-        }
-
-        if (hasNew) {
-          setUpdateAvailable(true);
-        }
-      } catch (err) {
-        console.error('Failed to check for updates:', err);
-      }
-    };
-    checkUpdates();
+    checkUpdates(false);
   }, []);
 
   const handleUpdateClick = () => {
-    window.open('https://github.com/Neuroxcx1/Odinote/releases/latest', '_blank');
+    if (updateAvailable) {
+      window.open('https://github.com/Neuroxcx1/Odinote/releases/latest', '_blank');
+    } else {
+      checkUpdates(true);
+    }
   };
 
   // Load state on startup (Electron Local Folder Vault has precedence, falls back to browser IndexedDB)
@@ -162,12 +259,13 @@ function App() {
       setVaultPath(savedVault);
       window.electronAPI.readVault(savedVault).then(vaultState => {
         if (vaultState) {
+          const migrated = migrateTemplates(vaultState);
           ignoreNextPersistRef.current = true;
-          if (vaultState.view) setView(vaultState.view);
-          if (vaultState.lang) setLang(vaultState.lang);
-          if (vaultState.theme) setTheme(vaultState.theme);
-          if (vaultState.projects) setProjects(vaultState.projects);
-          if (vaultState.canvases) setCanvases(cleanCanvases(vaultState.canvases));
+          if (migrated.view) setView(migrated.view);
+          if (migrated.lang) setLang(migrated.lang);
+          if (migrated.theme) setTheme(migrated.theme);
+          if (migrated.projects) setProjects(migrated.projects);
+          if (migrated.canvases) setCanvases(cleanCanvases(migrated.canvases));
         }
         setLoading(false);
       }).catch(() => {
@@ -176,12 +274,13 @@ function App() {
         // load fallback from browser IndexedDB
         loadStateFromDB().then(dbState => {
           if (dbState) {
+            const migrated = migrateTemplates(dbState);
             ignoreNextPersistRef.current = true;
-            if (dbState.view) setView(dbState.view);
-            if (dbState.lang) setLang(dbState.lang);
-            if (dbState.theme) setTheme(dbState.theme);
-            if (dbState.projects) setProjects(dbState.projects);
-            if (dbState.canvases) setCanvases(cleanCanvases(dbState.canvases));
+            if (migrated.view) setView(migrated.view);
+            if (migrated.lang) setLang(migrated.lang);
+            if (migrated.theme) setTheme(migrated.theme);
+            if (migrated.projects) setProjects(migrated.projects);
+            if (migrated.canvases) setCanvases(cleanCanvases(migrated.canvases));
           }
           setLoading(false);
         });
@@ -189,25 +288,27 @@ function App() {
     } else {
       loadStateFromDB().then(dbState => {
         if (dbState) {
+          const migrated = migrateTemplates(dbState);
           ignoreNextPersistRef.current = true;
-          if (dbState.view) setView(dbState.view);
-          if (dbState.lang) setLang(dbState.lang);
-          if (dbState.theme) setTheme(dbState.theme);
-          if (dbState.projects) setProjects(dbState.projects);
-          if (dbState.canvases) setCanvases(cleanCanvases(dbState.canvases));
+          if (migrated.view) setView(migrated.view);
+          if (migrated.lang) setLang(migrated.lang);
+          if (migrated.theme) setTheme(migrated.theme);
+          if (migrated.projects) setProjects(migrated.projects);
+          if (migrated.canvases) setCanvases(cleanCanvases(migrated.canvases));
         } else {
           // Fallback / migration from localStorage
           try {
             const raw = localStorage.getItem(STORE_KEY);
             if (raw) {
               const localState = JSON.parse(raw);
+              const migrated = migrateTemplates(localState);
               ignoreNextPersistRef.current = true;
-              if (localState.view) setView(localState.view);
-              if (localState.lang) setLang(localState.lang);
-              if (localState.theme) setTheme(localState.theme);
-              if (localState.projects) setProjects(localState.projects);
-              if (localState.canvases) setCanvases(cleanCanvases(localState.canvases));
-              saveStateToDB(localState);
+              if (migrated.view) setView(migrated.view);
+              if (migrated.lang) setLang(migrated.lang);
+              if (migrated.theme) setTheme(migrated.theme);
+              if (migrated.projects) setProjects(migrated.projects);
+              if (migrated.canvases) setCanvases(cleanCanvases(migrated.canvases));
+              saveStateToDB(migrated);
             }
           } catch {}
         }
@@ -215,6 +316,7 @@ function App() {
       });
     }
   }, []);
+
 
   // apply theme on body
   useEffectApp(() => {
@@ -290,9 +392,9 @@ function App() {
     const id = setTimeout(async () => {
       if (vaultPath && window.electronAPI) {
         const cleanCanvases = await saveBase64MediaLocally(canvases, vaultPath);
-        window.electronAPI.writeVault(vaultPath, { view, lang, theme, projects, canvases: cleanCanvases });
+        window.electronAPI.writeVault(vaultPath, { view, lang, theme, projects, canvases: cleanCanvases, templatesVersion: 2 });
       } else {
-        saveStateToDB({ view, lang, theme, projects, canvases });
+        saveStateToDB({ view, lang, theme, projects, canvases, templatesVersion: 2 });
       }
     }, 400);
     return () => clearTimeout(id);
@@ -303,9 +405,9 @@ function App() {
     if (loading) return;
     const flush = () => {
       if (vaultPath && window.electronAPI) {
-        window.electronAPI.writeVault(vaultPath, { view, lang, theme, projects, canvases });
+        window.electronAPI.writeVault(vaultPath, { view, lang, theme, projects, canvases, templatesVersion: 2 });
       } else {
-        saveStateToDB({ view, lang, theme, projects, canvases });
+        saveStateToDB({ view, lang, theme, projects, canvases, templatesVersion: 2 });
       }
     };
     window.addEventListener('beforeunload', flush);
@@ -324,15 +426,16 @@ function App() {
     try {
       const vaultState = await window.electronAPI.readVault(path);
       if (vaultState) {
+        const migrated = migrateTemplates(vaultState);
         ignoreNextPersistRef.current = true;
-        if (vaultState.view) setView(vaultState.view);
-        if (vaultState.lang) setLang(vaultState.lang);
-        if (vaultState.theme) setTheme(vaultState.theme);
-        if (vaultState.projects) setProjects(vaultState.projects);
-        if (vaultState.canvases) setCanvases(cleanCanvases(vaultState.canvases));
+        if (migrated.view) setView(migrated.view);
+        if (migrated.lang) setLang(migrated.lang);
+        if (migrated.theme) setTheme(migrated.theme);
+        if (migrated.projects) setProjects(migrated.projects);
+        if (migrated.canvases) setCanvases(cleanCanvases(migrated.canvases));
       } else {
         // If empty / new folder, initialize it with the current active state
-        await window.electronAPI.writeVault(path, { view, lang, theme, projects, canvases });
+        await window.electronAPI.writeVault(path, { view, lang, theme, projects, canvases, templatesVersion: 2 });
       }
     } catch (err) {
       alert(lang === 'es' ? 'No se pudo leer la boveda seleccionada.' : 'Could not read the selected vault.');
@@ -349,12 +452,13 @@ function App() {
     // Reload original browser IndexedDB state
     loadStateFromDB().then(dbState => {
       if (dbState) {
+        const migrated = migrateTemplates(dbState);
         ignoreNextPersistRef.current = true;
-        if (dbState.view) setView(dbState.view);
-        if (dbState.lang) setLang(dbState.lang);
-        if (dbState.theme) setTheme(dbState.theme);
-        if (dbState.projects) setProjects(dbState.projects);
-        if (dbState.canvases) setCanvases(cleanCanvases(dbState.canvases));
+        if (migrated.view) setView(migrated.view);
+        if (migrated.lang) setLang(migrated.lang);
+        if (migrated.theme) setTheme(migrated.theme);
+        if (migrated.projects) setProjects(migrated.projects);
+        if (migrated.canvases) setCanvases(cleanCanvases(migrated.canvases));
       } else {
         setProjects(window.SAMPLE_PROJECTS);
         setCanvases(JSON.parse(JSON.stringify(window.INITIAL_CANVASES)));

@@ -31,7 +31,14 @@ function getNodeRect(itemId, items) {
   if (!items) return null;
   const topItem = items.find(i => i.id === itemId);
   if (topItem) {
-    return { id: topItem.id, x: topItem.x, y: topItem.y, w: topItem.w, h: topItem.h };
+    let w = topItem.w;
+    let h = topItem.h;
+    if (w === undefined || h === undefined) {
+      const def = (window.defaultDims && window.defaultDims(topItem.type)) || { w: 200, h: 200 };
+      if (w === undefined) w = def.w;
+      if (h === undefined) h = def.h;
+    }
+    return { id: topItem.id, x: topItem.x, y: topItem.y, w, h };
   }
   for (const it of items) {
     if (it.type === 'column' && it.children) {

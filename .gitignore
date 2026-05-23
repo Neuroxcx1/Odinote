@@ -29,6 +29,5 @@ Thumbs.db
 *.sln
 
 # Exclude local marketing webpage from main Git repo
-Website/
-Pagina web/
+# Website/ is no longer used since it's unified at the root
 

@@ -682,6 +682,20 @@ a, button, select, input[type="submit"], input[type="button"], [role="button"],
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='22' height='22'%3E%3Cpath d='M11 9.5L12.6 12.3H9.4Z' fill='%231A1A1A' fill-opacity='0.13'/%3E%3C/svg%3E");
   background-size: 22px 22px;
 }
+.canvas-wrap.canvas-bg-default { background-color: var(--bg); }
+.canvas-wrap.canvas-bg-gray { background-color: #ECEAE6; }
+.canvas-wrap.canvas-bg-sand { background-color: #F4EFE6; }
+.canvas-wrap.canvas-bg-mint { background-color: #EAF2EB; }
+.canvas-wrap.canvas-bg-sky { background-color: #E6F0FA; }
+.canvas-wrap.canvas-bg-pink { background-color: #FAEBEF; }
+
+[data-theme="dark"] .canvas-wrap.canvas-bg-default { background-color: #2A282A; }
+[data-theme="dark"] .canvas-wrap.canvas-bg-gray { background-color: #1E1C1E; }
+[data-theme="dark"] .canvas-wrap.canvas-bg-sand { background-color: #38322B; }
+[data-theme="dark"] .canvas-wrap.canvas-bg-mint { background-color: #25332A; }
+[data-theme="dark"] .canvas-wrap.canvas-bg-sky { background-color: #232F3D; }
+[data-theme="dark"] .canvas-wrap.canvas-bg-pink { background-color: #3A232F; }
+
 .canvas-surface { position: absolute; transform-origin: 0 0; }
 .canvas-surface, .item-card {
   -webkit-font-smoothing: antialiased;
