@@ -66,6 +66,40 @@ function loadStateFromDB() {
   });
 }
 
+// Clean loaded canvases from ghost nodes (like the deleted title-1 node)
+function cleanCanvases(canvases) {
+  if (!canvases) return canvases;
+  const next = { ...canvases };
+  for (const [cid, canvas] of Object.entries(next)) {
+    if (canvas) {
+      let changed = false;
+      let nextItems = canvas.items || [];
+      let nextConnectors = canvas.connectors || [];
+      
+      const filteredItems = nextItems.filter(item => item.id !== 'title-1');
+      if (filteredItems.length !== nextItems.length) {
+        nextItems = filteredItems;
+        changed = true;
+      }
+      
+      const filteredConnectors = nextConnectors.filter(co => {
+        const fromId = co.fromEnd?.itemId || co.from;
+        const toId = co.toEnd?.itemId || co.to;
+        return fromId !== 'title-1' && toId !== 'title-1';
+      });
+      if (filteredConnectors.length !== nextConnectors.length) {
+        nextConnectors = filteredConnectors;
+        changed = true;
+      }
+      
+      if (changed) {
+        next[cid] = { ...canvas, items: nextItems, connectors: nextConnectors };
+      }
+    }
+  }
+  return next;
+}
+
 function App() {
   const [loading, setLoading]   = useStateApp(true);
 
@@ -87,7 +121,7 @@ function App() {
           if (vaultState.lang) setLang(vaultState.lang);
           if (vaultState.theme) setTheme(vaultState.theme);
           if (vaultState.projects) setProjects(vaultState.projects);
-          if (vaultState.canvases) setCanvases(vaultState.canvases);
+          if (vaultState.canvases) setCanvases(cleanCanvases(vaultState.canvases));
         }
         setLoading(false);
       }).catch(() => {
@@ -100,7 +134,7 @@ function App() {
             if (dbState.lang) setLang(dbState.lang);
             if (dbState.theme) setTheme(dbState.theme);
             if (dbState.projects) setProjects(dbState.projects);
-            if (dbState.canvases) setCanvases(dbState.canvases);
+            if (dbState.canvases) setCanvases(cleanCanvases(dbState.canvases));
           }
           setLoading(false);
         });
@@ -112,7 +146,7 @@ function App() {
           if (dbState.lang) setLang(dbState.lang);
           if (dbState.theme) setTheme(dbState.theme);
           if (dbState.projects) setProjects(dbState.projects);
-          if (dbState.canvases) setCanvases(dbState.canvases);
+          if (dbState.canvases) setCanvases(cleanCanvases(dbState.canvases));
         } else {
           // Fallback / migration from localStorage
           try {
@@ -123,7 +157,7 @@ function App() {
               if (localState.lang) setLang(localState.lang);
               if (localState.theme) setTheme(localState.theme);
               if (localState.projects) setProjects(localState.projects);
-              if (localState.canvases) setCanvases(localState.canvases);
+              if (localState.canvases) setCanvases(cleanCanvases(localState.canvases));
               saveStateToDB(localState);
             }
           } catch {}
@@ -139,6 +173,8 @@ function App() {
     document.body.setAttribute('data-lang', lang);
   }, [theme, lang]);
 
+  const savingMediaRef = React.useRef(new Set());
+
   const saveBase64MediaLocally = async (currentCanvases, activeVaultPath) => {
     if (!window.electronAPI || !activeVaultPath) return currentCanvases;
     
@@ -150,6 +186,11 @@ function App() {
       if (!canvas.items) continue;
       canvas.items.forEach(item => {
         if (item.src && item.src.startsWith('data:')) {
+          // If already in progress of saving this specific item, skip it to avoid race conditions and duplicates
+          if (savingMediaRef.current.has(item.id)) {
+            return;
+          }
+          savingMediaRef.current.add(item.id);
           changed = true;
           const ext = item.fileType || (item.type === 'image' ? 'png' : item.type === 'audio' ? 'mp3' : 'dat');
           const rawName = item.name || `media_${item.id}.${ext}`;
@@ -175,6 +216,9 @@ function App() {
               });
             } catch (err) {
               console.error('Failed to save file physically inside vault:', err);
+            } finally {
+              // Always clean up saving status so future updates can write if needed
+              savingMediaRef.current.delete(item.id);
             }
           })());
         }
@@ -231,7 +275,7 @@ function App() {
         if (vaultState.lang) setLang(vaultState.lang);
         if (vaultState.theme) setTheme(vaultState.theme);
         if (vaultState.projects) setProjects(vaultState.projects);
-        if (vaultState.canvases) setCanvases(vaultState.canvases);
+        if (vaultState.canvases) setCanvases(cleanCanvases(vaultState.canvases));
       } else {
         // If empty / new folder, initialize it with the current active state
         await window.electronAPI.writeVault(path, { view, lang, theme, projects, canvases });
@@ -255,7 +299,7 @@ function App() {
         if (dbState.lang) setLang(dbState.lang);
         if (dbState.theme) setTheme(dbState.theme);
         if (dbState.projects) setProjects(dbState.projects);
-        if (dbState.canvases) setCanvases(dbState.canvases);
+        if (dbState.canvases) setCanvases(cleanCanvases(dbState.canvases));
       } else {
         setProjects(window.SAMPLE_PROJECTS);
         setCanvases(JSON.parse(JSON.stringify(window.INITIAL_CANVASES)));

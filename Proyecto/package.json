@@ -6,7 +6,7 @@
   "scripts": {
     "start": "electron .",
     "build:exe": "electron-packager . Odinote --platform=win32 --arch=x64 --out=dist --overwrite --icon=Icon/Icon.ico",
-    "build:installer": "node build-installer.js"
+    "build:installer": "electron-builder --win --x64"
   },
   "devDependencies": {
     "electron": "^28.3.3",
@@ -17,8 +17,9 @@
   "build": {
     "appId": "com.odinote.app",
     "productName": "Odinote",
+    "asar": false,
     "directories": {
-      "output": "dist/installer"
+      "output": "dist/nsis-builder"
     },
     "win": {
       "icon": "Icon/Icon.ico",
@@ -29,14 +30,17 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "Odinote"
+      "shortcutName": "Odinote",
+      "license": "LICENSE"
     },
     "files": [
-      "**/*",
-      "!dist",
-      "!node_modules/electron",
-      "!node_modules/electron-packager",
-      "!node_modules/electron-builder"
+      "main.js",
+      "preload.js",
+      "index.html",
+      "LICENSE",
+      "Icon/**/*",
+      "lib/**/*",
+      "src/**/*"
     ]
   }
 }

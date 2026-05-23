@@ -155,26 +155,24 @@ ipcMain.handle('save-media', async (event, { folderPath, fileName, base64Data })
       fs.mkdirSync(mediaDir, { recursive: true });
     }
 
-    // Clean filename to prevent traversal
-    const safeName = path.basename(fileName).replace(/[^a-zA-Z0-9._-]/g, '_');
-    const fileExt = path.extname(safeName);
-    const baseName = path.basename(safeName, fileExt);
-
-    let finalName = safeName;
-    let destPath = path.join(mediaDir, finalName);
-    let counter = 1;
-    
-    // Resolve duplicate filenames
-    while (fs.existsSync(destPath)) {
-      finalName = `${baseName}_${counter}${fileExt}`;
-      destPath = path.join(mediaDir, finalName);
-      counter++;
-    }
-
-    // Convert base64 to binary buffer
+    // Convert base64 to binary buffer and generate content-based hash
     const base64Content = base64Data.split(',')[1] || base64Data;
     const buffer = Buffer.from(base64Content, 'base64');
     
+    const crypto = require('crypto');
+    const hash = crypto.createHash('sha256').update(base64Content).digest('hex').slice(0, 16);
+
+    const fileExt = path.extname(fileName) || '.png';
+    const baseName = path.basename(fileName, fileExt).replace(/[^a-zA-Z0-9._-]/g, '_');
+    const finalName = `${baseName}_${hash}${fileExt}`;
+    const destPath = path.join(mediaDir, finalName);
+
+    // De-duplication check: if file already exists, reuse it and skip writing
+    if (fs.existsSync(destPath)) {
+      logToFile(`IPC save-media: File already exists on disk, reusing: media/${finalName}`);
+      return `media/${finalName}`;
+    }
+
     fs.writeFileSync(destPath, buffer);
     logToFile(`IPC save-media: Saved successfully to media/${finalName}`);
     return `media/${finalName}`;

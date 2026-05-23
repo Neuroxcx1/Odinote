@@ -594,13 +594,14 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
             if (targetItem && targetItem.type === 'image') {
               // Replace existing image
               const w = targetItem.w || 260;
-              updateItem(targetId, { src, w, h: Math.max(60, Math.round(w / ratio)) });
+              updateItem(targetId, { src, name: file.name, w, h: Math.max(60, Math.round(w / ratio)) });
             } else {
               // Create a new image node at drop location
               const w = 300;
               const h = Math.max(60, Math.round(w / ratio));
               const newItem = makeNewItem('image', pt.x - w / 2, pt.y - h / 2, w, h, lang);
               newItem.src = src;
+              newItem.name = file.name;
               newItem.w = w;
               newItem.h = h;
               setCanvases(prev => {
@@ -611,7 +612,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
             }
           };
           img.onerror = () => {
-            if (targetItem && targetItem.type === 'image') updateItem(targetId, { src });
+            if (targetItem && targetItem.type === 'image') updateItem(targetId, { src, name: file.name });
           };
           img.src = src;
         };
