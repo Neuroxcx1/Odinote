@@ -161,4 +161,32 @@ document.addEventListener('DOMContentLoaded', () => {
     // Start particle burst
     animate();
   }
+
+  // ==========================================================
+  // ZOOM PREVENTION (Ctrl + Mousewheel)
+  // ==========================================================
+  window.addEventListener('wheel', (e) => {
+    if (e.ctrlKey) {
+      e.preventDefault();
+    }
+  }, { passive: false });
+
+  // ==========================================================
+  // INTERSECTION OBSERVER FOR SCROLL REVEAL ANIMATIONS
+  // ==========================================================
+  const revealElements = document.querySelectorAll('.reveal');
+  if (revealElements.length > 0) {
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('active');
+        }
+      });
+    }, {
+      threshold: 0.05,
+      rootMargin: '0px 0px -120px 0px'
+    });
+
+    revealElements.forEach(el => observer.observe(el));
+  }
 });

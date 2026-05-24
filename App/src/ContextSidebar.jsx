@@ -128,7 +128,7 @@ function ContextSidebar({
             // Step 3: otherwise close the sidebar entirely
             onClose();
           }}
-          title={lang==='es'?'Atrás':'Back'}
+          title={window.t('Atrás', 'Back')}
         >
           <span className="material-symbols-rounded">arrow_back</span>
         </button>
@@ -150,7 +150,7 @@ function ContextSidebar({
           title="Reacciones"
         >
           <span className="material-symbols-rounded">add_reaction</span>
-          <span>{lang==='es'?'Reacciones':'React'}</span>
+          <span>{window.t('Reacciones', 'React')}</span>
         </button>
 
         <button
@@ -159,7 +159,7 @@ function ContextSidebar({
           title="Comentarios"
         >
           <span className="material-symbols-rounded">chat_bubble</span>
-          <span>{lang==='es'?'Comentar':'Comment'}</span>
+          <span>{window.t('Comentar', 'Comment')}</span>
           {comments.length > 0 && <div className="ctx-badge">{comments.length}</div>}
         </button>
 
@@ -168,26 +168,26 @@ function ContextSidebar({
             <button
               className={`ctx-btn ${item.showTitle !== false ? 'active' : ''}`}
               onClick={()=>onUpdate({ showTitle: item.showTitle === false })}
-              title={lang==='es'?'Mostrar/ocultar título':'Toggle title'}
+              title={window.t('Mostrar/ocultar título', 'Toggle title')}
             >
               <span className="material-symbols-rounded">title</span>
-              <span>{lang==='es'?'Título':'Title'}</span>
+              <span>{window.t('Título', 'Title')}</span>
             </button>
             <button
               className={`ctx-btn ${pane === 'dueDate' ? 'active' : ''}`}
               onClick={()=>setPane(pane === 'dueDate' ? null : 'dueDate')}
-              title={lang==='es'?'Fecha límite':'Due date'}
+              title={window.t('Fecha límite', 'Due date')}
             >
               <span className="material-symbols-rounded">calendar_today</span>
-              <span>{lang==='es'?'Para':'Due'}</span>
+              <span>{window.t('Para', 'Due')}</span>
             </button>
             <button
               className={`ctx-btn ${pane === 'assign' ? 'active' : ''}`}
               onClick={()=>setPane(pane === 'assign' ? null : 'assign')}
-              title={lang==='es'?'Asignar':'Assign'}
+              title={window.t('Asignar', 'Assign')}
             >
               <span className="material-symbols-rounded">person</span>
-              <span>{lang==='es'?'Asignar':'Assign'}</span>
+              <span>{window.t('Asignar', 'Assign')}</span>
             </button>
             <div className="ctx-sep-h"/>
             <button
@@ -207,10 +207,10 @@ function ContextSidebar({
                   onUpdate({ items: nextItems });
                 }
               }}
-              title={lang==='es'?'Aumentar sangría':'Indent'}
+              title={window.t('Aumentar sangría', 'Indent')}
             >
               <span className="material-symbols-rounded">format_indent_increase</span>
-              <span>{lang==='es'?'Indentar':'Indent'}</span>
+              <span>{window.t('Indentar', 'Indent')}</span>
             </button>
             <button
               className="ctx-btn"
@@ -229,10 +229,10 @@ function ContextSidebar({
                   onUpdate({ items: nextItems });
                 }
               }}
-              title={lang==='es'?'Reducir sangría':'Outdent'}
+              title={window.t('Reducir sangría', 'Outdent')}
             >
               <span className="material-symbols-rounded">format_indent_decrease</span>
-              <span>{lang==='es'?'Desindentar':'Outdent'}</span>
+              <span>{window.t('Desindentar', 'Outdent')}</span>
             </button>
             <div className="ctx-sep-h"/>
           </>
@@ -243,15 +243,15 @@ function ContextSidebar({
             <button
               className={`ctx-btn ${item.showPreview !== false ? 'active' : ''}`}
               onClick={()=>onUpdate({ showPreview: item.showPreview === false })}
-              title={lang==='es'?'Alternar vista previa':'Toggle preview'}
+              title={window.t('Alternar vista previa', 'Toggle preview')}
             >
               <span className="material-symbols-rounded">image</span>
-              <span>{lang==='es'?'Vista previa':'Preview'}</span>
+              <span>{window.t('Vista previa', 'Preview')}</span>
             </button>
             <button
               className={`ctx-btn ${item.showInfo !== false ? 'active' : ''}`}
               onClick={()=>onUpdate({ showInfo: item.showInfo === false })}
-              title={lang==='es'?'Mostrar informacion':'Show info'}
+              title={window.t('Mostrar informacion', 'Show info')}
             >
               <span className="material-symbols-rounded">link</span>
               <span>Info</span>
@@ -262,18 +262,18 @@ function ContextSidebar({
                 const show = item.showCaption !== true;
                 onUpdate({ showCaption: show, h: show ? (item.h || 230) + 46 : Math.max(120, (item.h || 230) - 46) });
               }}
-              title={lang==='es'?'Leyenda':'Caption'}
+              title={window.t('Leyenda', 'Caption')}
             >
               <span className="material-symbols-rounded">notes</span>
-              <span>{lang==='es'?'Leyenda':'Caption'}</span>
+              <span>{window.t('Leyenda', 'Caption')}</span>
             </button>
             <button
               className="ctx-btn"
               onClick={()=>item.url && window.open(item.url, '_blank', 'noopener,noreferrer')}
-              title={lang==='es'?'Abrir enlace':'Open link'}
+              title={window.t('Abrir enlace', 'Open link')}
             >
               <span className="material-symbols-rounded">open_in_new</span>
-              <span>{lang==='es'?'Abrir':'Open'}</span>
+              <span>{window.t('Abrir', 'Open')}</span>
             </button>
           </>
         )}
@@ -282,10 +282,10 @@ function ContextSidebar({
           <button
             className={`ctx-btn ${pane === 'boardIcon' ? 'active' : ''}`}
             onClick={()=>setPane(pane === 'boardIcon' ? null : 'boardIcon')}
-            title={lang==='es'?'Cambiar icono':'Change icon'}
+            title={window.t('Cambiar icono', 'Change icon')}
           >
             <span className="material-symbols-rounded">{item.icon || (isColumn ? 'view_column' : 'dashboard')}</span>
-            <span>{lang==='es'?'Icono':'Icon'}</span>
+            <span>{window.t('Icono', 'Icon')}</span>
           </button>
         )}
 
@@ -294,10 +294,10 @@ function ContextSidebar({
             <button
               className={`ctx-btn ${item.loop === true ? 'active' : ''}`}
               onClick={()=>onUpdate({ loop: item.loop !== true })}
-              title={lang==='es'?'Bucle':'Loop'}
+              title={window.t('Bucle', 'Loop')}
             >
               <span className="material-symbols-rounded">loop</span>
-              <span>{lang==='es'?'Bucle':'Loop'}</span>
+              <span>{window.t('Bucle', 'Loop')}</span>
             </button>
             <button
               className={`ctx-btn ${item.showCaption === true ? 'active' : ''}`}
@@ -305,10 +305,10 @@ function ContextSidebar({
                 const show = item.showCaption !== true;
                 onUpdate({ showCaption: show, h: show ? (item.h || 140) + 40 : Math.max(100, (item.h || 140) - 40) });
               }}
-              title={lang==='es'?'Leyenda':'Caption'}
+              title={window.t('Leyenda', 'Caption')}
             >
               <span className="material-symbols-rounded">notes</span>
-              <span>{lang==='es'?'Leyenda':'Caption'}</span>
+              <span>{window.t('Leyenda', 'Caption')}</span>
             </button>
           </>
         )}
@@ -318,10 +318,10 @@ function ContextSidebar({
           <button
             className={`ctx-btn ${item.showTitle !== false ? 'active' : ''}`}
             onClick={()=>onUpdate({ showTitle: item.showTitle === false })}
-            title={lang==='es'?'Mostrar/ocultar título':'Toggle title'}
+            title={window.t('Mostrar/ocultar título', 'Toggle title')}
           >
             <span className="material-symbols-rounded">title</span>
-            <span>{lang==='es'?'Título':'Title'}</span>
+            <span>{window.t('Título', 'Title')}</span>
           </button>
         )}
 
@@ -330,7 +330,7 @@ function ContextSidebar({
           <button
             className={`ctx-btn ${item.showHex !== false ? 'active' : ''}`}
             onClick={()=>onUpdate({ showHex: item.showHex === false })}
-            title={lang==='es'?'Mostrar HEX':'Show HEX'}
+            title={window.t('Mostrar HEX', 'Show HEX')}
           >
             <span className="ctx-letter" style={{fontWeight:800, fontSize:13}}>#</span>
             <span>HEX</span>
@@ -354,10 +354,10 @@ function ContextSidebar({
                   onUpdate({ showPreview: false, showInfo: false, w: 200, h: 190 });
                 }
               }}
-              title={lang==='es'?'Vista previa':'Preview'}
+              title={window.t('Vista previa', 'Preview')}
             >
               <span className="material-symbols-rounded">image</span>
-              <span>{lang==='es'?'Vista previa':'Preview'}</span>
+              <span>{window.t('Vista previa', 'Preview')}</span>
             </button>
             {item.showPreview === true && (
               <button
@@ -378,14 +378,14 @@ function ContextSidebar({
             <button
               className={`ctx-btn ${item.showPreview !== false ? 'active' : ''}`}
               onClick={()=>onUpdate({ showPreview: item.showPreview === false })}
-              title={lang==='es'?'Vista previa':'Preview'}
+              title={window.t('Vista previa', 'Preview')}
             >
               <span className="material-symbols-rounded">image</span>
-              <span>{lang==='es'?'Vista previa':'Preview'}</span>
+              <span>{window.t('Vista previa', 'Preview')}</span>
             </button>
-            <button className="ctx-btn" onClick={downloadDocPdf} title={lang==='es'?'Descargar PDF':'Download PDF'}>
+            <button className="ctx-btn" onClick={downloadDocPdf} title={window.t('Descargar PDF', 'Download PDF')}>
               <span className="material-symbols-rounded">download</span>
-              <span>{lang==='es'?'Descargar':'Download'}</span>
+              <span>{window.t('Descargar', 'Download')}</span>
             </button>
           </>
         )}
@@ -399,10 +399,10 @@ function ContextSidebar({
               const dH = isImage ? 0 : 44; // image caption is an overlay (no extra height)
               onUpdate({ showCaption: show, h: show ? (item.h || 200) + dH : Math.max(80, (item.h || 200) - dH) });
             }}
-            title={lang==='es'?'Leyenda':'Caption'}
+            title={window.t('Leyenda', 'Caption')}
           >
             <span className="material-symbols-rounded">notes</span>
-            <span>{lang==='es'?'Leyenda':'Caption'}</span>
+            <span>{window.t('Leyenda', 'Caption')}</span>
           </button>
         )}
 
@@ -412,10 +412,10 @@ function ContextSidebar({
             <button
               className={`ctx-btn ${item.showTitle === true ? 'active' : ''}`}
               onClick={()=>onUpdate({ showTitle: item.showTitle !== true })}
-              title={lang==='es'?'Mostrar/ocultar título':'Toggle title'}
+              title={window.t('Mostrar/ocultar título', 'Toggle title')}
             >
               <span className="material-symbols-rounded">title</span>
-              <span>{lang==='es'?'Título':'Title'}</span>
+              <span>{window.t('Título', 'Title')}</span>
             </button>
           </>
         )}
@@ -426,10 +426,10 @@ function ContextSidebar({
             <button
               className={`ctx-btn ${pane === 'tblStyle' ? 'active' : ''}`}
               onClick={()=>setPane(pane === 'tblStyle' ? null : 'tblStyle')}
-              title={lang==='es'?'Estilo':'Style'}
+              title={window.t('Estilo', 'Style')}
             >
               <span className="material-symbols-rounded">text_format</span>
-              <span>{lang==='es'?'Estilo':'Style'}</span>
+              <span>{window.t('Estilo', 'Style')}</span>
             </button>
             <button
               className={`ctx-btn ${pane === 'tblColor' ? 'active' : ''}`}
@@ -442,52 +442,52 @@ function ContextSidebar({
             <button
               className="ctx-btn"
               onClick={()=>{ setPane(null); tableCell.startFormula && tableCell.startFormula(); }}
-              title={lang==='es'?'Fórmula (= en la celda)':'Formula (= in cell)'}
+              title={window.t('Fórmula (= en la celda)', 'Formula (= in cell)')}
             >
               <span style={{fontFamily:'serif', fontStyle:'italic', fontWeight:700, fontSize:14}}>fx</span>
-              <span>{lang==='es'?'Fórmula':'Formula'}</span>
+              <span>{window.t('Fórmula', 'Formula')}</span>
             </button>
             <button
               className={`ctx-btn ${pane === 'tblAlign' ? 'active' : ''}`}
               onClick={()=>setPane(pane === 'tblAlign' ? null : 'tblAlign')}
-              title={lang==='es'?'Alineación':'Alignment'}
+              title={window.t('Alineación', 'Alignment')}
             >
               <span className="material-symbols-rounded">format_align_center</span>
-              <span>{lang==='es'?'Alineación':'Align'}</span>
+              <span>{window.t('Alineación', 'Align')}</span>
             </button>
             <div className="ctx-sep-h"/>
             <button
               className="ctx-btn"
               onClick={()=>tableCell.addCol()}
-              title={lang==='es'?'Añadir columna':'Add column'}
+              title={window.t('Añadir columna', 'Add column')}
             >
               <span className="material-symbols-rounded">add_box</span>
-              <span>{lang==='es'?'Columna':'Column'}</span>
+              <span>{window.t('Columna', 'Column')}</span>
             </button>
             <button
               className="ctx-btn"
               onClick={()=>tableCell.addRow()}
-              title={lang==='es'?'Añadir fila':'Add row'}
+              title={window.t('Añadir fila', 'Add row')}
             >
               <span className="material-symbols-rounded">add_row_below</span>
-              <span>{lang==='es'?'Añadir fila':'Add row'}</span>
+              <span>{window.t('Añadir fila', 'Add row')}</span>
             </button>
             <div className="ctx-sep-h"/>
             <button
               className="ctx-btn danger"
               onClick={()=>tableCell.removeCol()}
-              title={lang==='es'?'Eliminar columna':'Remove column'}
+              title={window.t('Eliminar columna', 'Remove column')}
             >
               <span className="material-symbols-rounded">indeterminate_check_box</span>
-              <span>{lang==='es'?'Col -':'Col -'}</span>
+              <span>{window.t('Col -', 'Col -')}</span>
             </button>
             <button
               className="ctx-btn danger"
               onClick={()=>tableCell.removeRow()}
-              title={lang==='es'?'Eliminar fila':'Remove row'}
+              title={window.t('Eliminar fila', 'Remove row')}
             >
               <span className="material-symbols-rounded">remove</span>
-              <span>{lang==='es'?'Fila -':'Row -'}</span>
+              <span>{window.t('Fila -', 'Row -')}</span>
             </button>
           </>
         )}
@@ -496,10 +496,10 @@ function ContextSidebar({
           <button
             className={`ctx-btn`}
             onClick={()=>onOpen && onOpen()}
-            title={lang==='es'?'Abrir':'Open'}
+            title={window.t('Abrir', 'Open')}
           >
             <span className="material-symbols-rounded">open_in_full</span>
-            <span>{lang==='es'?'Abrir':'Open'}</span>
+            <span>{window.t('Abrir', 'Open')}</span>
           </button>
         )}
 
@@ -508,23 +508,23 @@ function ContextSidebar({
             <button
               className="ctx-btn"
               onClick={()=>onUpdate({ _triggerImagePick: true })}
-              title={lang==='es'?'Cambiar imagen':'Change image'}
+              title={window.t('Cambiar imagen', 'Change image')}
             >
               <span className="material-symbols-rounded">swap_horiz</span>
-              <span>{lang==='es'?'Cambiar':'Change'}</span>
+              <span>{window.t('Cambiar', 'Change')}</span>
             </button>
           </>
         )}
 
         <div className="ctx-sep-h"/>
 
-        <button className="ctx-btn" onClick={onDuplicate} title={lang==='es'?'Duplicar':'Duplicate'}>
+        <button className="ctx-btn" onClick={onDuplicate} title={window.t('Duplicar', 'Duplicate')}>
           <span className="material-symbols-rounded">content_copy</span>
-          <span>{lang==='es'?'Duplicar':'Duplicate'}</span>
+          <span>{window.t('Duplicar', 'Duplicate')}</span>
         </button>
-        <button className="ctx-btn danger" onClick={onDelete} title={lang==='es'?'Eliminar':'Delete'}>
+        <button className="ctx-btn danger" onClick={onDelete} title={window.t('Eliminar', 'Delete')}>
           <span className="material-symbols-rounded">delete</span>
-          <span>{lang==='es'?'Eliminar':'Delete'}</span>
+          <span>{window.t('Eliminar', 'Delete')}</span>
         </button>
       </div>
 
@@ -532,7 +532,7 @@ function ContextSidebar({
       {pane === 'color' && (
         <div className="ctx-popout">
           <div className="ctx-pop-section">
-            <div className="ctx-pop-title">{isColumn ? (lang==='es'?'Color de la franja':'Strip color') : (lang==='es'?'Color de fondo':'Background')}</div>
+            <div className="ctx-pop-title">{isColumn ? (window.t('Color de la franja', 'Strip color')) : (window.t('Color de fondo', 'Background'))}</div>
             <div className="ctx-sticky-grid">
               {STICKY_PALETTE.map(p => (
                 <button
@@ -551,7 +551,7 @@ function ContextSidebar({
       {pane === 'colorHex' && (
         <div className="ctx-popout">
           <div className="ctx-pop-section">
-            <div className="ctx-pop-title">{lang==='es'?'Color':'Color'}</div>
+            <div className="ctx-pop-title">{window.t('Color', 'Color')}</div>
             <div className="ctx-colorhex">
               <input
                 type="color"
@@ -574,7 +574,7 @@ function ContextSidebar({
       {pane === 'boardIcon' && (
         <div className="ctx-popout">
           <div className="ctx-pop-section">
-            <div className="ctx-pop-title">{lang==='es'?'Icono del tablero':'Board icon'}</div>
+            <div className="ctx-pop-title">{window.t('Icono del tablero', 'Board icon')}</div>
             <div className="ctx-icon-grid">
               {BOARD_ICON_CHOICES.map(ic => (
                 <button
@@ -594,7 +594,7 @@ function ContextSidebar({
       {pane === 'emoji' && (
         <div className="ctx-popout">
           <div className="ctx-pop-section">
-            <div className="ctx-pop-title">{lang==='es'?'Reacciones':'Reactions'}</div>
+            <div className="ctx-pop-title">{window.t('Reacciones', 'Reactions')}</div>
             <div className="ctx-emoji-grid">
               {EMOJI_OPTIONS.map(e => (
                 <button key={e} className="ctx-emoji-btn" onClick={()=>addReaction(e)}>{e}</button>
@@ -602,7 +602,7 @@ function ContextSidebar({
             </div>
             {Object.keys(reactions).length > 0 && (
               <>
-                <div className="ctx-pop-sub">{lang==='es'?'Actuales':'Current'}</div>
+                <div className="ctx-pop-sub">{window.t('Actuales', 'Current')}</div>
                 <div className="ctx-reactions-current">
                   {Object.entries(reactions).map(([emoji, count]) => (
                     <button
@@ -614,7 +614,7 @@ function ContextSidebar({
                         else next[emoji] = count - 1;
                         onUpdate({ reactions: next });
                       }}
-                      title={lang==='es'?'Clic para quitar':'Click to remove'}
+                      title={window.t('Clic para quitar', 'Click to remove')}
                     >
                       <span style={{fontSize:13}}>{emoji}</span>
                       <span>{count}</span>
@@ -630,11 +630,11 @@ function ContextSidebar({
       {pane === 'comments' && (
         <div className="ctx-popout">
           <div className="ctx-pop-section">
-            <div className="ctx-pop-title">{lang==='es'?`Comentarios (${comments.length})`:`Comments (${comments.length})`}</div>
+            <div className="ctx-pop-title">{window.t(`Comentarios (${comments.length})`, `Comments (${comments.length})`)}</div>
             <div className="ctx-comments-list">
               {comments.length === 0 && (
                 <div className="ctx-comments-empty">
-                  {lang==='es'?'Sin comentarios aún':'No comments yet'}
+                  {window.t('Sin comentarios aún', 'No comments yet')}
                 </div>
               )}
               {comments.map(c => (
@@ -648,7 +648,7 @@ function ContextSidebar({
                     <button
                       className="ctx-comment-del"
                       onClick={()=>onUpdate({ comments: comments.filter(cm => cm.id !== c.id) })}
-                      title={lang==='es'?'Eliminar comentario':'Delete comment'}
+                      title={window.t('Eliminar comentario', 'Delete comment')}
                     >
                       <span className="material-symbols-rounded">close</span>
                     </button>
@@ -682,13 +682,13 @@ function ContextSidebar({
           <div className="ctx-popout">
             <div className="ctx-pop-section">
               <div className="ctx-pop-title">
-                {lang==='es'?'Fecha límite':'Due date'}
-                {!hasActiveRow && <div style={{fontSize:10,color:'var(--ink-3)',marginTop:2}}>{lang==='es'?'Enfoca una tarea primero':'Focus a task first'}</div>}
+                {window.t('Fecha límite', 'Due date')}
+                {!hasActiveRow && <div style={{fontSize:10,color:'var(--ink-3)',marginTop:2}}>{window.t('Enfoca una tarea primero', 'Focus a task first')}</div>}
               </div>
               {hasActiveRow && (
                 <>
                   <label className="ctx-field">
-                     <span>{lang==='es'?'Fecha':'Date'}</span>
+                     <span>{window.t('Fecha', 'Date')}</span>
                      <input
                        type="date"
                        value={rowDate}
@@ -698,7 +698,7 @@ function ContextSidebar({
                   {rowDate && (
                     <button className="ctx-btn danger" style={{marginTop:6}} onClick={()=>{ updateLiveRowMeta({ dueDate: null }); window._notifyFocusedRowChanged?.(); }}>
                       <span className="material-symbols-rounded">close</span>
-                      <span>{lang==='es'?'Quitar':'Remove'}</span>
+                      <span>{window.t('Quitar', 'Remove')}</span>
                     </button>
                   )}
                 </>
@@ -728,16 +728,16 @@ function ContextSidebar({
           <div className="ctx-popout">
             <div className="ctx-pop-section">
               <div className="ctx-pop-title">
-                {lang==='es'?'Asignar a':'Assign to'}
-                {!hasActiveRow && <div style={{fontSize:10,color:'var(--ink-3)',marginTop:2}}>{lang==='es'?'Enfoca una tarea primero':'Focus a task first'}</div>}
+                {window.t('Asignar a', 'Assign to')}
+                {!hasActiveRow && <div style={{fontSize:10,color:'var(--ink-3)',marginTop:2}}>{window.t('Enfoca una tarea primero', 'Focus a task first')}</div>}
               </div>
               {hasActiveRow && (
                 <label className="ctx-field">
-                  <span>{lang==='es'?'Persona':'Person'}</span>
+                  <span>{window.t('Persona', 'Person')}</span>
                   <input
                      type="text"
                      value={rowAssignee}
-                     placeholder={lang==='es'?'Nombre…':'Name…'}
+                     placeholder={window.t('Nombre…', 'Name…')}
                      onChange={(e)=>{ updateLiveRowMeta({ assignee: e.target.value || null }); window._notifyFocusedRowChanged?.(); }}
                   />
                 </label>
@@ -750,7 +750,7 @@ function ContextSidebar({
       {pane === 'tblStyle' && tableCell && (
         <div className="ctx-popout">
           <div className="ctx-pop-section">
-            <div className="ctx-pop-title">{lang==='es'?'Estilo':'Style'}</div>
+            <div className="ctx-pop-title">{window.t('Estilo', 'Style')}</div>
             <div style={{display:'flex', gap:4, flexWrap:'wrap'}}>
               {[
                 { k: 'bold',      icon: 'format_bold', label: 'B' },
@@ -776,13 +776,13 @@ function ContextSidebar({
       {pane === 'tblColor' && tableCell && (
         <div className="ctx-popout">
           <div className="ctx-pop-section">
-            <div className="ctx-pop-title">{lang==='es'?'Color de celda':'Cell color'}</div>
+            <div className="ctx-pop-title">{window.t('Color de celda', 'Cell color')}</div>
             <div className="ctx-sticky-grid">
               <button
                 className={`ctx-sticky-swatch ${!tableCell.cellData?.color ? 'active' : ''}`}
                 style={{ background: 'transparent', border: '1.5px dashed var(--line-soft)' }}
                 onClick={()=>tableCell.updateCell({ color: null })}
-                title={lang==='es'?'Ninguno':'None'}
+                title={window.t('Ninguno', 'None')}
               />
               {STICKY_PALETTE.map(p => (
                 <button
@@ -801,7 +801,7 @@ function ContextSidebar({
       {pane === 'tblAlign' && tableCell && (
         <div className="ctx-popout">
           <div className="ctx-pop-section">
-            <div className="ctx-pop-title">{lang==='es'?'Alineación':'Alignment'}</div>
+            <div className="ctx-pop-title">{window.t('Alineación', 'Alignment')}</div>
             <div style={{display:'flex', gap: 4}}>
               {['left','center','right','justify'].map(a => (
                 <button
@@ -887,13 +887,13 @@ function CommentComposer({ onSubmit, lang }) {
       <textarea
         value={draft}
         onChange={(e)=>setDraft(e.target.value)}
-        placeholder={lang==='es'?'Escribe un comentario…':'Write a comment…'}
+        placeholder={window.t('Escribe un comentario…', 'Write a comment…')}
         onKeyDown={(e)=>{
           if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submit(); }
         }}
       />
       <button className="btn btn-primary press" onClick={submit} disabled={!draft.trim()}>
-        {lang==='es'?'Enviar':'Send'}
+        {window.t('Enviar', 'Send')}
       </button>
     </div>
   );

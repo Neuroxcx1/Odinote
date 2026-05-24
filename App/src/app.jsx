@@ -161,25 +161,31 @@ function App() {
 
   const ignoreNextPersistRef = React.useRef(false);
 
+  const MOCK_UPDATE_TEST = true; // Cambiar a false en producción. Habilita probar la campana en local.
+
   const checkUpdates = async (manual = false) => {
     if (checkingUpdates) return;
     if (manual) setCheckingUpdates(true);
     try {
+      if (MOCK_UPDATE_TEST) {
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        setUpdateAvailable(true);
+        if (manual) {
+          alert(window.t('¡Nueva versión disponible: v1.0.3! Haz clic en la campana para descargarla.', 'New version available: v1.0.3! Click the bell to download it.'));
+        }
+        return;
+      }
       const res = await fetch('https://api.github.com/repos/Neuroxcx1/Odinote/releases');
       if (!res.ok) {
         if (manual) {
-          alert(lang === 'es' 
-            ? 'No se pudieron comprobar las actualizaciones. Comprueba tu conexión.' 
-            : 'Could not check for updates. Please check your connection.');
+          alert(window.t('No se pudieron comprobar las actualizaciones. Comprueba tu conexión.', 'Could not check for updates. Please check your connection.'));
         }
         return;
       }
       const data = await res.json();
       if (!Array.isArray(data) || data.length === 0) {
         if (manual) {
-          alert(lang === 'es'
-            ? '¡Estás al día! Odinote está en su versión más reciente (v1.0.2).'
-            : 'You are up to date! Odinote is on the latest version (v1.0.2).');
+          alert(window.t('¡Estás al día! Odinote está en su versión más reciente (v1.0.2).', 'You are up to date! Odinote is on the latest version (v1.0.2).'));
         }
         return;
       }
@@ -187,9 +193,7 @@ function App() {
       const latestVersion = latestRelease.tag_name;
       if (!latestVersion) {
         if (manual) {
-          alert(lang === 'es'
-            ? '¡Estás al día! Odinote está en su versión más reciente (v1.0.2).'
-            : 'You are up to date! Odinote is on the latest version (v1.0.2).');
+          alert(window.t('¡Estás al día! Odinote está en su versión más reciente (v1.0.2).', 'You are up to date! Odinote is on the latest version (v1.0.2).'));
         }
         return;
       }
@@ -215,24 +219,18 @@ function App() {
       if (hasNew) {
         setUpdateAvailable(true);
         if (manual) {
-          alert(lang === 'es'
-            ? `¡Nueva versión disponible: v${cleanLatest}! Haz clic en la campana para descargarla.`
-            : `New version available: v${cleanLatest}! Click the bell to download it.`);
+          alert(window.t(`¡Nueva versión disponible: v${cleanLatest}! Haz clic en la campana para descargarla.`, `New version available: v${cleanLatest}! Click the bell to download it.`));
         }
       } else {
         setUpdateAvailable(false);
         if (manual) {
-          alert(lang === 'es'
-            ? '¡Estás al día! Odinote está en su versión más reciente (v1.0.2).'
-            : 'You are up to date! Odinote is on the latest version (v1.0.2).');
+          alert(window.t('¡Estás al día! Odinote está en su versión más reciente (v1.0.2).', 'You are up to date! Odinote is on the latest version (v1.0.2).'));
         }
       }
     } catch (err) {
       console.error('Failed to check for updates:', err);
       if (manual) {
-        alert(lang === 'es'
-          ? 'Error al comprobar actualizaciones. Comprueba tu conexión a internet.'
-          : 'Error checking for updates. Please check your internet connection.');
+        alert(window.t('Error al comprobar actualizaciones. Comprueba tu conexión a internet.', 'Error checking for updates. Please check your internet connection.'));
       }
     } finally {
       if (manual) setCheckingUpdates(false);
@@ -254,26 +252,59 @@ function App() {
     }
   };
 
-  // Load state on startup (Electron Local Folder Vault has precedence, falls back to browser IndexedDB)
+  // Prevent Ctrl + Mousewheel zoom
   useEffectApp(() => {
-    const savedVault = localStorage.getItem('odinote.vault_path');
-    if (savedVault && window.electronAPI) {
-      setVaultPath(savedVault);
-      window.electronAPI.readVault(savedVault).then(vaultState => {
-        if (vaultState) {
-          const migrated = migrateTemplates(vaultState);
-          ignoreNextPersistRef.current = true;
-          if (migrated.view) setView(migrated.view);
-          if (migrated.lang) setLang(migrated.lang);
-          if (migrated.theme) setTheme(migrated.theme);
-          if (migrated.projects) setProjects(migrated.projects);
-          if (migrated.canvases) setCanvases(cleanCanvases(migrated.canvases));
-        }
-        setLoading(false);
-      }).catch(() => {
-        localStorage.removeItem('odinote.vault_path');
-        setVaultPath(null);
-        // load fallback from browser IndexedDB
+    const handleWheel = (e) => {
+      if (e.ctrlKey) {
+        e.preventDefault();
+      }
+    };
+    window.addEventListener('wheel', handleWheel, { passive: false });
+    return () => window.removeEventListener('wheel', handleWheel);
+  }, []);
+  useEffectApp(() => {
+    const initVault = async () => {
+      let savedVault = null;
+      if (window.electronAPI && window.electronAPI.getVaultPath) {
+        savedVault = await window.electronAPI.getVaultPath();
+      } else {
+        savedVault = localStorage.getItem('odinote.vault_path');
+      }
+
+      if (savedVault) {
+        setVaultPath(savedVault);
+        window.electronAPI.readVault(savedVault).then(vaultState => {
+          if (vaultState) {
+            const migrated = migrateTemplates(vaultState);
+            ignoreNextPersistRef.current = true;
+            if (migrated.view) setView(migrated.view);
+            if (migrated.lang) setLang(migrated.lang);
+            if (migrated.theme) setTheme(migrated.theme);
+            if (migrated.projects) setProjects(migrated.projects);
+            if (migrated.canvases) setCanvases(cleanCanvases(migrated.canvases));
+          }
+          setLoading(false);
+        }).catch(() => {
+          if (window.electronAPI && window.electronAPI.setVaultPath) {
+            window.electronAPI.setVaultPath(null);
+          }
+          localStorage.removeItem('odinote.vault_path');
+          setVaultPath(null);
+          // load fallback from browser IndexedDB
+          loadStateFromDB().then(dbState => {
+            if (dbState) {
+              const migrated = migrateTemplates(dbState);
+              ignoreNextPersistRef.current = true;
+              if (migrated.view) setView(migrated.view);
+              if (migrated.lang) setLang(migrated.lang);
+              if (migrated.theme) setTheme(migrated.theme);
+              if (migrated.projects) setProjects(migrated.projects);
+              if (migrated.canvases) setCanvases(cleanCanvases(migrated.canvases));
+            }
+            setLoading(false);
+          });
+        });
+      } else {
         loadStateFromDB().then(dbState => {
           if (dbState) {
             const migrated = migrateTemplates(dbState);
@@ -283,40 +314,28 @@ function App() {
             if (migrated.theme) setTheme(migrated.theme);
             if (migrated.projects) setProjects(migrated.projects);
             if (migrated.canvases) setCanvases(cleanCanvases(migrated.canvases));
+          } else {
+            // Fallback / migration from localStorage
+            try {
+              const raw = localStorage.getItem(STORE_KEY);
+              if (raw) {
+                const localState = JSON.parse(raw);
+                const migrated = migrateTemplates(localState);
+                ignoreNextPersistRef.current = true;
+                if (migrated.view) setView(migrated.view);
+                if (migrated.lang) setLang(migrated.lang);
+                if (migrated.theme) setTheme(migrated.theme);
+                if (migrated.projects) setProjects(migrated.projects);
+                if (migrated.canvases) setCanvases(cleanCanvases(migrated.canvases));
+                saveStateToDB(migrated);
+              }
+            } catch {}
           }
           setLoading(false);
         });
-      });
-    } else {
-      loadStateFromDB().then(dbState => {
-        if (dbState) {
-          const migrated = migrateTemplates(dbState);
-          ignoreNextPersistRef.current = true;
-          if (migrated.view) setView(migrated.view);
-          if (migrated.lang) setLang(migrated.lang);
-          if (migrated.theme) setTheme(migrated.theme);
-          if (migrated.projects) setProjects(migrated.projects);
-          if (migrated.canvases) setCanvases(cleanCanvases(migrated.canvases));
-        } else {
-          // Fallback / migration from localStorage
-          try {
-            const raw = localStorage.getItem(STORE_KEY);
-            if (raw) {
-              const localState = JSON.parse(raw);
-              const migrated = migrateTemplates(localState);
-              ignoreNextPersistRef.current = true;
-              if (migrated.view) setView(migrated.view);
-              if (migrated.lang) setLang(migrated.lang);
-              if (migrated.theme) setTheme(migrated.theme);
-              if (migrated.projects) setProjects(migrated.projects);
-              if (migrated.canvases) setCanvases(cleanCanvases(migrated.canvases));
-              saveStateToDB(migrated);
-            }
-          } catch {}
-        }
-        setLoading(false);
-      });
-    }
+      }
+    };
+    initVault();
   }, []);
 
 
@@ -324,6 +343,7 @@ function App() {
   useEffectApp(() => {
     document.body.setAttribute('data-theme', theme);
     document.body.setAttribute('data-lang', lang);
+    window.currentLang = lang;
   }, [theme, lang]);
 
   const savingMediaRef = React.useRef(new Set());
@@ -422,6 +442,9 @@ function App() {
     if (!path) return;
     
     setLoading(true);
+    if (window.electronAPI.setVaultPath) {
+      await window.electronAPI.setVaultPath(path);
+    }
     localStorage.setItem('odinote.vault_path', path);
     setVaultPath(path);
     
@@ -440,7 +463,7 @@ function App() {
         await window.electronAPI.writeVault(path, { view, lang, theme, projects, canvases, templatesVersion: 2 });
       }
     } catch (err) {
-      alert(lang === 'es' ? 'No se pudo leer la boveda seleccionada.' : 'Could not read the selected vault.');
+      alert(window.t('No se pudo leer la boveda seleccionada.', 'Could not read the selected vault.'));
     } finally {
       setLoading(false);
     }
@@ -448,6 +471,9 @@ function App() {
 
   const closeLocalVault = () => {
     setLoading(true);
+    if (window.electronAPI && window.electronAPI.setVaultPath) {
+      window.electronAPI.setVaultPath(null);
+    }
     localStorage.removeItem('odinote.vault_path');
     setVaultPath(null);
     
@@ -562,7 +588,7 @@ function App() {
           const parsed = JSON.parse(reader.result);
           const state = parsed.state || parsed;
           if (!state.projects || !state.canvases) {
-            alert(lang === 'es' ? 'Este archivo no parece ser un respaldo valido de Odinote.' : 'This file does not look like a valid Odinote backup.');
+            alert(window.t('Este archivo no parece ser un respaldo valido de Odinote.', 'This file does not look like a valid Odinote backup.'));
             return;
           }
           setView(state.view || { kind: 'home' });
@@ -571,7 +597,7 @@ function App() {
           setProjects(state.projects);
           setCanvases(state.canvases);
         } catch {
-          alert(lang === 'es' ? 'No se pudo importar el respaldo.' : 'The backup could not be imported.');
+          alert(window.t('No se pudo importar el respaldo.', 'The backup could not be imported.'));
         }
       };
       reader.readAsText(file);

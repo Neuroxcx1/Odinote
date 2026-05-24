@@ -66,7 +66,7 @@ function Topbar({
             if (entry.ellipsis) {
               return (
                 <React.Fragment key="ellipsis">
-                  <div className="crumb crumb-ellipsis" title={lang==='es'?'Niveles ocultos':'Hidden levels'}>…</div>
+                  <div className="crumb crumb-ellipsis" title={window.t('Niveles ocultos', 'Hidden levels')}>…</div>
                   <span className="crumb-sep">/</span>
                 </React.Fragment>
               );
@@ -99,7 +99,7 @@ function Topbar({
             {idx === 13 && <div className="tool-divider"/>}
             <button
               className={`tool press ${activeTool === tool.id ? 'active' : ''}`}
-              title={`${t[tool.label]} · ${lang==='es'?'Arrastra al canvas o clic':'Drag to canvas or click'}`}
+              title={`${t[tool.label]} · ${window.t('Arrastra al canvas o clic', 'Drag to canvas or click')}`}
               onMouseDown={(e)=>startToolDrag(e, tool.id)}
             >
               <div
@@ -121,10 +121,10 @@ function Topbar({
         <button
           className="kofi-topbar-btn"
           onClick={() => window.open('https://ko-fi.com/W3G31ZYE06', '_blank', 'noopener,noreferrer')}
-          title={lang === 'es' ? 'Apóyame en Ko-fi' : 'Support me on Ko-fi'}
+          title={window.t('Apóyame en Ko-fi', 'Support me on Ko-fi')}
         >
           <span className="material-symbols-rounded kofi-icon">coffee</span>
-          <span>{lang === 'es' ? 'Apoyar' : 'Support'}</span>
+          <span>{window.t('Apoyar', 'Support')}</span>
         </button>
       </div>
 
@@ -140,8 +140,8 @@ function Topbar({
             onClick={onUpdateClick}
             title={
               updateAvailable
-                ? (lang === 'es' ? '¡Nueva actualización disponible! Haz clic para descargar de GitHub.' : 'New update available! Click to download from GitHub.')
-                : (lang === 'es' ? 'Buscar actualizaciones' : 'Check for updates')
+                ? (window.t('¡Nueva actualización disponible! Haz clic para descargar de GitHub.', 'New update available! Click to download from GitHub.'))
+                : (window.t('Buscar actualizaciones', 'Check for updates'))
             }
           >
             <span className="material-symbols-rounded">
@@ -163,8 +163,18 @@ function Topbar({
           <span className="material-symbols-rounded">{theme === 'dark' ? 'light_mode' : 'dark_mode'}</span>
         </button>
         <div className="lang-switch">
-          <button className={lang==='es'?'active':''} onClick={()=>setLang('es')}>ES</button>
-          <button className={lang==='en'?'active':''} onClick={()=>setLang('en')}>EN</button>
+          <select value={lang} onChange={(e)=>setLang(e.target.value)} className="lang-select">
+            <option value="es">ES</option>
+            <option value="en">EN</option>
+            <option value="fr">FR</option>
+            <option value="de">DE</option>
+            <option value="it">IT</option>
+            <option value="pt">PT</option>
+            <option value="zh">ZH</option>
+            <option value="ja">JA</option>
+            <option value="ko">KO</option>
+            <option value="ar">AR</option>
+          </select>
         </div>
       </div>
     </div>

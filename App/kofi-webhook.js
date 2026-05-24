@@ -22,8 +22,8 @@ const cors = require('cors');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Configuración de Ko-fi
-const KOFI_VERIFICATION_TOKEN = 'fd67ed4c-f7d7-47fc-a652-124d36eccf30'; // Tu token de verificación de la imagen
+// Configuración de Ko-fi (SEGURO: lee el token desde variables de entorno de producción. Si no está definido, usa el valor de respaldo local)
+const KOFI_VERIFICATION_TOKEN = process.env.KOFI_VERIFICATION_TOKEN || 'fd67ed4c-f7d7-47fc-a652-124d36eccf30';
 const DONATIONS_FILE_PATH = path.join(__dirname, 'donations.json'); // Archivo que servirá la app de Odinote
 const MAX_DONATIONS_LIST = 10; // Número máximo de donantes recientes a conservar
 

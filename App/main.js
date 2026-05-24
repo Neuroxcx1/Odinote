@@ -123,6 +123,42 @@ function createWindow() {
 }
 
 // IPC Handlers
+const configPath = path.join(app.getPath('userData'), 'config.json');
+
+ipcMain.handle('get-vault-path', async () => {
+  logToFile('IPC Call: get-vault-path');
+  try {
+    if (fs.existsSync(configPath)) {
+      const content = fs.readFileSync(configPath, 'utf-8');
+      const config = JSON.parse(content);
+      logToFile(`IPC get-vault-path: Found vault path in config: ${config.vaultPath}`);
+      return config.vaultPath || null;
+    }
+  } catch (err) {
+    logToFile(`IPC get-vault-path ERROR: ${err.message}`);
+  }
+  return null;
+});
+
+ipcMain.handle('set-vault-path', async (event, vaultPath) => {
+  logToFile(`IPC Call: set-vault-path to ${vaultPath}`);
+  try {
+    let config = {};
+    if (fs.existsSync(configPath)) {
+      try {
+        config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+      } catch (e) {}
+    }
+    config.vaultPath = vaultPath;
+    fs.writeFileSync(configPath, JSON.stringify(config, null, 2), 'utf-8');
+    logToFile(`IPC set-vault-path: Saved successfully to config.json.`);
+    return true;
+  } catch (err) {
+    logToFile(`IPC set-vault-path ERROR: ${err.message}`);
+    throw err;
+  }
+});
+
 ipcMain.handle('select-folder', async () => {
   logToFile('IPC Call: select-folder');
   const result = await dialog.showOpenDialog({

@@ -195,7 +195,7 @@ function NoteItem({ item, lang, editing, onUpdate }) {
             className="note-edit rich"
             contentEditable
             suppressContentEditableWarning
-            data-placeholder={lang==='es'?'Escribe tu nota…':'Write your note…'}
+            data-placeholder={window.t('Escribe tu nota…', 'Write your note…')}
             onInput={(e) => { onInput(); scheduleHighlight(); }}
             onBlur={reHighlight}
             onClick={(e)=>e.stopPropagation()}
@@ -480,7 +480,7 @@ function NodeCaption({ item, lang, onUpdate, className, placeholder, style, auto
       style={style}
       contentEditable
       suppressContentEditableWarning
-      data-placeholder={placeholder || (lang === 'es' ? 'Añade una leyenda…' : 'Add a caption…')}
+      data-placeholder={placeholder || (window.t('Añade una leyenda…', 'Add a caption…'))}
       onInput={commit}
       onClick={(e)=>e.stopPropagation()}
       onMouseDown={(e)=>e.stopPropagation()}
@@ -548,7 +548,7 @@ function ImageItem({ item, lang, onUpdate }) {
               className="image-change-btn"
               onClick={(e)=>{ e.stopPropagation(); fileRef.current?.click(); }}
               onMouseDown={(e)=>e.stopPropagation()}
-              title={lang==='es'?'Cambiar imagen':'Change image'}
+              title={window.t('Cambiar imagen', 'Change image')}
             >
               <span className="material-symbols-rounded">swap_horiz</span>
             </button>
@@ -568,7 +568,7 @@ function ImageItem({ item, lang, onUpdate }) {
           >
             <span className="material-symbols-rounded">add_photo_alternate</span>
             <span style={{fontSize:11, fontWeight: 600, textAlign:'center', lineHeight:1.3}}>
-              {lang==='es'?'Clic · pegar · soltar imagen':'Click · paste · drop image'}
+              {window.t('Clic · pegar · soltar imagen', 'Click · paste · drop image')}
             </span>
           </div>
         )}
@@ -681,7 +681,7 @@ function LinkItem({ item, lang, onUpdate, editing, onEndEdit }) {
             <input
               className="link-input"
               autoFocus
-              placeholder={lang==='es'?'Pega un enlace…':'Paste a link…'}
+              placeholder={window.t('Pega un enlace…', 'Paste a link…')}
               value={item.url || ''}
               onClick={(e)=>e.stopPropagation()}
               onMouseDown={(e)=>e.stopPropagation()}
@@ -699,7 +699,7 @@ function LinkItem({ item, lang, onUpdate, editing, onEndEdit }) {
             />
           </div>
           <div className="link-edit-hint">
-            {lang==='es' ? 'Enter para guardar · Esc para salir' : 'Enter to save · Esc to exit'}
+            {window.t('Enter para guardar · Esc para salir', 'Enter to save · Esc to exit')}
           </div>
         </div>
       </div>
@@ -708,7 +708,7 @@ function LinkItem({ item, lang, onUpdate, editing, onEndEdit }) {
 
   const thumb = showPreview ? (meta?.thumb || fetched?.image) : null;
   const titleVal = item.title != null ? item.title : (fetched?.title || meta?.title || '');
-  const titlePlaceholder = lang==='es' ? 'Título del enlace…' : 'Link title…';
+  const titlePlaceholder = window.t('Título del enlace…', 'Link title…');
   const desc = fetched?.description;
   const openLink = () => item.url && window.open(item.url, '_blank', 'noopener,noreferrer');
 
@@ -720,7 +720,7 @@ function LinkItem({ item, lang, onUpdate, editing, onEndEdit }) {
           className="link-thumb"
           style={ thumb && !playing ? { backgroundImage: `url(${thumb})` } : null }
           onClick={(e)=>{ if (!ytId) { e.stopPropagation(); openLink(); } }}
-          title={!ytId ? (lang==='es'?'Abrir enlace':'Open link') : null}
+          title={!ytId ? (window.t('Abrir enlace', 'Open link')) : null}
         >
           {ytId && playing ? (
             <iframe
@@ -739,7 +739,7 @@ function LinkItem({ item, lang, onUpdate, editing, onEndEdit }) {
                   className="link-play-btn"
                   onClick={(e)=>{ e.stopPropagation(); setPlaying(true); }}
                   onMouseDown={(e)=>e.stopPropagation()}
-                  title={lang==='es'?'Reproducir':'Play'}
+                  title={window.t('Reproducir', 'Play')}
                 >
                   <span className="material-symbols-rounded">play_arrow</span>
                 </button>
@@ -769,7 +769,7 @@ function LinkItem({ item, lang, onUpdate, editing, onEndEdit }) {
               className="link-open-btn"
               onClick={(e)=>{ e.stopPropagation(); openLink(); }}
               onMouseDown={(e)=>e.stopPropagation()}
-              title={lang==='es'?'Abrir enlace':'Open link'}
+              title={window.t('Abrir enlace', 'Open link')}
             >
               <span className="material-symbols-rounded">open_in_new</span>
             </button>
@@ -890,7 +890,7 @@ function TodoItem({ item, lang, onUpdate, editing, callbacks }) {
                 onKeyDown={(e)=>{ if (e.key==='Enter' || e.key==='Escape') e.target.blur(); }}
               />
             ) : (
-              <span>{pickLang(item.title, lang) || (lang==='es'?'Pendientes':'To-do')}</span>
+              <span>{pickLang(item.title, lang) || (window.t('Pendientes', 'To-do'))}</span>
             )}
           </div>
         )}
@@ -919,7 +919,7 @@ function TodoItem({ item, lang, onUpdate, editing, callbacks }) {
                   <input
                     className="todo-input"
                     value={pickLang(ti.text, lang)}
-                    placeholder={lang==='es' ? 'Tarea…' : 'Task…'}
+                    placeholder={window.t('Tarea…', 'Task…')}
                     onChange={(e)=>updateRow(idx, { text: { es: e.target.value, en: e.target.value } })}
                     onClick={(e)=>e.stopPropagation()}
                     onMouseDown={(e)=>{ callbacks?.selectItem?.(item.id); e.stopPropagation(); }}
@@ -961,7 +961,7 @@ function TodoItem({ item, lang, onUpdate, editing, callbacks }) {
                         <span
                           className="todo-meta-chip assignee"
                           onClick={(e)=>{ e.stopPropagation(); updateRow(idx, { assignee: null }); }}
-                          title={lang==='es'?'Clic para quitar':'Click to remove'}
+                          title={window.t('Clic para quitar', 'Click to remove')}
                         >
                           @{ti.assignee}
                         </span>
@@ -970,10 +970,10 @@ function TodoItem({ item, lang, onUpdate, editing, callbacks }) {
                         <span
                           className="todo-meta-chip due"
                           onClick={(e)=>{ e.stopPropagation(); updateRow(idx, { dueDate: null }); }}
-                          title={lang==='es'?'Clic para quitar':'Click to remove'}
+                          title={window.t('Clic para quitar', 'Click to remove')}
                         >
                           <span className="material-symbols-rounded">notifications</span>
-                          {lang==='es'?'Vence':'Due'} {(() => {
+                          {window.t('Vence', 'Due')} {(() => {
                             const d = new Date(ti.dueDate + 'T00:00:00');
                             return isNaN(d.getTime()) ? ti.dueDate : d.toLocaleDateString(lang, { day:'numeric', month:'short' });
                           })()}
@@ -998,7 +998,7 @@ function TodoItem({ item, lang, onUpdate, editing, callbacks }) {
             onMouseDown={(e)=>e.stopPropagation()}
           >
             <span className="material-symbols-rounded">add</span>
-            <span>{lang==='es'?'Nueva tarea':'New task'}</span>
+            <span>{window.t('Nueva tarea', 'New task')}</span>
           </div>
         </div>
       </div>
@@ -1033,11 +1033,11 @@ function ColumnItem({ item, lang, onUpdate, editing, callbacks }) {
                 style={{ color: 'inherit', textAlign:'center' }}
               />
             ) : (
-              <span className="column-strip-title">{pickLang(item.content, lang) || (lang==='es'?'Nueva Columna':'New Column')}</span>
+              <span className="column-strip-title">{pickLang(item.content, lang) || (window.t('Nueva Columna', 'New Column'))}</span>
             ))}
           </div>
           <div className="column-strip-meta">
-            {children.length} {children.length === 1 ? (lang==='es'?'nodo':'node') : (lang==='es'?'nodos':'nodes')}
+            {children.length} {children.length === 1 ? (window.t('nodo', 'node')) : (window.t('nodos', 'nodes'))}
           </div>
         </div>
         <div className="column-body">
@@ -1151,7 +1151,7 @@ function BoardItem({ item, lang, onUpdate, onOpenBoard, editing, getNestedItems,
           <div className="board-cover-grid"/>
           {nestedItems.length === 0 && (
             <div className="board-preview-item empty-message">
-              {lang==='es' ? 'Tablero vacío' : 'Empty board'}
+              {window.t('Tablero vacío', 'Empty board')}
             </div>
           )}
           {nestedItems.slice(0, 12).map((it) => {
@@ -1192,7 +1192,7 @@ function BoardItem({ item, lang, onUpdate, onOpenBoard, editing, getNestedItems,
               onFocus={(e)=>{ if (item._new) e.target.select(); }}
               onBlur={(e)=>{
                 const val = e.target.value.trim();
-                const defaultName = lang === 'es' ? 'Nuevo tablero' : 'New board';
+                const defaultName = window.t('Nuevo tablero', 'New board');
                 const finalName = val || defaultName;
                 onUpdate({
                   content: { es: finalName, en: finalName },
@@ -1203,7 +1203,7 @@ function BoardItem({ item, lang, onUpdate, onOpenBoard, editing, getNestedItems,
             />
           ) : (
             <div className="board-foot-title">
-              {pickLang(item.content, lang) || (lang==='es'?'Tablero':'Board')}
+              {pickLang(item.content, lang) || (window.t('Tablero', 'Board'))}
             </div>
           ))}
           <span className="board-count">{nestedItems.length}</span>
@@ -1224,7 +1224,7 @@ function DocItem({ item, lang, onOpenDoc }) {
   const bg = window.resolveStickyColor ? window.resolveStickyColor(item.color || 'white') : null;
   const isDarkBg = ['olive','wine','dark','green','red','purple'].includes(item.color);
   const compact = item.showPreview === false; // preview off → just the doc logo
-  const title = pickLang(item.title, lang) || (lang==='es'?'Documento':'Document');
+  const title = pickLang(item.title, lang) || (window.t('Documento', 'Document'));
   return (
     <div className="doc-card" style={{width:'100%', height:'100%'}}>
       <div
@@ -1375,13 +1375,13 @@ function CalendarItem({ item, lang, onUpdate, editing }) {
                 onClick={(e)=>{ e.stopPropagation(); setOpenPicker(openPicker === 'day' ? null : 'day'); }}
                 onMouseDown={(e)=>e.stopPropagation()}
               >
-                {selectedDay != null ? selectedDay : (lang==='es'?'Día':'Day')}
+                {selectedDay != null ? selectedDay : (window.t('Día', 'Day'))}
                 <span className="material-symbols-rounded" style={{fontSize:'1em'}}>arrow_drop_down</span>
               </button>
               {openPicker === 'day' && (
                 <div className="cal-mb-dropdown" onMouseDown={(e)=>e.stopPropagation()}>
                   <button className="cal-mb-drop-item" onClick={(e)=>{ e.stopPropagation(); onUpdate({ selectedDay: null, selectedYear: null, selectedMonth: null }); setOpenPicker(null); }}>
-                    {lang==='es'?'Ninguno':'None'}
+                    {window.t('Ninguno', 'None')}
                   </button>
                   {Array.from({length: daysInMonth}, (_, i) => i + 1).map(d => (
                     <button
@@ -1449,10 +1449,10 @@ function CalendarItem({ item, lang, onUpdate, editing }) {
             </div>
           </div>
 
-          <button className="cal-mb-nav" onClick={(e)=>{e.stopPropagation(); setView(v => v.month === 0 ? {year:v.year-1, month:11} : {...v, month:v.month-1});}} onMouseDown={(e)=>e.stopPropagation()} title={lang==='es'?'Mes anterior':'Previous month'}>
+          <button className="cal-mb-nav" onClick={(e)=>{e.stopPropagation(); setView(v => v.month === 0 ? {year:v.year-1, month:11} : {...v, month:v.month-1});}} onMouseDown={(e)=>e.stopPropagation()} title={window.t('Mes anterior', 'Previous month')}>
             <span className="material-symbols-rounded">chevron_left</span>
           </button>
-          <button className="cal-mb-nav" onClick={(e)=>{e.stopPropagation(); setView(v => v.month === 11 ? {year:v.year+1, month:0} : {...v, month:v.month+1});}} onMouseDown={(e)=>e.stopPropagation()} title={lang==='es'?'Mes siguiente':'Next month'}>
+          <button className="cal-mb-nav" onClick={(e)=>{e.stopPropagation(); setView(v => v.month === 11 ? {year:v.year+1, month:0} : {...v, month:v.month+1});}} onMouseDown={(e)=>e.stopPropagation()} title={window.t('Mes siguiente', 'Next month')}>
             <span className="material-symbols-rounded">chevron_right</span>
           </button>
         </div>
@@ -1487,7 +1487,7 @@ function CalendarItem({ item, lang, onUpdate, editing }) {
                 {!c.muted && (
                   <div className="cal-mb-day-actions">
                     <button
-                      title={lang==='es'?'Añadir imagen':'Add image'}
+                      title={window.t('Añadir imagen', 'Add image')}
                       onClick={(e)=>{e.stopPropagation(); startAddImage(c.key);}}
                       onMouseDown={(e)=>e.stopPropagation()}
                     >
@@ -1495,7 +1495,7 @@ function CalendarItem({ item, lang, onUpdate, editing }) {
                     </button>
                     {hasImg && (
                       <button
-                        title={lang==='es'?'Borrar imagen':'Remove image'}
+                        title={window.t('Borrar imagen', 'Remove image')}
                         onClick={(e)=>{e.stopPropagation(); removeImage(c.key);}}
                         onMouseDown={(e)=>e.stopPropagation()}
                       >
@@ -1527,7 +1527,7 @@ function CalendarItem({ item, lang, onUpdate, editing }) {
                           className="cal-mb-event-del"
                           onClick={(e)=>{ e.stopPropagation(); deleteEvent(c.key, ev.id); setEditingEvent(null); setEventDraft(''); }}
                           onMouseDown={(e)=>{ e.preventDefault(); e.stopPropagation(); }}
-                          title={lang==='es'?'Eliminar':'Delete'}
+                          title={window.t('Eliminar', 'Delete')}
                         >
                           <span className="material-symbols-rounded">close</span>
                         </button>
@@ -1542,7 +1542,7 @@ function CalendarItem({ item, lang, onUpdate, editing }) {
                       onClick={(e)=>{ e.stopPropagation(); setEditingEvent({ key: c.key, evId: ev.id }); setEventDraft(ev.text); }}
                       onMouseDown={(e)=>e.stopPropagation()}
                       onContextMenu={(e)=>{ e.preventDefault(); e.stopPropagation(); deleteEvent(c.key, ev.id); }}
-                      title={lang==='es'?'Clic para editar · Clic derecho para borrar':'Click to edit · Right-click to delete'}
+                      title={window.t('Clic para editar · Clic derecho para borrar', 'Click to edit · Right-click to delete')}
                     >
                       {ev.text}
                     </div>
@@ -1561,7 +1561,7 @@ function CalendarItem({ item, lang, onUpdate, editing }) {
                       if (e.key === 'Enter') { addEvent(c.key, draft); setDraft(''); setAdding(null); }
                       if (e.key === 'Escape') { setDraft(''); setAdding(null); }
                     }}
-                    placeholder={lang==='es'?'+ evento':'+ event'}
+                    placeholder={window.t('+ evento', '+ event')}
                   />
                 )}
               </div>
@@ -1569,7 +1569,7 @@ function CalendarItem({ item, lang, onUpdate, editing }) {
           })}
         </div>
         <div className="cal-mb-hint">
-          {lang==='es' ? 'Clic en un día para evento · ícono de imagen para foto' : 'Click a day for event · image icon for photo'}
+          {window.t('Clic en un día para evento · ícono de imagen para foto', 'Click a day for event · image icon for photo')}
         </div>
         <input ref={fileRef} type="file" accept="image/*" style={{display:'none'}} onChange={handlePickImage}/>
         {dayMenu && (() => {
@@ -1584,29 +1584,29 @@ function CalendarItem({ item, lang, onUpdate, editing }) {
                 onClick={(e)=>e.stopPropagation()}
                 onMouseDown={(e)=>e.stopPropagation()}
               >
-                <button className="ctx-close" onClick={()=>openDayMenu(null)} title={lang==='es'?'Cerrar':'Close'}>
+                <button className="ctx-close" onClick={()=>openDayMenu(null)} title={window.t('Cerrar', 'Close')}>
                   <span className="material-symbols-rounded">arrow_back</span>
                 </button>
                 <div style={{padding:'2px 6px 4px', fontSize:9, fontWeight:700, color:'var(--ink-3)', fontFamily:'var(--font-mono)', textTransform:'uppercase', textAlign:'center'}}>
-                  {lang==='es'?'Día':'Day'} {k.split('-').pop()}
+                  {window.t('Día', 'Day')} {k.split('-').pop()}
                 </div>
                 <button className="ctx-btn" onClick={()=>{ setAdding(k); openDayMenu(null); }}>
                   <span className="material-symbols-rounded">add</span>
-                  <span>{lang==='es'?'Evento':'Event'}</span>
+                  <span>{window.t('Evento', 'Event')}</span>
                 </button>
                 <button className="ctx-btn" onClick={()=>{ startAddImage(k); openDayMenu(null); }}>
                   <span className="material-symbols-rounded">image</span>
-                  <span>{hasImg ? (lang==='es'?'Cambiar':'Change') : (lang==='es'?'Imagen':'Image')}</span>
+                  <span>{hasImg ? (window.t('Cambiar', 'Change')) : (window.t('Imagen', 'Image'))}</span>
                 </button>
                 {hasImg && (
                   <button className="ctx-btn" onClick={()=>{ removeImage(k); }}>
                     <span className="material-symbols-rounded">hide_image</span>
-                    <span>{lang==='es'?'Quitar':'Remove'}</span>
+                    <span>{window.t('Quitar', 'Remove')}</span>
                   </button>
                 )}
                 <div className="ctx-sep-h"/>
                 <div style={{padding:'2px 4px 4px', fontSize:9, fontWeight:700, color:'var(--ink-3)', fontFamily:'var(--font-mono)', textTransform:'uppercase', textAlign:'center'}}>
-                  {lang==='es'?'Color':'Color'}
+                  {window.t('Color', 'Color')}
                 </div>
                 <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:5, padding:'2px 8px 6px', justifyItems:'center'}}>
                   {DAY_COLORS.map(c => (
@@ -1626,7 +1626,7 @@ function CalendarItem({ item, lang, onUpdate, editing }) {
                     <div className="ctx-sep-h"/>
                     <button className="ctx-btn danger" onClick={()=>{ clearDayEvents(k); openDayMenu(null); }}>
                       <span className="material-symbols-rounded">delete_sweep</span>
-                      <span>{lang==='es'?'Limpiar':'Clear'}</span>
+                      <span>{window.t('Limpiar', 'Clear')}</span>
                     </button>
                   </>
                 )}
@@ -2149,7 +2149,7 @@ function TableItem({ item, lang, onUpdate, editing, selected, onSelectItem, onRe
               <input
                 className="tbl-title"
                 value={title}
-                placeholder={lang==='es'?'Nueva Tabla':'New Table'}
+                placeholder={window.t('Nueva Tabla', 'New Table')}
                 onChange={(e)=>onUpdate({ title: { es: e.target.value, en: e.target.value } })}
                 onClick={(e)=>e.stopPropagation()}
                 onMouseDown={(e)=>e.stopPropagation()}
@@ -2287,7 +2287,7 @@ function TableItem({ item, lang, onUpdate, editing, selected, onSelectItem, onRe
                                 </button>
                               ))}
                               <div className="tbl-formula-help">
-                                {lang==='es'?'↑↓ navegar · Tab/Enter elegir':'↑↓ navigate · Tab/Enter pick'}
+                                {window.t('↑↓ navegar · Tab/Enter elegir', '↑↓ navigate · Tab/Enter pick')}
                               </div>
                             </div>,
                             document.body
@@ -2354,7 +2354,7 @@ function CommentItem({ item, lang, onUpdate, editing }) {
             className="note-edit rich comment-rich"
             contentEditable
             suppressContentEditableWarning
-            data-placeholder={lang==='es'?'Escribe un comentario…':'Write a comment…'}
+            data-placeholder={window.t('Escribe un comentario…', 'Write a comment…')}
             onInput={onInput}
             onClick={(e)=>e.stopPropagation()}
             onMouseDown={(e)=>e.stopPropagation()}
@@ -2475,7 +2475,7 @@ function AudioItem({ item, lang, onUpdate }) {
     const file = e.target.files?.[0];
     if (!file) return;
     if (!file.type.startsWith('audio/')) {
-      alert(lang === 'es' ? 'Por favor selecciona un archivo de audio válido.' : 'Please select a valid audio file.');
+      alert(window.t('Por favor selecciona un archivo de audio válido.', 'Please select a valid audio file.'));
       return;
     }
     const reader = new FileReader();
@@ -2530,7 +2530,7 @@ function AudioItem({ item, lang, onUpdate }) {
           <div className="audio-empty" onClick={triggerFilePick}>
             <span className="material-symbols-rounded">cloud_upload</span>
             <span style={{ fontSize: 11, fontWeight: 700, textAlign: 'center', lineHeight: 1.3 }}>
-              {lang === 'es' ? 'Clic para subir un audio' : 'Click to upload audio'}
+              {window.t('Clic para subir un audio', 'Click to upload audio')}
             </span>
             <input ref={fileInputRef} type="file" accept="audio/*" style={{ display: 'none' }} onChange={onFileChange} />
           </div>
@@ -2631,7 +2631,7 @@ function AudioItem({ item, lang, onUpdate }) {
                 download={item.name || 'audio.mp3'}
                 style={{ color: metaColor }}
               >
-                {lang === 'es' ? 'Descargar' : 'Download'}
+                {window.t('Descargar', 'Download')}
               </a>
               <span>-</span>
               <span>{formatSize(item.size)}</span>
@@ -2833,7 +2833,7 @@ function FileItem({ item, lang, onUpdate, onOpenFile }) {
       <div className="file-card" style={{width:'100%', height:'100%'}}>
         <div className="item-card file-uploading">
           <div className="file-icon" style={{ '--file-accent': '#9A969A' }}>
-            <span className="file-icon-label">{lang==='es'?'Subiendo':'Uploading'}</span>
+            <span className="file-icon-label">{window.t('Subiendo', 'Uploading')}</span>
             <div className="file-progress"><div className="file-progress-bar" style={{ width: `${progress}%` }}/></div>
           </div>
         </div>
@@ -2848,7 +2848,7 @@ function FileItem({ item, lang, onUpdate, onOpenFile }) {
         <div className="item-card">
           <div className="file-empty" onClick={(e)=>{ e.stopPropagation(); fileInputRef.current?.click(); }}>
             <span className="material-symbols-rounded">upload_file</span>
-            <span style={{fontSize:11, fontWeight:700, textAlign:'center'}}>{lang==='es'?'Clic para subir un archivo':'Click to upload a file'}</span>
+            <span style={{fontSize:11, fontWeight:700, textAlign:'center'}}>{window.t('Clic para subir un archivo', 'Click to upload a file')}</span>
           </div>
           <input ref={fileInputRef} type="file" style={{display:'none'}} onChange={onFileChange}/>
         </div>
@@ -2865,7 +2865,7 @@ function FileItem({ item, lang, onUpdate, onOpenFile }) {
             <div
               className="file-preview"
               onDoubleClick={(e)=>{ e.stopPropagation(); onOpenFile && onOpenFile(item.id); }}
-              title={lang==='es'?'Doble clic para ver completo':'Double-click to view full'}
+              title={window.t('Doble clic para ver completo', 'Double-click to view full')}
             >
               {kind === 'image' && <img src={item.src} alt={item.name}/>}
               {kind === 'pdf' && <iframe title={item.name} src={item.src}/>}
@@ -2879,12 +2879,12 @@ function FileItem({ item, lang, onUpdate, onOpenFile }) {
                   ? <div className="file-page-scale" style={{ width: REF, transform: `scale(${scale})`, transformOrigin: 'top left' }}>
                       <div className="file-doc-html" dangerouslySetInnerHTML={{ __html: docHtml }}/>
                     </div>
-                  : <div className="file-preview-empty"><span className="material-symbols-rounded">{docHtml==='loading'?'hourglass_top':'description'}</span><span>{docHtml==='loading'?(lang==='es'?'Generando vista…':'Rendering…'):(lang==='es'?'Sin vista previa':'No preview')}</span></div>
+                  : <div className="file-preview-empty"><span className="material-symbols-rounded">{docHtml==='loading'?'hourglass_top':'description'}</span><span>{docHtml==='loading'?(window.t('Generando vista…', 'Rendering…')):(window.t('Sin vista previa', 'No preview'))}</span></div>
               )}
               {(kind === 'pptx' || kind === 'other') && (
                 <div className="file-preview-empty">
                   <div className="file-icon" style={{ '--file-accent': meta.color }}><span className="file-icon-label">{meta.label}</span></div>
-                  <span>{lang==='es'?'Sin vista previa':'No preview'}</span>
+                  <span>{window.t('Sin vista previa', 'No preview')}</span>
                 </div>
               )}
             </div>
@@ -2951,12 +2951,12 @@ function FileViewerModal({ fileItem, lang, onClose }) {
           {kind !== 'pdf' && (
             <a className="btn btn-ghost" href={fileItem.src} download={fileItem.name}>
               <span className="material-symbols-rounded">download</span>
-              {lang==='es'?'Descargar':'Download'}
+              {window.t('Descargar', 'Download')}
             </a>
           )}
           <button className="btn btn-ghost" onClick={onClose}>
             <span className="material-symbols-rounded">close</span>
-            {lang==='es'?'Cerrar':'Close'}
+            {window.t('Cerrar', 'Close')}
           </button>
         </div>
         <div className={`file-viewer-body kind-${kind}`}>
@@ -2966,12 +2966,12 @@ function FileViewerModal({ fileItem, lang, onClose }) {
           {(kind === 'docx' || kind === 'excel') && (
             docHtml
               ? <div className="file-doc-html file-doc-page" dangerouslySetInnerHTML={{ __html: docHtml }}/>
-              : <div className="file-preview-empty"><span className="material-symbols-rounded">hourglass_top</span><span>{lang==='es'?'Generando vista…':'Rendering…'}</span></div>
+              : <div className="file-preview-empty"><span className="material-symbols-rounded">hourglass_top</span><span>{window.t('Generando vista…', 'Rendering…')}</span></div>
           )}
           {(kind === 'pptx' || kind === 'other') && (
             <div className="file-preview-empty">
               <div className="file-icon" style={{ '--file-accent': meta.color }}><span className="file-icon-label">{meta.label}</span></div>
-              <span>{lang==='es'?'Sin vista previa · usa Descargar':'No preview · use Download'}</span>
+              <span>{window.t('Sin vista previa · usa Descargar', 'No preview · use Download')}</span>
             </div>
           )}
         </div>

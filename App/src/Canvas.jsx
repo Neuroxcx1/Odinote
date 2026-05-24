@@ -142,7 +142,7 @@ function makeNewItem(type, x, y, w, h, lang) {
     case 'comment':
       return { ...base, type: 'comment', ...defaultSize(280, 150),
         avatar: 'A', avatarColor: 'sage',
-        name: lang==='es' ? 'Tú' : 'You',
+        name: window.t('Tú', 'You'),
         text: { es: '', en: '' } };
     case 'calendar':
       return { ...base, type: 'calendar', ...defaultSize(520, 420), events: {} };
@@ -1854,32 +1854,32 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
         const CONN_COLORS = ['#1A1A1A','#595459','#E6544F','#90B968','#F7DA84','#3D5A80','#955BA5','#FFFFFF'];
         return (
           <div className="ctx-side" onMouseDown={(e)=>e.stopPropagation()}>
-            <button className="ctx-close" onClick={()=>setSelectedConn(null)} title={lang==='es'?'Cerrar':'Close'}>
+            <button className="ctx-close" onClick={()=>setSelectedConn(null)} title={window.t('Cerrar', 'Close')}>
               <span className="material-symbols-rounded">arrow_back</span>
             </button>
 
             <button className={`ctx-btn ${shape==='curve' ? 'active' : ''}`} onClick={()=>updateConnector(conn.id, { shape: 'curve' })}>
               <span className="material-symbols-rounded">show_chart</span>
-              <span>{lang==='es'?'Curva':'Curve'}</span>
+              <span>{window.t('Curva', 'Curve')}</span>
             </button>
             <button className={`ctx-btn ${shape==='orthogonal' ? 'active' : ''}`} onClick={()=>updateConnector(conn.id, { shape: 'orthogonal', bend: { x: 0, y: 0 } })}>
               <span className="material-symbols-rounded">stairs</span>
-              <span>{lang==='es'?'Recta':'Right-angle'}</span>
+              <span>{window.t('Recta', 'Right-angle')}</span>
             </button>
 
             <div className="ctx-sep-h"/>
 
             <button className={`ctx-btn ${style==='solid' ? 'active' : ''}`} onClick={()=>updateConnector(conn.id, { style: 'solid' })}>
               <svg width="22" height="6"><line x1="0" y1="3" x2="22" y2="3" stroke="currentColor" strokeWidth="2.5"/></svg>
-              <span>{lang==='es'?'Sólida':'Solid'}</span>
+              <span>{window.t('Sólida', 'Solid')}</span>
             </button>
             <button className={`ctx-btn ${style==='dashed' ? 'active' : ''}`} onClick={()=>updateConnector(conn.id, { style: 'dashed' })}>
               <svg width="22" height="6"><line x1="0" y1="3" x2="22" y2="3" stroke="currentColor" strokeWidth="2.5" strokeDasharray="5 3"/></svg>
-              <span>{lang==='es'?'Discontinua':'Dashed'}</span>
+              <span>{window.t('Discontinua', 'Dashed')}</span>
             </button>
             <button className={`ctx-btn ${style==='dotted' ? 'active' : ''}`} onClick={()=>updateConnector(conn.id, { style: 'dotted' })}>
               <svg width="22" height="6"><line x1="0" y1="3" x2="22" y2="3" stroke="currentColor" strokeWidth="2.5" strokeDasharray="1 3" strokeLinecap="round"/></svg>
-              <span>{lang==='es'?'Punteada':'Dotted'}</span>
+              <span>{window.t('Punteada', 'Dotted')}</span>
             </button>
 
             <div className="ctx-sep-h"/>
@@ -1906,19 +1906,19 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
             <button
               className={`ctx-btn ${conn.bidirectional ? 'active' : ''}`}
               onClick={()=>updateConnector(conn.id, { bidirectional: !conn.bidirectional })}
-              title={lang==='es'?'Flecha bidireccional':'Bidirectional arrow'}
+              title={window.t('Flecha bidireccional', 'Bidirectional arrow')}
             >
               <span className="material-symbols-rounded">sync_alt</span>
-              <span>{lang==='es'?'Doble':'Two-way'}</span>
+              <span>{window.t('Doble', 'Two-way')}</span>
             </button>
 
             <button
               className={`ctx-btn ${connLabelOpen ? 'active' : ''}`}
               onClick={()=>setConnLabelOpen(o => !o)}
-              title={lang==='es'?'Etiqueta':'Label'}
+              title={window.t('Etiqueta', 'Label')}
             >
               <span className="material-symbols-rounded">label</span>
-              <span>{lang==='es'?'Etiqueta':'Label'}</span>
+              <span>{window.t('Etiqueta', 'Label')}</span>
             </button>
 
             {connLabelOpen && (
@@ -1927,7 +1927,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
                   className="conn-label-input"
                   autoFocus
                   value={conn.label || ''}
-                  placeholder={lang==='es'?'Etiqueta…':'Label…'}
+                  placeholder={window.t('Etiqueta…', 'Label…')}
                   onChange={(e)=>updateConnector(conn.id, { label: e.target.value })}
                   onClick={(e)=>e.stopPropagation()}
                   onMouseDown={(e)=>e.stopPropagation()}
@@ -1940,7 +1940,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
 
             <button className="ctx-btn danger" onClick={()=>deleteConnector(conn.id)}>
               <span className="material-symbols-rounded">delete</span>
-              <span>{lang==='es'?'Eliminar':'Delete'}</span>
+              <span>{window.t('Eliminar', 'Delete')}</span>
             </button>
           </div>
         );
@@ -2088,7 +2088,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
                     <div
                       className="item-comment-badge"
                       onClick={(e)=>{ e.stopPropagation(); setSelected(item.id); }}
-                      title={`${item.comments.length} ${lang==='es'?'comentarios':'comments'}`}
+                      title={`${item.comments.length} ${window.t('comentarios', 'comments')}`}
                     >
                       {item.comments.length}
                     </div>
@@ -2168,10 +2168,8 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
               {activeTool === 'line' ? 'arrow_outward' : 'ads_click'}
             </span>
             {activeTool === 'line'
-              ? (lang==='es'?'Arrastra de un nodo a otro':'Drag from one node to another')
-              : (lang==='es'
-                  ? `Arrastra para dibujar · clic simple para tamaño por defecto`
-                  : `Drag to size · single click for default`)
+              ? (window.t('Arrastra de un nodo a otro', 'Drag from one node to another'))
+              : (window.t(`Arrastra para dibujar · clic simple para tamaño por defecto`, `Drag to size · single click for default`))
             }
             <span className="esc">esc</span>
           </div>
@@ -2179,7 +2177,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
 
         {/* Status pills */}
         <div className="status-bar">
-          <div className="status-pill"><div className="dot-live"/> {lang==='es' ? 'Guardado' : 'Saved'}</div>
+          <div className="status-pill"><div className="dot-live"/> {window.t('Guardado', 'Saved')}</div>
           <div className="status-pill">
             <span className="material-symbols-rounded" style={{fontSize:14}}>category</span>
             {current.items.length} {window.TRANSLATIONS[lang].items_count}
@@ -2187,7 +2185,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
           {stack.length > 1 && (
             <div className="status-pill accent">
               <span className="material-symbols-rounded" style={{fontSize:14}}>layers</span>
-              {lang==='es' ? `Nivel ${stack.length}` : `Level ${stack.length}`}
+              {window.t(`Nivel ${stack.length}`, `Level ${stack.length}`)}
             </div>
           )}
         </div>
@@ -2222,7 +2220,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
               cursor: 'pointer'
             }}
             onClick={() => setShowBgSelector(!showBgSelector)}
-            title={lang === 'es' ? 'Color de fondo del lienzo' : 'Canvas background color'}
+            title={window.t('Color de fondo del lienzo', 'Canvas background color')}
           >
             <span className="material-symbols-rounded" style={{ fontSize: '18px' }}>texture</span>
           </button>
@@ -2244,7 +2242,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
               onMouseDown={(e)=>e.stopPropagation()}
             >
               <div style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-soft, #595459)', marginBottom: '2px' }}>
-                {lang === 'es' ? 'Fondo del Lienzo' : 'Canvas Background'}
+                {window.t('Fondo del Lienzo', 'Canvas Background')}
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px' }}>
                 {['default', 'gray', 'sand', 'mint', 'sky', 'pink'].map(bgOpt => {
@@ -2295,11 +2293,11 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
           <div ref={ctxMenuRef} className="context-menu context-menu-create" style={{ left: contextMenu.x, top: contextMenu.y }} onMouseDown={(e)=>e.stopPropagation()}>
             <button disabled={historyIdx <= 0} onClick={()=>{ undo(); setContextMenu(null); }}>
               <span className="material-symbols-rounded">undo</span>
-              {lang==='es'?'Deshacer':'Undo'} <span style={{marginLeft:'auto', fontFamily:'var(--font-mono)', fontSize:10, color:'var(--ink-3)'}}>⌘Z</span>
+              {window.t('Deshacer', 'Undo')} <span style={{marginLeft:'auto', fontFamily:'var(--font-mono)', fontSize:10, color:'var(--ink-3)'}}>⌘Z</span>
             </button>
             <button onClick={()=>{ selectAllItems(); setContextMenu(null); }}>
               <span className="material-symbols-rounded">select_all</span>
-              {lang==='es'?'Seleccionar todo':'Select all'} <span style={{marginLeft:'auto', fontFamily:'var(--font-mono)', fontSize:10, color:'var(--ink-3)'}}>⌘A</span>
+              {window.t('Seleccionar todo', 'Select all')} <span style={{marginLeft:'auto', fontFamily:'var(--font-mono)', fontSize:10, color:'var(--ink-3)'}}>⌘A</span>
             </button>
              <div class="ctx-sep"/>
             {(window.TOOLS || []).map(tool => (
@@ -2310,7 +2308,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
             ))}
             <div className="ctx-sep"/>
             <div style={{ padding: '6px 12px', fontSize: '11px', fontWeight: '700', color: 'var(--text-soft, #595459)' }}>
-              {lang === 'es' ? 'Cambiar fondo del lienzo' : 'Change canvas background'}
+              {window.t('Cambiar fondo del lienzo', 'Change canvas background')}
             </div>
             <div style={{ display: 'flex', gap: '6px', padding: '4px 12px 10px 12px', justifyContent: 'space-between', width: '100%', boxSizing: 'border-box' }} onMouseDown={(e)=>e.stopPropagation()}>
               {['default', 'gray', 'sand', 'mint', 'sky', 'pink'].map(bgOpt => {
@@ -2367,29 +2365,29 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
               {['note','todo','link','column','comment','board'].includes(it.type) && (
                 <button onClick={()=>{ setEditing(it.id); setContextMenu(null); }}>
                   <span className="material-symbols-rounded">edit</span>
-                  {lang==='es'?'Editar':'Edit'}
+                  {window.t('Editar', 'Edit')}
                 </button>
               )}
               {it.type === 'doc' && (
                 <button onClick={()=>{ setDocOpen({ id: it.id }); setContextMenu(null); }}>
                   <span className="material-symbols-rounded">edit_note</span>
-                  {lang==='es'?'Abrir documento':'Open document'}
+                  {window.t('Abrir documento', 'Open document')}
                 </button>
               )}
               {it.type === 'board' && (
                 <button onClick={()=>{ openBoard(it.canvasId, it.id); setContextMenu(null); }}>
                   <span className="material-symbols-rounded">open_in_full</span>
-                  {lang==='es'?'Abrir tablero':'Open board'}
+                  {window.t('Abrir tablero', 'Open board')}
                 </button>
               )}
               <button onClick={()=>{ duplicateItem(it.id); setContextMenu(null); }}>
                 <span className="material-symbols-rounded">content_copy</span>
-                {lang==='es'?'Duplicar':'Duplicate'} <span style={{marginLeft:'auto', fontFamily:'var(--font-mono)', fontSize:10, color:'var(--ink-3)'}}>⌘D</span>
+                {window.t('Duplicar', 'Duplicate')} <span style={{marginLeft:'auto', fontFamily:'var(--font-mono)', fontSize:10, color:'var(--ink-3)'}}>⌘D</span>
               </button>
               <div className="ctx-sep"/>
               <button className="danger" onClick={()=>{ deleteItem(it.id); }}>
                 <span className="material-symbols-rounded">delete</span>
-                {lang==='es'?'Eliminar':'Delete'} <span style={{marginLeft:'auto', fontFamily:'var(--font-mono)', fontSize:10, color:'var(--ink-3)'}}>⌫</span>
+                {window.t('Eliminar', 'Delete')} <span style={{marginLeft:'auto', fontFamily:'var(--font-mono)', fontSize:10, color:'var(--ink-3)'}}>⌫</span>
               </button>
             </div>
           );

@@ -68,23 +68,23 @@ function Home({ lang, setLang, theme, setTheme, onOpenProject, projects, onCreat
         </button>
 
         <nav className="ms-nav">
-          <div className="ms-nav-label">{lang==='es'?'Espacios':'Spaces'}</div>
+          <div className="ms-nav-label">{window.t('Espacios', 'Spaces')}</div>
           <button className={`ms-nav-item ${section==='all'?'active':''}`} onClick={()=>setSection('all')}>
             <span className="material-symbols-rounded">grid_view</span>
-            <span>{lang==='es'?'Todos los proyectos':'All projects'}</span>
+            <span>{window.t('Todos los proyectos', 'All projects')}</span>
             <span className="ms-nav-count">{projects.length}</span>
           </button>
           <button className={`ms-nav-item ${section==='recent'?'active':''}`} onClick={()=>setSection('recent')}>
             <span className="material-symbols-rounded">schedule</span>
-            <span>{lang==='es'?'Recientes':'Recent'}</span>
+            <span>{window.t('Recientes', 'Recent')}</span>
           </button>
           <button className={`ms-nav-item ${section==='starred'?'active':''}`} onClick={()=>setSection('starred')}>
             <span className="material-symbols-rounded">star</span>
-            <span>{lang==='es'?'Favoritos':'Favorites'}</span>
+            <span>{window.t('Favoritos', 'Favorites')}</span>
           </button>
           <button className={`ms-nav-item ${section==='trash'?'active':''}`} onClick={()=>setSection('trash')}>
             <span className="material-symbols-rounded">delete_outline</span>
-            <span>{lang==='es'?'Papelera':'Trash'}</span>
+            <span>{window.t('Papelera', 'Trash')}</span>
           </button>
         </nav>
 
@@ -94,7 +94,7 @@ function Home({ lang, setLang, theme, setTheme, onOpenProject, projects, onCreat
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--wine, #7B2D26)' }}>
               <span className="material-symbols-rounded" style={{ fontSize: '20px' }}>folder_shared</span>
               <span style={{ fontWeight: '600', fontSize: '14px' }}>
-                {lang === 'es' ? 'Bóveda Local' : 'Local Vault'}
+                {window.t('Bóveda Local', 'Local Vault')}
               </span>
             </div>
             {vaultPath ? (
@@ -108,13 +108,13 @@ function Home({ lang, setLang, theme, setTheme, onOpenProject, projects, onCreat
                   onClick={onCloseVault}
                 >
                   <span className="material-symbols-rounded" style={{ fontSize: '16px' }}>eject</span>
-                  <span>{lang === 'es' ? 'Desconectar Bóveda' : 'Disconnect Vault'}</span>
+                  <span>{window.t('Desconectar Bóveda', 'Disconnect Vault')}</span>
                 </button>
               </>
             ) : (
               <>
                 <p style={{ fontSize: '11px', color: 'var(--text-soft, #595459)', margin: 0, lineHeight: '1.4' }}>
-                  {lang === 'es' ? 'Guarda todo directamente en carpetas de tu PC.' : 'Save everything directly to folders on your PC.'}
+                  {window.t('Guarda todo directamente en carpetas de tu PC.', 'Save everything directly to folders on your PC.')}
                 </p>
                 <button
                   className="ms-new-btn"
@@ -122,7 +122,7 @@ function Home({ lang, setLang, theme, setTheme, onOpenProject, projects, onCreat
                   onClick={onOpenVault}
                 >
                   <span className="material-symbols-rounded" style={{ fontSize: '18px' }}>folder_open</span>
-                  <span>{lang === 'es' ? 'Abrir Carpeta' : 'Open Folder'}</span>
+                  <span>{window.t('Abrir Carpeta', 'Open Folder')}</span>
                 </button>
               </>
             )}
@@ -132,11 +132,11 @@ function Home({ lang, setLang, theme, setTheme, onOpenProject, projects, onCreat
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-soft, #595459)' }}>
               <span className="material-symbols-rounded" style={{ fontSize: '20px' }}>folder_shared</span>
               <span style={{ fontWeight: '600', fontSize: '14px' }}>
-                {lang === 'es' ? 'Bóveda Local' : 'Local Vault'}
+                {window.t('Bóveda Local', 'Local Vault')}
               </span>
             </div>
             <p style={{ fontSize: '11px', color: 'var(--text-soft, #595459)', margin: 0, lineHeight: '1.4' }}>
-              {lang === 'es' ? 'Disponible en la versión de escritorio para PC.' : 'Available in the desktop version for PC.'}
+              {window.t('Disponible en la versión de escritorio para PC.', 'Available in the desktop version for PC.')}
             </p>
           </div>
         )}
@@ -147,7 +147,7 @@ function Home({ lang, setLang, theme, setTheme, onOpenProject, projects, onCreat
           <div className="kofi-card-title" style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--wine, #7B2D26)', fontWeight: '600', fontSize: '14px' }}>
             <span className="material-symbols-rounded" style={{ fontSize: '20px' }}>favorite</span>
             <span style={{ fontWeight: '600', fontSize: '14px' }}>
-              {lang === 'es' ? 'Apoya Odinote' : 'Support Odinote'}
+              {window.t('Apoya Odinote', 'Support Odinote')}
             </span>
           </div>
           
@@ -162,9 +162,7 @@ function Home({ lang, setLang, theme, setTheme, onOpenProject, projects, onCreat
           </div>
 
           <p style={{ fontSize: '11px', color: 'var(--text-soft, #595459)', margin: 0, lineHeight: '1.4' }}>
-            {lang === 'es' 
-              ? 'Odinote es 100% gratuito. Si te ayuda en tus apuntes, considera hacernos una donación para apoyar el desarrollo independiente.' 
-              : 'Odinote is 100% free. If it helps you with your notes, consider supporting independent development.'}
+            {window.t('Odinote es 100% gratuito. Si te ayuda en tus apuntes, considera hacernos una donación para apoyar el desarrollo independiente.', 'Odinote is 100% free. If it helps you with your notes, consider supporting independent development.')}
           </p>
 
           <button
@@ -173,7 +171,7 @@ function Home({ lang, setLang, theme, setTheme, onOpenProject, projects, onCreat
             onClick={() => window.open('https://ko-fi.com/neuroxcx', '_blank', 'noopener,noreferrer')}
           >
             <span className="material-symbols-rounded" style={{ fontSize: '18px' }}>coffee</span>
-            <span>{lang === 'es' ? 'Apoyar en Ko-fi' : 'Support on Ko-fi'}</span>
+            <span>{window.t('Apoyar en Ko-fi', 'Support on Ko-fi')}</span>
           </button>
         </div>
 
@@ -185,7 +183,7 @@ function Home({ lang, setLang, theme, setTheme, onOpenProject, projects, onCreat
           <div className="ms-search">
             <span className="material-symbols-rounded">search</span>
             <input
-              placeholder={lang==='es'?'Buscar proyectos, tableros, notas…':'Search projects, boards, notes…'}
+              placeholder={window.t('Buscar proyectos, tableros, notas…', 'Search projects, boards, notes…')}
               value={query}
               onChange={(e)=>setQuery(e.target.value)}
             />
@@ -202,8 +200,8 @@ function Home({ lang, setLang, theme, setTheme, onOpenProject, projects, onCreat
                 onClick={onUpdateClick}
                 title={
                   updateAvailable
-                    ? (lang === 'es' ? '¡Nueva actualización disponible! Haz clic para descargar de GitHub.' : 'New update available! Click to download from GitHub.')
-                    : (lang === 'es' ? 'Buscar actualizaciones' : 'Check for updates')
+                    ? (window.t('¡Nueva actualización disponible! Haz clic para descargar de GitHub.', 'New update available! Click to download from GitHub.'))
+                    : (window.t('Buscar actualizaciones', 'Check for updates'))
                 }
               >
                 <span className="material-symbols-rounded">
@@ -218,15 +216,25 @@ function Home({ lang, setLang, theme, setTheme, onOpenProject, projects, onCreat
             >
               <span className="material-symbols-rounded">{theme === 'dark' ? 'light_mode' : 'dark_mode'}</span>
             </button>
-            <button className="icon-btn lift" onClick={onExport} title={lang==='es'?'Exportar respaldo JSON':'Export JSON backup'}>
+            <button className="icon-btn lift" onClick={onExport} title={window.t('Exportar respaldo JSON', 'Export JSON backup')}>
               <span className="material-symbols-rounded">download</span>
             </button>
-            <button className="icon-btn lift" onClick={onImport} title={lang==='es'?'Importar respaldo JSON':'Import JSON backup'}>
+            <button className="icon-btn lift" onClick={onImport} title={window.t('Importar respaldo JSON', 'Import JSON backup')}>
               <span className="material-symbols-rounded">upload</span>
             </button>
             <div className="lang-switch">
-              <button className={lang==='es'?'active':''} onClick={()=>setLang('es')}>ES</button>
-              <button className={lang==='en'?'active':''} onClick={()=>setLang('en')}>EN</button>
+              <select value={lang} onChange={(e)=>setLang(e.target.value)} className="lang-select">
+                <option value="es">ES</option>
+                <option value="en">EN</option>
+                <option value="fr">FR</option>
+                <option value="de">DE</option>
+                <option value="it">IT</option>
+                <option value="pt">PT</option>
+                <option value="zh">ZH</option>
+                <option value="ja">JA</option>
+                <option value="ko">KO</option>
+                <option value="ar">AR</option>
+              </select>
             </div>
           </div>
         </header>
@@ -237,7 +245,7 @@ function Home({ lang, setLang, theme, setTheme, onOpenProject, projects, onCreat
               <div className="ms-hero-text">
                 <div className="ms-hero-eyebrow">
                   <span className="dot"/>
-                  {lang==='es' ? 'Open source · gratis para siempre' : 'Open source · free forever'}
+                  {window.t('Open source · gratis para siempre', 'Open source · free forever')}
                 </div>
                 <h1 className="ms-hero-title">
                   {lang==='es' ? (
@@ -246,9 +254,7 @@ function Home({ lang, setLang, theme, setTheme, onOpenProject, projects, onCreat
                     <>Your mind, organized<br/>as <span className="hero-mark">nested canvases</span>.</>
                   )}
                 </h1>
-                <p className="ms-hero-sub">{lang==='es'
-                  ? 'Pensado para game devs, escritores y creativos que no caben en una sola pantalla. Notas, imágenes, vínculos, tableros — todo en un canvas infinito.'
-                  : 'Built for game devs, writers and creatives who don\'t fit on one screen. Notes, images, links, boards — all on an infinite canvas.'}</p>
+                <p className="ms-hero-sub">{window.t('Pensado para game devs, escritores y creativos que no caben en una sola pantalla. Notas, imágenes, vínculos, tableros — todo en un canvas infinito.', 'Built for game devs, writers and creatives who don\')t fit on one screen. Notes, images, links, boards — all on an infinite canvas.'}</p>
               </div>
               <div className="ms-hero-art">
                 <div className="ms-art-card a" style={{background:'#F7DA84'}}>
@@ -279,8 +285,8 @@ function Home({ lang, setLang, theme, setTheme, onOpenProject, projects, onCreat
 
             <section className="ms-section">
               <div className="ms-section-head">
-                <h2>{lang==='es'?'Recientes':'Recent'}</h2>
-                <button className="ms-section-link">{lang==='es'?'Ver todos':'View all'}</button>
+                <h2>{window.t('Recientes', 'Recent')}</h2>
+                <button className="ms-section-link">{window.t('Ver todos', 'View all')}</button>
               </div>
               <div className="ms-recent-row">
                 {recents.map(p => (
@@ -298,16 +304,16 @@ function Home({ lang, setLang, theme, setTheme, onOpenProject, projects, onCreat
         <section className="ms-section">
           <div className="ms-section-head">
             <h2>
-              {section === 'recent' ? (lang==='es'?'Recientes':'Recent') :
-               section === 'starred' ? (lang==='es'?'Favoritos':'Favorites') :
-               section === 'trash' ? (lang==='es'?'Papelera':'Trash') :
-               (lang==='es'?'Todos los proyectos':'All projects')}
+              {section === 'recent' ? (window.t('Recientes', 'Recent')) :
+               section === 'starred' ? (window.t('Favoritos', 'Favorites')) :
+               section === 'trash' ? (window.t('Papelera', 'Trash')) :
+               (window.t('Todos los proyectos', 'All projects'))}
             </h2>
             <div className="ms-view-toggle">
-              <button className={viewMode==='grid'?'active':''} onClick={()=>setViewMode('grid')} title={lang==='es'?'Cuadrícula':'Grid'}>
+              <button className={viewMode==='grid'?'active':''} onClick={()=>setViewMode('grid')} title={window.t('Cuadrícula', 'Grid')}>
                 <span className="material-symbols-rounded">grid_view</span>
               </button>
-              <button className={viewMode==='list'?'active':''} onClick={()=>setViewMode('list')} title={lang==='es'?'Lista':'List'}>
+              <button className={viewMode==='list'?'active':''} onClick={()=>setViewMode('list')} title={window.t('Lista', 'List')}>
                 <span className="material-symbols-rounded">view_list</span>
               </button>
             </div>
@@ -325,7 +331,7 @@ function Home({ lang, setLang, theme, setTheme, onOpenProject, projects, onCreat
               />
             ))}
             {section==='trash' && filtered.length === 0 && (
-              <div className="ms-empty-hint">{lang==='es'?'La papelera está vacía':'Trash is empty'}</div>
+              <div className="ms-empty-hint">{window.t('La papelera está vacía', 'Trash is empty')}</div>
             )}
           </div>
         </section>
@@ -348,11 +354,11 @@ function RecentCard({ project, lang, t, onOpen, onDelete, onToggleStar }) {
       <div className="ms-recent-cover" style={{background: project.cover}}>
         <div className="ms-recent-emoji">{project.emoji}</div>
         <div className="ms-card-actions" onClick={(e)=>e.stopPropagation()}>
-          <button className={`ms-card-btn ${project.starred?'on':''}`} title={lang==='es'?'Favorito':'Star'}
+          <button className={`ms-card-btn ${project.starred?'on':''}`} title={window.t('Favorito', 'Star')}
             onClick={(e)=>{ e.stopPropagation(); onToggleStar && onToggleStar(); }}>
             <span className="material-symbols-rounded">{project.starred?'star':'star_border'}</span>
           </button>
-          <button className="ms-card-btn danger" title={lang==='es'?'Mover a papelera':'Move to trash'}
+          <button className="ms-card-btn danger" title={window.t('Mover a papelera', 'Move to trash')}
             onClick={(e)=>{ e.stopPropagation(); onDelete && onDelete(); }}>
             <span className="material-symbols-rounded">delete</span>
           </button>
@@ -363,7 +369,7 @@ function RecentCard({ project, lang, t, onOpen, onDelete, onToggleStar }) {
         <div className="ms-recent-meta">
           <span>{project.items} {t.items_count}</span>
           <span className="dot"/>
-          <span>{project.updated?.[lang] || project.updated || (lang==='es'?'recién':'recent')}</span>
+          <span>{project.updated?.[lang] || project.updated || (window.t('recién', 'recent'))}</span>
         </div>
       </div>
     </div>
@@ -382,22 +388,22 @@ function ProjectCard({ project, lang, t, onOpen, onDelete, onRestore, onPurge, o
         <div className="ms-card-actions" onClick={(e)=>e.stopPropagation()}>
           {isTrash ? (
             <>
-              <button className="ms-card-btn" title={lang==='es'?'Restaurar':'Restore'}
+              <button className="ms-card-btn" title={window.t('Restaurar', 'Restore')}
                 onClick={(e)=>{ e.stopPropagation(); onRestore && onRestore(); }}>
                 <span className="material-symbols-rounded">restore_from_trash</span>
               </button>
-              <button className="ms-card-btn danger" title={lang==='es'?'Eliminar definitivamente':'Delete forever'}
+              <button className="ms-card-btn danger" title={window.t('Eliminar definitivamente', 'Delete forever')}
                 onClick={(e)=>{ e.stopPropagation(); onPurge && onPurge(); }}>
                 <span className="material-symbols-rounded">delete_forever</span>
               </button>
             </>
           ) : (
             <>
-              <button className={`ms-card-btn ${project.starred?'on':''}`} title={lang==='es'?'Favorito':'Star'}
+              <button className={`ms-card-btn ${project.starred?'on':''}`} title={window.t('Favorito', 'Star')}
                 onClick={(e)=>{ e.stopPropagation(); onToggleStar && onToggleStar(); }}>
                 <span className="material-symbols-rounded">{project.starred?'star':'star_border'}</span>
               </button>
-              <button className="ms-card-btn danger" title={lang==='es'?'Mover a papelera':'Move to trash'}
+              <button className="ms-card-btn danger" title={window.t('Mover a papelera', 'Move to trash')}
                 onClick={(e)=>{ e.stopPropagation(); onDelete && onDelete(); }}>
                 <span className="material-symbols-rounded">delete</span>
               </button>
@@ -410,7 +416,7 @@ function ProjectCard({ project, lang, t, onOpen, onDelete, onRestore, onPurge, o
         <div className="ms-project-meta">
           <span>{project.items} {t.items_count}</span>
           <span className="dot"/>
-          <span>{project.updated?.[lang] || project.updated || (lang==='es'?'recién':'recent')}</span>
+          <span>{project.updated?.[lang] || project.updated || (window.t('recién', 'recent'))}</span>
         </div>
       </div>
     </div>
@@ -428,7 +434,7 @@ function NewProjectCard({ label, onClick, lang }) {
       <div className="ms-project-body">
         <div className="ms-project-title">{label}</div>
         <div className="ms-project-meta">
-          <span>{lang==='es'?'Canvas en blanco':'Blank canvas'}</span>
+          <span>{window.t('Canvas en blanco', 'Blank canvas')}</span>
         </div>
       </div>
     </div>
@@ -456,22 +462,22 @@ function NewProjectModal({ lang, onClose, onCreate }) {
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <div className="modal" onClick={(e)=>e.stopPropagation()}>
-        <h2>{lang==='es'?'Nuevo proyecto':'New project'}</h2>
-        <p>{lang==='es'?'Empieza con un canvas en blanco — luego añade tableros, notas, lo que necesites.':'Start with a blank canvas — then add boards, notes, whatever you need.'}</p>
+        <h2>{window.t('Nuevo proyecto', 'New project')}</h2>
+        <p>{window.t('Empieza con un canvas en blanco — luego añade tableros, notas, lo que necesites.', 'Start with a blank canvas — then add boards, notes, whatever you need.')}</p>
 
         <div className="field">
-          <label>{lang==='es'?'Nombre':'Name'}</label>
+          <label>{window.t('Nombre', 'Name')}</label>
           <input
             autoFocus
             value={name}
             onChange={(e)=>setName(e.target.value)}
             onKeyDown={(e)=>{ if (e.key==='Enter') submit(); }}
-            placeholder={lang==='es'?'Mi nuevo proyecto…':'My new project…'}
+            placeholder={window.t('Mi nuevo proyecto…', 'My new project…')}
           />
         </div>
 
         <div className="field">
-          <label>{lang==='es'?'Ícono':'Icon'}</label>
+          <label>{window.t('Ícono', 'Icon')}</label>
           <div className="emoji-row">
             {EMOJI_PRESETS.map(e => (
               <button key={e} className={`emoji-pick ${emoji===e?'active':''}`} onClick={()=>setEmoji(e)}>{e}</button>
@@ -480,7 +486,7 @@ function NewProjectModal({ lang, onClose, onCreate }) {
         </div>
 
         <div className="field">
-          <label>{lang==='es'?'Portada':'Cover'}</label>
+          <label>{window.t('Portada', 'Cover')}</label>
           <div className="cover-row">
             {COVER_PRESETS.map(c => (
               <button
@@ -494,14 +500,14 @@ function NewProjectModal({ lang, onClose, onCreate }) {
         </div>
 
         <div className="modal-actions">
-          <button className="btn btn-ghost" onClick={onClose}>{lang==='es'?'Cancelar':'Cancel'}</button>
+          <button className="btn btn-ghost" onClick={onClose}>{window.t('Cancelar', 'Cancel')}</button>
           <button
             className="btn btn-primary"
             onClick={submit}
             disabled={!name.trim()}
             style={{opacity: name.trim() ? 1 : 0.5}}
           >
-            {lang==='es'?'Crear proyecto':'Create project'}
+            {window.t('Crear proyecto', 'Create project')}
           </button>
         </div>
       </div>
