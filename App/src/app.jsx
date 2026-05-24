@@ -241,7 +241,9 @@ function App() {
 
   // Check for updates instantly on mount
   useEffectApp(() => {
-    checkUpdates(false);
+    if (window.electronAPI) {
+      checkUpdates(false);
+    }
   }, []);
 
   const handleUpdateClick = () => {

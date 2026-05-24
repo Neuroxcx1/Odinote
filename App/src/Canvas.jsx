@@ -1118,7 +1118,11 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
     const onMove = (ev) => {
       const dx = (ev.clientX - startX) / scale;
       const dy = (ev.clientY - startY) / scale;
-      if (Math.abs(dx) > 2 || Math.abs(dy) > 2) moved = true;
+      if (!moved && (Math.abs(dx) > 2 || Math.abs(dy) > 2)) {
+        moved = true;
+      }
+      if (!moved) return;
+
       if (isMultiDrag && multiStart) {
         // Move all selected items by the same delta
         _setCanvases(prev => {
