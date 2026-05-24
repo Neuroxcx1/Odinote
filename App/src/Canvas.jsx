@@ -2301,13 +2301,61 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
               <span className="material-symbols-rounded">select_all</span>
               {lang==='es'?'Seleccionar todo':'Select all'} <span style={{marginLeft:'auto', fontFamily:'var(--font-mono)', fontSize:10, color:'var(--ink-3)'}}>⌘A</span>
             </button>
-            <div className="ctx-sep"/>
+             <div class="ctx-sep"/>
             {(window.TOOLS || []).map(tool => (
               <button key={tool.id} onClick={()=>{ createNodeAt(tool.id, contextMenu.cx, contextMenu.cy); setContextMenu(null); }}>
                 <span className="material-symbols-rounded">{tool.icon}</span>
                 {window.TRANSLATIONS[lang][tool.label] || tool.id}
               </button>
             ))}
+            <div className="ctx-sep"/>
+            <div style={{ padding: '6px 12px', fontSize: '11px', fontWeight: '700', color: 'var(--text-soft, #595459)' }}>
+              {lang === 'es' ? 'Cambiar fondo del lienzo' : 'Change canvas background'}
+            </div>
+            <div style={{ display: 'flex', gap: '6px', padding: '4px 12px 10px 12px', justifyContent: 'space-between', width: '100%', boxSizing: 'border-box' }} onMouseDown={(e)=>e.stopPropagation()}>
+              {['default', 'gray', 'sand', 'mint', 'sky', 'pink'].map(bgOpt => {
+                const colorsMap = {
+                  default: { light: '#FAF8F6', dark: '#2A282A', label: { es: 'Por defecto', en: 'Default' } },
+                  gray: { light: '#ECEAE6', dark: '#1E1C1E', label: { es: 'Gris', en: 'Gray' } },
+                  sand: { light: '#F4EFE6', dark: '#38322B', label: { es: 'Arena', en: 'Sand' } },
+                  mint: { light: '#EAF2EB', dark: '#25332A', label: { es: 'Menta', en: 'Mint' } },
+                  sky: { light: '#E6F0FA', dark: '#232F3D', label: { es: 'Celeste', en: 'Sky' } },
+                  pink: { light: '#FAEBEF', dark: '#3A232F', label: { es: 'Rosa', en: 'Pink' } }
+                };
+                const colorHex = theme === 'dark' ? colorsMap[bgOpt].dark : colorsMap[bgOpt].light;
+                const active = (current.bgColor || 'default') === bgOpt;
+                return (
+                  <button
+                    key={bgOpt}
+                    style={{
+                      display: 'block',
+                      width: '20px',
+                      height: '20px',
+                      minWidth: '20px',
+                      padding: 0,
+                      borderRadius: '50%',
+                      background: colorHex,
+                      border: active ? '2.5px solid var(--wine, #7B2D26)' : '1px solid var(--line-soft, #E5E1DD)',
+                      cursor: 'pointer',
+                      boxShadow: active ? '0 0 4px rgba(0,0,0,0.2)' : 'none',
+                      transition: 'transform 100ms',
+                      margin: 0
+                    }}
+                    onClick={() => {
+                      setCanvases(prev => ({
+                        ...prev,
+                        [currentId]: {
+                          ...prev[currentId],
+                          bgColor: bgOpt
+                        }
+                      }));
+                      setContextMenu(null);
+                    }}
+                    title={lang === 'es' ? colorsMap[bgOpt].label.es : colorsMap[bgOpt].label.en}
+                  />
+                );
+              })}
+            </div>
           </div>
         )}
 

@@ -11,6 +11,30 @@ function DocModal({ docItem, lang, onClose, onUpdate }) {
   const savedRangeRef = React.useRef(null);             // selection captured when the link menu opened
   const linkInputRef = React.useRef(null);
 
+  const timeoutRef = React.useRef(null);
+  const pendingUpdateRef = React.useRef(null);
+
+  const debounceUpdate = React.useCallback((patch) => {
+    pendingUpdateRef.current = { ...pendingUpdateRef.current, ...patch };
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    timeoutRef.current = setTimeout(() => {
+      if (pendingUpdateRef.current) {
+        onUpdate(pendingUpdateRef.current);
+        pendingUpdateRef.current = null;
+      }
+    }, 600); // 600ms debounce
+  }, [onUpdate]);
+
+  // Flush pending updates on unmount
+  React.useEffect(() => {
+    return () => {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+      if (pendingUpdateRef.current) {
+        onUpdate(pendingUpdateRef.current);
+      }
+    };
+  }, [onUpdate]);
+
   // Set initial content once
   React.useEffect(() => {
     if (bodyRef.current) {
@@ -50,12 +74,12 @@ function DocModal({ docItem, lang, onClose, onUpdate }) {
 
   const commitBody = () => {
     if (!bodyRef.current) return;
-    onUpdate({ body: { es: bodyRef.current.innerHTML, en: bodyRef.current.innerHTML } });
+    debounceUpdate({ body: { es: bodyRef.current.innerHTML, en: bodyRef.current.innerHTML } });
   };
 
   const commitTitle = () => {
     if (!titleRef.current) return;
-    onUpdate({ title: { es: titleRef.current.value, en: titleRef.current.value } });
+    debounceUpdate({ title: { es: titleRef.current.value, en: titleRef.current.value } });
   };
 
   // Toggle blockquote on/off

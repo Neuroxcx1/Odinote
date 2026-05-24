@@ -601,6 +601,8 @@ a {
   overflow: hidden;
   box-shadow: var(--shadow-sm);
   transition: transform 140ms var(--e-out), box-shadow 140ms var(--e-out);
+  text-decoration: none;
+  color: inherit;
 }
 .feature-card:hover {
   transform: translate(-2px, -3px);
