@@ -1,23 +1,21 @@
 # Odinote 📝🌀
 
 > **Your mind, organized in nested infinite canvases.** An offline-first, free, and open-source project management tool designed for game developers, writers, and creatives.
->
-> *Tu mente, organizada en canvases infinitos y anidados. Una herramienta de gestión de proyectos offline-first, gratuita y de código abierto para desarrolladores de videojuegos, escritores y creativos.*
 
 ---
 
-## 🌟 Key Features / Características Clave
+## 🌟 Key Features
 
-* **🌀 Nested Canvases**: Create canvases inside notes, notes inside images, and boards inside boards. Infinite recursive structure. *(Crea tableros dentro de notas, notas dentro de imágenes y vuelve a empezar).*
-* **📝 Rich Text Formatting**: Easy note-taking with markdown shortcuts, multi-tab support, and auto-formatting. *(Escritura enriquecida con atajos rápidos de teclado).*
-* **🎛️ Audio Synthesizer**: Built-in mechanical keyboard clicks and interface sounds with a custom volume regulator slider. *(Sintetizador con regulador de volumen y sonidos de interfaz).*
-* **📏 Snapping Alignment**: Guidelines and physical snapping to help you align and organize your canvas nodes perfectly. *(Líneas guía inteligentes y ajuste automático al mover y redimensionar nodos).*
-* **🌐 Multi-language Support**: Fully localized into English, Spanish, German, Chinese, French, Italian, Russian, Arabic, and Portuguese. *(Traducido a más de 9 idiomas).*
-* **🔒 Privacy & Offline First**: Zero accounts needed. All data is saved on your machine via local vaults or browser database. *(Privacidad absoluta; almacenamiento local sin necesidad de internet).*
+* **🌀 Nested Canvases**: Create canvases inside notes, notes inside images, and boards inside boards. Infinite recursive structure.
+* **📝 Rich Text Formatting**: Easy note-taking with markdown shortcuts, multi-tab support, and auto-formatting.
+* **🎛️ Audio Synthesizer**: Built-in mechanical keyboard clicks and interface sounds with a custom volume regulator slider.
+* **📏 Snapping Alignment**: Guidelines and physical snapping to help you align and organize your canvas nodes perfectly.
+* **🌐 Multi-language Support**: Fully localized into English, Spanish, German, Chinese, French, Italian, Russian, Arabic, and Portuguese.
+* **🔒 Privacy & Offline First**: Zero accounts needed. All data is saved on your machine via local vaults or browser database.
 
 ---
 
-## 🖥️ Screenshots / Capturas de Pantalla
+## 🖥️ Screenshots
 
 *Here is how Odinote looks in action:*
 
@@ -25,14 +23,14 @@
   <img src="App/Icon/Icon.png" width="120" alt="Odinote Logo" />
 </p>
 
-> 💡 **Tip / Consejo para agregar imágenes**: 
-> Puedes subir capturas de pantalla de la aplicación de dos formas muy sencillas en GitHub:
-> 1. **Arrastrar y soltar**: Edita este archivo en la web de GitHub y arrastra una imagen de tu computadora directamente al cuadro de edición. GitHub la subirá y creará el código de imagen de forma automática.
-> 2. **Carpeta local**: Guarda tus capturas en una carpeta (ej. `assets/`) en tu computadora, agrégalas a Git, súbelas y enlázalas en este archivo usando `![Showcase](assets/captura.png)`.
+> 💡 **Tip for adding images**: 
+> You can easily add screenshots of the application directly on GitHub:
+> 1. **Drag and Drop**: Edit this file on the GitHub website, and drag an image from your computer directly into the text editor box. GitHub will automatically upload it and generate the image link.
+> 2. **Local Folder**: Save your screenshots in a folder (e.g. `assets/`) on your computer, commit them, and link them using `![Showcase](assets/screenshot.png)`.
 
 ---
 
-## 🚀 Installation & Usage / Instalación y Uso
+## 🚀 Installation & Usage
 
 ### 💿 Windows Installer (.exe)
 1. Go to the **[Releases](https://github.com/Neuroxcx1/Odinote/releases)** page on this repository.
@@ -46,7 +44,7 @@
 
 ---
 
-## 🛠️ Development (Run Locally) / Desarrollo Local
+## 🛠️ Development (Run Locally)
 
 If you want to run or build the project locally, make sure you have [Node.js](https://nodejs.org/) installed:
 
@@ -69,6 +67,6 @@ If you want to run or build the project locally, make sure you have [Node.js](ht
 
 ---
 
-## 📄 License / Licencia
+## 📄 License
 
 This project is licensed under the MIT License - see the [LICENSE](App/LICENSE) file for details.
