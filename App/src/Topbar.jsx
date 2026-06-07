@@ -32,6 +32,7 @@ function Topbar({
   onUndo, onRedo, canUndo, canRedo,
   onToolDragStart,
   updateAvailable, onUpdateClick,
+  volume, onChangeVolume,
 }) {
   const t = window.TRANSLATIONS[lang];
 
@@ -101,6 +102,7 @@ function Topbar({
               className={`tool press ${activeTool === tool.id ? 'active' : ''}`}
               title={`${t[tool.label]} · ${window.t('Arrastra al canvas o clic', 'Drag to canvas or click')}`}
               onMouseDown={(e)=>startToolDrag(e, tool.id)}
+              onClick={() => window.playAudioTone && window.playAudioTone('click')}
             >
               <div
                 className="tool-icon"
@@ -137,7 +139,7 @@ function Topbar({
               marginRight: 6,
               animation: updateAvailable ? 'pulse-bell 1.5s infinite alternate' : 'none'
             }}
-            onClick={onUpdateClick}
+            onClick={() => { onUpdateClick(); window.playAudioTone && window.playAudioTone('click'); }}
             title={
               updateAvailable
                 ? (window.t('¡Nueva actualización disponible! Haz clic para descargar de GitHub.', 'New update available! Click to download from GitHub.'))
@@ -149,31 +151,100 @@ function Topbar({
             </span>
           </button>
         )}
-        <button className="icon-btn lift" title="Undo (⌘Z)" onClick={onUndo} style={{ opacity: canUndo ? 1 : 0.4 }}>
+        <button
+          className="icon-btn lift"
+          title="Undo (⌘Z)"
+          onClick={() => { onUndo(); window.playAudioTone && window.playAudioTone('click'); }}
+          style={{ opacity: canUndo ? 1 : 0.4 }}
+        >
           <span className="material-symbols-rounded">undo</span>
         </button>
-        <button className="icon-btn lift" title="Redo (⌘⇧Z)" onClick={onRedo} style={{ opacity: canRedo ? 1 : 0.4 }}>
+        <button
+          className="icon-btn lift"
+          title="Redo (⌘⇧Z)"
+          onClick={() => { onRedo(); window.playAudioTone && window.playAudioTone('click'); }}
+          style={{ opacity: canRedo ? 1 : 0.4 }}
+        >
           <span className="material-symbols-rounded">redo</span>
         </button>
+        <div className="volume-ctrl" style={{ marginRight: 6 }}>
+          <button
+            className="icon-btn-mute"
+            title={volume === 0 ? (lang === 'es' ? 'Activar sonido' : 'Unmute') : (lang === 'es' ? 'Silenciar' : 'Mute')}
+            onClick={() => {
+              let nextVol = 0.5;
+              if (volume > 0) {
+                localStorage.setItem('odinote.last_volume', volume.toString());
+                nextVol = 0;
+              } else {
+                const last = localStorage.getItem('odinote.last_volume');
+                nextVol = last ? parseFloat(last) : 0.5;
+              }
+              onChangeVolume(nextVol);
+              setTimeout(() => { window.playAudioTone && window.playAudioTone('click'); }, 20);
+            }}
+          >
+            <span className="material-symbols-rounded">
+              {volume === 0 ? 'volume_off' : (volume < 0.4 ? 'volume_down' : 'volume_up')}
+            </span>
+          </button>
+          <input
+            type="range"
+            min="0"
+            max="1"
+            step="0.05"
+            value={volume}
+            onChange={(e) => onChangeVolume(parseFloat(e.target.value))}
+            className="volume-slider"
+            title={`${Math.round(volume * 100)}%`}
+          />
+        </div>
         <button
           className="icon-btn lift theme-btn"
           title={theme==='dark'?'Light mode':'Dark mode'}
-          onClick={()=>setTheme(theme === 'dark' ? 'light' : 'dark')}
+          onClick={() => { setTheme(theme === 'dark' ? 'light' : 'dark'); window.playAudioTone && window.playAudioTone('click'); }}
         >
           <span className="material-symbols-rounded">{theme === 'dark' ? 'light_mode' : 'dark_mode'}</span>
         </button>
-        <div className="lang-switch">
-          <select value={lang} onChange={(e)=>setLang(e.target.value)} className="lang-select">
-            <option value="es">ES</option>
-            <option value="en">EN</option>
-            <option value="fr">FR</option>
-            <option value="de">DE</option>
-            <option value="it">IT</option>
-            <option value="pt">PT</option>
-            <option value="zh">ZH</option>
-            <option value="ja">JA</option>
-            <option value="ko">KO</option>
-            <option value="ar">AR</option>
+        <div
+          className="lang-switch"
+          title={
+            {
+              es: 'Español',
+              en: 'English',
+              fr: 'Français',
+              de: 'Deutsch',
+              it: 'Italiano',
+              pt: 'Português',
+              zh: '中文 (Chinese)',
+              ja: '日本語 (Japanese)',
+              ko: '한국어 (Korean)',
+              ar: 'العربية (Arabic)',
+              ru: 'Русский (Russian)'
+            }[lang] || ''
+          }
+          style={{ position: 'relative' }}
+        >
+          <span style={{ pointerEvents: 'none', position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--ink)', fontSize: '11.5px', fontWeight: '700' }}>
+            {lang.toUpperCase()}
+          </span>
+          <select
+            value={lang}
+            onChange={(e) => { setLang(e.target.value); window.playAudioTone && window.playAudioTone('click'); }}
+            className="lang-select"
+            style={{ opacity: 0, cursor: 'pointer', position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', zIndex: 2 }}
+          >
+            <option value="es" title="Español">ES - Español</option>
+            <option value="en" title="English">EN - English</option>
+            <option value="fr" title="Français">FR - Français</option>
+            <option value="de" title="Deutsch">DE - Deutsch</option>
+            <option value="it" title="Italiano">IT - Italiano</option>
+            <option value="pt" title="Português">PT - Português</option>
+            <option value="zh" title="中文 (Chinese)">ZH - 中文 (Chinese)</option>
+            <option value="ja" title="日本語 (Japanese)">JA - 日本語 (Japanese)</option>
+            <option value="ko" title="한국어 (Korean)">KO - 한국어 (Korean)</option>
+            <option value="ar" title="العربية (Arabic)">AR - العربية (Arabic)</option>
+            <option value="ru" title="Русский (Russian)">RU - Русский (Russian)</option>
           </select>
         </div>
       </div>

@@ -4,7 +4,7 @@
   "description": "Tu mente, ordenada en canvases anidados libres e infinitos.",
   "main": "main.js",
   "scripts": {
-    "start": "electron .",
+    "start": "electron main.js",
     "build:exe": "electron-packager . Odinote --platform=win32 --arch=x64 --out=dist --overwrite --icon=Icon/Icon.ico",
     "build:installer": "electron-builder --win --x64"
   },

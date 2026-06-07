@@ -42,6 +42,9 @@ function DocModal({ docItem, lang, onClose, onUpdate }) {
     }
     if (titleRef.current) {
       titleRef.current.value = window.pickLang(docItem.title, lang) || '';
+      // Adjust height to fit loaded title
+      titleRef.current.style.height = 'auto';
+      titleRef.current.style.height = titleRef.current.scrollHeight + 'px';
     }
     setTimeout(() => bodyRef.current?.focus(), 50);
   // eslint-disable-next-line
@@ -51,6 +54,23 @@ function DocModal({ docItem, lang, onClose, onUpdate }) {
     const sel = window.getSelection();
     const hasSel = !!(sel && sel.rangeCount && !sel.isCollapsed &&
       bodyRef.current && bodyRef.current.contains(sel.getRangeAt(0).commonAncestorContainer));
+      
+    let isH1 = false;
+    let isH2 = false;
+    let isQuote = false;
+    if (sel && sel.rangeCount) {
+      let node = sel.anchorNode;
+      while (node && node !== bodyRef.current) {
+        if (node.nodeType === 1) {
+          if (node.tagName === 'H1') isH1 = true;
+          if (node.tagName === 'H2') isH2 = true;
+          if (node.tagName === 'BLOCKQUOTE') isQuote = true;
+        }
+        node = node.parentNode;
+      }
+    }
+    const isP = !isH1 && !isH2 && !isQuote && !document.queryCommandState('insertUnorderedList') && !document.queryCommandState('insertOrderedList');
+
     setActive({
       bold:      document.queryCommandState('bold'),
       italic:    document.queryCommandState('italic'),
@@ -61,11 +81,27 @@ function DocModal({ docItem, lang, onClose, onUpdate }) {
       alignC:    document.queryCommandState('justifyCenter'),
       alignR:    document.queryCommandState('justifyRight'),
       alignJ:    document.queryCommandState('justifyFull'),
+      h1:        isH1,
+      h2:        isH2,
+      p:         isP,
+      quote:     isQuote,
       hasSel,
     });
   };
 
   const exec = (cmd, val) => {
+    if (cmd === 'formatBlock') {
+      const cleanTag = val.replace(/[<>]/g, '').toLowerCase();
+      const changed = window.changeBlockTag && window.changeBlockTag(bodyRef.current, cleanTag);
+      if (changed) {
+        bodyRef.current?.focus();
+        refreshActive();
+        commitBody();
+        return;
+      }
+      // Clean inline styling so the block takes theme styles cleanly
+      document.execCommand('removeFormat', false, null);
+    }
     document.execCommand(cmd, false, val);
     bodyRef.current?.focus();
     refreshActive();
@@ -87,10 +123,10 @@ function DocModal({ docItem, lang, onClose, onUpdate }) {
     const sel = window.getSelection();
     let node = sel?.anchorNode;
     while (node && node !== bodyRef.current) {
-      if (node.tagName === 'BLOCKQUOTE') { exec('formatBlock', 'P'); return; }
+      if (node.tagName === 'BLOCKQUOTE') { exec('formatBlock', '<p>'); return; }
       node = node.parentNode;
     }
-    exec('formatBlock', 'BLOCKQUOTE');
+    exec('formatBlock', '<blockquote>');
   };
 
   // Open the floating link editor next to the current text selection.
@@ -211,7 +247,7 @@ function DocModal({ docItem, lang, onClose, onUpdate }) {
           if (node.tagName === 'BLOCKQUOTE') {
             if ((node.textContent || '').trim() === '') {
               e.preventDefault();
-              document.execCommand('formatBlock', false, 'P');
+              document.execCommand('formatBlock', false, '<p>');
               commitBody();
             }
             return;
@@ -230,7 +266,7 @@ function DocModal({ docItem, lang, onClose, onUpdate }) {
         if (node.tagName === 'BLOCKQUOTE') {
           if ((node.textContent || '').trim() === '') {
             e.preventDefault();
-            document.execCommand('formatBlock', false, 'P');
+            document.execCommand('formatBlock', false, '<p>');
             commitBody();
           }
           return;
@@ -258,12 +294,50 @@ function DocModal({ docItem, lang, onClose, onUpdate }) {
       <div className="doc-modal" onMouseDown={(e)=>e.stopPropagation()} onKeyDown={onKey}>
         <div className="doc-modal-head">
           <span className="material-symbols-rounded" style={{color:'var(--wine)'}}>description</span>
-          <input
-            ref={titleRef}
-            className="doc-title-input"
-            placeholder={lang==='es'?'Sin título':'Untitled'}
-            onChange={commitTitle}
-          />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, minWidth: 0 }}>
+            <textarea
+              ref={titleRef}
+              className="doc-title-input"
+              placeholder={lang==='es'?'Sin título':'Untitled'}
+              onChange={(e) => {
+                commitTitle();
+                e.target.style.height = 'auto';
+                e.target.style.height = e.target.scrollHeight + 'px';
+              }}
+              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); e.target.blur(); } }}
+              rows={1}
+              style={{
+                resize: 'none',
+                overflowY: 'hidden',
+                height: 'auto',
+                fontFamily: 'var(--font-display)',
+                fontWeight: '800',
+                fontSize: '20px',
+                flex: 1,
+                letterSpacing: '-0.02em',
+                background: 'transparent',
+                border: 'none',
+                outline: 'none',
+                color: 'inherit',
+                padding: '4px 0'
+              }}
+            />
+            <button
+              className="icon-btn lift"
+              onClick={() => titleRef.current?.select()}
+              title={lang==='es' ? 'Editar título' : 'Edit title'}
+              style={{
+                padding: '6px',
+                minWidth: 'auto',
+                height: 'auto',
+                flexShrink: 0,
+                background: '#FFFFFF',
+                borderColor: '#E1DFE3',
+              }}
+            >
+              <span className="material-symbols-rounded" style={{ fontSize: '18px', color: '#595459' }}>edit</span>
+            </button>
+          </div>
           <button className="btn btn-ghost" onClick={onClose}>
             <span className="material-symbols-rounded">close</span>
             {lang==='es'?'Cerrar':'Close'}
@@ -284,9 +358,9 @@ function DocModal({ docItem, lang, onClose, onUpdate }) {
               <span style={{textDecoration:'line-through', fontWeight: 700}}>S</span>
             </button>
             <div className="doc-tool-sep"/>
-            <button onClick={()=>exec('formatBlock', 'H1')} title="Título 1"><span style={{fontFamily:'var(--font-display)', fontWeight: 800, fontSize: 14}}>H1</span></button>
-            <button onClick={()=>exec('formatBlock', 'H2')} title="Título 2"><span style={{fontFamily:'var(--font-display)', fontWeight: 700, fontSize: 12}}>H2</span></button>
-            <button onClick={()=>exec('formatBlock', 'P')}  title="Párrafo"><span className="material-symbols-rounded">notes</span></button>
+            <button onClick={()=>exec('formatBlock', '<h1>')} className={active.h1 ? 'active' : ''} title="Título 1"><span style={{fontFamily:'var(--font-display)', fontWeight: 800, fontSize: 14}}>H1</span></button>
+            <button onClick={()=>exec('formatBlock', '<h2>')} className={active.h2 ? 'active' : ''} title="Título 2"><span style={{fontFamily:'var(--font-display)', fontWeight: 700, fontSize: 12}}>H2</span></button>
+            <button onClick={()=>exec('formatBlock', '<p>')}  className={active.p ? 'active' : ''} title="Párrafo"><span className="material-symbols-rounded">notes</span></button>
             <div className="doc-tool-sep"/>
             <button onClick={()=>exec('insertUnorderedList')} className={active.ul ? 'active' : ''} title="Lista con viñetas">
               <span className="material-symbols-rounded">format_list_bulleted</span>
@@ -294,7 +368,7 @@ function DocModal({ docItem, lang, onClose, onUpdate }) {
             <button onClick={()=>exec('insertOrderedList')} className={active.ol ? 'active' : ''} title="Lista numerada">
               <span className="material-symbols-rounded">format_list_numbered</span>
             </button>
-            <button onClick={toggleQuote} title="Cita">
+            <button onClick={toggleQuote} className={active.quote ? 'active' : ''} title="Cita">
               <span className="material-symbols-rounded">format_quote</span>
             </button>
             <div className="doc-tool-sep"/>
@@ -321,18 +395,21 @@ function DocModal({ docItem, lang, onClose, onUpdate }) {
               <span className="material-symbols-rounded">link</span>
             </button>
           </div>
-          <div
-            ref={bodyRef}
-            className="doc-modal-content"
-            contentEditable
-            suppressContentEditableWarning
-            onInput={commitBody}
-            onKeyUp={refreshActive}
-            onMouseUp={refreshActive}
-            onKeyDown={onBodyKey}
-            onPaste={onBodyPaste}
-            onClick={onBodyClick}
-          />
+          <div className="doc-modal-editor-pane" onClick={(e) => { if (e.target === e.currentTarget) bodyRef.current?.focus(); }}>
+            <div
+              ref={bodyRef}
+              className="doc-modal-content"
+              contentEditable
+              suppressContentEditableWarning
+              spellCheck={true}
+              onInput={commitBody}
+              onKeyUp={refreshActive}
+              onMouseUp={refreshActive}
+              onKeyDown={onBodyKey}
+              onPaste={onBodyPaste}
+              onClick={onBodyClick}
+            />
+          </div>
         </div>
       </div>
 

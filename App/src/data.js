@@ -3,377 +3,11 @@
 // Showcasing Architecture, Game Design, and Marketing
 // =====================================================
 
-const SAMPLE_PROJECTS = [
-  {
-    id: 'architecture',
-    name: { es: 'Estudio de Arquitectura — Casa Colina', en: 'Architecture Studio — Hillside House' },
-    emoji: '🏡',
-    cover: 'linear-gradient(135deg, #A8E6C9, #DFF26E)',
-    updated: { es: 'hace 2 horas', en: '2 hours ago' },
-    items: 7,
-  },
-  {
-    id: 'gamedev',
-    name: { es: 'Diseño de Videojuego — Project Aether', en: 'Game Design — Project Aether' },
-    emoji: '👾',
-    cover: 'linear-gradient(135deg, #D4B4FF, #FFB088)',
-    updated: { es: 'ayer', en: 'yesterday' },
-    items: 7,
-  },
-  {
-    id: 'marketing',
-    name: { es: 'Campaña de Marketing — Lanzamiento Nova', en: 'Marketing Campaign — Nova Launch' },
-    emoji: '🚀',
-    cover: 'linear-gradient(135deg, #FFB6D4, #FFD0E5)',
-    updated: { es: 'hace 3 días', en: '3 days ago' },
-    items: 7,
-  },
-];
+const SAMPLE_PROJECTS = [];
 
 // All canvases live in one big map. Root canvas key = project id.
 // Boards are first-class items with their own canvas key.
-const INITIAL_CANVASES = {
-  // ─────────── 1. ARCHITECTURE ───────────
-  'architecture': {
-    title: { es: 'Estudio de Arquitectura — Casa Colina', en: 'Architecture Studio — Hillside House' },
-    items: [
-      {
-        id: 'arch-note-1', type: 'note', x: 60, y: 130, w: 460, h: 80, color: 'mint',
-        content: {
-          es: '🏡 **Estudio preliminar - Casa Colina**\nDiseño ecológico de bajo impacto energético, adaptado a la topografía de la ladera oeste.',
-          en: '🏡 **Preliminary study - Hillside House**\nLow-energy ecological design, adapted to the topography of the western hillside.',
-        },
-      },
-      {
-        id: 'arch-board-1', type: 'board', x: 60, y: 240, w: 260, h: 180, color: 'sky',
-        canvasId: 'arch-plans',
-        content: { es: 'Zonificación y Planos', en: 'Zoning & Blueprints' },
-      },
-      {
-        id: 'arch-board-2', type: 'board', x: 340, y: 240, w: 260, h: 180, color: 'cream',
-        canvasId: 'arch-materials',
-        content: { es: 'Materiales y Acabados', en: 'Materials & Finishes' },
-      },
-      {
-        id: 'arch-col-1', type: 'column', x: 60, y: 450, w: 280, h: 320, color: 'coral',
-        content: { es: 'Fases del Proyecto', en: 'Project Phases' },
-        children: [
-          { id: 'ap1', text: { es: 'Fase 1: Levantamiento 3D', en: 'Phase 1: 3D Survey' } },
-          { id: 'ap2', text: { es: 'Fase 2: Anteproyecto', en: 'Phase 2: Concept Design' } },
-          { id: 'ap3', text: { es: 'Fase 3: Ingeniería Estructural', en: 'Phase 3: Structural Engineering' } },
-        ],
-      },
-      {
-        id: 'arch-todo-1', type: 'todo', x: 360, y: 450, w: 280, h: 220, color: 'yellow',
-        title: { es: 'Pendientes', en: 'Tasks' },
-        items: [
-          { id: 'at1', text: { es: 'Verificar distancias reglamentarias', en: 'Check zoning setbacks' }, done: true },
-          { id: 'at2', text: { es: 'Selección de vidrios fotovoltaicos', en: 'Select photovoltaic glass' }, done: false },
-          { id: 'at3', text: { es: 'Reunión con paisajista', en: 'Meeting with landscape designer' }, done: false },
-        ],
-      },
-      {
-        id: 'arch-cmt-1', type: 'comment', x: 640, y: 240, w: 260, h: 120,
-        avatar: 'M', avatarColor: 'sky',
-        name: 'Arq. Mateo',
-        text: {
-          es: 'La inclinación de la ladera requiere un muro de contención reforzado en el eje norte.',
-          en: 'The slope inclination requires a reinforced retaining wall on the north axis.',
-        },
-      },
-      {
-        id: 'arch-palette', type: 'swatch', x: 640, y: 390, w: 260, h: 140,
-        title: { es: 'Paleta Orgánica', en: 'Organic Palette' },
-        colors: [
-          { hex: '#3E5C4E', name: 'Pino' },
-          { hex: '#D2B48C', name: 'Arena' },
-          { hex: '#705A4E', name: 'Piedra' },
-          { hex: '#FAF9F6', name: 'Tiza' },
-        ],
-      },
-    ],
-    connectors: [
-      { id: 'ac1', from: 'arch-note-1', to: 'arch-board-1', fromAnchor: 'bottom', toAnchor: 'top', bend: { x: -40, y: 0 } },
-    ],
-  },
-  'arch-plans': {
-    title: { es: 'Zonificación y Planos', en: 'Zoning & Blueprints' },
-    parent: 'architecture',
-    parentLabel: { es: 'Casa Colina', en: 'Hillside House' },
-    items: [
-      {
-        id: 'arch-plans-t', type: 'title', x: 60, y: 40, w: 500, h: 60,
-        content: { es: 'Planos y Distribución', en: 'Blueprints & Distribution' },
-      },
-      {
-        id: 'arch-plans-n1', type: 'note', x: 60, y: 130, w: 260, h: 160, color: 'sky',
-        content: {
-          es: '**PLANTA BAJA**\n- Estacionamiento techado (2 autos)\n- Hall de acceso de doble altura\n- Cocina y comedor abierto\n- Terraza con borde infinito',
-          en: '**GROUND FLOOR**\n- Covered parking (2 cars)\n- Double height access hall\n- Open kitchen & dining room\n- Infinity edge terrace',
-        },
-      },
-      {
-        id: 'arch-plans-n2', type: 'note', x: 340, y: 130, w: 260, h: 160, color: 'mint',
-        content: {
-          es: '**PLANTA ALTA**\n- Suite principal + vestidor\n- Biblioteca / Oficina en casa\n- 2 dormitorios secundarios con baño',
-          en: '**FIRST FLOOR**\n- Master suite + walk-in closet\n- Library / Home office\n- 2 secondary bedrooms with bathroom',
-        },
-      },
-    ],
-    connectors: [],
-  },
-  'arch-materials': {
-    title: { es: 'Materiales y Acabados', en: 'Materials & Finishes' },
-    parent: 'architecture',
-    parentLabel: { es: 'Casa Colina', en: 'Hillside House' },
-    items: [
-      {
-        id: 'arch-mat-t', type: 'title', x: 60, y: 40, w: 500, h: 60,
-        content: { es: 'Materiales Sugeridos', en: 'Suggested Materials' },
-      },
-      {
-        id: 'arch-mat-n1', type: 'note', x: 60, y: 130, w: 260, h: 150, color: 'cream',
-        content: {
-          es: '**Fachada y Exteriores**\n- Hormigón visto texturizado\n- Paneles de madera de teca curada\n- Piedra volcánica local en la base',
-          en: '**Facade & Exteriors**\n- Textured exposed concrete\n- Cured teak wood panels\n- Local volcanic stone at the base',
-        },
-      },
-      {
-        id: 'arch-mat-n2', type: 'note', x: 340, y: 130, w: 260, h: 150, color: 'yellow',
-        content: {
-          es: '**Interiores y Pisos**\n- Microcemento gris claro\n- Revestimientos en madera de roble\n- Griferías empotradas negro mate',
-          en: '**Interiors & Floors**\n- Light gray microcement\n- Oak wood paneling\n- Matte black built-in faucets',
-        },
-      },
-    ],
-    connectors: [],
-  },
-
-  // ─────────── 2. GAME DESIGN ───────────
-  'gamedev': {
-    title: { es: 'Diseño de Videojuego — Project Aether', en: 'Game Design — Project Aether' },
-    items: [
-      {
-        id: 'game-note-1', type: 'note', x: 60, y: 130, w: 460, h: 80, color: 'lavender',
-        content: {
-          es: '👾 **Project Aether (Metroidvania)**\nJuego de acción y exploración 2D. Enfoque en combos aéreos y personalización de prótesis mecánicas.',
-          en: '👾 **Project Aether (Metroidvania)**\n2D action-exploration game. Focus on aerial combos and mechanical prosthetic customization.',
-        },
-      },
-      {
-        id: 'game-board-1', type: 'board', x: 60, y: 240, w: 260, h: 180, color: 'pink',
-        canvasId: 'game-chars',
-        content: { es: 'Personajes y Jefes', en: 'Characters & Bosses' },
-      },
-      {
-        id: 'game-board-2', type: 'board', x: 340, y: 240, w: 260, h: 180, color: 'mint',
-        canvasId: 'game-mechs',
-        content: { es: 'Mecánicas Core', en: 'Core Mechanics' },
-      },
-      {
-        id: 'game-col-1', type: 'column', x: 60, y: 450, w: 280, h: 320, color: 'coral',
-        content: { es: 'Sprint Backlog', en: 'Sprint Backlog' },
-        children: [
-          { id: 'gp1', text: { es: 'Pulir salto y aceleración física', en: 'Polish jump & physics acceleration' } },
-          { id: 'gp2', text: { es: 'Efectos de sonido de impacto', en: 'Hit impact sound effects' } },
-          { id: 'gp3', text: { es: 'Diseño del Jefe: El Alquimista', en: 'Boss Design: The Alchemist' } },
-        ],
-      },
-      {
-        id: 'game-todo-1', type: 'todo', x: 360, y: 450, w: 280, h: 220, color: 'yellow',
-        title: { es: 'Hitos Alpha', en: 'Alpha Milestones' },
-        items: [
-          { id: 'gt1', text: { es: 'Implementar el doble salto rúnico', en: 'Implement runic double jump' }, done: true },
-          { id: 'gt2', text: { es: 'Integrar enemigo básico (Cazador)', en: 'Integrate basic enemy (Scout)' }, done: false },
-          { id: 'gt3', text: { es: 'Prueba de control con Gamepad', en: 'Gamepad controller test' }, done: false },
-        ],
-      },
-      {
-        id: 'game-cmt-1', type: 'comment', x: 640, y: 240, w: 260, h: 120,
-        avatar: 'N', avatarColor: 'pink',
-        name: 'Niko (Gamedev)',
-        text: {
-          es: '¿Y si el gancho consume vapor de presión en vez de energía rúnica?',
-          en: 'What if the grappling hook consumes pressure steam instead of runic energy?',
-        },
-      },
-      {
-        id: 'game-palette', type: 'swatch', x: 640, y: 390, w: 260, h: 140,
-        title: { es: 'Paleta Steampunk', en: 'Steampunk Palette' },
-        colors: [
-          { hex: '#4A3B32', name: 'Cobre' },
-          { hex: '#D4AF37', name: 'Bronce' },
-          { hex: '#7D2E68', name: 'Aether' },
-          { hex: '#1A1A1A', name: 'Hollín' },
-        ],
-      },
-    ],
-    connectors: [
-      { id: 'gc1', from: 'game-note-1', to: 'game-board-1', fromAnchor: 'bottom', toAnchor: 'top', bend: { x: -40, y: 0 } },
-    ],
-  },
-  'game-chars': {
-    title: { es: 'Personajes y Jefes', en: 'Characters & Bosses' },
-    parent: 'gamedev',
-    parentLabel: { es: 'Project Aether', en: 'Project Aether' },
-    items: [
-      {
-        id: 'game-chars-t', type: 'title', x: 60, y: 40, w: 500, h: 60,
-        content: { es: 'Héroes y Enemigos', en: 'Heroes & Enemies' },
-      },
-      {
-        id: 'game-chars-n1', type: 'note', x: 60, y: 130, w: 260, h: 160, color: 'pink',
-        content: {
-          es: '**VALERY (Protagonista)**\nIngeniera rebelde con brazo prostético de vapor adaptable. Puede equipar cañón, gancho o taladro.',
-          en: '**VALERY (Protagonist)**\nRebel engineer with adaptable steam prosthetic arm. Can equip cannon, grapple, or drill.',
-        },
-      },
-      {
-        id: 'game-chars-n2', type: 'note', x: 340, y: 130, w: 260, h: 160, color: 'sky',
-        content: {
-          es: '**EL ALQUIMISTA (Jefe)**\nCientífico corrupto que usa Aether líquido para mutar. Se mueve suspendido por tentáculos mecánicos.',
-          en: '**THE ALCHEMIST (Boss)**\nCorrupt scientist who uses liquid Aether to mutate. Moves suspended by mechanical tentacles.',
-        },
-      },
-    ],
-    connectors: [],
-  },
-  'game-mechs': {
-    title: { es: 'Mecánicas Core', en: 'Core Mechanics' },
-    parent: 'gamedev',
-    parentLabel: { es: 'Project Aether', en: 'Project Aether' },
-    items: [
-      {
-        id: 'game-mechs-t', type: 'title', x: 60, y: 40, w: 500, h: 60,
-        content: { es: 'Sistemas del Juego', en: 'Game Systems' },
-      },
-      {
-        id: 'game-mechs-n1', type: 'note', x: 60, y: 130, w: 260, h: 150, color: 'mint',
-        content: {
-          es: '**Presión de Vapor**\nEsquivar y atacar acumula calor. Si se sobrecalienta, Valery inflige más daño pero pierde vida gradualmente.',
-          en: '**Steam Pressure**\nDashing and attacking builds up heat. Overheating increases damage output but drains health slowly.',
-        },
-      },
-      {
-        id: 'game-mechs-n2', type: 'note', x: 340, y: 130, w: 260, h: 150, color: 'yellow',
-        content: {
-          es: '**Instalación de Módulos**\nSlots de mejora en bancos de trabajo. Permite optimizar la prótesis para exploración o daño.',
-          en: '**Module Upgrades**\nUpgrade slots at workbenches. Allows optimizing the prosthetic for mobility or raw damage.',
-        },
-      },
-    ],
-    connectors: [],
-  },
-
-  // ─────────── 3. MARKETING ───────────
-  'marketing': {
-    title: { es: 'Campaña de Marketing — Lanzamiento Nova', en: 'Marketing Campaign — Nova Launch' },
-    items: [
-      {
-        id: 'mkt-note-1', type: 'note', x: 60, y: 130, w: 460, h: 80, color: 'pink',
-        content: {
-          es: '🚀 **Lanzamiento de Nova SaaS v3.0**\nCampaña de marketing digital multi-canal para posicionar a Nova como el software de colaboración líder en 2026.',
-          en: '🚀 **Nova SaaS v3.0 Launch**\nMulti-channel digital marketing campaign to position Nova as the leading collaboration tool in 2026.',
-        },
-      },
-      {
-        id: 'mkt-board-1', type: 'board', x: 60, y: 240, w: 260, h: 180, color: 'sky',
-        canvasId: 'mkt-channels',
-        content: { es: 'Canales y Medios', en: 'Channels & Media' },
-      },
-      {
-        id: 'mkt-board-2', type: 'board', x: 340, y: 240, w: 260, h: 180, color: 'yellow',
-        canvasId: 'mkt-creative',
-        content: { es: 'Recursos Creativos', en: 'Creative Assets' },
-      },
-      {
-        id: 'mkt-col-1', type: 'column', x: 60, y: 450, w: 280, h: 320, color: 'coral',
-        content: { es: 'Fases de Campaña', en: 'Campaign Phases' },
-        children: [
-          { id: 'mp1', text: { es: 'Fase 1: Teaser en Redes', en: 'Phase 1: Social Teaser' } },
-          { id: 'mp2', text: { es: 'Fase 2: Lanzamiento General', en: 'Phase 2: General Release' } },
-          { id: 'mp3', text: { es: 'Fase 3: Remarketing', en: 'Phase 3: Remarketing' } },
-        ],
-      },
-      {
-        id: 'mkt-todo-1', type: 'todo', x: 360, y: 450, w: 280, h: 220, color: 'yellow',
-        title: { es: 'Pre-lanzamiento', en: 'Pre-launch Checklist' },
-        items: [
-          { id: 'mt1', text: { es: 'Redacción de notas de prensa', en: 'Write press releases' }, done: true },
-          { id: 'mt2', text: { es: 'Configurar píxel de conversión', en: 'Set up conversion pixel' }, done: false },
-          { id: 'mt3', text: { es: 'Enviar copias de prensa a medios', en: 'Send press kits to media outlets' }, done: false },
-        ],
-      },
-      {
-        id: 'mkt-cmt-1', type: 'comment', x: 640, y: 240, w: 260, h: 120,
-        avatar: 'E', avatarColor: 'mint',
-        name: 'Elisa (Growth)',
-        text: {
-          es: 'Las campañas de búsqueda de Google Ads deben enfocarse en palabras clave de dolor de usuario.',
-          en: 'Google Ads search campaigns should target high-intent user pain points.',
-        },
-      },
-      {
-        id: 'mkt-palette', type: 'swatch', x: 640, y: 390, w: 260, h: 140,
-        title: { es: 'Branding de Nova', en: 'Nova Branding' },
-        colors: [
-          { hex: '#FF6B6B', name: 'Coral' },
-          { hex: '#4D96FF', name: 'Azul' },
-          { hex: '#6BCB77', name: 'Menta' },
-          { hex: '#FAF9F6', name: 'Blanco' },
-        ],
-      },
-    ],
-    connectors: [
-      { id: 'mc1', from: 'mkt-note-1', to: 'mkt-board-1', fromAnchor: 'bottom', toAnchor: 'top', bend: { x: -40, y: 0 } },
-    ],
-  },
-  'mkt-channels': {
-    title: { es: 'Canales y Medios', en: 'Channels & Media' },
-    parent: 'marketing',
-    parentLabel: { es: 'Lanzamiento Nova', en: 'Nova Launch' },
-    items: [
-      {
-        id: 'mkt-chan-t', type: 'title', x: 60, y: 40, w: 500, h: 60,
-        content: { es: 'Canales de Adquisición', en: 'Acquisition Channels' },
-      },
-      {
-        id: 'mkt-chan-n1', type: 'note', x: 60, y: 130, w: 260, h: 150, color: 'sky',
-        content: {
-          es: '**Orgánico e Inbound**\n- Post en el blog sobre silos de comunicación\n- Secuencia de correo para suscriptores\n- SEO enfocado en búsqueda semántica',
-          en: '**Organic & Inbound**\n- Blog post on communication silos\n- Email sequence for subscribers\n- SEO optimized for semantic search',
-        },
-      },
-      {
-        id: 'mkt-chan-n2', type: 'note', x: 340, y: 130, w: 260, h: 150, color: 'pink',
-        content: {
-          es: '**Anuncios de Pago**\n- LinkedIn Ads para tomadores de decisiones (CTOs, PMs)\n- Retargeting en YouTube con videos cortos (15s)',
-          en: '**Paid Advertising**\n- LinkedIn Ads targeting decision makers (CTOs, PMs)\n- YouTube Ads retargeting with short videos (15s)',
-        },
-      },
-    ],
-    connectors: [],
-  },
-  'mkt-creative': {
-    title: { es: 'Recursos Creativos', en: 'Creative Assets' },
-    parent: 'marketing',
-    parentLabel: { es: 'Lanzamiento Nova', en: 'Nova Launch' },
-    items: [
-      {
-        id: 'mkt-cre-t', type: 'title', x: 60, y: 40, w: 500, h: 60,
-        content: { es: 'Recursos de Diseño', en: 'Design Assets' },
-      },
-      {
-        id: 'mkt-cre-n1', type: 'note', x: 60, y: 130, w: 260, h: 140, color: 'yellow',
-        content: {
-          es: '**Línea Gráfica y Medios**\n- Banners en formatos horizontal y vertical\n- Capturas animadas de la app (GIFs)\n- Videos de testimonios subtitulados',
-          en: '**Graphics & Media**\n- Horizontal and vertical banner formats\n- Animated app walkthroughs (GIFs)\n- Subtitled customer testimonial videos',
-        },
-      },
-    ],
-    connectors: [],
-  },
-};
+const INITIAL_CANVASES = {};
 
 const TRANSLATIONS = {
   es: {
@@ -556,14 +190,274 @@ const TRANSLATIONS = {
     search_canvas: 'البحث في هذه اللوحة…',
     new_canvas: 'لوحة جديدة',
   },
+  ru: {
+    home_hero: 'Ваш разум,\nорганизованный в\nхолсты.',
+    home_sub: 'Odinote — это бесконечный холст с вложенными досками. Создан для разработчиков игр, писателей и творцов, которым мало одного экрана.',
+    new_project: 'Новый проект',
+    search_projects: 'Поиск проектов…',
+    recent: 'Недавние',
+    all_projects: 'Все проекты',
+    items_count: 'узлов',
+    open_board: 'Открыть',
+    home: 'Главная',
+    tool_note: 'Заметка', tool_link: 'Ссылка', tool_todo: 'Список задач', tool_line: 'Линия',
+    tool_board: 'Доска', tool_column: 'Колонка', tool_comment: 'Комментарий',
+    tool_image: 'Изображение', tool_doc: 'Документ', tool_calendar: 'Календарь',
+    tool_table: 'Таблица', tool_audio: 'Аудио',
+    tool_color: 'Цвет', tool_file: 'Файл',
+    search_canvas: 'Поиск на холсте…',
+    new_canvas: 'Новый холст',
+  },
 };
 
-Object.assign(window, { SAMPLE_PROJECTS, INITIAL_CANVASES, TRANSLATIONS });
+Object.assign(window, { SAMPLE_PROJECTS, INITIAL_CANVASES });
+
+// Wrap each language translation object in a Proxy to fallback to English/Spanish keys
+const createLangProxy = (langObj, langKey) => {
+  return new Proxy(langObj, {
+    get(target, prop) {
+      if (prop in target) return target[prop];
+      // Fallback to english translation key, then spanish translation key
+      const fallbackLang = langKey === 'en' ? 'es' : 'en';
+      const fallbackObj = TRANSLATIONS[fallbackLang];
+      if (fallbackObj && prop in fallbackObj) {
+        return fallbackObj[prop];
+      }
+      return "";
+    }
+  });
+};
+
+const TRANSLATIONS_PROXY = new Proxy(
+  Object.keys(TRANSLATIONS).reduce((acc, key) => {
+    acc[key] = createLangProxy(TRANSLATIONS[key], key);
+    return acc;
+  }, {}),
+  {
+    get(target, prop) {
+      if (prop in target) {
+        return target[prop];
+      }
+      // If language itself is not found, fallback to 'en', then 'es'
+      return target['en'] || target['es'] || {};
+    }
+  }
+);
+
+window.TRANSLATIONS = TRANSLATIONS_PROXY;
 
 // ==========================================================================
 // CENTRALIZED UI WORDS TRANSLATIONS FOR 10 OFFLINE LANGUAGES
 // ==========================================================================
 window.UI_WORDS = {
+  "Tablero vacío": {
+    "es": "Tablero vacío",
+    "en": "Empty board",
+    "fr": "Tableau vide",
+    "de": "Leeres Board",
+    "it": "Tavola vuota",
+    "pt": "Quadro vazio",
+    "zh": "空看板",
+    "ja": "空のボード",
+    "ko": "빈 보드",
+    "ar": "لوحة فارغة",
+    "ru": "Пустая доска"
+  },
+  "La papelera está vacía": {
+    "es": "La papelera está vacía",
+    "en": "Trash is empty",
+    "fr": "La corbeille est vide",
+    "de": "Der Papierkorb ist leer",
+    "it": "Il cestino è vuoto",
+    "pt": "A lixeira está vazia",
+    "zh": "回收站已空",
+    "ja": "ゴミ箱は空です",
+    "ko": "휴지통이 비어 있습니다",
+    "ar": "سلة المهملات فارغة",
+    "ru": "Корзина пуста"
+  },
+  "Ninguno": {
+    "es": "Ninguno",
+    "en": "None",
+    "fr": "Aucun",
+    "de": "Keine",
+    "it": "Nessuno",
+    "pt": "Nenhum",
+    "zh": "无",
+    "ja": "なし",
+    "ko": "없음",
+    "ar": "لا أحد",
+    "ru": "Никто"
+  },
+  "Día": {
+    "es": "Día",
+    "en": "Day",
+    "fr": "Jour",
+    "de": "Tag",
+    "it": "Giorno",
+    "pt": "Dia",
+    "zh": "日",
+    "ja": "日",
+    "ko": "일",
+    "ar": "يوم",
+    "ru": "День"
+  },
+  "Mes anterior": {
+    "es": "Mes anterior",
+    "en": "Previous month",
+    "fr": "Mois précédent",
+    "de": "Vorheriger Monat",
+    "it": "Mese precedente",
+    "pt": "Mês anterior",
+    "zh": "上个月",
+    "ja": "前月",
+    "ko": "이전 달",
+    "ar": "الشهر السابق",
+    "ru": "Предыдущий месяц"
+  },
+  "Mes siguiente": {
+    "es": "Mes siguiente",
+    "en": "Next month",
+    "fr": "Mois suivant",
+    "de": "Nächster Monat",
+    "it": "Mese successivo",
+    "pt": "Próximo mês",
+    "zh": "下个月",
+    "ja": "翌月",
+    "ko": "다음 달",
+    "ar": "الشهر التالي",
+    "ru": "Следующий месяц"
+  },
+  "Añadir imagen": {
+    "es": "Añadir imagen",
+    "en": "Add image",
+    "fr": "Ajouter une image",
+    "de": "Bild hinzufügen",
+    "it": "Aggiungi immagine",
+    "pt": "Adicionar imagem",
+    "zh": "添加图片",
+    "ja": "画像を追加",
+    "ko": "이미지 추가",
+    "ar": "إضافة صورة",
+    "ru": "Добавить изображение"
+  },
+  "Borrar imagen": {
+    "es": "Borrar imagen",
+    "en": "Remove image",
+    "fr": "Supprimer l'image",
+    "de": "Bild entfernen",
+    "it": "Rimuovi immagine",
+    "pt": "Remover imagem",
+    "zh": "移除图片",
+    "ja": "画像を削除",
+    "ko": "이미지 제거",
+    "ar": "إزالة الصورة",
+    "ru": "Удалить изображение"
+  },
+  "Clic para editar · Clic derecho para borrar": {
+    "es": "Clic para editar · Clic derecho para borrar",
+    "en": "Click to edit · Right-click to delete",
+    "fr": "Cliquer pour modifier · Clic droit pour supprimer",
+    "de": "Klicken zum Bearbeiten · Rechtsklick zum Löschen",
+    "it": "Clicca per modificare · Tasto destro per eliminare",
+    "pt": "Clique para editar · Clique com o botão direito para excluir",
+    "zh": "点击编辑 · 右键删除",
+    "ja": "クリックで編集 · 右クリックで削除",
+    "ko": "클릭하여 편집 · 마우스 오른쪽 버튼을 클릭하여 삭제",
+    "ar": "انقر للتعديل · انقر بزر الماوس الأيمن للحذف",
+    "ru": "Нажмите, чтобы отредактировать · Щелкните правой кнопкой мыши, чтобы удалить"
+  },
+  "+ evento": {
+    "es": "+ evento",
+    "en": "+ event",
+    "fr": "+ événement",
+    "de": "+ Ereignis",
+    "it": "+ evento",
+    "pt": "+ evento",
+    "zh": "+ 事件",
+    "ja": "+ イベント",
+    "ko": "+ 이벤트",
+    "ar": "+ حدث",
+    "ru": "+ событие"
+  },
+  "Clic en un día para evento · ícono de imagen para foto": {
+    "es": "Clic en un día para evento · ícono de imagen para foto",
+    "en": "Click a day for event · image icon for photo",
+    "fr": "Cliquez sur un jour pour un événement · icône d'image pour photo",
+    "de": "Klicken Sie auf einen Tag für ein Ereignis · Bildsymbol für Foto",
+    "it": "Clicca su un giorno per un evento · icona immagine per foto",
+    "pt": "Clique em um dia para evento · ícone de imagem para foto",
+    "zh": "点击日期添加事件 · 点击图片图标添加照片",
+    "ja": "クリックでイベント追加 · 画像アイコンで写真追加",
+    "ko": "이벤트를 추가하려면 날짜를 클릭하세요 · 사진을 추가하려면 이미지 아이콘을 클릭하세요",
+    "ar": "انقر فوق يوم للحدث · أيقونة صورة للصورة",
+    "ru": "Нажмите на day для события · значок изображения для фото"
+  },
+  "Evento": {
+    "es": "Evento",
+    "en": "Event",
+    "fr": "Événement",
+    "de": "Ereignis",
+    "it": "Evento",
+    "pt": "Evento",
+    "zh": "事件",
+    "ja": "イベント",
+    "ko": "이벤트",
+    "ar": "حدث",
+    "ru": "Событие"
+  },
+  "Imagen": {
+    "es": "Imagen",
+    "en": "Image",
+    "fr": "Image",
+    "de": "Bild",
+    "it": "Immagine",
+    "pt": "Imagem",
+    "zh": "图片",
+    "ja": "画像",
+    "ko": "이미지",
+    "ar": "صورة",
+    "ru": "Изображение"
+  },
+  "Limpiar": {
+    "es": "Limpiar",
+    "en": "Clear",
+    "fr": "Effacer",
+    "de": "Löschen",
+    "it": "Pulisci",
+    "pt": "Limpar",
+    "zh": "清除",
+    "ja": "クリア",
+    "ko": "지우기",
+    "ar": "مسح",
+    "ru": "Очистить"
+  },
+  "Escribe tu nota…": {
+    "es": "Escribe tu nota…",
+    "en": "Write your note…",
+    "fr": "Écrivez votre note...",
+    "de": "Schreiben Sie Ihre Notiz...",
+    "it": "Scrivi la tua nota...",
+    "pt": "Escreva sua nota...",
+    "zh": "写下便签...",
+    "ja": "メモを書く...",
+    "ko": "노트 쓰기...",
+    "ar": "اكتب ملاحظتك...",
+    "ru": "Напишите свою заметку..."
+  },
+  "Añade una leyenda…": {
+    "es": "Añade una leyenda…",
+    "en": "Add a caption…",
+    "fr": "Ajouter une légende...",
+    "de": "Fügen Sie eine Beschriftung hinzu...",
+    "it": "Aggiungi una didascalia...",
+    "pt": "Adicione uma legenda...",
+    "zh": "添加说明文字...",
+    "ja": "キャプションを追加...",
+    "ko": "캡션 추가...",
+    "ar": "إضافة شرح...",
+    "ru": "Добавить описание..."
+  },
   "Atrás": {
     "es": "Atrás",
     "en": "Back",
@@ -574,7 +468,8 @@ window.UI_WORDS = {
     "zh": "返回",
     "ja": "戻る",
     "ko": "뒤로",
-    "ar": "رجوع"
+    "ar": "رجوع",
+    "ru": "Назад"
   },
   "Reacciones": {
     "es": "Reacciones",
@@ -586,7 +481,8 @@ window.UI_WORDS = {
     "zh": "反应",
     "ja": "リアクション",
     "ko": "반응",
-    "ar": "تفاعلات"
+    "ar": "تفاعلات",
+    "ru": "Реакции"
   },
   "Comentar": {
     "es": "Comentar",
@@ -598,7 +494,8 @@ window.UI_WORDS = {
     "zh": "评论",
     "ja": "コメント",
     "ko": "댓글",
-    "ar": "تعليق"
+    "ar": "تعليق",
+    "ru": "Комментарий"
   },
   "Mostrar/ocultar título": {
     "es": "Mostrar/ocultar título",
@@ -610,7 +507,8 @@ window.UI_WORDS = {
     "zh": "显示/隐藏标题",
     "ja": "タイトルの表示切替",
     "ko": "제목 표시 전환",
-    "ar": "إظهار/إخفاء العنوان"
+    "ar": "إظهار/إخفاء العنوان",
+    "ru": "Показать/скрыть заголовок"
   },
   "Título": {
     "es": "Título",
@@ -622,7 +520,8 @@ window.UI_WORDS = {
     "zh": "标题",
     "ja": "タイトル",
     "ko": "제목",
-    "ar": "العنوان"
+    "ar": "العنوان",
+    "ru": "Квалификация"
   },
   "Fecha límite": {
     "es": "Fecha límite",
@@ -634,7 +533,8 @@ window.UI_WORDS = {
     "zh": "截止日期",
     "ja": "期限",
     "ko": "마감일",
-    "ar": "تاريخ الاستحقاق"
+    "ar": "تاريخ الاستحقاق",
+    "ru": "Крайний срок"
   },
   "Para": {
     "es": "Para",
@@ -646,7 +546,8 @@ window.UI_WORDS = {
     "zh": "截止",
     "ja": "期限",
     "ko": "기한",
-    "ar": "مستحق"
+    "ar": "مستحق",
+    "ru": "Для"
   },
   "Asignar": {
     "es": "Asignar",
@@ -658,7 +559,8 @@ window.UI_WORDS = {
     "zh": "指派",
     "ja": "割り当て",
     "ko": "할당",
-    "ar": "تعيين"
+    "ar": "تعيين",
+    "ru": "Назначать"
   },
   "Aumentar sangría": {
     "es": "Aumentar sangría",
@@ -670,7 +572,8 @@ window.UI_WORDS = {
     "zh": "增加缩进",
     "ja": "インデント",
     "ko": "들여쓰기",
-    "ar": "زيادة المسافة البادئة"
+    "ar": "زيادة المسافة البادئة",
+    "ru": "Увеличить отступ"
   },
   "Indentar": {
     "es": "Indentar",
@@ -682,7 +585,8 @@ window.UI_WORDS = {
     "zh": "缩进",
     "ja": "インデント",
     "ko": "들여쓰기",
-    "ar": "مسافة بادئة"
+    "ar": "مسافة بادئة",
+    "ru": "Отступ"
   },
   "Reducir sangría": {
     "es": "Reducir sangría",
@@ -694,7 +598,8 @@ window.UI_WORDS = {
     "zh": "减少缩进",
     "ja": "アウトデント",
     "ko": "내어쓰기",
-    "ar": "تقليل المسافة البادئة"
+    "ar": "تقليل المسافة البادئة",
+    "ru": "Уменьшить отступ"
   },
   "Desindentar": {
     "es": "Desindentar",
@@ -706,7 +611,8 @@ window.UI_WORDS = {
     "zh": "减少缩进",
     "ja": "アウトデント",
     "ko": "내어쓰기",
-    "ar": "إلغاء المسافة البادئة"
+    "ar": "إلغاء المسافة البادئة",
+    "ru": "Несогласный"
   },
   "Alternar vista previa": {
     "es": "Alternar vista previa",
@@ -718,7 +624,8 @@ window.UI_WORDS = {
     "zh": "切换预览",
     "ja": "プレビュー切替",
     "ko": "미리보기 전환",
-    "ar": "تبديل المعاينة"
+    "ar": "تبديل المعاينة",
+    "ru": "Переключить предварительный просмотр"
   },
   "Vista previa": {
     "es": "Vista previa",
@@ -730,7 +637,8 @@ window.UI_WORDS = {
     "zh": "预览",
     "ja": "プレビュー",
     "ko": "미리보기",
-    "ar": "معاينة"
+    "ar": "معاينة",
+    "ru": "Предварительный просмотр"
   },
   "Mostrar informacion": {
     "es": "Mostrar informacion",
@@ -742,7 +650,8 @@ window.UI_WORDS = {
     "zh": "显示信息",
     "ja": "情報の表示",
     "ko": "정보 표시",
-    "ar": "إظهار المعلومات"
+    "ar": "إظهار المعلومات",
+    "ru": "Показать информацию"
   },
   "Leyenda": {
     "es": "Leyenda",
@@ -754,7 +663,8 @@ window.UI_WORDS = {
     "zh": "说明文字",
     "ja": "キャプション",
     "ko": "캡션",
-    "ar": "شرح"
+    "ar": "شرح",
+    "ru": "Легенда"
   },
   "Abrir enlace": {
     "es": "Abrir enlace",
@@ -766,7 +676,8 @@ window.UI_WORDS = {
     "zh": "打开链接",
     "ja": "リンクを開く",
     "ko": "링크 열기",
-    "ar": "فتح الرابط"
+    "ar": "فتح الرابط",
+    "ru": "Открыть ссылку"
   },
   "Abrir": {
     "es": "Abrir",
@@ -778,7 +689,8 @@ window.UI_WORDS = {
     "zh": "打开",
     "ja": "開く",
     "ko": "열기",
-    "ar": "فتح"
+    "ar": "فتح",
+    "ru": "Открыть"
   },
   "Cambiar icono": {
     "es": "Cambiar icono",
@@ -790,7 +702,8 @@ window.UI_WORDS = {
     "zh": "更改图标",
     "ja": "アイコン変更",
     "ko": "아이콘 변경",
-    "ar": "تغيير الأيقونة"
+    "ar": "تغيير الأيقونة",
+    "ru": "Изменить значок"
   },
   "Icono": {
     "es": "Icono",
@@ -802,7 +715,8 @@ window.UI_WORDS = {
     "zh": "图标",
     "ja": "アイコン",
     "ko": "아이콘",
-    "ar": "أيقونة"
+    "ar": "أيقونة",
+    "ru": "Икона"
   },
   "Bucle": {
     "es": "Bucle",
@@ -814,7 +728,8 @@ window.UI_WORDS = {
     "zh": "循环",
     "ja": "ループ",
     "ko": "루프",
-    "ar": "تكرار"
+    "ar": "تكرار",
+    "ru": "Петля"
   },
   "Mostrar HEX": {
     "es": "Mostrar HEX",
@@ -826,7 +741,8 @@ window.UI_WORDS = {
     "zh": "显示HEX",
     "ja": "HEX表示",
     "ko": "HEX 표시",
-    "ar": "إظهار HEX"
+    "ar": "إظهار HEX",
+    "ru": "Показать шестнадцатеричный"
   },
   "Descargar PDF": {
     "es": "Descargar PDF",
@@ -838,7 +754,8 @@ window.UI_WORDS = {
     "zh": "下载PDF",
     "ja": "PDFダウンロード",
     "ko": "PDF 다운로드",
-    "ar": "تنزيل PDF"
+    "ar": "تنزيل PDF",
+    "ru": "Скачать PDF"
   },
   "Descargar": {
     "es": "Descargar",
@@ -850,7 +767,8 @@ window.UI_WORDS = {
     "zh": "下载",
     "ja": "ダウンロード",
     "ko": "다운로드",
-    "ar": "تنزيل"
+    "ar": "تنزيل",
+    "ru": "Увольнять"
   },
   "Estilo": {
     "es": "Estilo",
@@ -862,7 +780,8 @@ window.UI_WORDS = {
     "zh": "样式",
     "ja": "スタイル",
     "ko": "스타일",
-    "ar": "نمط"
+    "ar": "نمط",
+    "ru": "Стиль"
   },
   "Fórmula (= en la celda)": {
     "es": "Fórmula (= en la celda)",
@@ -874,7 +793,8 @@ window.UI_WORDS = {
     "zh": "公式（在单元格中输入 =）",
     "ja": "数式（セル内に=）",
     "ko": "수식 (셀에 = 입력)",
-    "ar": "صيغة (= في الخلية)"
+    "ar": "صيغة (= في الخلية)",
+    "ru": "Формула (= в ячейке)"
   },
   "Fórmula": {
     "es": "Fórmula",
@@ -886,7 +806,8 @@ window.UI_WORDS = {
     "zh": "公式",
     "ja": "数式",
     "ko": "수식",
-    "ar": "صيغة"
+    "ar": "صيغة",
+    "ru": "Формула"
   },
   "Alineación": {
     "es": "Alineación",
@@ -898,7 +819,8 @@ window.UI_WORDS = {
     "zh": "对齐",
     "ja": "配置",
     "ko": "정렬",
-    "ar": "محاذاة"
+    "ar": "محاذاة",
+    "ru": "Выравнивание"
   },
   "Align": {
     "es": "Align",
@@ -910,7 +832,8 @@ window.UI_WORDS = {
     "zh": "对齐",
     "ja": "配置",
     "ko": "정렬",
-    "ar": "محاذاة"
+    "ar": "محاذاة",
+    "ru": "Выровнять"
   },
   "Añadir columna": {
     "es": "Añadir columna",
@@ -922,7 +845,8 @@ window.UI_WORDS = {
     "zh": "添加列",
     "ja": "列を追加",
     "ko": "열 추가",
-    "ar": "إضافة عمود"
+    "ar": "إضافة عمود",
+    "ru": "Добавить столбец"
   },
   "Columna": {
     "es": "Columna",
@@ -934,7 +858,8 @@ window.UI_WORDS = {
     "zh": "列",
     "ja": "列",
     "ko": "열",
-    "ar": "عمود"
+    "ar": "عمود",
+    "ru": "Столбец"
   },
   "Añadir fila": {
     "es": "Añadir fila",
@@ -946,7 +871,8 @@ window.UI_WORDS = {
     "zh": "添加行",
     "ja": "行を追加",
     "ko": "행 추가",
-    "ar": "إضافة صف"
+    "ar": "إضافة صف",
+    "ru": "Добавить строку"
   },
   "Eliminar columna": {
     "es": "Eliminar columna",
@@ -958,7 +884,8 @@ window.UI_WORDS = {
     "zh": "删除列",
     "ja": "列を削除",
     "ko": "열 삭제",
-    "ar": "حذف العمود"
+    "ar": "حذف العمود",
+    "ru": "Удалить столбец"
   },
   "Eliminar fila": {
     "es": "Eliminar fila",
@@ -970,7 +897,8 @@ window.UI_WORDS = {
     "zh": "删除行",
     "ja": "行を削除",
     "ko": "행 제거",
-    "ar": "إزالة الصف"
+    "ar": "إزالة الصف",
+    "ru": "Удалить строку"
   },
   "Eliminar": {
     "es": "Eliminar",
@@ -982,7 +910,8 @@ window.UI_WORDS = {
     "zh": "删除",
     "ja": "削除",
     "ko": "삭제",
-    "ar": "حذف"
+    "ar": "حذف",
+    "ru": "Устранять"
   },
   "Exportar CSV": {
     "es": "Exportar CSV",
@@ -994,7 +923,8 @@ window.UI_WORDS = {
     "zh": "导出CSV",
     "ja": "CSVエクスポート",
     "ko": "CSV 내보내기",
-    "ar": "تصدير CSV"
+    "ar": "تصدير CSV",
+    "ru": "Экспорт CSV"
   },
   "Importar archivo": {
     "es": "Importar archivo",
@@ -1006,7 +936,8 @@ window.UI_WORDS = {
     "zh": "导入文件",
     "ja": "ファイルをインポート",
     "ko": "파일 가져오기",
-    "ar": "استيراد ملف"
+    "ar": "استيراد ملف",
+    "ru": "Импортировать файл"
   },
   "Exportar": {
     "es": "Exportar",
@@ -1018,7 +949,8 @@ window.UI_WORDS = {
     "zh": "导出",
     "ja": "エクスポート",
     "ko": "내보내기",
-    "ar": "تصدير"
+    "ar": "تصدير",
+    "ru": "Экспорт"
   },
   "Importar": {
     "es": "Importar",
@@ -1030,7 +962,8 @@ window.UI_WORDS = {
     "zh": "导入",
     "ja": "インポート",
     "ko": "가져오기",
-    "ar": "استيراد"
+    "ar": "استيراد",
+    "ru": "Иметь значение"
   },
   "Color": {
     "es": "Color",
@@ -1042,7 +975,8 @@ window.UI_WORDS = {
     "zh": "颜色",
     "ja": "色",
     "ko": "색상",
-    "ar": "لون"
+    "ar": "لون",
+    "ru": "Цвет"
   },
   "Tamaño": {
     "es": "Tamaño",
@@ -1054,7 +988,8 @@ window.UI_WORDS = {
     "zh": "大小",
     "ja": "サイズ",
     "ko": "크기",
-    "ar": "حجم"
+    "ar": "حجم",
+    "ru": "Размер"
   },
   "Eliminar nota": {
     "es": "Eliminar nota",
@@ -1066,7 +1001,8 @@ window.UI_WORDS = {
     "zh": "删除便签",
     "ja": "メモを削除",
     "ko": "노트 삭제",
-    "ar": "حذف الملاحظة"
+    "ar": "حذف الملاحظة",
+    "ru": "Удалить заметку"
   },
   "Eliminar enlace": {
     "es": "Eliminar enlace",
@@ -1078,7 +1014,8 @@ window.UI_WORDS = {
     "zh": "删除链接",
     "ja": "リンクを削除",
     "ko": "링크 삭제",
-    "ar": "حذف الرابط"
+    "ar": "حذف الرابط",
+    "ru": "Удалить ссылку"
   },
   "Eliminar tarea": {
     "es": "Eliminar tarea",
@@ -1090,7 +1027,8 @@ window.UI_WORDS = {
     "zh": "删除任务",
     "ja": "タスクを削除",
     "ko": "할 일 삭제",
-    "ar": "حذف المهمة"
+    "ar": "حذف المهمة",
+    "ru": "Удалить задачу"
   },
   "Eliminar conector": {
     "es": "Eliminar conector",
@@ -1102,7 +1040,8 @@ window.UI_WORDS = {
     "zh": "删除连接",
     "ja": "接続を削除",
     "ko": "연결 삭제",
-    "ar": "حذف الاتصال"
+    "ar": "حذف الاتصال",
+    "ru": "Удалить соединитель"
   },
   "Eliminar tablero": {
     "es": "Eliminar tablero",
@@ -1114,7 +1053,8 @@ window.UI_WORDS = {
     "zh": "删除看板",
     "ja": "ボードを削除",
     "ko": "보드 삭제",
-    "ar": "حذف اللوحة"
+    "ar": "حذف اللوحة",
+    "ru": "Удалить доску"
   },
   "Eliminar tabla": {
     "es": "Eliminar tabla",
@@ -1126,7 +1066,8 @@ window.UI_WORDS = {
     "zh": "删除表格",
     "ja": "テーブルを削除",
     "ko": "표 삭제",
-    "ar": "حذف الجدول"
+    "ar": "حذف الجدول",
+    "ru": "Удалить таблицу"
   },
   "Eliminar calendario": {
     "es": "Eliminar calendario",
@@ -1138,7 +1079,8 @@ window.UI_WORDS = {
     "zh": "删除日历",
     "ja": "カレンダーを削除",
     "ko": "캘린더 삭제",
-    "ar": "حذف التقويم"
+    "ar": "حذف التقويم",
+    "ru": "Удалить календарь"
   },
   "Eliminar comentario": {
     "es": "Eliminar comentario",
@@ -1150,7 +1092,8 @@ window.UI_WORDS = {
     "zh": "删除评论",
     "ja": "コメントを削除",
     "ko": "댓글 삭제",
-    "ar": "حذف التعليق"
+    "ar": "حذف التعليق",
+    "ru": "Удалить комментарий"
   },
   "Eliminar imagen": {
     "es": "Eliminar imagen",
@@ -1162,7 +1105,8 @@ window.UI_WORDS = {
     "zh": "删除图片",
     "ja": "画像を削除",
     "ko": "이미지 삭제",
-    "ar": "حذف الصورة"
+    "ar": "حذف الصورة",
+    "ru": "Удалить изображение"
   },
   "Eliminar documento": {
     "es": "Eliminar documento",
@@ -1174,7 +1118,8 @@ window.UI_WORDS = {
     "zh": "删除文档",
     "ja": "ドキュメントを削除",
     "ko": "문서 삭제",
-    "ar": "حذف المستند"
+    "ar": "حذف المستند",
+    "ru": "Удалить документ"
   },
   "Eliminar archivo": {
     "es": "Eliminar archivo",
@@ -1186,7 +1131,8 @@ window.UI_WORDS = {
     "zh": "删除文件",
     "ja": "ファイルを削除",
     "ko": "파일 삭제",
-    "ar": "حذف الملف"
+    "ar": "حذف الملف",
+    "ru": "Удалить файл"
   },
   "Eliminar audio": {
     "es": "Eliminar audio",
@@ -1198,7 +1144,8 @@ window.UI_WORDS = {
     "zh": "删除音频",
     "ja": "オーディオを削除",
     "ko": "오디오 삭제",
-    "ar": "حذف الصوت"
+    "ar": "حذف الصوت",
+    "ru": "Удалить аудио"
   },
   "Color de fondo del lienzo": {
     "es": "Color de fondo del lienzo",
@@ -1210,7 +1157,8 @@ window.UI_WORDS = {
     "zh": "画布背景颜色",
     "ja": "キャンバスの背景色",
     "ko": "캔버스 배경색",
-    "ar": "لون خلفية اللوحة"
+    "ar": "لون خلفية اللوحة",
+    "ru": "Цвет фона холста"
   },
   "Fondo del Lienzo": {
     "es": "Fondo del Lienzo",
@@ -1222,7 +1170,8 @@ window.UI_WORDS = {
     "zh": "画布背景",
     "ja": "キャンバスの背景",
     "ko": "캔버스 배경",
-    "ar": "خلفية اللوحة"
+    "ar": "خلفية اللوحة",
+    "ru": "Холст фон"
   },
   "Cambiar fondo del lienzo": {
     "es": "Cambiar fondo del lienzo",
@@ -1234,7 +1183,8 @@ window.UI_WORDS = {
     "zh": "修改画布背景",
     "ja": "キャンバスの背景変更",
     "ko": "캔버스 배경 변경",
-    "ar": "تغيير خلفية اللوحة"
+    "ar": "تغيير خلفية اللوحة",
+    "ru": "Изменение фона холста"
   },
   "Curva": {
     "es": "Curva",
@@ -1246,7 +1196,8 @@ window.UI_WORDS = {
     "zh": "曲线",
     "ja": "カーブ",
     "ko": "곡선",
-    "ar": "منحنى"
+    "ar": "منحنى",
+    "ru": "Изгиб"
   },
   "Recta": {
     "es": "Recta",
@@ -1258,7 +1209,8 @@ window.UI_WORDS = {
     "zh": "直角",
     "ja": "直角",
     "ko": "직각",
-    "ar": "زاوية قائمة"
+    "ar": "زاوية قائمة",
+    "ru": "Прямой"
   },
   "Sólida": {
     "es": "Sólida",
@@ -1270,7 +1222,8 @@ window.UI_WORDS = {
     "zh": "实线",
     "ja": "実线",
     "ko": "실선",
-    "ar": "صلب"
+    "ar": "صلب",
+    "ru": "Твердый"
   },
   "Discontinua": {
     "es": "Discontinua",
@@ -1282,7 +1235,8 @@ window.UI_WORDS = {
     "zh": "虚线",
     "ja": "破線",
     "ko": "점선",
-    "ar": "متقطع"
+    "ar": "متقطع",
+    "ru": "Прерывистый"
   },
   "Punteada": {
     "es": "Punteada",
@@ -1294,7 +1248,8 @@ window.UI_WORDS = {
     "zh": "点线",
     "ja": "点線",
     "ko": "점선(細)",
-    "ar": "منقط"
+    "ar": "منقط",
+    "ru": "Пунктирный"
   },
   "Doble": {
     "es": "Doble",
@@ -1306,7 +1261,8 @@ window.UI_WORDS = {
     "zh": "双向",
     "ja": "双方向",
     "ko": "양방향",
-    "ar": "اتجاهين"
+    "ar": "اتجاهين",
+    "ru": "Двойной"
   },
   "Flecha bidireccional": {
     "es": "Flecha bidireccional",
@@ -1318,7 +1274,8 @@ window.UI_WORDS = {
     "zh": "双向箭头",
     "ja": "双方向矢印",
     "ko": "양방향 화살표",
-    "ar": "سهم ثنائي الاتجاه"
+    "ar": "سهم ثنائي الاتجاه",
+    "ru": "Двунаправленная стрелка"
   },
   "Etiqueta": {
     "es": "Etiqueta",
@@ -1330,7 +1287,8 @@ window.UI_WORDS = {
     "zh": "标签",
     "ja": "ラベル",
     "ko": "라벨",
-    "ar": "ملصق"
+    "ar": "ملصق",
+    "ru": "Этикетка"
   },
   "Etiqueta…": {
     "es": "Etiqueta…",
@@ -1342,7 +1300,8 @@ window.UI_WORDS = {
     "zh": "标签…",
     "ja": "ラベル…",
     "ko": "라벨…",
-    "ar": "ملصق…"
+    "ar": "ملصق…",
+    "ru": "Этикетка…"
   },
   "Arrastra de un nodo a otro": {
     "es": "Arrastra de un nodo a otro",
@@ -1354,7 +1313,8 @@ window.UI_WORDS = {
     "zh": "从一个节点拖动到另一个节点",
     "ja": "ノードからノードへドラッグ",
     "ko": "한 노드에서 다른 노드로 드래그",
-    "ar": "اسحب من عقدة إلى أخرى"
+    "ar": "اسحب من عقدة إلى أخرى",
+    "ru": "Перетаскивание с одного узла на другой"
   },
   "Guardado": {
     "es": "Guardado",
@@ -1366,7 +1326,8 @@ window.UI_WORDS = {
     "zh": "已保存",
     "ja": "保存済",
     "ko": "저장됨",
-    "ar": "تم الحفظ"
+    "ar": "تم الحفظ",
+    "ru": "Сохранено"
   },
   "Deshacer": {
     "es": "Deshacer",
@@ -1378,7 +1339,8 @@ window.UI_WORDS = {
     "zh": "撤销",
     "ja": "元に戻す",
     "ko": "실행 취소",
-    "ar": "تراجع"
+    "ar": "تراجع",
+    "ru": "Отменить"
   },
   "Seleccionar todo": {
     "es": "Seleccionar todo",
@@ -1390,7 +1352,8 @@ window.UI_WORDS = {
     "zh": "全选",
     "ja": "すべて選択",
     "ko": "전체 선택",
-    "ar": "تحديد الكل"
+    "ar": "تحديد الكل",
+    "ru": "Выбрать все"
   },
   "Editar": {
     "es": "Editar",
@@ -1402,7 +1365,8 @@ window.UI_WORDS = {
     "zh": "编辑",
     "ja": "編集",
     "ko": "편집",
-    "ar": "تعديل"
+    "ar": "تعديل",
+    "ru": "Редактировать"
   },
   "Abrir documento": {
     "es": "Abrir documento",
@@ -1414,7 +1378,8 @@ window.UI_WORDS = {
     "zh": "打开文档",
     "ja": "ドキュメントを開く",
     "ko": "문서 열기",
-    "ar": "فتح المستند"
+    "ar": "فتح المستند",
+    "ru": "Открыть документ"
   },
   "Abrir tablero": {
     "es": "Abrir tablero",
@@ -1426,7 +1391,8 @@ window.UI_WORDS = {
     "zh": "打开看板",
     "ja": "ボードを開く",
     "ko": "보드 열기",
-    "ar": "فتح اللوحة"
+    "ar": "فتح اللوحة",
+    "ru": "Открытая доска"
   },
   "Duplicar": {
     "es": "Duplicar",
@@ -1438,7 +1404,8 @@ window.UI_WORDS = {
     "zh": "复制",
     "ja": "複製",
     "ko": "복제",
-    "ar": "تكرار"
+    "ar": "تكرار",
+    "ru": "Двойной"
   },
   "Tú": {
     "es": "Tú",
@@ -1450,7 +1417,8 @@ window.UI_WORDS = {
     "zh": "你",
     "ja": "あなた",
     "ko": "나",
-    "ar": "أنت"
+    "ar": "أنت",
+    "ru": "Ты"
   },
   "Bóveda Local": {
     "es": "Bóveda Local",
@@ -1462,7 +1430,8 @@ window.UI_WORDS = {
     "zh": "本地保险库",
     "ja": "ローカル保管庫",
     "ko": "로컬 보관소",
-    "ar": "الخزنة المحلية"
+    "ar": "الخزنة المحلية",
+    "ru": "Локальное хранилище"
   },
   "Desconectar Bóveda": {
     "es": "Desconectar Bóveda",
@@ -1474,7 +1443,8 @@ window.UI_WORDS = {
     "zh": "断开保险库",
     "ja": "保管庫の接続解除",
     "ko": "보관소 연결 해제",
-    "ar": "إلغاء اتصال الخزنة"
+    "ar": "إلغاء اتصال الخزنة",
+    "ru": "Отключить хранилище"
   },
   "Guarda todo directamente en carpetas de tu PC.": {
     "es": "Guarda todo directamente en carpetas de tu PC.",
@@ -1486,7 +1456,8 @@ window.UI_WORDS = {
     "zh": "将所有内容直接保存到您电脑的文件夹中。",
     "ja": "PC上のフォルダに直接すべてを保存します。",
     "ko": "PC의 폴더에 직접 모든 내용을 저장하세요.",
-    "ar": "احفظ كل شيء مباشرة في مجلدات جهاز الكمبيوتر الخاص بك."
+    "ar": "احفظ كل شيء مباشرة في مجلدات جهاز الكمبيوتر الخاص بك.",
+    "ru": "Сохраняйте все прямо в папки на вашем компьютере."
   },
   "Abrir Carpeta": {
     "es": "Abrir Carpeta",
@@ -1498,7 +1469,8 @@ window.UI_WORDS = {
     "zh": "打开文件夹",
     "ja": "フォルダを開く",
     "ko": "폴더 열기",
-    "ar": "فتح المجلد"
+    "ar": "فتح المجلد",
+    "ru": "Открыть папку"
   },
   "Disponible en la versión de escritorio para PC.": {
     "es": "Disponible en la versión de escritorio para PC.",
@@ -1510,7 +1482,8 @@ window.UI_WORDS = {
     "zh": "可在PC的桌面版中使用。",
     "ja": "PC向けデスクトップ版でご利用いただけます。",
     "ko": "PC 데스크톱 버전에서 사용 가능합니다.",
-    "ar": "متوفر في نسخة سطح المكتب لأجهزة الكمبيوتر."
+    "ar": "متوفر في نسخة سطح المكتب لأجهزة الكمبيوتر.",
+    "ru": "Доступна настольная версия для ПК."
   },
   "Apoya Odinote": {
     "es": "Apoya Odinote",
@@ -1522,7 +1495,8 @@ window.UI_WORDS = {
     "zh": "支持 Odinote",
     "ja": "Odinoteをサポート",
     "ko": "Odinote 후원하기",
-    "ar": "دعم أودينوت"
+    "ar": "دعم أودينوت",
+    "ru": "Поддержка Одиноте"
   },
   "Odinote es 100% gratis y de código abierto. Si te es útil, considera apoyarnos para mantener el proyecto.": {
     "es": "Odinote es 100% gratis y de código abierto. Si te es útil, considera apoyarnos para mantener el proyecto.",
@@ -1534,7 +1508,8 @@ window.UI_WORDS = {
     "zh": "Odinote 是 100% 免费且开源的。如果您觉得有用，请考虑支持我们以维持项目。",
     "ja": "Odinoteは100%無料でオープンソースです。便利だと思ったら、プロジェクト継続のために支援をご検討ください。",
     "ko": "Odinote는 100% 무료이며 오픈 소스입니다. 유용하다고 생각하시면 프로젝트 유지를 위한 후원을 고려해 주세요.",
-    "ar": "أودينوت مجاني ومفتوح المصدر بنسبة 100٪. إذا كان مفيدًا لك، فيرجى التفكير في دعمنا للاستمرار."
+    "ar": "أودينوت مجاني ومفتوح المصدر بنسبة 100٪. إذا كان مفيدًا لك، فيرجى التفكير في دعمنا للاستمرار.",
+    "ru": "Odinote на 100% бесплатен и имеет открытый исходный код. Если это будет вам полезно, рассмотрите возможность поддержать нас в поддержании проекта."
   },
   "Apoyar en Ko-fi": {
     "es": "Apoyar en Ko-fi",
@@ -1546,7 +1521,8 @@ window.UI_WORDS = {
     "zh": "在 Ko-fi 上支持",
     "ja": "Ko-fiでサポート",
     "ko": "Ko-fi에서 후원하기",
-    "ar": "الدعم على Ko-fi"
+    "ar": "الدعم على Ko-fi",
+    "ru": "Поддержка на Ко-фи"
   },
   "Apoyar": {
     "es": "Apoyar",
@@ -1558,7 +1534,8 @@ window.UI_WORDS = {
     "zh": "支持",
     "ja": "サポート",
     "ko": "후원",
-    "ar": "دعم"
+    "ar": "دعم",
+    "ru": "Поддерживать"
   },
   "Apóyame en Ko-fi": {
     "es": "Apóyame en Ko-fi",
@@ -1570,7 +1547,8 @@ window.UI_WORDS = {
     "zh": "在 Ko-fi 上支持我",
     "ja": "Ko-fiで支援する",
     "ko": "Ko-fi에서 저를 후원해 주세요",
-    "ar": "ادعمني على Ko-fi"
+    "ar": "ادعمني على Ko-fi",
+    "ru": "Поддержите меня на Ко-фи"
   },
   "¡Nueva actualización disponible! Haz clic para descargar de GitHub.": {
     "es": "¡Nueva actualización disponible! Haz clic para descargar de GitHub.",
@@ -1582,7 +1560,8 @@ window.UI_WORDS = {
     "zh": "有新更新可用！点击从 GitHub 下载。",
     "ja": "新しいアップデートがあります！クリックしてGitHubからダウンロードします。",
     "ko": "새로운 업데이트가 있습니다! GitHub에서 다운로드하려면 클릭하세요.",
-    "ar": "تحديث جديد متاح! انقر للتنزيل من GitHub."
+    "ar": "تحديث جديد متاح! انقر للتنزيل من GitHub.",
+    "ru": "Доступно новое обновление! Нажмите, чтобы загрузить с GitHub."
   },
   "Buscar actualizaciones": {
     "es": "Buscar actualizaciones",
@@ -1594,7 +1573,8 @@ window.UI_WORDS = {
     "zh": "检查更新",
     "ja": "アップデートを確認",
     "ko": "업데이트 확인",
-    "ar": "التحقق من وجود تحديثات"
+    "ar": "التحقق من وجود تحديثات",
+    "ru": "Проверьте наличие обновлений"
   },
   "recién": {
     "es": "recién",
@@ -1606,7 +1586,8 @@ window.UI_WORDS = {
     "zh": "最近",
     "ja": "最近",
     "ko": "최근",
-    "ar": "حديث"
+    "ar": "حديث",
+    "ru": "недавно"
   },
   "Abrir en navegador": {
     "es": "Abrir en navegador",
@@ -1618,7 +1599,8 @@ window.UI_WORDS = {
     "zh": "在浏览器中打开",
     "ja": "ブラウザで開く",
     "ko": "브라우저에서 열기",
-    "ar": "فتح في المتصفح"
+    "ar": "فتح في المتصفح",
+    "ru": "Открыть в браузере"
   },
   "Apoyar de forma directa": {
     "es": "Apoyar de forma directa",
@@ -1630,7 +1612,8 @@ window.UI_WORDS = {
     "zh": "直接支持",
     "ja": "直接支援",
     "ko": "직접 후원",
-    "ar": "دعم مباشر"
+    "ar": "دعم مباشر",
+    "ru": "Поддержка напрямую"
   },
   "Donadores Recientes": {
     "es": "Donadores Recientes",
@@ -1642,7 +1625,8 @@ window.UI_WORDS = {
     "zh": "最近捐赠者",
     "ja": "最近の支援者",
     "ko": "최근 후원자",
-    "ar": "المتبرعون المحدثون"
+    "ar": "المتبرعون المحدثون",
+    "ru": "Недавние доноры"
   },
   "Gracias a estas personas por hacer posible Odinote": {
     "es": "Gracias a estas personas por hacer posible Odinote",
@@ -1654,7 +1638,8 @@ window.UI_WORDS = {
     "zh": "感谢这些让 Odinote 成为可能的人们",
     "ja": "Odinoteの実現にご協力いただいた皆様に感謝いたします",
     "ko": "Odinote를 가능하게 해주신 분들께 감사드립니다",
-    "ar": "شكراً لهؤلاء الأشخاص لجعل أودينوت ممكناً"
+    "ar": "شكراً لهؤلاء الأشخاص لجعل أودينوت ممكناً",
+    "ru": "Спасибо этим людям за то, что сделали Odinote возможным."
   },
   "Añade una leyenda…": {
     "es": "Añade una leyenda…",
@@ -1666,7 +1651,8 @@ window.UI_WORDS = {
     "zh": "添加说明文字…",
     "ja": "キャプションを追加…",
     "ko": "캡션 추가…",
-    "ar": "إضافة شرح…"
+    "ar": "إضافة شرح…",
+    "ru": "Добавьте легенду…"
   },
   "Nuevo tablero": {
     "es": "Nuevo tablero",
@@ -1678,7 +1664,8 @@ window.UI_WORDS = {
     "zh": "新看板",
     "ja": "新規ボード",
     "ko": "새 보드",
-    "ar": "لوحة جديدة"
+    "ar": "لوحة جديدة",
+    "ru": "Новая доска"
   },
   "Nueva tarea": {
     "es": "Nueva tarea",
@@ -1690,7 +1677,8 @@ window.UI_WORDS = {
     "zh": "新任务",
     "ja": "新規タスク",
     "ko": "새 할 일",
-    "ar": "مهمة جديدة"
+    "ar": "مهمة جديدة",
+    "ru": "Новая задача"
   },
   "Nueva nota": {
     "es": "Nueva nota",
@@ -1702,7 +1690,8 @@ window.UI_WORDS = {
     "zh": "新便签",
     "ja": "新規メモ",
     "ko": "새 노트",
-    "ar": "ملاحظة جديدة"
+    "ar": "ملاحظة جديدة",
+    "ru": "Новая заметка"
   },
   "Nueva columna": {
     "es": "Nueva columna",
@@ -1714,7 +1703,8 @@ window.UI_WORDS = {
     "zh": "新列栏",
     "ja": "新規カラム",
     "ko": "새 열",
-    "ar": "عمود جديد"
+    "ar": "عمود جديد",
+    "ru": "Новый столбец"
   },
   "Nuevo documento": {
     "es": "Nuevo documento",
@@ -1726,7 +1716,8 @@ window.UI_WORDS = {
     "zh": "新文档",
     "ja": "新規ドキュメント",
     "ko": "새 문서",
-    "ar": "مستند جديد"
+    "ar": "مستند جديد",
+    "ru": "Новый документ"
   },
   "Nuevo calendario": {
     "es": "Nuevo calendario",
@@ -1738,7 +1729,8 @@ window.UI_WORDS = {
     "zh": "新日历",
     "ja": "新規カレンダー",
     "ko": "새 캘린더",
-    "ar": "تقويم جديد"
+    "ar": "تقويم جديد",
+    "ru": "Новый календарь"
   },
   "Nueva tabla": {
     "es": "Nueva tabla",
@@ -1750,7 +1742,8 @@ window.UI_WORDS = {
     "zh": "新表格",
     "ja": "新規テーブル",
     "ko": "새 표",
-    "ar": "جدول جديد"
+    "ar": "جدول جديد",
+    "ru": "Новый стол"
   },
   "Nuevo audio": {
     "es": "Nuevo audio",
@@ -1762,7 +1755,8 @@ window.UI_WORDS = {
     "zh": "新音频",
     "ja": "新規オーディオ",
     "ko": "새 오디오",
-    "ar": "صوت جديد"
+    "ar": "صوت جديد",
+    "ru": "Новое аудио"
   },
   "Nuevo enlace": {
     "es": "Nuevo enlace",
@@ -1774,7 +1768,8 @@ window.UI_WORDS = {
     "zh": "新链接",
     "ja": "新規リンク",
     "ko": "새 링크",
-    "ar": "رابط جديد"
+    "ar": "رابط جديد",
+    "ru": "Новая ссылка"
   },
   "Por favor selecciona un archivo de audio válido.": {
     "es": "Por favor selecciona un archivo de audio válido.",
@@ -1786,7 +1781,8 @@ window.UI_WORDS = {
     "zh": "请选择有效的音频文件。",
     "ja": "有効なオーディオファイルを選択してください。",
     "ko": "올바른 오디오 파일을 선택해 주세요.",
-    "ar": "يرجى تحديد ملف صوتي صالح."
+    "ar": "يرجى تحديد ملف صوتي صالح.",
+    "ru": "Пожалуйста, выберите действительный аудиофайл."
   },
   "Clic para subir un audio": {
     "es": "Clic para subir un audio",
@@ -1798,7 +1794,8 @@ window.UI_WORDS = {
     "zh": "点击上传音频",
     "ja": "クリックしてオーディオをアップロード",
     "ko": "오디오를 업로드하려면 클릭하세요",
-    "ar": "انقر لتحميل ملف صوتي"
+    "ar": "انقر لتحميل ملف صوتي",
+    "ru": "Нажмите, чтобы загрузить аудио"
   },
   "No se pudieron comprobar las actualizaciones. Comprueba tu conexión.": {
     "es": "No se pudieron comprobar las actualizaciones. Comprueba tu conexión.",
@@ -1810,7 +1807,8 @@ window.UI_WORDS = {
     "zh": "无法检查更新。请检查您的网络连接。",
     "ja": "アップデートを確認できませんでした。接続を確認してください。",
     "ko": "업데이트를 확인할 수 없습니다. 연결 상태를 확인해 주세요.",
-    "ar": "تعذر التحقق من وجود تحديثات. يرجى التحقق من الاتصال."
+    "ar": "تعذر التحقق من وجود تحديثات. يرجى التحقق من الاتصال.",
+    "ru": "Не удалось проверить наличие обновлений. Проверьте свое соединение."
   },
   "¡Estás al día! Odinote está en su versión más reciente (v1.0.2).": {
     "es": "¡Estás al día! Odinote está en su versión más reciente (v1.0.2).",
@@ -1822,7 +1820,8 @@ window.UI_WORDS = {
     "zh": "您已是最新版本！Odinote 处于最新版本 (v1.0.2)。",
     "ja": "最新の状態です！Odinoteは最新バージョン (v1.0.2) です。",
     "ko": "최신 버전입니다! Odinote가 최신 버전(v1.0.2)입니다.",
-    "ar": "أنت على أحدث إصدار! أودينوت في أحدث إصدار (v1.0.2)."
+    "ar": "أنت على أحدث إصدار! أودينوت في أحدث إصدار (v1.0.2).",
+    "ru": "Вы в курсе! Odinote находится в самой последней версии (v1.0.2)."
   },
   "No se pudo leer la boveda seleccionada.": {
     "es": "No se pudo leer la boveda seleccionada.",
@@ -1834,7 +1833,8 @@ window.UI_WORDS = {
     "zh": "无法读取所选保险库。",
     "ja": "選択した保管庫を読み取れませんでした。",
     "ko": "선택한 보관소를 읽을 수 없습니다.",
-    "ar": "تعذر قراءة الخزنة المحددة."
+    "ar": "تعذر قراءة الخزنة المحددة.",
+    "ru": "Не удалось прочитать выбранное хранилище."
   },
   "Este archivo no parece ser un respaldo valido de Odinote.": {
     "es": "Este archivo no parece ser un respaldo valido de Odinote.",
@@ -1846,7 +1846,8 @@ window.UI_WORDS = {
     "zh": "此文件似乎不是有效的 Odinote 备份文件。",
     "ja": "このファイルは有効なOdinoteバックアップファイルではないようです。",
     "ko": "이 파일은 올바른 Odinote 백업 파일이 아닌 것 같습니다.",
-    "ar": "لا يبدو هذا الملف كنسخة احتياطية صالحة لأودينوت."
+    "ar": "لا يبدو هذا الملف كنسخة احتياطية صالحة لأودينوت.",
+    "ru": "Этот файл не является действительной резервной копией Odinote."
   },
   "No se pudo importar el respaldo.": {
     "es": "No se pudo importar el respaldo.",
@@ -1858,25 +1859,27 @@ window.UI_WORDS = {
     "zh": "无法导入备份。",
     "ja": "バックアップをインポートできませんでした。",
     "ko": "백업을 가져올 수 없습니다.",
-    "ar": "تعذر استيراد النسخة الاحتياطية."
+    "ar": "تعذر استيراد النسخة الاحتياطية.",
+    "ru": "Резервную копию не удалось импортировать."
   }
 };
 
+
 // Translation helper supporting 10 languages reactively
-window.t = function(es, en, fr, de, it, pt, zh, ja, ko, ar) {
+window.t = function(es, en, fr, de, it, pt, zh, ja, ko, ar, ru) {
   const currentLang = window.currentLang || 'es';
   
   // Array parameters support (like dows days of week)
   if (Array.isArray(es)) {
-    const list = [es, en, fr, de, it, pt, zh, ja, ko, ar];
-    const indexMap = { es: 0, en: 1, fr: 2, de: 3, it: 4, pt: 5, zh: 6, ja: 7, ko: 8, ar: 9 };
+    const list = [es, en, fr, de, it, pt, zh, ja, ko, ar, ru];
+    const indexMap = { es: 0, en: 1, fr: 2, de: 3, it: 4, pt: 5, zh: 6, ja: 7, ko: 8, ar: 9, ru: 10 };
     const idx = indexMap[currentLang];
     return list[idx] || list[1] || list[0];
   }
 
   // If all 10 translations are explicitly passed as arguments:
   if (arguments.length > 2) {
-    const indexMap = { es: 0, en: 1, fr: 2, de: 3, it: 4, pt: 5, zh: 6, ja: 7, ko: 8, ar: 9 };
+    const indexMap = { es: 0, en: 1, fr: 2, de: 3, it: 4, pt: 5, zh: 6, ja: 7, ko: 8, ar: 9, ru: 10 };
     const idx = indexMap[currentLang];
     return arguments[idx] || en || es;
   }
@@ -1890,4 +1893,135 @@ window.t = function(es, en, fr, de, it, pt, zh, ja, ko, ar) {
   }
   
   return currentLang === 'es' ? es : en;
+};
+
+// Robust helper to physically swap block tags in contentEditable elements
+window.changeBlockTag = function(editor, targetTag) {
+  const sel = window.getSelection();
+  if (!sel || !sel.rangeCount) return false;
+  const range = sel.getRangeAt(0);
+  
+  // Find all direct children of the editor that intersect the selection
+  const children = Array.from(editor.children);
+  const selectedBlocks = children.filter(child => sel.containsNode(child, true));
+  
+  // Fallback for collapsed cursor selection (point target)
+  if (selectedBlocks.length === 0) {
+    let node = range.commonAncestorContainer;
+    if (node.nodeType === 3) node = node.parentNode;
+    let current = node;
+    while (current && current !== editor) {
+      if (children.includes(current)) {
+        selectedBlocks.push(current);
+        break;
+      }
+      current = current.parentNode;
+    }
+  }
+  
+  if (selectedBlocks.length > 0) {
+    let replacedAny = false;
+    selectedBlocks.forEach(blockNode => {
+      // Standard structural tags we are allowed to convert
+      if (!['H1', 'H2', 'P', 'DIV', 'BLOCKQUOTE'].includes(blockNode.tagName)) return;
+      
+      const newBlock = document.createElement(targetTag);
+      newBlock.innerHTML = blockNode.innerHTML;
+      
+      // Clean inline styling from external paste if converting back to plain paragraph
+      if (targetTag.toLowerCase() === 'p') {
+        newBlock.removeAttribute('style');
+        newBlock.querySelectorAll('*').forEach(child => {
+          child.removeAttribute('style');
+        });
+      }
+      
+      blockNode.parentNode.replaceChild(newBlock, blockNode);
+      replacedAny = true;
+    });
+    return replacedAny;
+  }
+  return false;
+};
+
+// Web Audio API programmatical sound effects engine (ultra-low latency, zero external files)
+window.playAudioTone = function(type) {
+  if (window.isAudioMuted) return;
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    
+    const now = ctx.currentTime;
+    
+    if (type === 'click') {
+      // Premium mechanical high-frequency tick
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(880, now);
+      osc.frequency.exponentialRampToValueAtTime(1500, now + 0.015);
+      gain.gain.setValueAtTime(0.02, now);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.015);
+      osc.start(now);
+      osc.stop(now + 0.015);
+    } else if (type === 'create') {
+      // Satisfying organic bubble plop
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(180, now);
+      osc.frequency.exponentialRampToValueAtTime(780, now + 0.08);
+      gain.gain.setValueAtTime(0.05, now);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.08);
+      osc.start(now);
+      osc.stop(now + 0.08);
+    } else if (type === 'delete') {
+      // Soft tactile slip / paper slide
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(260, now);
+      osc.frequency.exponentialRampToValueAtTime(60, now + 0.12);
+      gain.gain.setValueAtTime(0.04, now);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.12);
+      osc.start(now);
+      osc.stop(now + 0.12);
+    } else if (type === 'connect') {
+      // Soft acoustic dual chime (music box)
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(523.25, now); // C5
+      osc.frequency.setValueAtTime(783.99, now + 0.04); // G5
+      gain.gain.setValueAtTime(0.03, now);
+      gain.gain.setValueAtTime(0.03, now + 0.04);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.16);
+      osc.start(now);
+      osc.stop(now + 0.16);
+    } else if (type === 'drag_start') {
+      // Soft card lift/grab thump
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(140, now);
+      osc.frequency.exponentialRampToValueAtTime(90, now + 0.03);
+      gain.gain.setValueAtTime(0.03, now);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.03);
+      osc.start(now);
+      osc.stop(now + 0.03);
+    } else if (type === 'drag_end') {
+      // Soft card landing drop
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(100, now);
+      osc.frequency.exponentialRampToValueAtTime(50, now + 0.05);
+      gain.gain.setValueAtTime(0.04, now);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.05);
+      osc.start(now);
+      osc.stop(now + 0.05);
+    } else if (type === 'snap') {
+      // Tiny haptic ticking sound
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(1200, now);
+      gain.gain.setValueAtTime(0.008, now);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.008);
+      osc.start(now);
+      osc.stop(now + 0.008);
+    }
+  } catch (e) {
+    // Fail silently if browser audio context blocked
+  }
 };

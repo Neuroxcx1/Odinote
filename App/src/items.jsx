@@ -186,6 +186,20 @@ function NoteItem({ item, lang, editing, onUpdate }) {
     highlightTimer.current = setTimeout(liveHighlight, 350);
   };
 
+  React.useEffect(() => {
+    if (!ref.current) return;
+    const contentEl = ref.current;
+    const origHeight = contentEl.style.height;
+    contentEl.style.height = 'auto';
+    const naturalHeight = contentEl.scrollHeight;
+    contentEl.style.height = origHeight;
+    const totalHeight = Math.max(80, Math.round(naturalHeight + 3));
+    if (Math.abs((item.h || 0) - totalHeight) > 3) {
+      onUpdate({ h: totalHeight });
+    }
+  // eslint-disable-next-line
+  }, [item.content, editing, item.h, lang]);
+
   if (editing) {
     return (
       <div className={`note c-${cls}`} style={{width:'100%', height:'100%'}}>
@@ -195,6 +209,7 @@ function NoteItem({ item, lang, editing, onUpdate }) {
             className="note-edit rich"
             contentEditable
             suppressContentEditableWarning
+            spellCheck={true}
             data-placeholder={window.t('Escribe tu nota…', 'Write your note…')}
             onInput={(e) => { onInput(); scheduleHighlight(); }}
             onBlur={reHighlight}
@@ -480,6 +495,7 @@ function NodeCaption({ item, lang, onUpdate, className, placeholder, style, auto
       style={style}
       contentEditable
       suppressContentEditableWarning
+      spellCheck={true}
       data-placeholder={placeholder || (window.t('Añade una leyenda…', 'Add a caption…'))}
       onInput={commit}
       onClick={(e)=>e.stopPropagation()}
@@ -775,14 +791,40 @@ function LinkItem({ item, lang, onUpdate, editing, onEndEdit }) {
             </button>
           </div>
           {item.showTitle !== false && (
-            <input
+            <textarea
               className="link-title-input"
               value={titleVal}
               placeholder={titlePlaceholder}
-              onChange={(e)=>onUpdate({ title: e.target.value })}
+              onChange={(e)=>{
+                onUpdate({ title: e.target.value });
+                e.target.style.height = 'auto';
+                e.target.style.height = e.target.scrollHeight + 'px';
+              }}
+              ref={(el) => {
+                if (el) {
+                  el.style.height = 'auto';
+                  el.style.height = el.scrollHeight + 'px';
+                }
+              }}
               onClick={(e)=>e.stopPropagation()}
               onMouseDown={(e)=>e.stopPropagation()}
               onDoubleClick={(e)=>e.stopPropagation()}
+              onKeyDown={(e)=>{ if (e.key === 'Enter') { e.preventDefault(); e.target.blur(); } }}
+              rows={1}
+              style={{
+                resize: 'none',
+                overflowY: 'hidden',
+                height: 'auto',
+                display: 'block',
+                width: '100%',
+                background: 'transparent',
+                border: 'none',
+                outline: 'none',
+                fontFamily: 'inherit',
+                fontWeight: '700',
+                color: 'inherit',
+                padding: 0
+              }}
             />
           )}
           {showCaption && (
@@ -873,24 +915,176 @@ function TodoItem({ item, lang, onUpdate, editing, callbacks }) {
     onUpdate({ items: subs.filter((_, i) => i !== idx) });
   };
 
+  const cardRef = React.useRef(null);
+
+  const moveRow = (idx, direction) => {
+    const next = [...subs];
+    const targetIdx = idx + direction;
+    if (targetIdx < 0 || targetIdx >= subs.length) return;
+    const temp = next[idx];
+    next[idx] = next[targetIdx];
+    next[targetIdx] = temp;
+    onUpdate({ items: next });
+  };
+
+  React.useEffect(() => {
+    if (!cardRef.current) return;
+    const cardEl = cardRef.current;
+    const titleEl = cardEl.querySelector('.todo-title');
+    const listEl = cardEl.querySelector('.todo-list');
+    if (!listEl) return;
+
+    const overrideStyle = (el, prop, val) => {
+      if (!el) return null;
+      const origVal = el.style.getPropertyValue(prop);
+      const origPrio = el.style.getPropertyPriority(prop);
+      el.style.setProperty(prop, val, 'important');
+      return () => {
+        if (origVal) {
+          el.style.setProperty(prop, origVal, origPrio);
+        } else {
+          el.style.removeProperty(prop);
+        }
+      };
+    };
+
+    // 1. Temporarily unconstrain height of all parent and container elements for natural layout measurement
+    const itemEl = cardEl.parentElement;
+    const itemCardEl = cardEl.querySelector('.item-card');
+    const restores = [];
+
+    restores.push(overrideStyle(itemEl, 'height', 'auto'));
+    restores.push(overrideStyle(cardEl, 'height', 'auto'));
+    restores.push(overrideStyle(itemCardEl, 'height', 'auto'));
+    restores.push(overrideStyle(listEl, 'height', 'auto'));
+    restores.push(overrideStyle(listEl, 'min-height', '0'));
+    restores.push(overrideStyle(listEl, 'flex', 'none'));
+    restores.push(overrideStyle(listEl, 'overflow-y', 'visible'));
+
+    // 2. Adjust height of title edit if present under unconstrained height
+    const titleEdits = cardEl.querySelectorAll('.todo-title-edit');
+    titleEdits.forEach(el => {
+      el.style.height = '0px';
+      el.style.height = el.scrollHeight + 'px';
+    });
+
+    const padding = 22; // default padding in pixels (11 * 2)
+    let totalHeight = padding;
+
+    if (titleEl) {
+      totalHeight += titleEl.offsetHeight + 8; // title + margin-bottom
+    }
+
+    const children = Array.from(listEl.children);
+    let listHeight = 0;
+    children.forEach((child) => {
+      let chH = 0;
+      if (child.classList.contains('todo-row')) {
+        const inputEl = child.querySelector('.todo-input');
+        if (inputEl) {
+          inputEl.style.height = '0px';
+          const sh = inputEl.scrollHeight;
+          inputEl.style.height = sh + 'px';
+
+          const metaEl = child.querySelector('.todo-row-meta');
+          const controlsEl = child.querySelector('.todo-row-controls');
+          const metaH = metaEl ? metaEl.offsetHeight : 0;
+          const controlsH = controlsEl ? controlsEl.offsetHeight : 0;
+
+          // textarea scrollHeight + meta height + controls height + padding
+          chH = sh + metaH + controlsH + (metaEl || controlsEl ? 4 : 0) + 8;
+        } else {
+          chH = child.offsetHeight;
+        }
+      } else {
+        chH = child.offsetHeight;
+      }
+      listHeight += chH + 3; // gap is 3px
+    });
+    totalHeight += listHeight;
+    totalHeight += 4; // borders and minor spacing
+
+    const calculatedHeight = Math.max(100, Math.round(totalHeight));
+
+    // Restore the original styles so DOM matches state until update completes
+    restores.forEach(restore => restore?.());
+
+    if (Math.abs((item.h || 0) - calculatedHeight) > 3) {
+      onUpdate({ h: calculatedHeight });
+    }
+  }, [subs, item.title, editing, item.h, lang]);
+
   return (
-    <div className="todo-card" style={{width:'100%', height:'100%'}}>
+    <div ref={cardRef} className="todo-card" style={{width:'100%', height:'100%'}}>
       <div className="item-card" style={{ background: bg, color: isDarkBg ? 'white' : 'inherit' }}>
         {item.showTitle !== false && (
-          <div className="todo-title">
+          <div className="todo-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
             {editing ? (
-              <input
+              <textarea
                 className="todo-title-edit"
                 autoFocus
                 value={pickLang(item.title, lang)}
-                onChange={(e)=>onUpdate({ title: { es: e.target.value, en: e.target.value } })}
+                onChange={(e)=>{
+                  onUpdate({ title: { es: e.target.value, en: e.target.value } });
+                  e.target.style.height = 'auto';
+                  e.target.style.height = e.target.scrollHeight + 'px';
+                }}
+                ref={(el) => {
+                  if (el) {
+                    el.style.height = 'auto';
+                    el.style.height = el.scrollHeight + 'px';
+                  }
+                }}
                 onClick={(e)=>e.stopPropagation()}
                 onMouseDown={(e)=>e.stopPropagation()}
                 onFocus={(e)=>{ if (item._new) e.target.select(); }}
-                onKeyDown={(e)=>{ if (e.key==='Enter' || e.key==='Escape') e.target.blur(); }}
+                onKeyDown={(e)=>{ if (e.key==='Enter') { e.preventDefault(); e.target.blur(); } }}
+                rows={1}
+                style={{
+                  resize: 'none',
+                  overflowY: 'hidden',
+                  height: 'auto',
+                  display: 'block',
+                  width: '100%',
+                  background: 'transparent',
+                  border: 'none',
+                  outline: 'none',
+                  fontFamily: 'inherit',
+                  fontWeight: '700',
+                  color: 'inherit',
+                  padding: 0
+                }}
               />
             ) : (
               <span>{pickLang(item.title, lang) || (window.t('Pendientes', 'To-do'))}</span>
+            )}
+            {!editing && subs.some(ti => ti.done) && (
+              <button
+                className="todo-clear-btn"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const remaining = subs.filter(ti => !ti.done);
+                  if (remaining.length === 0) {
+                    remaining.push({ id: `t-${Date.now()}-1`, text: { es: '', en: '' }, done: false, indent: 0 });
+                  }
+                  onUpdate({ items: remaining });
+                }}
+                onMouseDown={(e)=>e.stopPropagation()}
+                title={window.t('Eliminar tareas completadas', 'Clear completed tasks')}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: 'var(--wine, #E6544F)',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  padding: '2px 4px',
+                  borderRadius: '4px',
+                  opacity: 0.8
+                }}
+              >
+                <span className="material-symbols-rounded" style={{ fontSize: '16px' }}>delete_sweep</span>
+              </button>
             )}
           </div>
         )}
@@ -911,16 +1105,39 @@ function TodoItem({ item, lang, onUpdate, editing, callbacks }) {
                 }}
               >
                 <div
+                  className="todo-drag-handle"
+                  onMouseDown={(e) => {
+                    if (callbacks?.startDragTaskRow) {
+                      callbacks.startDragTaskRow(e, item.id, idx);
+                    }
+                  }}
+                  title={lang === 'es' ? 'Arrastrar tarea fuera o reordenar' : 'Drag task out or reorder'}
+                >
+                  <span className="material-symbols-rounded">drag_indicator</span>
+                </div>
+                <div
                   className={`todo-check ${state === 'done' ? 'done' : ''} ${state === 'partial' ? 'partial' : ''}`}
                   onClick={(e)=>{e.stopPropagation(); toggleRow(idx);}}
                   onMouseDown={(e)=>{ callbacks?.selectItem?.(item.id); e.stopPropagation(); }}
                 />
                 <div className="todo-row-body">
-                  <input
+                  <textarea
                     className="todo-input"
                     value={pickLang(ti.text, lang)}
                     placeholder={window.t('Tarea…', 'Task…')}
-                    onChange={(e)=>updateRow(idx, { text: { es: e.target.value, en: e.target.value } })}
+                    spellCheck={true}
+                    rows={1}
+                    onChange={(e)=>{
+                      updateRow(idx, { text: { es: e.target.value, en: e.target.value } });
+                      e.target.style.height = '0px';
+                      e.target.style.height = e.target.scrollHeight + 'px';
+                    }}
+                    ref={(el) => {
+                      if (el) {
+                        el.style.height = '0px';
+                        el.style.height = el.scrollHeight + 'px';
+                      }
+                    }}
                     onClick={(e)=>e.stopPropagation()}
                     onMouseDown={(e)=>{ callbacks?.selectItem?.(item.id); e.stopPropagation(); }}
                     onFocus={()=>{
@@ -928,12 +1145,16 @@ function TodoItem({ item, lang, onUpdate, editing, callbacks }) {
                     }}
                     onKeyDown={(e)=>{
                       if (e.key === 'Enter') {
-                        e.preventDefault();
-                        addRow(idx);
-                        setTimeout(()=>{
-                          const inputs = e.target.closest('.todo-list').querySelectorAll('.todo-input');
-                          inputs[idx+1]?.focus();
-                        }, 10);
+                        if (e.shiftKey) {
+                          // Let Shift+Enter insert a newline natively
+                        } else {
+                          e.preventDefault();
+                          addRow(idx);
+                          setTimeout(()=>{
+                            const inputs = e.target.closest('.todo-list').querySelectorAll('.todo-input');
+                            inputs[idx+1]?.focus();
+                          }, 10);
+                        }
                       }
                       if (e.key === 'Tab') {
                         e.preventDefault();
@@ -981,6 +1202,45 @@ function TodoItem({ item, lang, onUpdate, editing, callbacks }) {
                       )}
                     </div>
                   )}
+                  {isRowFocused && (
+                    <div className="todo-row-controls" onMouseDown={(e)=>e.stopPropagation()} style={{ marginTop: '4px', marginLeft: 0 }}>
+                      <button
+                        disabled={ti.indent === 0}
+                        onClick={(e) => { e.stopPropagation(); indentRow(idx, -1); }}
+                        title={window.t('Disminuir sangría', 'Decrease indent')}
+                      >
+                        <span className="material-symbols-rounded">format_indent_decrease</span>
+                      </button>
+                      <button
+                        disabled={ti.indent >= 2}
+                        onClick={(e) => { e.stopPropagation(); indentRow(idx, 1); }}
+                        title={window.t('Aumentar sangría', 'Increase indent')}
+                      >
+                        <span className="material-symbols-rounded">format_indent_increase</span>
+                      </button>
+                      <button
+                        disabled={idx === 0}
+                        onClick={(e) => { e.stopPropagation(); moveRow(idx, -1); }}
+                        title={window.t('Subir tarea', 'Move up')}
+                      >
+                        <span className="material-symbols-rounded">arrow_upward</span>
+                      </button>
+                      <button
+                        disabled={idx === subs.length - 1}
+                        onClick={(e) => { e.stopPropagation(); moveRow(idx, 1); }}
+                        title={window.t('Bajar tarea', 'Move down')}
+                      >
+                        <span className="material-symbols-rounded">arrow_downward</span>
+                      </button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); deleteRow(idx); }}
+                        title={window.t('Eliminar tarea', 'Delete task')}
+                        className="danger"
+                      >
+                        <span className="material-symbols-rounded">delete</span>
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
             );
@@ -1022,15 +1282,40 @@ function ColumnItem({ item, lang, onUpdate, editing, callbacks }) {
           <div className="column-strip-head">
             <span className="material-symbols-rounded column-strip-icon">{item.icon || 'view_column'}</span>
             {item.showTitle !== false && (editing ? (
-              <input
+              <textarea
                 autoFocus
                 value={pickLang(item.content, lang)}
-                onChange={(e)=>onUpdate({ content: { es: e.target.value, en: e.target.value } })}
+                onChange={(e)=>{
+                  onUpdate({ content: { es: e.target.value, en: e.target.value } });
+                  e.target.style.height = 'auto';
+                  e.target.style.height = e.target.scrollHeight + 'px';
+                }}
+                ref={(el) => {
+                  if (el) {
+                    el.style.height = 'auto';
+                    el.style.height = el.scrollHeight + 'px';
+                  }
+                }}
                 onClick={(e)=>e.stopPropagation()}
                 onMouseDown={(e)=>e.stopPropagation()}
                 onFocus={(e)=>{ if (item._new) e.target.select(); }}
-                onKeyDown={(e)=>{ if (e.key==='Enter' || e.key==='Escape') e.target.blur(); }}
-                style={{ color: 'inherit', textAlign:'center' }}
+                onKeyDown={(e)=>{ if (e.key === 'Enter') { e.preventDefault(); e.target.blur(); } }}
+                rows={1}
+                style={{
+                  color: 'inherit',
+                  textAlign: 'center',
+                  resize: 'none',
+                  overflowY: 'hidden',
+                  height: 'auto',
+                  display: 'block',
+                  width: '100%',
+                  background: 'transparent',
+                  border: 'none',
+                  outline: 'none',
+                  fontFamily: 'inherit',
+                  fontWeight: '700',
+                  padding: 0
+                }}
               />
             ) : (
               <span className="column-strip-title">{pickLang(item.content, lang) || (window.t('Nueva Columna', 'New Column'))}</span>
@@ -1045,14 +1330,15 @@ function ColumnItem({ item, lang, onUpdate, editing, callbacks }) {
             <div className="column-empty"/>
           )}
           {children.map(child => {
-            const h = child.h || (child.type === 'note' ? 90 :
+            const isBoardCompact = child.type === 'board' && child.showPreview === false;
+            const h = isBoardCompact ? 58 : (child.h || (child.type === 'board' ? 200 :
+                                  child.type === 'note' ? 90 :
                                   child.type === 'todo' ? 140 :
                                   child.type === 'link' ? 180 :
                                   child.type === 'image' ? 140 :
                                   child.type === 'doc' ? 90 :
-                                  child.type === 'board' ? 130 :
                                   child.type === 'comment' ? 80 :
-                                  child.type === 'calendar' ? 220 : 90);
+                                  child.type === 'calendar' ? 220 : 90));
             const w = (item.w || 240) - 24;
             const isEditingChild = callbacks.editingChild && callbacks.editingChild.colId === item.id && callbacks.editingChild.childId === child.id;
             const isSelected = callbacks.isSelectedItem?.(child.id);
@@ -1064,12 +1350,14 @@ function ColumnItem({ item, lang, onUpdate, editing, callbacks }) {
                 data-col-parent-id={item.id}
                 data-item-id={child.id}
                 style={{ height: h, width: '100%', position: 'relative' }}
-                onMouseDown={(e) => callbacks.startColChildDrag && callbacks.startColChildDrag(e, item.id, child.id)}
+                onMouseDown={(e) => {
+                  if (isEditingChild) return;
+                  callbacks.startColChildDrag && callbacks.startColChildDrag(e, item.id, child.id);
+                }}
                 onClick={(e) => {
                   e.stopPropagation();
-                  if (child.type === 'doc') { callbacks.openDoc && callbacks.openDoc(child.id, item.id); return; }
-                  if (child.type === 'board') { callbacks.openBoard && callbacks.openBoard(child.canvasId, child.id); return; }
                   callbacks.setEditingChild && callbacks.setEditingChild(item.id, child.id);
+                  callbacks.selectItem && callbacks.selectItem(child.id);
                 }}
                 onDoubleClick={(e) => {
                   e.stopPropagation();
@@ -1079,7 +1367,7 @@ function ColumnItem({ item, lang, onUpdate, editing, callbacks }) {
                 }}
               >
                 <window.ItemRenderer
-                  item={{ ...child, w, h }}
+                  item={{ ...child, w, h, _inColumn: true }}
                   lang={lang}
                   editing={isEditingChild}
                   callbacks={{
@@ -1089,10 +1377,13 @@ function ColumnItem({ item, lang, onUpdate, editing, callbacks }) {
                 />
                 {!isEditingChild && callbacks.startAnchorDrag && (
                   <div className="anchors">
-                    <div className="anchor top"    onMouseDown={(e)=>callbacks.startAnchorDrag(e, child.id, 'top')}/>
-                    <div className="anchor right"  onMouseDown={(e)=>callbacks.startAnchorDrag(e, child.id, 'right')}/>
-                    <div className="anchor bottom" onMouseDown={(e)=>callbacks.startAnchorDrag(e, child.id, 'bottom')}/>
-                    <div className="anchor left"   onMouseDown={(e)=>callbacks.startAnchorDrag(e, child.id, 'left')}/>
+                    <div
+                      className="connect-handle"
+                      title={lang==='es'?'Arrastra para conectar':'Drag to connect'}
+                      onMouseDown={(e)=>callbacks.startAnchorDrag(e, child.id, 'center')}
+                    >
+                      <span className="material-symbols-rounded">trip_origin</span>
+                    </div>
                   </div>
                 )}
               </div>
@@ -1128,8 +1419,84 @@ function BoardItem({ item, lang, onUpdate, onOpenBoard, editing, getNestedItems,
   const darkAccent = isColorDark(accent);
   const nestedItems = getNestedItems ? getNestedItems(item.canvasId) : [];
 
+  const cardRef = React.useRef(null);
+  const lastCalculatedH = React.useRef(item.h);
+  const desiredPreviewH = React.useRef(item.h - 60);
+  const [iconPickerOpen, setIconPickerOpen] = React.useState(false);
+
+  // If item.h changes from the outside (e.g. user drag resize), update our desired preview height
+  if (item.h !== lastCalculatedH.current) {
+    const footEl = cardRef.current?.querySelector('.board-foot');
+    const captionEl = cardRef.current?.querySelector('.node-caption-row');
+    const footH = footEl ? footEl.offsetHeight : 52;
+    const captionH = captionEl ? captionEl.offsetHeight : 0;
+    const colorBarH = 8;
+    const borderH = 3;
+    const currentPreviewH = item.h - colorBarH - footH - captionH - borderH;
+    desiredPreviewH.current = Math.max(50, currentPreviewH);
+    lastCalculatedH.current = item.h;
+  }
+
+  const compact = item.showPreview === false; // compact = no preview, just a small square with logo + title
+
+  React.useEffect(() => {
+    if (compact) return; // compact mode uses a fixed small square, no preview auto-height
+    if (!cardRef.current) return;
+    const footEl = cardRef.current.querySelector('.board-foot');
+    const captionEl = cardRef.current.querySelector('.node-caption-row');
+    if (!footEl) return;
+
+    const overrideStyle = (el, prop, val) => {
+      if (!el) return null;
+      const origVal = el.style.getPropertyValue(prop);
+      const origPrio = el.style.getPropertyPriority(prop);
+      el.style.setProperty(prop, val, 'important');
+      return () => {
+        if (origVal) {
+          el.style.setProperty(prop, origVal, origPrio);
+        } else {
+          el.style.removeProperty(prop);
+        }
+      };
+    };
+
+    // Temporarily unconstrain height of all parent and container elements for natural layout measurement
+    const cardEl = cardRef.current;
+    const itemEl = cardEl.parentElement;
+    const itemCardEl = cardEl.querySelector('.item-card');
+    const restores = [];
+
+    restores.push(overrideStyle(itemEl, 'height', 'auto'));
+    restores.push(overrideStyle(cardEl, 'height', 'auto'));
+    restores.push(overrideStyle(itemCardEl, 'height', 'auto'));
+
+    const footH = footEl.offsetHeight;
+    const captionH = captionEl ? captionEl.offsetHeight : 0;
+    const colorBarH = 8;
+    const borderH = 3;
+
+    // Restore the original styles
+    restores.forEach(restore => restore?.());
+
+    const totalHeight = Math.round(desiredPreviewH.current + colorBarH + footH + captionH + borderH);
+
+    if (Math.abs((item.h || 0) - totalHeight) > 3) {
+      lastCalculatedH.current = totalHeight;
+      onUpdate({ h: totalHeight });
+    }
+  }, [item.content, editing, item.h, lang, item.showCaption, compact]);
+
   const previewW = item.w - 16;
-  const previewH = item.h - 60;
+  const colorBarH = 8;
+  const borderH = 3;
+  
+  // Estimate or calculate the actual preview height for scale math
+  const footElForScale = cardRef.current?.querySelector('.board-foot');
+  const captionElForScale = cardRef.current?.querySelector('.node-caption-row');
+  const footHForScale = footElForScale ? footElForScale.offsetHeight : 52;
+  const captionHForScale = captionElForScale ? captionElForScale.offsetHeight : 0;
+  const previewH = Math.max(50, item.h - colorBarH - footHForScale - captionHForScale - borderH);
+
   let scale = 1, bx = 8, by = 8;
   if (nestedItems.length) {
     let mx = 0, my = 0;
@@ -1139,15 +1506,66 @@ function BoardItem({ item, lang, onUpdate, onOpenBoard, editing, getNestedItems,
     scale = Math.min(sx, sy, 0.35);
   }
 
+  // ── Inside a column (compact) OR Compact Mode on Canvas: Milanote-style horizontal card (icon left, name + count right) ──
+  if (compact) {
+    return (
+      <div
+        className={`board-card board-in-column ${editing ? 'editing' : ''}`}
+        style={{width:'100%', height:'100%'}}
+        onDoubleClick={!item._inColumn ? (e)=>{ e.stopPropagation(); onOpenBoard && onOpenBoard(item.canvasId, item.id); } : undefined}
+      >
+        <div className="board-col-card" style={compact ? { border: '1.5px solid var(--line)', background: 'var(--paper)', borderRadius: '6px', overflow: 'hidden' } : {}}>
+          <div
+            className="board-col-icon"
+            style={{ background: accent, color: darkAccent ? '#fff' : '#1A1A1A', cursor: editing ? 'pointer' : 'inherit', position: 'relative' }}
+            onClick={editing ? (e)=>{ e.stopPropagation(); setIconPickerOpen(o=>!o); } : undefined}
+            onMouseDown={editing ? (e)=>e.stopPropagation() : undefined}
+            title={editing ? window.t('Cambiar icono', 'Change icon') : undefined}
+          >
+            <span className="material-symbols-rounded">{item.icon || 'dashboard'}</span>
+            {editing && iconPickerOpen && (
+              <div className="board-col-iconpicker" onMouseDown={(e)=>e.stopPropagation()} onClick={(e)=>e.stopPropagation()}>
+                {BOARD_ICONS.map(ic => (
+                  <button key={ic} className={`board-col-iconopt ${(item.icon||'dashboard')===ic?'active':''}`}
+                    onClick={(e)=>{ e.stopPropagation(); onUpdate({ icon: ic }); setIconPickerOpen(false); }}>
+                    <span className="material-symbols-rounded">{ic}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+          <div className="board-col-meta">
+            {editing ? (
+              <input
+                className="board-col-title-edit"
+                autoFocus
+                value={pickLang(item.content, lang)}
+                onChange={(e)=>onUpdate({ content: { es: e.target.value, en: e.target.value } })}
+                onClick={(e)=>e.stopPropagation()}
+                onMouseDown={(e)=>e.stopPropagation()}
+                onFocus={(e)=>e.target.select()}
+                onKeyDown={(e)=>{ if (e.key==='Enter' || e.key==='Escape') e.target.blur(); }}
+              />
+            ) : (
+              <div className="board-col-title">{pickLang(item.content, lang) || (window.t('Tablero', 'Board'))}</div>
+            )}
+            <div className="board-col-count">{nestedItems.length} {window.t('nodos', 'nodes')} · {window.t('doble clic para abrir', 'double-click to open')}</div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div
+      ref={cardRef}
       className="board-card"
       style={{width:'100%', height:'100%'}}
       onDoubleClick={(e)=>{ e.stopPropagation(); onOpenBoard && onOpenBoard(item.canvasId, item.id); }}
     >
       <div className="item-card" style={{borderColor: 'var(--line)'}}>
         <div className="board-color-bar" style={{background: accent}}/>
-        <div className="board-cover">
+        <div className="board-cover" style={{ height: previewH, flex: 'none' }}>
           <div className="board-cover-grid"/>
           {nestedItems.length === 0 && (
             <div className="board-preview-item empty-message">
@@ -1182,11 +1600,21 @@ function BoardItem({ item, lang, onUpdate, onOpenBoard, editing, getNestedItems,
         >
           <span className="material-symbols-rounded board-foot-icon">{item.icon || 'dashboard'}</span>
           {item.showTitle !== false && (editing ? (
-            <input
+            <textarea
               className="board-title-edit"
               autoFocus
               value={pickLang(item.content, lang)}
-              onChange={(e)=>onUpdate({ content: { es: e.target.value, en: e.target.value } })}
+              onChange={(e)=>{
+                onUpdate({ content: { es: e.target.value, en: e.target.value } });
+                e.target.style.height = 'auto';
+                e.target.style.height = e.target.scrollHeight + 'px';
+              }}
+              ref={(el) => {
+                if (el) {
+                  el.style.height = 'auto';
+                  el.style.height = el.scrollHeight + 'px';
+                }
+              }}
               onClick={(e)=>e.stopPropagation()}
               onMouseDown={(e)=>e.stopPropagation()}
               onFocus={(e)=>{ if (item._new) e.target.select(); }}
@@ -1199,7 +1627,22 @@ function BoardItem({ item, lang, onUpdate, onOpenBoard, editing, getNestedItems,
                   _editing: false
                 });
               }}
-              onKeyDown={(e)=>{ if (e.key==='Enter' || e.key==='Escape') e.target.blur(); }}
+              onKeyDown={(e)=>{ if (e.key==='Enter') { e.preventDefault(); e.target.blur(); } }}
+              rows={1}
+              style={{
+                resize: 'none',
+                overflowY: 'hidden',
+                height: 'auto',
+                display: 'block',
+                width: '100%',
+                background: 'transparent',
+                border: 'none',
+                outline: 'none',
+                fontFamily: 'inherit',
+                fontWeight: '700',
+                color: 'inherit',
+                padding: 0
+              }}
             />
           ) : (
             <div className="board-foot-title">
@@ -1241,7 +1684,7 @@ function DocItem({ item, lang, onOpenDoc }) {
           <>
             <div className="doc-head">
               <span className="material-symbols-rounded">description</span>
-              <span style={{flex:1, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>{title}</span>
+              <span style={{flex:1, wordBreak:'break-word', whiteSpace:'pre-wrap'}}>{title}</span>
             </div>
             <div className="doc-body-preview" dangerouslySetInnerHTML={{ __html: body || '' }}/>
           </>
@@ -2354,6 +2797,7 @@ function CommentItem({ item, lang, onUpdate, editing }) {
             className="note-edit rich comment-rich"
             contentEditable
             suppressContentEditableWarning
+            spellCheck={true}
             data-placeholder={window.t('Escribe un comentario…', 'Write a comment…')}
             onInput={onInput}
             onClick={(e)=>e.stopPropagation()}
@@ -3011,7 +3455,16 @@ function SwatchItem({ item, lang }) {
 // ──────────────── Dispatcher ────────────────
 function ItemRenderer({ item, lang, editing, callbacks }) {
   const cb = callbacks || {};
-  const onUpdate = (patch) => cb.updateItem && cb.updateItem(item.id, patch);
+  const onUpdate = (patch) => {
+    if (patch.h !== undefined) {
+      console.log('[DEBUG-HEIGHT] ItemRenderer onUpdate height update for item.id =', item.id, 'patch.h =', patch.h);
+    }
+    if (cb.updateItem) {
+      cb.updateItem(item.id, patch);
+    } else {
+      console.log('[DEBUG-HEIGHT] error: cb.updateItem is undefined in ItemRenderer');
+    }
+  };
   switch (item.type) {
     case 'note':     return <NoteItem  item={item} lang={lang} editing={editing} onUpdate={onUpdate}/>;
     case 'image':    return <ImageItem item={item} lang={lang} onUpdate={onUpdate}/>;

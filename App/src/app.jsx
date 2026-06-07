@@ -104,26 +104,19 @@ function cleanCanvases(canvases) {
 function migrateTemplates(state) {
   if (!state) return state;
 
-  const currentVersion = 2;
-  const newTemplateIds = ['architecture', 'gamedev', 'marketing'];
-  const newTemplateCanvases = Object.keys(window.INITIAL_CANVASES || {});
+  const currentVersion = 3;
 
-  // Check if we need migration: version mismatch, or has old templates, or missing new ones
-  const hasOldTemplates = state.projects && state.projects.some(p => !p.id.startsWith('proj-') && !newTemplateIds.includes(p.id));
-  const hasNewTemplates = state.projects && state.projects.some(p => newTemplateIds.includes(p.id));
-  const needsMigration = state.templatesVersion !== currentVersion || hasOldTemplates || !hasNewTemplates;
+  // Check if we need migration: version mismatch, or has old templates (not starting with 'proj-')
+  const hasOldTemplates = state.projects && state.projects.some(p => !p.id.startsWith('proj-'));
+  const needsMigration = state.templatesVersion !== currentVersion || hasOldTemplates;
 
   if (needsMigration) {
     console.log('Migrating templates to version', currentVersion);
     
     // 1. Filter projects
     let nextProjects = state.projects ? [...state.projects] : [];
-    // Remove all old and current templates (anything not starting with proj-)
+    // Remove all template projects (anything not starting with proj-)
     nextProjects = nextProjects.filter(p => p.id.startsWith('proj-'));
-    
-    // Add the fresh templates at the beginning
-    const freshTemplates = JSON.parse(JSON.stringify(window.SAMPLE_PROJECTS || []));
-    nextProjects = [...freshTemplates, ...nextProjects];
     state.projects = nextProjects;
 
     // 2. Filter canvases
@@ -134,11 +127,6 @@ function migrateTemplates(state) {
         if (!cid.startsWith('proj-') && !cid.startsWith('b-')) {
           delete nextCanvases[cid];
         }
-      }
-      
-      // Inject fresh template canvases
-      for (const [cid, canvas] of Object.entries(window.INITIAL_CANVASES || {})) {
-        nextCanvases[cid] = JSON.parse(JSON.stringify(canvas));
       }
       state.canvases = nextCanvases;
     }
@@ -158,10 +146,21 @@ function App() {
   const [vaultPath, setVaultPath] = useStateApp(null);
   const [updateAvailable, setUpdateAvailable] = useStateApp(false);
   const [checkingUpdates, setCheckingUpdates] = useStateApp(false);
+  const [contextMenu, setContextMenu] = useStateApp(null);
+  const [volume, setVolume] = useStateApp(() => {
+    const val = localStorage.getItem('odinote.volume');
+    return val !== null ? parseFloat(val) : 0.5;
+  });
+
+  React.useEffect(() => {
+    window.audioVolume = volume;
+    window.isAudioMuted = (volume === 0);
+    localStorage.setItem('odinote.volume', volume.toString());
+  }, [volume]);
 
   const ignoreNextPersistRef = React.useRef(false);
 
-  const MOCK_UPDATE_TEST = true; // Cambiar a false en producción. Habilita probar la campana en local.
+  const MOCK_UPDATE_TEST = false; // Cambiar a true para probar la campana localmente.
 
   const checkUpdates = async (manual = false) => {
     if (checkingUpdates) return;
@@ -262,6 +261,53 @@ function App() {
     window.addEventListener('wheel', handleWheel, { passive: false });
     return () => window.removeEventListener('wheel', handleWheel);
   }, []);
+
+  // Listen to IPC event for Electron custom context menu
+  useEffectApp(() => {
+    if (window.electronAPI && window.electronAPI.onShowContextMenu) {
+      const unsub = window.electronAPI.onShowContextMenu((data) => {
+        setContextMenu(data);
+      });
+      
+      const hideMenu = (e) => {
+        if (e.target.closest('.custom-context-menu')) return;
+        setContextMenu(null);
+      };
+      window.addEventListener('mousedown', hideMenu, true);
+      window.addEventListener('contextmenu', hideMenu, true);
+      return () => {
+        unsub();
+        window.removeEventListener('mousedown', hideMenu, true);
+        window.removeEventListener('contextmenu', hideMenu, true);
+      };
+    }
+  }, []);
+
+  // Sync spellchecker languages dynamically when UI language changes
+  useEffectApp(() => {
+    if (window.electronAPI && window.electronAPI.setSpellcheckerLanguages) {
+      let spellLangs = ['en-US', 'en'];
+      if (lang === 'es') {
+        spellLangs = ['es-ES', 'es-419', 'es'];
+      } else if (lang === 'fr') {
+        spellLangs = ['fr-FR', 'fr'];
+      } else if (lang === 'de') {
+        spellLangs = ['de-DE', 'de'];
+      } else if (lang === 'it') {
+        spellLangs = ['it-IT', 'it'];
+      } else if (lang === 'pt') {
+        spellLangs = ['pt-PT', 'pt-BR', 'pt'];
+      } else if (lang === 'ru') {
+        spellLangs = ['ru-RU', 'ru'];
+      } else if (lang === 'ar') {
+        spellLangs = [];
+      } else if (lang === 'zh' || lang === 'ja' || lang === 'ko') {
+        spellLangs = [];
+      }
+      window.electronAPI.setSpellcheckerLanguages(spellLangs);
+    }
+  }, [lang]);
+
   useEffectApp(() => {
     const initVault = async () => {
       let savedVault = null;
@@ -338,6 +384,11 @@ function App() {
     initVault();
   }, []);
 
+
+  // Keep the global language in sync SYNCHRONOUSLY during render so window.t() returns the
+  // correct language on the very same render that `lang` changes (otherwise the old text
+  // sticks until the next unrelated re-render — the "need to click the canvas" bug).
+  window.currentLang = lang;
 
   // apply theme on body
   useEffectApp(() => {
@@ -656,8 +707,43 @@ function App() {
     );
   }
 
+  const handleSuggestion = (suggestion) => {
+    if (window.electronAPI && window.electronAPI.replaceMisspelling) {
+      window.electronAPI.replaceMisspelling(suggestion);
+    }
+    setContextMenu(null);
+  };
+
+  const handleAddToDictionary = () => {
+    if (window.electronAPI && window.electronAPI.addToDictionary && contextMenu.misspelledWord) {
+      window.electronAPI.addToDictionary(contextMenu.misspelledWord);
+    }
+    setContextMenu(null);
+  };
+
+  const handleCut = () => {
+    document.execCommand('cut');
+    setContextMenu(null);
+  };
+
+  const handleCopy = () => {
+    document.execCommand('copy');
+    setContextMenu(null);
+  };
+
+  const handlePaste = async () => {
+    try {
+      const text = await navigator.clipboard.readText();
+      document.execCommand('insertText', false, text);
+    } catch {
+      document.execCommand('paste');
+    }
+    setContextMenu(null);
+  };
+
+  let activeView = null;
   if (view.kind === 'home') {
-    return <window.Home
+    activeView = <window.Home
       lang={lang} setLang={setLang}
       theme={theme} setTheme={setTheme}
       projects={projects}
@@ -675,18 +761,102 @@ function App() {
       updateAvailable={updateAvailable}
       onUpdateClick={handleUpdateClick}
     />;
+  } else {
+    activeView = <window.Canvas
+      key={view.projectId}
+      projectId={view.projectId}
+      lang={lang} setLang={setLang}
+      theme={theme} setTheme={setTheme}
+      onHome={goHome}
+      canvasesIn={canvases}
+      setCanvases={setCanvases}
+      updateAvailable={updateAvailable}
+      onUpdateClick={handleUpdateClick}
+      volume={volume}
+      onChangeVolume={setVolume}
+    />;
   }
-  return <window.Canvas
-    key={view.projectId}
-    projectId={view.projectId}
-    lang={lang} setLang={setLang}
-    theme={theme} setTheme={setTheme}
-    onHome={goHome}
-    canvasesIn={canvases}
-    setCanvases={setCanvases}
-    updateAvailable={updateAvailable}
-    onUpdateClick={handleUpdateClick}
-  />;
+
+  return (
+    <>
+      {activeView}
+      {contextMenu && (
+        <div
+          className="custom-context-menu"
+          style={{
+            position: 'fixed',
+            top: contextMenu.y,
+            left: contextMenu.x,
+            zIndex: 9999,
+          }}
+          onContextMenu={(e) => e.preventDefault()}
+          onMouseDown={(e) => e.stopPropagation()}
+        >
+          <div className="custom-context-menu-wrapper">
+            {contextMenu.misspelledWord && (
+              <>
+                <div className="ctx-menu-header">
+                  <span className="material-symbols-rounded" style={{ fontSize: '14px', color: 'var(--wine)' }}>spellcheck</span>
+                  <span>{lang === 'es' ? 'Ortografía' : 'Spelling'}</span>
+                </div>
+                <div className="ctx-menu-suggestions">
+                  {contextMenu.dictionarySuggestions && contextMenu.dictionarySuggestions.length > 0 ? (
+                    contextMenu.dictionarySuggestions.map((sug, idx) => (
+                      <button
+                        key={idx}
+                        className="ctx-menu-item suggestion-btn"
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => handleSuggestion(sug)}
+                      >
+                        <strong>{sug}</strong>
+                      </button>
+                    ))
+                  ) : (
+                    <div className="ctx-menu-no-suggestions">
+                      <i>{lang === 'es' ? 'Sin sugerencias' : 'No suggestions'}</i>
+                    </div>
+                  )}
+                </div>
+                <button
+                  className="ctx-menu-item"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={handleAddToDictionary}
+                >
+                  <span className="material-symbols-rounded">add_to_photos</span>
+                  <span>{lang === 'es' ? 'Añadir al diccionario' : 'Add to dictionary'}</span>
+                </button>
+                {(contextMenu.isEditable || (contextMenu.selectionText && contextMenu.selectionText.trim() !== '')) && <div className="ctx-menu-divider" />}
+              </>
+            )}
+
+            {contextMenu.isEditable && (
+              <>
+                <button className="ctx-menu-item" onMouseDown={(e) => e.preventDefault()} onClick={handleCut}>
+                  <span className="material-symbols-rounded">content_cut</span>
+                  <span>{lang === 'es' ? 'Cortar' : 'Cut'}</span>
+                </button>
+                <button className="ctx-menu-item" onMouseDown={(e) => e.preventDefault()} onClick={handleCopy}>
+                  <span className="material-symbols-rounded">content_copy</span>
+                  <span>{lang === 'es' ? 'Copiar' : 'Copy'}</span>
+                </button>
+                <button className="ctx-menu-item" onMouseDown={(e) => e.preventDefault()} onClick={handlePaste}>
+                  <span className="material-symbols-rounded">content_paste</span>
+                  <span>{lang === 'es' ? 'Pegar' : 'Paste'}</span>
+                </button>
+              </>
+            )}
+
+            {!contextMenu.isEditable && contextMenu.selectionText && contextMenu.selectionText.trim() !== '' && (
+              <button className="ctx-menu-item" onMouseDown={(e) => e.preventDefault()} onClick={handleCopy}>
+                <span className="material-symbols-rounded">content_copy</span>
+                <span>{lang === 'es' ? 'Copiar' : 'Copy'}</span>
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+    </>
+  );
 }
 
 ReactDOM.createRoot(document.getElementById('root')).render(<App/>);

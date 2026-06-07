@@ -48,6 +48,16 @@ function TextFormatSidebar({ item, lang, onUpdate, onClose, variant, noCodeQuote
   const exec = (cmd, val) => {
     const ed = findEditor();
     if (!ed) return;
+    if (cmd === 'formatBlock') {
+      const cleanTag = val.replace(/[<>]/g, '').toLowerCase();
+      const changed = window.changeBlockTag && window.changeBlockTag(ed, cleanTag);
+      if (changed) {
+        ed.dispatchEvent(new Event('input', { bubbles: true }));
+        refresh();
+        return;
+      }
+      document.execCommand('removeFormat', false, null);
+    }
     document.execCommand(cmd, false, val);
     // notify the note to persist via input event
     ed.dispatchEvent(new Event('input', { bubbles: true }));
@@ -79,10 +89,20 @@ function TextFormatSidebar({ item, lang, onUpdate, onClose, variant, noCodeQuote
       </button>
 
       {!isCaption && (
-        <button className="ctx-btn" onClick={()=>exec('formatBlock', 'H1')}>
-          <div className="ctx-letter" style={{fontWeight: 800, fontSize: 14}}>H1</div>
-          <span>{lang==='es'?'Título':'Heading'}</span>
-        </button>
+        <>
+          <button className="ctx-btn" onClick={()=>exec('formatBlock', '<h1>')}>
+            <div className="ctx-letter" style={{fontWeight: 800, fontSize: 14}}>H1</div>
+            <span>{lang==='es'?'Título':'Heading'}</span>
+          </button>
+          <button className="ctx-btn" onClick={()=>exec('formatBlock', '<h2>')}>
+            <div className="ctx-letter" style={{fontWeight: 700, fontSize: 12}}>H2</div>
+            <span>{lang==='es'?'Subtítulo':'Subheading'}</span>
+          </button>
+          <button className="ctx-btn" onClick={()=>exec('formatBlock', '<p>')}>
+            <span className="material-symbols-rounded">notes</span>
+            <span>{lang==='es'?'Texto normal':'Paragraph'}</span>
+          </button>
+        </>
       )}
 
       <button className={`ctx-btn ${active.bold ? 'active' : ''}`} onClick={()=>exec('bold')}>

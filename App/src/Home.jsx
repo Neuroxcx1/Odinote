@@ -222,18 +222,45 @@ function Home({ lang, setLang, theme, setTheme, onOpenProject, projects, onCreat
             <button className="icon-btn lift" onClick={onImport} title={window.t('Importar respaldo JSON', 'Import JSON backup')}>
               <span className="material-symbols-rounded">upload</span>
             </button>
-            <div className="lang-switch">
-              <select value={lang} onChange={(e)=>setLang(e.target.value)} className="lang-select">
-                <option value="es">ES</option>
-                <option value="en">EN</option>
-                <option value="fr">FR</option>
-                <option value="de">DE</option>
-                <option value="it">IT</option>
-                <option value="pt">PT</option>
-                <option value="zh">ZH</option>
-                <option value="ja">JA</option>
-                <option value="ko">KO</option>
-                <option value="ar">AR</option>
+            <div
+              className="lang-switch"
+              title={
+                {
+                  es: 'Español',
+                  en: 'English',
+                  fr: 'Français',
+                  de: 'Deutsch',
+                  it: 'Italiano',
+                  pt: 'Português',
+                  zh: '中文 (Chinese)',
+                  ja: '日本語 (Japanese)',
+                  ko: '한국어 (Korean)',
+                  ar: 'العربية (Arabic)',
+                  ru: 'Русский (Russian)'
+                }[lang] || ''
+              }
+              style={{ position: 'relative' }}
+            >
+              <span style={{ pointerEvents: 'none', position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--ink)', fontSize: '11.5px', fontWeight: '700' }}>
+                {lang.toUpperCase()}
+              </span>
+              <select
+                value={lang}
+                onChange={(e)=>setLang(e.target.value)}
+                className="lang-select"
+                style={{ opacity: 0, cursor: 'pointer', position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', zIndex: 2 }}
+              >
+                <option value="es" title="Español">ES - Español</option>
+                <option value="en" title="English">EN - English</option>
+                <option value="fr" title="Français">FR - Français</option>
+                <option value="de" title="Deutsch">DE - Deutsch</option>
+                <option value="it" title="Italiano">IT - Italiano</option>
+                <option value="pt" title="Português">PT - Português</option>
+                <option value="zh" title="中文 (Chinese)">ZH - 中文 (Chinese)</option>
+                <option value="ja" title="日本語 (Japanese)">JA - 日本語 (Japanese)</option>
+                <option value="ko" title="한국어 (Korean)">KO - 한국어 (Korean)</option>
+                <option value="ar" title="العربية (Arabic)">AR - العربية (Arabic)</option>
+                <option value="ru" title="Русский (Russian)">RU - Русский (Russian)</option>
               </select>
             </div>
           </div>
@@ -254,7 +281,7 @@ function Home({ lang, setLang, theme, setTheme, onOpenProject, projects, onCreat
                     <>Your mind, organized<br/>as <span className="hero-mark">nested canvases</span>.</>
                   )}
                 </h1>
-                <p className="ms-hero-sub">{window.t('Pensado para game devs, escritores y creativos que no caben en una sola pantalla. Notas, imágenes, vínculos, tableros — todo en un canvas infinito.', 'Built for game devs, writers and creatives who don\')t fit on one screen. Notes, images, links, boards — all on an infinite canvas.'}</p>
+                <p className="ms-hero-sub">{window.t('Pensado para game devs, escritores y creativos que no caben en una sola pantalla. Notas, imágenes, vínculos, tableros — todo en un canvas infinito.', "Built for game devs, writers and creatives who don't fit on one screen. Notes, images, links, boards — all on an infinite canvas.")}</p>
               </div>
               <div className="ms-hero-art">
                 <div className="ms-art-card a" style={{background:'#F7DA84'}}>

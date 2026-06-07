@@ -1,4 +1,5 @@
 const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
+app.commandLine.appendSwitch('disable-features', 'WinUseBrowserSpellChecker');
 const path = require('path');
 const fs = require('fs');
 const http = require('http');
@@ -42,8 +43,38 @@ function createWindow() {
     }
   });
 
+  const { session } = require('electron');
+  if (session.defaultSession) {
+    try {
+      session.defaultSession.setSpellCheckerLanguages([
+        'es-ES', 'es-419', 'es',
+        'fr-FR', 'fr',
+        'de-DE', 'de',
+        'en-US', 'en-GB', 'en',
+        'it-IT', 'it',
+        'pt-PT', 'pt-BR', 'pt',
+        'ru-RU', 'ru'
+      ]);
+    } catch (err) {
+      logToFile(`Error setting initial spellchecker languages: ${err.message}`);
+    }
+  }
+
   // Hide default menu bar
   mainWindow.setMenuBarVisibility(false);
+
+  // Handle spellcheck suggestions and custom HTML context menu
+  mainWindow.webContents.on('context-menu', (event, params) => {
+    event.preventDefault();
+    mainWindow.webContents.send('show-context-menu', {
+      x: params.x,
+      y: params.y,
+      misspelledWord: params.misspelledWord,
+      dictionarySuggestions: params.dictionarySuggestions,
+      isEditable: params.isEditable,
+      selectionText: params.selectionText
+    });
+  });
 
   // Open external links in default browser instead of new Electron windows
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
@@ -63,10 +94,6 @@ function createWindow() {
       }
     }
   });
-
-  // OPEN DEVTOOLS SO WE CAN IMMEDIATELY SEE THE CONSOLE ERRORS
-  logToFile('Opening DevTools...');
-  mainWindow.webContents.openDevTools();
 
   // Start internal static HTTP server
   logToFile('Starting local HTTP server...');
@@ -260,6 +287,34 @@ ipcMain.handle('save-media', async (event, { folderPath, fileName, base64Data })
     logToFile(`IPC save-media ERROR: ${err.message}`);
     throw err;
   }
+});
+
+ipcMain.handle('replace-misspelling', async (event, suggestion) => {
+  if (mainWindow) {
+    mainWindow.webContents.replaceMisspelling(suggestion);
+  }
+  return true;
+});
+
+ipcMain.handle('add-to-dictionary', async (event, word) => {
+  if (mainWindow && mainWindow.webContents.session) {
+    mainWindow.webContents.session.addWordToSpellCheckerDictionary(word);
+  }
+  return true;
+});
+
+ipcMain.handle('set-spellchecker-languages', async (event, langs) => {
+  const { session } = require('electron');
+  if (session.defaultSession) {
+    try {
+      session.defaultSession.setSpellCheckerLanguages(langs);
+      logToFile(`Spellchecker languages set to: ${langs.join(', ')}`);
+      return true;
+    } catch (err) {
+      logToFile(`Error setting spellchecker languages: ${err.message}`);
+    }
+  }
+  return false;
 });
 
 app.whenReady().then(() => {

@@ -6,9 +6,24 @@ const EMOJI_OPTIONS = ['👍','❤️','🔥','💡','✨','🎉','👀','🤔',
 
 // Icon choices for boards (Material Symbols names) — uses the shared list defined in items.jsx
 const BOARD_ICON_CHOICES = [
-  'dashboard','folder','work','lightbulb','rocket_launch','palette','code','sports_esports',
-  'movie','music_note','book','favorite','star','bolt','build','science','brush','terrain',
-  'map','group','flag','schedule','psychology','category',
+  // General / organización
+  'dashboard','folder','folder_open','category','widgets','grid_view','space_dashboard','inventory_2','label','bookmark','push_pin','tag','workspaces','topic',
+  // Trabajo / productividad
+  'work','business_center','lightbulb','rocket_launch','trending_up','target','task_alt','checklist','event','schedule','calendar_month','timeline','flag','priority_high',
+  // Creatividad / arte
+  'palette','brush','draw','format_paint','color_lens','imagesmode','photo_camera','movie','theaters','music_note','headphones','mic','piano','auto_awesome','animation',
+  // Desarrollo / juegos
+  'code','terminal','bug_report','memory','smart_toy','sports_esports','stadia_controller','casino','extension','joystick','swords',
+  // Conocimiento / escritura
+  'book','menu_book','auto_stories','school','science','biotech','functions','calculate','history_edu','translate','psychology','quiz','description','edit_note',
+  // Mundo / mapas
+  'map','public','travel_explore','place','explore','terrain','forest','park','landscape','castle','cottage','home','apartment','store',
+  // Personas / social
+  'group','person','groups','diversity_3','handshake','forum','chat','campaign','volunteer_activism',
+  // Naturaleza / elementos
+  'eco','local_florist','pets','bug_report','water_drop','local_fire_department','bolt','wb_sunny','dark_mode','cloud','ac_unit','spa',
+  // Objetos / símbolos
+  'star','favorite','diamond','emoji_objects','emoji_events','military_tech','workspace_premium','shield','key','lock','visibility','build','construction','settings','tune','science','rocket','flight','directions_car','sailing','anchor','restaurant','local_cafe','sports_bar','cake','redeem',
 ];
 
 // Color picker — separate background and header strip for columns
@@ -56,10 +71,11 @@ function resolveStripColor(key) {
 
 function ContextSidebar({
   item, lang, onUpdate, onDelete, onDuplicate, onOpen,
-  onClose,
+  onClose, isColChild,
 }) {
   const [pane, setPane] = React.useState(null); // 'color' | 'emoji' | 'comments' | 'rename' | null
   const [focusedRowVersion, setFocusedRowVersion] = React.useState(0);
+  const [iconQuery, setIconQuery] = React.useState('');
 
   React.useEffect(() => {
     window._notifyFocusedRowChanged = () => setFocusedRowVersion(v => v + 1);
@@ -286,6 +302,24 @@ function ContextSidebar({
           >
             <span className="material-symbols-rounded">{item.icon || (isColumn ? 'view_column' : 'dashboard')}</span>
             <span>{window.t('Icono', 'Icon')}</span>
+          </button>
+        )}
+
+        {isBoard && (
+          <button
+            className={`ctx-btn ${item.showPreview !== false ? 'active' : ''}`}
+            onClick={()=>{
+              const show = item.showPreview === false; // toggling ON
+              if (show) {
+                onUpdate(isColChild ? { showPreview: true } : { showPreview: true, w: 300, h: 240 });
+              } else {
+                onUpdate(isColChild ? { showPreview: false } : { showPreview: false, w: 220, h: 62 });
+              }
+            }}
+            title={window.t('Vista previa', 'Preview')}
+          >
+            <span className="material-symbols-rounded">{item.showPreview === false ? 'crop_square' : 'grid_view'}</span>
+            <span>{window.t('Vista previa', 'Preview')}</span>
           </button>
         )}
 
@@ -571,25 +605,39 @@ function ContextSidebar({
         </div>
       )}
 
-      {pane === 'boardIcon' && (
-        <div className="ctx-popout">
-          <div className="ctx-pop-section">
-            <div className="ctx-pop-title">{window.t('Icono del tablero', 'Board icon')}</div>
-            <div className="ctx-icon-grid">
-              {BOARD_ICON_CHOICES.map(ic => (
-                <button
-                  key={ic}
-                  className={`ctx-icon-btn ${(item.icon || 'dashboard') === ic ? 'active' : ''}`}
-                  onClick={()=>onUpdate({ icon: ic })}
-                  title={ic}
-                >
-                  <span className="material-symbols-rounded">{ic}</span>
-                </button>
-              ))}
+      {pane === 'boardIcon' && (() => {
+        const q = iconQuery.trim().toLowerCase();
+        const list = q ? BOARD_ICON_CHOICES.filter(ic => ic.includes(q)) : BOARD_ICON_CHOICES;
+        const seen = new Set();
+        const icons = list.filter(ic => { if (seen.has(ic)) return false; seen.add(ic); return true; });
+        return (
+          <div className="ctx-popout">
+            <div className="ctx-pop-section">
+              <div className="ctx-pop-title">{window.t('Icono', 'Icon')}</div>
+              <input
+                className="ctx-icon-search"
+                placeholder={window.t('Buscar icono…', 'Search icon…')}
+                value={iconQuery}
+                onChange={(e)=>setIconQuery(e.target.value)}
+                autoFocus
+              />
+              <div className="ctx-icon-grid ctx-icon-grid-scroll">
+                {icons.map(ic => (
+                  <button
+                    key={ic}
+                    className={`ctx-icon-btn ${(item.icon || 'dashboard') === ic ? 'active' : ''}`}
+                    onClick={()=>onUpdate({ icon: ic })}
+                    title={ic}
+                  >
+                    <span className="material-symbols-rounded">{ic}</span>
+                  </button>
+                ))}
+                {icons.length === 0 && <div className="ctx-icon-empty">{window.t('Sin resultados','No results')}</div>}
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {pane === 'emoji' && (
         <div className="ctx-popout">

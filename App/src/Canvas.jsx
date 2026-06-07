@@ -48,7 +48,7 @@ function withResizedColumn(items, colId) {
 // ───── default templates per tool ─────
 function defaultDims(type) {
   switch (type) {
-    case 'note':     return { w: 300, h: 150 };
+    case 'note':     return { w: 300, h: 120 };
     case 'todo':     return { w: 300, h: 230 };
     case 'doc':      return { w: 300, h: 210 };
     case 'image':    return { w: 300, h: 220 };
@@ -117,7 +117,7 @@ function makeNewItem(type, x, y, w, h, lang) {
   const defaultSize = (defW, defH) => ({ w: Math.max(120, w || defW), h: Math.max(80, h || defH) });
   switch (type) {
     case 'note':
-      return { ...base, type: 'note', ...defaultSize(300, 150), color: 'white', content: { es: '', en: '' } };
+      return { ...base, type: 'note', ...defaultSize(300, 120), color: 'white', content: { es: '', en: '' } };
     case 'todo':
       return { ...base, type: 'todo', ...defaultSize(300, 230),
         title: { es: 'Pendientes', en: 'To-do' },
@@ -185,22 +185,201 @@ function closestAnchor(item, x, y) {
   return opts[0].a;
 }
 
-function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn, setCanvases: setExtCanvases, updateAvailable, onUpdateClick }) {
+function cleanupOrtho(ortho) {
+  console.log('[DEBUG-ORTHO-CANVAS] Entrada cleanupOrtho:', JSON.stringify(ortho));
+  if (!ortho || ortho.length <= 1) return ortho;
+
+  let currentPts = ortho.map(p => ({ x: p.x, y: p.y }));
+  let changed = true;
+  let iterations = 0;
+  const THRESHOLD = 10;
+
+  while (changed && iterations < 5) {
+    changed = false;
+    iterations++;
+
+    // 1. Alinear puntos casi alineados en el mismo eje
+    for (let i = 0; i < currentPts.length - 1; i++) {
+      const p1 = currentPts[i];
+      const p2 = currentPts[i + 1];
+      if (Math.abs(p1.x - p2.x) > 0 && Math.abs(p1.x - p2.x) < THRESHOLD) {
+        p2.x = p1.x;
+        changed = true;
+      }
+      if (Math.abs(p1.y - p2.y) > 0 && Math.abs(p1.y - p2.y) < THRESHOLD) {
+        p2.y = p1.y;
+        changed = true;
+      }
+    }
+
+    // 2. Fusionar puntos coincidentes o muy cercanos (eliminar stubs)
+    let merged = [currentPts[0]];
+    for (let i = 1; i < currentPts.length; i++) {
+      const prev = merged[merged.length - 1];
+      const cur = currentPts[i];
+      const dist = Math.hypot(cur.x - prev.x, cur.y - prev.y);
+      if (dist < THRESHOLD) {
+        changed = true;
+      } else {
+        merged.push(cur);
+      }
+    }
+    currentPts = merged;
+
+    if (currentPts.length <= 2) break;
+
+    // 3. Eliminar puntos colineales
+    let nonCollinear = [currentPts[0]];
+    for (let i = 1; i < currentPts.length - 1; i++) {
+      const prev = nonCollinear[nonCollinear.length - 1];
+      const cur = currentPts[i];
+      const next = currentPts[i + 1];
+
+      const isCollinearX = Math.abs(prev.x - cur.x) < THRESHOLD && Math.abs(cur.x - next.x) < THRESHOLD;
+      const isCollinearY = Math.abs(prev.y - cur.y) < THRESHOLD && Math.abs(cur.y - next.y) < THRESHOLD;
+
+      if (isCollinearX) {
+        cur.x = prev.x;
+        next.x = prev.x;
+        changed = true;
+      } else if (isCollinearY) {
+        cur.y = prev.y;
+        next.y = prev.y;
+        changed = true;
+      } else {
+        nonCollinear.push(cur);
+      }
+    }
+    nonCollinear.push(currentPts[currentPts.length - 1]);
+    currentPts = nonCollinear;
+
+    if (currentPts.length <= 2) break;
+
+    // 4. Eliminar zigzags/bucles en "U" redundantes (backtracking)
+    let cleanLoops = [currentPts[0]];
+    for (let i = 1; i < currentPts.length; i++) {
+      const last = cleanLoops[cleanLoops.length - 1];
+      const cur = currentPts[i];
+      if (i < currentPts.length - 1) {
+        const next = currentPts[i + 1];
+        if (Math.abs(last.x - next.x) < THRESHOLD && Math.abs(last.y - cur.y) < THRESHOLD) {
+          cleanLoops.pop();
+          cleanLoops.push({ x: last.x, y: next.y });
+          i++;
+          changed = true;
+          continue;
+        }
+      }
+      cleanLoops.push(cur);
+    }
+    currentPts = cleanLoops;
+
+    if (currentPts.length <= 2) break;
+
+    // 5. Eliminar picos estrechos (zigzags de ida y vuelta muy pegados)
+    let cleanPikes = [currentPts[0]];
+    const PIKE_THRESHOLD = 15;
+    for (let i = 1; i < currentPts.length - 1; i++) {
+      const prev = cleanPikes[cleanPikes.length - 1];
+      const cur = currentPts[i];
+      const next = currentPts[i + 1];
+
+      const isVerticalPike = Math.abs(prev.x - next.x) < PIKE_THRESHOLD;
+      const isHorizontalPike = Math.abs(prev.y - next.y) < PIKE_THRESHOLD;
+
+      if (isVerticalPike) {
+        next.x = prev.x;
+        changed = true;
+      } else if (isHorizontalPike) {
+        next.y = prev.y;
+        changed = true;
+      } else {
+        cleanPikes.push(cur);
+      }
+    }
+    cleanPikes.push(currentPts[currentPts.length - 1]);
+    currentPts = cleanPikes;
+  }
+
+  console.log('[DEBUG-ORTHO-CANVAS] Salida cleanupOrtho:', JSON.stringify(currentPts));
+  if (currentPts.length === 0) return ortho;
+  return currentPts;
+}
+
+function duplicateCanvasState(state, origId, newId) {
+  if (!state[origId]) return;
+  const origCanvas = state[origId];
+  const canvasIdMap = {};
+  const innerCanvasDuplications = [];
+  const duplicatedItems = origCanvas.items.map(it => {
+    const itemNewId = `it-${Date.now()}-${Math.floor(Math.random()*99999)}-${Math.floor(Math.random()*99999)}`;
+    canvasIdMap[it.id] = itemNewId;
+    const copy = { ...it, id: itemNewId };
+    if (copy.type === 'board' && copy.canvasId) {
+      const innerNewCid = `b-${Date.now()}-${Math.floor(Math.random()*99999)}`;
+      copy.canvasId = innerNewCid;
+      innerCanvasDuplications.push({ orig: it.canvasId, next: innerNewCid });
+    }
+    return copy;
+  });
+
+  const duplicatedConnectors = (origCanvas.connectors || []).map(co => {
+    const connNewId = `co-${Date.now()}-${Math.floor(Math.random()*99999)}`;
+    const copy = { ...co, id: connNewId };
+    if (copy.fromEnd && canvasIdMap[copy.fromEnd.itemId]) {
+      copy.fromEnd = { ...copy.fromEnd, itemId: canvasIdMap[copy.fromEnd.itemId] };
+    }
+    if (copy.toEnd && canvasIdMap[copy.toEnd.itemId]) {
+      copy.toEnd = { ...copy.toEnd, itemId: canvasIdMap[copy.toEnd.itemId] };
+    }
+    return copy;
+  });
+
+  state[newId] = {
+    ...origCanvas,
+    items: duplicatedItems,
+    connectors: duplicatedConnectors
+  };
+
+  innerCanvasDuplications.forEach(({ orig, next }) => {
+    duplicateCanvasState(state, orig, next);
+  });
+}
+
+function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn, setCanvases: setExtCanvases, updateAvailable, onUpdateClick, volume, onChangeVolume }) {
   const [canvases, _setCanvases] = useStateCanvas(() => canvasesIn || JSON.parse(JSON.stringify(window.INITIAL_CANVASES)));
   // Stable ref to App's setter — avoids the infinite loop caused by it being a dep on every render
   const setExtCanvasesRef = useRefCanvas(setExtCanvases);
   setExtCanvasesRef.current = setExtCanvases;
+
+  // Track canvases we sent to App to avoid circular updates and old echoes overwriting local state
+  const sentCanvasesRef = useRefCanvas(new Set());
+
   // Sync canvas state up to the App (for persistence). Skipped during an active drag/resize
   // (body.odi-busy) so we don't trigger a full App+Canvas re-render on every mouse-move frame.
   // The final committed change (odi-busy removed on mouseup) syncs normally, so nothing is lost.
   useEffectCanvas(() => {
     if (document.body.classList.contains('odi-busy')) return;
-    if (setExtCanvasesRef.current) setExtCanvasesRef.current(canvases);
+    if (setExtCanvasesRef.current) {
+      // Keep track of the reference we are sending to the parent
+      sentCanvasesRef.current.add(canvases);
+      // Bounded set size to prevent memory leaks
+      if (sentCanvasesRef.current.size > 50) {
+        const first = sentCanvasesRef.current.values().next().value;
+        sentCanvasesRef.current.delete(first);
+      }
+      setExtCanvasesRef.current(canvases);
+    }
   }, [canvases]);
 
   // Sync external changes (e.g. from media saving or vault loading) into local canvas state
+  // Skip while dragging/resizing (odi-busy) to prevent the debounced App save from resetting
+  // node positions mid-drag and causing the "convulsion" jitter bug.
   useEffectCanvas(() => {
+    if (document.body.classList.contains('odi-busy')) return;
     if (canvasesIn) {
+      // Avoid circular update loops and old echoes overwriting newer local state
+      if (sentCanvasesRef.current.has(canvasesIn)) return;
       _setCanvases(canvasesIn);
     }
   }, [canvasesIn]);
@@ -257,6 +436,18 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
       setPan({ x: 40, y: 20 });
       setScale(1);
     }
+  // eslint-disable-next-line
+  }, [currentId]);
+
+  // Clear selection and editing states on canvas level change to prevent crashes/inconsistencies
+  useEffectCanvas(() => {
+    setSelected(null);
+    setSelectedIds([]);
+    setSelectedConn(null);
+    setEditing(null);
+    setEditingChildState(null);
+    setContextMenu(null);
+    setShowBgSelector(false);
   }, [currentId]);
 
   // Save the camera when navigating away from currentId or when unmounting Canvas
@@ -316,6 +507,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
   const [pendingConn, setPendingConn] = useStateCanvas(null); // {fromId, fromAnchor, mx, my} or {fromX,fromY,...}
   // drop target column for current item drag
   const [dropTargetCol, setDropTargetCol] = useStateCanvas(null);
+  const [dropTargetTodo, setDropTargetTodo] = useStateCanvas(null);
 
   // drag-to-create preview
   const [dragCreate, setDragCreate] = useStateCanvas(null); // { x,y,w,h, sx,sy }
@@ -325,6 +517,10 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
   // undo stack
   const [history, setHistory] = useStateCanvas([]);
   const [historyIdx, setHistoryIdx] = useStateCanvas(-1);
+
+  // alignment guides and dragged task ghost
+  const [guides, setGuides] = useStateCanvas(null);
+  const [draggedTask, setDraggedTask] = useStateCanvas(null);
   const skipHistory = useRefCanvas(false);
 
   const surfaceRef = useRefCanvas(null);
@@ -503,11 +699,35 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
       if ((e.metaKey || e.ctrlKey) && e.key === 'a') {
         e.preventDefault(); selectAllItems();
       }
-      // Ctrl+C: copy the selected item to an in-app clipboard (no clipboard API needed)
-      if ((e.metaKey || e.ctrlKey) && e.key === 'c' && selected && !e.shiftKey) {
-        const it = current.items.find(i => i.id === selected);
-        if (it) {
-          window._odiCopiedItem = JSON.parse(JSON.stringify(it));
+      // Ctrl+C: copy the selected items and their connectors
+      if ((e.metaKey || e.ctrlKey) && e.key === 'c' && !e.shiftKey) {
+        const af = document.activeElement;
+        if (af &&
+            ((af.tagName || '').toLowerCase() === 'input' ||
+             (af.tagName || '').toLowerCase() === 'textarea' ||
+             (af.isContentEditable && af !== pasteIntRef.current))) {
+          return; // Let native copy handle it
+        }
+
+        const selectedItems = current.items.filter(it => selectedIds.includes(it.id) || (selectedIds.length === 0 && it.id === selected));
+        if (selectedItems.length > 0) {
+          e.preventDefault();
+          const selectedItemIds = selectedItems.map(it => it.id);
+          const selectedConnectors = (current.connectors || []).filter(co =>
+            selectedIds.includes(co.id) ||
+            (selectedItemIds.includes(co.fromEnd?.itemId) && selectedItemIds.includes(co.toEnd?.itemId))
+          );
+          
+          const copiedData = {
+            odinote: true,
+            items: JSON.parse(JSON.stringify(selectedItems)),
+            connectors: JSON.parse(JSON.stringify(selectedConnectors)),
+          };
+          window._odiCopiedData = copiedData;
+          window._odiCopiedItem = copiedData.items[0]; // Compatibility with single-item logic
+          navigator.clipboard.writeText(JSON.stringify(copiedData)).catch(err => {
+            console.warn('Could not write to system clipboard', err);
+          });
         }
       }
       if ((e.metaKey || e.ctrlKey) && e.key === 'z' && !e.shiftKey) { e.preventDefault(); undo(); }
@@ -698,25 +918,86 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
       const items = cdata?.items;
       const types = cdata ? Array.from(cdata.types || []) : [];
 
-      // Paste a previously-copied node at the mouse position
-      const pasteCopiedNode = () => {
-        e.preventDefault();
-        const src = window._odiCopiedItem;
-        const newId = `it-${Date.now()}-${Math.floor(Math.random()*9999)}`;
-        const m = lastMouseRef.current || { x: 0, y: 0 };
+      // Paste structured items and connectors
+      const pasteData = (data) => {
+        if (!data || !data.items || !data.items.length) return;
+        
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+        data.items.forEach(it => {
+          const w = it.w || 200;
+          const h = it.h || 120;
+          if (it.x < minX) minX = it.x;
+          if (it.y < minY) minY = it.y;
+          if (it.x + w > maxX) maxX = it.x + w;
+          if (it.y + h > maxY) maxY = it.y + h;
+        });
+
+        const centerX = (minX + maxX) / 2;
+        const centerY = (minY + maxY) / 2;
+        const m = lastMouseRef.current || { x: window.innerWidth / 2, y: window.innerHeight / 2 };
         const pt = screenToCanvas(m.x, m.y);
-        const w = src.w || 200, h = src.h || 120;
-        const newItem = { ...JSON.parse(JSON.stringify(src)), id: newId, x: Math.round(pt.x - w / 2), y: Math.round(pt.y - h / 2), _new: true };
-        if (newItem.type === 'board') newItem.canvasId = `b-${Date.now()}-${Math.floor(Math.random()*9999)}`;
+        const dx = pt.x - centerX;
+        const dy = pt.y - centerY;
+
+        const idMap = {};
+        const canvasDuplications = [];
+        const pastedItems = data.items.map(it => {
+          const newId = `it-${Date.now()}-${Math.floor(Math.random()*99999)}-${Math.floor(Math.random()*99999)}`;
+          idMap[it.id] = newId;
+          const copy = {
+            ...it,
+            id: newId,
+            x: Math.round(it.x + dx),
+            y: Math.round(it.y + dy),
+            _new: true,
+          };
+          if (copy.type === 'board' && copy.canvasId) {
+            const origCanvasId = copy.canvasId;
+            const newCid = `b-${Date.now()}-${Math.floor(Math.random()*99999)}`;
+            copy.canvasId = newCid;
+            canvasDuplications.push({ orig: origCanvasId, next: newCid });
+          }
+          return copy;
+        });
+
+        const pastedConnectors = (data.connectors || []).map(co => {
+          const newConnId = `co-${Date.now()}-${Math.floor(Math.random()*99999)}`;
+          const copy = {
+            ...co,
+            id: newConnId,
+          };
+          if (copy.fromEnd && idMap[copy.fromEnd.itemId]) {
+            copy.fromEnd = { ...copy.fromEnd, itemId: idMap[copy.fromEnd.itemId] };
+          }
+          if (copy.toEnd && idMap[copy.toEnd.itemId]) {
+            copy.toEnd = { ...copy.toEnd, itemId: idMap[copy.toEnd.itemId] };
+          }
+          return copy;
+        });
+
         setCanvases(prev => {
           const c = prev[currentId];
-          const out = { ...prev, [currentId]: { ...c, items: [...c.items, newItem] } };
-          if (newItem.type === 'board') {
-            out[newItem.canvasId] = { title: newItem.content, parent: currentId, parentLabel: c.title, items: [], connectors: [] };
-          }
-          return out;
+          const next = {
+            ...prev,
+            [currentId]: {
+              ...c,
+              items: [...c.items, ...pastedItems],
+              connectors: [...(c.connectors || []), ...pastedConnectors],
+            }
+          };
+          canvasDuplications.forEach(({ orig, next: nextCid }) => {
+            duplicateCanvasState(next, orig, nextCid);
+          });
+          return next;
         });
-        setSelected(newId);
+
+        if (pastedItems.length === 1) {
+          setSelected(pastedItems[0].id);
+          setSelectedIds([]);
+        } else if (pastedItems.length > 1) {
+          setSelected(null);
+          setSelectedIds(pastedItems.map(it => it.id));
+        }
       };
 
       // Resolve to a usable image source (data URL from blob, or http URL string)
@@ -747,7 +1028,30 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
         img.src = src;
       };
 
-      // 1) Real image blob (screenshots, "copy image") — highest priority
+      // 1) Intentar leer JSON estructurado de Odinote síncronamente desde el portapapeles
+      let parsedOdiData = null;
+      try {
+        const text = cdata?.getData('text/plain');
+        if (text) {
+          const parsed = JSON.parse(text);
+          if (parsed && parsed.odinote && parsed.items) {
+            parsedOdiData = parsed;
+          }
+        }
+      } catch (err) {}
+
+      // Fallback local por si acaso
+      if (!parsedOdiData && window._odiCopiedData) {
+        parsedOdiData = window._odiCopiedData;
+      }
+
+      if (parsedOdiData) {
+        e.preventDefault();
+        pasteData(parsedOdiData);
+        return;
+      }
+
+      // 2) Real image blob (screenshots, "copy image") — highest priority
       if (items) {
         for (const it of Array.from(items)) {
           if (it.type.startsWith('image/')) {
@@ -761,8 +1065,6 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
           }
         }
       }
-      // 2) A copied node takes priority over plain text/URLs in the clipboard
-      if (window._odiCopiedItem) { pasteCopiedNode(); return; }
       // 3) HTML with <img src="..."> (copying an image from a web page)
       if (types.includes('text/html')) {
         const html = cdata.getData('text/html');
@@ -790,6 +1092,9 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
 
   // ───── Item updates ─────
   const updateItem = useCallbackCanvas((itemId, patch) => {
+    if (patch.h !== undefined) {
+      console.log('[DEBUG-HEIGHT] Canvas updateItem updating height for itemId =', itemId, 'patch.h =', patch.h);
+    }
     setCanvases(prev => {
       const c = prev[currentId];
       const it = c.items.find(x => x.id === itemId);
@@ -836,7 +1141,19 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
     document.body.classList.remove('odi-busy');
     setCanvases(prev => {
       const c = prev[currentId];
-      return { ...prev, [currentId]: { ...c, items: c.items.map(it => ids.includes(it.id) ? { ...it, _dragging: false } : it) } };
+      return { ...prev, [currentId]: {
+        ...c,
+        items: c.items.map(it => ids.includes(it.id) ? { ...it, _dragging: false } : it),
+        connectors: (c.connectors || []).map(co => {
+          if (co.shape === 'orthogonal' && co.fromEnd && ids.includes(co.fromEnd.itemId) && co.toEnd && ids.includes(co.toEnd.itemId)) {
+            return {
+              ...co,
+              ortho: cleanupOrtho(co.ortho || [])
+            };
+          }
+          return co;
+        })
+      }};
     });
   };
 
@@ -850,6 +1167,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
   }, [currentId]);
 
   const addConnector = (fromEnd, toEnd) => {
+    window.playAudioTone && window.playAudioTone('connect');
     setCanvases(prev => {
       const c = prev[currentId];
       const conns = c.connectors || [];
@@ -857,12 +1175,14 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
         id: `cn-${Date.now()}-${Math.floor(Math.random()*9999)}`,
         fromEnd, toEnd,
         bend: { x: 0, y: 0 },
+        isColorExplicit: false,
       };
       return { ...prev, [currentId]: { ...c, connectors: [...conns, newConn] } };
     });
   };
 
   const deleteConnector = (connId) => {
+    window.playAudioTone && window.playAudioTone('delete');
     setCanvases(prev => {
       const c = prev[currentId];
       return { ...prev, [currentId]: { ...c, connectors: (c.connectors || []).filter(co => co.id !== connId) } };
@@ -891,6 +1211,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
     }
 
     setContextMenu(null);
+    setShowBgSelector(false);
 
     // panning
     if (e.button === 1 || e.altKey || e.shiftKey) {
@@ -940,6 +1261,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
         const y = small ? sy - def.h / 2 : Math.min(sy, p.y);
         const item = makeNewItem(activeTool, x, y, w, h, lang);
         if (item) {
+          window.playAudioTone && window.playAudioTone('create');
           setCanvases(prev => {
             const c = prev[currentId];
             const next = { ...prev, [currentId]: { ...c, items: [...c.items, item] } };
@@ -1043,6 +1365,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
     const def = defaultDims('note');
     const item = makeNewItem('note', p.x - def.w / 2, p.y - def.h / 2, 0, 0, lang);
     if (!item) return;
+    window.playAudioTone && window.playAudioTone('create');
     setCanvases(prev => {
       const c = prev[currentId];
       return { ...prev, [currentId]: { ...c, items: [...c.items, item] } };
@@ -1058,6 +1381,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
     const def = defaultDims(type);
     const item = makeNewItem(type, cx - def.w / 2, cy - def.h / 2, 0, 0, lang);
     if (!item) return;
+    window.playAudioTone && window.playAudioTone('create');
     setCanvases(prev => {
       const c = prev[currentId];
       const next = { ...prev, [currentId]: { ...c, items: [...c.items, item] } };
@@ -1093,7 +1417,24 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
   // ───── Item drag (with column drop detection) ─────
   const startDragItem = (e, itemId) => {
     if (e.target.closest('input, textarea, button, .todo-check, .swatch-btn, .anchor, .todo-add, .cal-mb-input, .cal-mb-cell, .cal-mb-nav')) return;
+    // A column may only be grabbed by its top strip — clicking the gray body just selects it
+    // (so its children stay interactive and the body isn't a drag handle).
+    {
+      const draggedItem = current.items.find(i => i.id === itemId);
+      if (draggedItem && draggedItem.type === 'column' && e.target.closest('.column-body')) {
+        if (!e.target.closest('.col-child-wrap')) {
+          e.stopPropagation();
+          setSelected(itemId); setSelectedIds([]); setSelectedConn(null); setContextMenu(null);
+          setEditingChildState(null);
+        }
+        return;
+      }
+    }
     if (editing === itemId) return;
+    if (editing && editing !== itemId) {
+      setEditing(null);
+      setEditingChildState(null);
+    }
     if (activeTool === 'line') return; // handled by startLineDrag
     if (activeTool) return;
     e.stopPropagation();
@@ -1101,6 +1442,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
     const isMultiDrag = selectedIds.length > 1 && selectedIds.includes(itemId);
     if (!isMultiDrag) setSelectedIds([]);
     setSelected(isMultiDrag ? null : itemId);
+    setEditingChildState(null);
     setSelectedConn(null);
     setContextMenu(null);
     document.body.classList.add('odi-busy');
@@ -1112,40 +1454,271 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
     const multiStart = isMultiDrag
       ? current.items.filter(it => selectedIds.includes(it.id)).map(it => ({ id: it.id, x: it.x, y: it.y }))
       : null;
+    const startConnectors = (current.connectors || []).map(co => ({
+      id: co.id,
+      ortho: (co.ortho || []).map(p => ({ x: p.x, y: p.y }))
+    }));
     let moved = false;
+    let wasSnappedX = false;
+    let wasSnappedY = false;
     let currentDropCol = null;
+    let currentDropTodo = null;
 
     const onMove = (ev) => {
       const dx = (ev.clientX - startX) / scale;
       const dy = (ev.clientY - startY) / scale;
       if (!moved && (Math.abs(dx) > 2 || Math.abs(dy) > 2)) {
         moved = true;
+        window.playAudioTone && window.playAudioTone('drag_start');
       }
       if (!moved) return;
 
+      let targetX = startItemX + dx;
+      let targetY = startItemY + dy;
+
+      if (ev.shiftKey) {
+        // Lock to horizontal or vertical axis based on major movement delta
+        if (Math.abs(dx) > Math.abs(dy)) {
+          targetY = startItemY;
+        } else {
+          targetX = startItemX;
+        }
+        // Snap to 20px grid
+        targetX = Math.round(targetX / 20) * 20;
+        targetY = Math.round(targetY / 20) * 20;
+      }
+
+      let activeGuidesX = [];
+      let activeGuidesY = [];
+
+      // Smart alignment guides relative to other items (ALWAYS active)
+      const snapThreshold = 12;
+      const w = item.w || 200;
+      const h = item.h || 120;
+      let bestDiffX = snapThreshold;
+      let bestDiffY = snapThreshold;
+
+      const currentItems = current.items || [];
+      const MAX_ALIGN_DIST = 600; // Constante de proximidad física perpendicular
+
+      for (const other of currentItems) {
+        if (other.id === itemId || other.type === 'line') continue;
+        const ow = other.w || 200;
+        const oh = other.h || 120;
+
+        // Solo alinear en X (guías verticales) si la distancia vertical entre centros es menor al umbral
+        const centerY = targetY + h / 2;
+        const otherCenterY = other.y + oh / 2;
+        const isNearY = Math.abs(centerY - otherCenterY) < MAX_ALIGN_DIST;
+
+        if (isNearY) {
+          // X alignments: left, center, right, left-to-right, right-to-left
+          const xOpts = [
+            { dragVal: targetX,       otherVal: other.x,        guideVal: other.x,        offset: 0 },
+            { dragVal: targetX + w/2, otherVal: other.x + ow/2, guideVal: other.x + ow/2, offset: -w/2 },
+            { dragVal: targetX + w,   otherVal: other.x + ow,   guideVal: other.x + ow,   offset: -w },
+            { dragVal: targetX,       otherVal: other.x + ow,   guideVal: other.x + ow,   offset: 0 },
+            { dragVal: targetX + w,   otherVal: other.x,        guideVal: other.x,        offset: -w }
+          ];
+          for (const opt of xOpts) {
+            const diff = Math.abs(opt.dragVal - opt.otherVal);
+            if (diff < bestDiffX) {
+              bestDiffX = diff;
+              targetX = opt.otherVal + opt.offset;
+              activeGuidesX = [{
+                x: opt.guideVal,
+                y1: Math.min(targetY, other.y),
+                y2: Math.max(targetY + h, other.y + oh)
+              }];
+            }
+          }
+        }
+
+        // Solo alinear en Y (guías horizontales) si la distancia horizontal entre centros es menor al umbral
+        const centerX = targetX + w / 2;
+        const otherCenterX = other.x + ow / 2;
+        const isNearX = Math.abs(centerX - otherCenterX) < MAX_ALIGN_DIST;
+
+        if (isNearX) {
+          // Y alignments: top, middle, bottom, top-to-bottom, bottom-to-top
+          const yOpts = [
+            { dragVal: targetY,       otherVal: other.y,        guideVal: other.y,        offset: 0 },
+            { dragVal: targetY + h/2, otherVal: other.y + oh/2, guideVal: other.y + oh/2, offset: -h/2 },
+            { dragVal: targetY + h,   otherVal: other.y + oh,   guideVal: other.y + oh,   offset: -h },
+            { dragVal: targetY,       otherVal: other.y + oh,   guideVal: other.y + oh,   offset: 0 },
+            { dragVal: targetY + h,   otherVal: other.y,        guideVal: other.y,        offset: -h }
+          ];
+          for (const opt of yOpts) {
+            const diff = Math.abs(opt.dragVal - opt.otherVal);
+            if (diff < bestDiffY) {
+              bestDiffY = diff;
+              targetY = opt.otherVal + opt.offset;
+              activeGuidesY = [{
+                y: opt.guideVal,
+                x1: Math.min(targetX, other.x),
+                x2: Math.max(targetX + w, other.x + ow)
+              }];
+            }
+          }
+        }
+      }
+
+      // ── Equal-spacing guides (Canva/Miro-style): snap so the gaps to the nearest
+      //    same-row / same-column neighbours are equal, and draw bracket markers. ──
+      const spacing = [];
+      const SPACE_T = 8;
+      const rowMates = currentItems.filter(o => o.id !== itemId && o.type !== 'line'
+        && (targetY + h) > o.y + 4 && targetY < (o.y + (o.h || 120)) - 4);    // vertical overlap
+      const colMates = currentItems.filter(o => o.id !== itemId && o.type !== 'line'
+        && (targetX + w) > o.x + 4 && targetX < (o.x + (o.w || 200)) - 4);    // horizontal overlap
+
+      // Horizontal equal spacing
+      let hSnapped = false;
+      {
+        const Ls = rowMates.filter(o => (o.x + (o.w||200)) <= targetX + SPACE_T).sort((a,b)=>(b.x+(b.w||200))-(a.x+(a.w||200)));
+        const Rs = rowMates.filter(o => o.x >= targetX + w - SPACE_T).sort((a,b)=>a.x-b.x);
+        
+        // Scenario 1: Center (L <- Target -> R)
+        if (!hSnapped && Ls.length > 0 && Rs.length > 0) {
+          const L = Ls[0], R = Rs[0];
+          const lr = L.x + (L.w||200), rl = R.x;
+          const gapL = targetX - lr, gapR = rl - (targetX + w);
+          if (gapL > 0 && gapR > 0 && Math.abs(gapL - gapR) < SPACE_T * 2) {
+            const free = rl - lr - w;
+            targetX = lr + free / 2;
+            const gy = targetY + h / 2;
+            spacing.push({ x: lr, y: gy, w: targetX - lr, horizontal: true });
+            spacing.push({ x: targetX + w, y: gy, w: rl - (targetX + w), horizontal: true });
+            hSnapped = true;
+          }
+        }
+        // Scenario 2: Right of two (A -> B -> Target)
+        if (!hSnapped && Ls.length > 1) {
+          const B = Ls[0], A = Ls[1];
+          const gapAB = B.x - (A.x + (A.w||200));
+          const gapBTarget = targetX - (B.x + (B.w||200));
+          if (gapAB > 0 && gapBTarget > 0 && Math.abs(gapAB - gapBTarget) < SPACE_T * 2) {
+            targetX = B.x + (B.w||200) + gapAB;
+            const gy = targetY + h / 2;
+            spacing.push({ x: A.x + (A.w||200), y: gy, w: gapAB, horizontal: true });
+            spacing.push({ x: B.x + (B.w||200), y: gy, w: targetX - (B.x + (B.w||200)), horizontal: true });
+            hSnapped = true;
+          }
+        }
+        // Scenario 3: Left of two (Target -> A -> B)
+        if (!hSnapped && Rs.length > 1) {
+          const A = Rs[0], B = Rs[1];
+          const gapAB = B.x - (A.x + (A.w||200));
+          const gapTargetA = A.x - (targetX + w);
+          if (gapAB > 0 && gapTargetA > 0 && Math.abs(gapAB - gapTargetA) < SPACE_T * 2) {
+            targetX = A.x - gapAB - w;
+            const gy = targetY + h / 2;
+            spacing.push({ x: targetX + w, y: gy, w: A.x - (targetX + w), horizontal: true });
+            spacing.push({ x: A.x + (A.w||200), y: gy, w: gapAB, horizontal: true });
+            hSnapped = true;
+          }
+        }
+      }
+
+      // Vertical equal spacing
+      let vSnapped = false;
+      {
+        const Ts = colMates.filter(o => (o.y + (o.h||120)) <= targetY + SPACE_T).sort((a,b)=>(b.y+(b.h||120))-(a.y+(a.h||120)));
+        const Bns = colMates.filter(o => o.y >= targetY + h - SPACE_T).sort((a,b)=>a.y-b.y);
+        
+        // Scenario 1: Center (T <- Target -> B)
+        if (!vSnapped && Ts.length > 0 && Bns.length > 0) {
+          const T = Ts[0], Bn = Bns[0];
+          const tb = T.y + (T.h||120), bt = Bn.y;
+          const gapT = targetY - tb, gapB = bt - (targetY + h);
+          if (gapT > 0 && gapB > 0 && Math.abs(gapT - gapB) < SPACE_T * 2) {
+            const free = bt - tb - h;
+            targetY = tb + free / 2;
+            const gx = targetX + w / 2;
+            spacing.push({ x: gx, y: tb, h: targetY - tb, horizontal: false });
+            spacing.push({ x: gx, y: targetY + h, h: bt - (targetY + h), horizontal: false });
+            vSnapped = true;
+          }
+        }
+        // Scenario 2: Below two (A -> B -> Target)
+        if (!vSnapped && Ts.length > 1) {
+          const B = Ts[0], A = Ts[1];
+          const gapAB = B.y - (A.y + (A.h||120));
+          const gapBTarget = targetY - (B.y + (B.h||120));
+          if (gapAB > 0 && gapBTarget > 0 && Math.abs(gapAB - gapBTarget) < SPACE_T * 2) {
+            targetY = B.y + (B.h||120) + gapAB;
+            const gx = targetX + w / 2;
+            spacing.push({ x: gx, y: A.y + (A.h||120), h: gapAB, horizontal: false });
+            spacing.push({ x: gx, y: B.y + (B.h||120), h: targetY - (B.y + (B.h||120)), horizontal: false });
+            vSnapped = true;
+          }
+        }
+        // Scenario 3: Above two (Target -> A -> B)
+        if (!vSnapped && Bns.length > 1) {
+          const A = Bns[0], B = Bns[1];
+          const gapAB = B.y - (A.y + (A.h||120));
+          const gapTargetA = A.y - (targetY + h);
+          if (gapAB > 0 && gapTargetA > 0 && Math.abs(gapAB - gapTargetA) < SPACE_T * 2) {
+            targetY = A.y - gapAB - h;
+            const gx = targetX + w / 2;
+            spacing.push({ x: gx, y: targetY + h, h: A.y - (targetY + h), horizontal: false });
+            spacing.push({ x: gx, y: A.y + (A.h||120), h: gapAB, horizontal: false });
+            vSnapped = true;
+          }
+        }
+      }
+
+      setGuides({ x: activeGuidesX, y: activeGuidesY, spacing });
+
       if (isMultiDrag && multiStart) {
         // Move all selected items by the same delta
+        let finalDx = dx;
+        let finalDy = dy;
+        if (ev.shiftKey) {
+          if (Math.abs(dx) > Math.abs(dy)) {
+            finalDy = 0;
+          } else {
+            finalDx = 0;
+          }
+        }
         _setCanvases(prev => {
           const c = prev[currentId];
           return { ...prev, [currentId]: {
             ...c,
             items: c.items.map(it => {
               const ms = multiStart.find(m => m.id === it.id);
-              if (ms) return { ...it, x: ms.x + dx, y: ms.y + dy, _dragging: true };
+              if (ms) {
+                let nx = ms.x + finalDx;
+                let ny = ms.y + finalDy;
+                if (ev.shiftKey) {
+                  nx = Math.round(nx / 20) * 20;
+                  ny = Math.round(ny / 20) * 20;
+                }
+                return { ...it, x: nx, y: ny, _dragging: true };
+              }
               return it;
             }),
+            connectors: (c.connectors || []).map(co => {
+              const sc = startConnectors.find(x => x.id === co.id);
+              if (sc && sc.ortho.length && co.shape === 'orthogonal' && co.fromEnd && selectedIds.includes(co.fromEnd.itemId) && co.toEnd && selectedIds.includes(co.toEnd.itemId)) {
+                return {
+                  ...co,
+                  ortho: sc.ortho.map(p => ({ x: p.x + finalDx, y: p.y + finalDy }))
+                };
+              }
+              return co;
+            })
           }};
         });
         return;
       }
-      const newX = startItemX + dx;
-      const newY = startItemY + dy;
-      updateItemSilent(itemId, { x: newX, y: newY, _dragging: true });
+
+      updateItemSilent(itemId, { x: targetX, y: targetY, _dragging: true });
 
       // detect column drop target (item being dragged is NOT itself a column)
       if (item.type !== 'column') {
-        const cx = newX + item.w / 2;
-        const cy = newY + item.h / 2;
+        const cx = targetX + item.w / 2;
+        const cy = targetY + item.h / 2;
         const overCol = current.items.find(it =>
           it.id !== itemId && it.type === 'column' &&
           cx >= it.x && cx <= it.x + it.w &&
@@ -1157,12 +1730,44 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
           setDropTargetCol(newDropId);
         }
       }
+
+      // Detect To-do card drop target (only if item being dragged is a To-do card itself)
+      if (item.type === 'todo') {
+        const cx = targetX + item.w / 2;
+        const cy = targetY + item.h / 2;
+        const overTodo = current.items.find(it =>
+          it.id !== itemId && it.type === 'todo' &&
+          cx >= it.x && cx <= it.x + it.w &&
+          cy >= it.y && cy <= it.y + it.h
+        );
+        const newDropTodoId = overTodo?.id || null;
+        if (newDropTodoId !== currentDropTodo) {
+          currentDropTodo = newDropTodoId;
+          setDropTargetTodo(newDropTodoId);
+        }
+      }
+
+      // Snap sound feedback
+      const currentlySnappedX = (bestDiffX < snapThreshold);
+      const currentlySnappedY = (bestDiffY < snapThreshold);
+      if ((currentlySnappedX && !wasSnappedX) || (currentlySnappedY && !wasSnappedY)) {
+        window.playAudioTone && window.playAudioTone('snap');
+      }
+      wasSnappedX = currentlySnappedX;
+      wasSnappedY = currentlySnappedY;
     };
     const onUp = () => {
       document.body.classList.remove('odi-busy');
       window.removeEventListener('mousemove', onMove);
       window.removeEventListener('mouseup', onUp);
       setDropTargetCol(null);
+      setDropTargetTodo(null);
+      setGuides(null);
+
+      if (moved) {
+        window.playAudioTone && window.playAudioTone('drag_end');
+      }
+
       if (isMultiDrag) {
         // Commit a non-silent update so history snapshots the new positions, and clear _dragging
         setCanvases(prev => {
@@ -1170,6 +1775,15 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
           return { ...prev, [currentId]: {
             ...c,
             items: c.items.map(it => selectedIds.includes(it.id) ? { ...it, _dragging: false } : it),
+            connectors: (c.connectors || []).map(co => {
+              if (co.shape === 'orthogonal' && co.fromEnd && selectedIds.includes(co.fromEnd.itemId) && co.toEnd && selectedIds.includes(co.toEnd.itemId)) {
+                return {
+                  ...co,
+                  ortho: cleanupOrtho(co.ortho || [])
+                };
+              }
+              return co;
+            })
           }};
         });
         return;
@@ -1200,6 +1814,27 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
           };
         });
         setSelected(null);
+      } else if (currentDropTodo && item.type === 'todo') {
+        // ABSORB todo tasks into another todo card
+        setCanvases(prev => {
+          const c = prev[currentId];
+          const draggedTodo = c.items.find(i => i.id === itemId);
+          const destTodo = c.items.find(i => i.id === currentDropTodo);
+          if (!draggedTodo || !destTodo) return prev;
+
+          const mergedTasks = [...(destTodo.items || []), ...(draggedTodo.items || [])];
+
+          return {
+            ...prev,
+            [currentId]: {
+              ...c,
+              items: c.items
+                .filter(i => i.id !== itemId)
+                .map(i => i.id === currentDropTodo ? { ...i, items: mergedTasks } : i)
+            }
+          };
+        });
+        setSelected(null);
       } else {
         if (moved) updateItem(itemId, { _dragging: false });
         else updateItemSilent(itemId, { _dragging: false });
@@ -1211,14 +1846,19 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
 
   // ───── Drag a child OUT of a column (extract on movement) ─────
   const startColChildDrag = (e, columnId, childId) => {
-    if (e.target.closest('input, textarea, button, .todo-check, .swatch-btn, .anchor, .todo-add, .cal-mb-input, .cal-mb-cell, .cal-mb-nav')) return;
+    if (e.target.closest('input, textarea, button, .todo-check, .swatch-btn, .anchor, .todo-add, .cal-mb-input, .cal-mb-cell, .cal-mb-nav, [contenteditable="true"]')) return;
     if (activeTool) return;
     e.stopPropagation();
+    document.body.classList.add('odi-busy');
     const startX = e.clientX, startY = e.clientY;
     let extracted = false;
+    let wasSnappedX = false;
+    let wasSnappedY = false;
     let extractedId = null;
     let extractedW = 200, extractedH = 100;
     let currentDropCol = null;
+    let startItemX = 0, startItemY = 0;
+    let extractStartX = 0, extractStartY = 0;
 
     const onMove = (ev) => {
       if (!extracted) {
@@ -1231,6 +1871,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
         const child = (col.children || []).find(c => c.id === childId);
         if (!child) return;
         extracted = true;
+        window.playAudioTone && window.playAudioTone('drag_start');
         extractedW = child.w || 200;
         extractedH = child.h || 100;
         const screenPt = screenToCanvas(ev.clientX, ev.clientY);
@@ -1241,6 +1882,10 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
           _dragging: true,
         };
         extractedId = newItem.id;
+        extractStartX = ev.clientX;
+        extractStartY = ev.clientY;
+        startItemX = newItem.x;
+        startItemY = newItem.y;
         setCanvases(prev => {
           const c = prev[currentId];
           return {
@@ -1263,8 +1908,96 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
       }
       // continue drag
       const screenPt = screenToCanvas(ev.clientX, ev.clientY);
-      const nx = screenPt.x - extractedW / 2;
-      const ny = screenPt.y - extractedH / 2;
+      let nx = screenPt.x - extractedW / 2;
+      let ny = screenPt.y - extractedH / 2;
+
+      // Snapping/constraining
+      if (ev.shiftKey) {
+        const dx = (ev.clientX - extractStartX) / scale;
+        const dy = (ev.clientY - extractStartY) / scale;
+        if (Math.abs(dx) > Math.abs(dy)) {
+          ny = startItemY;
+        } else {
+          nx = startItemX;
+        }
+        nx = Math.round(nx / 20) * 20;
+        ny = Math.round(ny / 20) * 20;
+      }
+
+      let activeGuidesX = [];
+      let activeGuidesY = [];
+      const snapThreshold = 12;
+      const w = extractedW;
+      const h = extractedH;
+      let bestDiffX = snapThreshold;
+      let bestDiffY = snapThreshold;
+
+      const currentItems = current.items || [];
+      const MAX_ALIGN_DIST = 600;
+
+      for (const other of currentItems) {
+        if (other.id === extractedId || other.type === 'line') continue;
+        const ow = other.w || 200;
+        const oh = other.h || 120;
+
+        // Solo alinear en X (guías verticales) si la distancia vertical entre centros es menor al umbral
+        const centerY = ny + h / 2;
+        const otherCenterY = other.y + oh / 2;
+        const isNearY = Math.abs(centerY - otherCenterY) < MAX_ALIGN_DIST;
+
+        if (isNearY) {
+          // X alignments
+          const xOpts = [
+            { dragVal: nx,       otherVal: other.x,        guideVal: other.x,        offset: 0 },
+            { dragVal: nx + w/2, otherVal: other.x + ow/2, guideVal: other.x + ow/2, offset: -w/2 },
+            { dragVal: nx + w,   otherVal: other.x + ow,   guideVal: other.x + ow,   offset: -w },
+            { dragVal: nx,       otherVal: other.x + ow,   guideVal: other.x + ow,   offset: 0 },
+            { dragVal: nx + w,   otherVal: other.x,        guideVal: other.x,        offset: -w }
+          ];
+          for (const opt of xOpts) {
+            const diff = Math.abs(opt.dragVal - opt.otherVal);
+            if (diff < bestDiffX) {
+              bestDiffX = diff;
+              nx = opt.otherVal + opt.offset;
+              activeGuidesX = [{
+                x: opt.guideVal,
+                y1: Math.min(ny, other.y),
+                y2: Math.max(ny + h, other.y + oh)
+              }];
+            }
+          }
+        }
+
+        // Solo alinear en Y (guías horizontales) si la distancia horizontal entre centros es menor al umbral
+        const centerX = nx + w / 2;
+        const otherCenterX = other.x + ow / 2;
+        const isNearX = Math.abs(centerX - otherCenterX) < MAX_ALIGN_DIST;
+
+        if (isNearX) {
+          // Y alignments
+          const yOpts = [
+            { dragVal: ny,       otherVal: other.y,        guideVal: other.y,        offset: 0 },
+            { dragVal: ny + h/2, otherVal: other.y + oh/2, guideVal: other.y + oh/2, offset: -h/2 },
+            { dragVal: ny + h,   otherVal: other.y + oh,   guideVal: other.y + oh,   offset: -h },
+            { dragVal: ny,       otherVal: other.y + oh,   guideVal: other.y + oh,   offset: 0 },
+            { dragVal: ny + h,   otherVal: other.y,        guideVal: other.y,        offset: -h }
+          ];
+          for (const opt of yOpts) {
+            const diff = Math.abs(opt.dragVal - opt.otherVal);
+            if (diff < bestDiffY) {
+              bestDiffY = diff;
+              ny = opt.otherVal + opt.offset;
+              activeGuidesY = [{
+                y: opt.guideVal,
+                x1: Math.min(nx, other.x),
+                x2: Math.max(nx + w, other.x + ow)
+              }];
+            }
+          }
+        }
+      }
+
+      setGuides({ x: activeGuidesX, y: activeGuidesY });
       updateItemSilent(extractedId, { x: nx, y: ny, _dragging: true });
 
       const cx = nx + extractedW / 2;
@@ -1279,11 +2012,27 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
         currentDropCol = newDropId;
         setDropTargetCol(newDropId);
       }
+
+      // Snap sound feedback
+      const currentlySnappedX = (bestDiffX < snapThreshold);
+      const currentlySnappedY = (bestDiffY < snapThreshold);
+      if ((currentlySnappedX && !wasSnappedX) || (currentlySnappedY && !wasSnappedY)) {
+        window.playAudioTone && window.playAudioTone('snap');
+      }
+      wasSnappedX = currentlySnappedX;
+      wasSnappedY = currentlySnappedY;
     };
     const onUp = () => {
+      document.body.classList.remove('odi-busy');
       window.removeEventListener('mousemove', onMove);
       window.removeEventListener('mouseup', onUp);
       setDropTargetCol(null);
+      setGuides(null);
+
+      if (extracted) {
+        window.playAudioTone && window.playAudioTone('drag_end');
+      }
+
       if (extracted && extractedId) {
         if (currentDropCol) {
           setCanvases(prev => {
@@ -1315,13 +2064,227 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
         setSelected(childId);
         setSelectedIds([]);
         setSelectedConn(null);
+        setEditingChildState({ colId: columnId, childId });
       }
     };
+
     window.addEventListener('mousemove', onMove);
     window.addEventListener('mouseup', onUp);
   };
 
-  // ───── Anchor drag (create connector) ─────
+  // ───── Drag a task row OUT of a todo card (create/absorb task on drop) ─────
+  // Remove a to-do node entirely if it is a titleless (pulled-out) card that has just become
+  // empty — so dragging its only task into another to-do doesn't leave a dangling empty box.
+  const pruneEmptyTitlelessTodos = (items, srcTodoId, newSrcItems) => {
+    if (newSrcItems && newSrcItems.length > 0) return items; // still has tasks → keep
+    const src = items.find(i => i.id === srcTodoId);
+    if (src) {
+      if (src.type === 'todo' && src.showTitle === false) {
+        return items.filter(i => i.id !== srcTodoId);
+      }
+      return items;
+    }
+    // Source might be a column child
+    return items.map(it => {
+      if (it.type === 'column' && it.children) {
+        const ch = it.children.find(c => c.id === srcTodoId);
+        if (ch && ch.type === 'todo' && ch.showTitle === false) {
+          return { ...it, children: it.children.filter(c => c.id !== srcTodoId) };
+        }
+      }
+      return it;
+    });
+  };
+
+  const startDragTaskRow = (e, todoId, rowIdx) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    // Helper to find a todo item in canvas or columns
+    const findTodo = (items, itemId) => {
+      const top = items.find(it => it.id === itemId);
+      if (top) return { item: top, colId: null };
+      for (const it of items) {
+        if (it.type === 'column' && it.children) {
+          const ch = it.children.find(c => c.id === itemId);
+          if (ch) return { item: ch, colId: it.id };
+        }
+      }
+      return { item: null, colId: null };
+    };
+
+    const { item: todoItem } = findTodo(current.items, todoId);
+    if (!todoItem || !todoItem.items) return;
+    const task = todoItem.items[rowIdx];
+    if (!task) return;
+
+    document.body.classList.add('odi-busy', 'dragging-task');
+    setDraggedTask({
+      todoId,
+      rowIdx,
+      x: e.clientX,
+      y: e.clientY,
+      text: window.pickLang(task.text, lang)
+    });
+
+    let currentDropTodoId = null;
+
+    const onMove = (ev) => {
+      setDraggedTask(prev => prev ? { ...prev, x: ev.clientX, y: ev.clientY } : null);
+
+      const el = document.elementFromPoint(ev.clientX, ev.clientY);
+      const todoCardEl = el?.closest('.todo-card');
+      const itemEl = todoCardEl?.closest('[data-item-id]');
+      const newDropId = itemEl?.getAttribute('data-item-id') || null;
+
+      if (newDropId !== currentDropTodoId) {
+        currentDropTodoId = newDropId;
+        setDropTargetTodo(newDropId);
+      }
+    };
+
+    const onUp = (ev) => {
+      document.body.classList.remove('odi-busy', 'dragging-task');
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+      setDraggedTask(null);
+      setDropTargetTodo(null);
+
+      const canvasPt = screenToCanvas(ev.clientX, ev.clientY);
+
+      // Helper to apply todo changes to items array (handling both canvas & columns)
+      const updateTodo = (items, targetId, fields) => {
+        return items.map(it => {
+          if (it.id === targetId) {
+            return { ...it, ...fields };
+          }
+          if (it.type === 'column' && it.children) {
+            return {
+              ...it,
+              children: it.children.map(ch => ch.id === targetId ? { ...ch, ...fields } : ch)
+            };
+          }
+          return it;
+        });
+      };
+
+      if (currentDropTodoId) {
+        // Drop inside a To-do (can be the source todoId or a destTodoId!)
+        setCanvases(prev => {
+          const c = prev[currentId];
+          const { item: srcTodo, colId: srcColId } = findTodo(c.items, todoId);
+          const { item: destTodo, colId: destColId } = findTodo(c.items, currentDropTodoId);
+          if (!srcTodo || !destTodo) return prev;
+
+          const taskToMove = srcTodo.items[rowIdx];
+          if (!taskToMove) return prev;
+
+          let newSrcItems = [...srcTodo.items];
+          let insertIdx = (destTodo.items || []).length; // default to end
+
+          const destEl = document.querySelector(`[data-item-id="${currentDropTodoId}"]`);
+          if (destEl) {
+            const rows = Array.from(destEl.querySelectorAll('.todo-row'));
+            for (let i = 0; i < rows.length; i++) {
+              const rect = rows[i].getBoundingClientRect();
+              const middleY = rect.top + rect.height / 2;
+              if (ev.clientY < middleY) {
+                insertIdx = i;
+                break;
+              }
+            }
+          }
+
+          let updatedItems = c.items;
+
+          if (todoId === currentDropTodoId) {
+            // Reordering within the same todo card!
+            newSrcItems.splice(rowIdx, 1);
+            let adjustedInsertIdx = insertIdx;
+            if (adjustedInsertIdx > rowIdx) {
+              adjustedInsertIdx--;
+            }
+            newSrcItems.splice(adjustedInsertIdx, 0, taskToMove);
+
+            updatedItems = updateTodo(updatedItems, todoId, { items: newSrcItems });
+          } else {
+            // Moving to a different todo card!
+            newSrcItems.splice(rowIdx, 1);
+            const newDestItems = [...(destTodo.items || [])];
+            newDestItems.splice(insertIdx, 0, { ...taskToMove, indent: 0 });
+
+            updatedItems = updateTodo(updatedItems, todoId, { items: newSrcItems });
+            updatedItems = updateTodo(updatedItems, currentDropTodoId, { items: newDestItems });
+            // If the SOURCE was a titleless (pulled-out) to-do and is now empty, remove it
+            updatedItems = pruneEmptyTitlelessTodos(updatedItems, todoId, newSrcItems);
+          }
+
+          // If source or destination was in a column, trigger column resize
+          if (srcColId) {
+            updatedItems = withResizedColumn(updatedItems, srcColId);
+          }
+          if (destColId && destColId !== srcColId) {
+            updatedItems = withResizedColumn(updatedItems, destColId);
+          }
+
+          return {
+            ...prev,
+            [currentId]: {
+              ...c,
+              items: updatedItems
+            }
+          };
+        });
+      } else {
+        // Drop on canvas -> Create a new To-do card!
+        setCanvases(prev => {
+          const c = prev[currentId];
+          const { item: srcTodo, colId: srcColId } = findTodo(c.items, todoId);
+          if (!srcTodo) return prev;
+
+          const taskToMove = srcTodo.items[rowIdx];
+          if (!taskToMove) return prev;
+
+          const newSrcItems = srcTodo.items.filter((_, idx) => idx !== rowIdx);
+
+          const newTodoId = `todo-${Date.now()}`;
+          const newTodoNode = {
+            id: newTodoId,
+            type: 'todo',
+            x: canvasPt.x - 150,
+            y: canvasPt.y - 60,
+            w: 300,
+            h: 120,
+            color: srcTodo.color || 'white',
+            showTitle: false,                 // pulled-out task → no title until the user adds one
+            title: { es: '', en: '' },
+            items: [{ ...taskToMove, indent: 0 }]
+          };
+
+          let updatedItems = updateTodo(c.items, todoId, { items: newSrcItems });
+          updatedItems = updatedItems.concat([newTodoNode]);
+          // If the SOURCE was a titleless (pulled-out) to-do and is now empty, remove it
+          updatedItems = pruneEmptyTitlelessTodos(updatedItems, todoId, newSrcItems);
+
+          if (srcColId) {
+            updatedItems = withResizedColumn(updatedItems, srcColId);
+          }
+
+          return {
+            ...prev,
+            [currentId]: {
+              ...c,
+              items: updatedItems
+            }
+          };
+        });
+      }
+    };
+
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  };
+
   const startAnchorDrag = (e, fromId, fromAnchor) => {
     e.stopPropagation(); e.preventDefault();
     const fromRect = window.getNodeRect?.(fromId, current.items);
@@ -1413,6 +2376,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
 
   // ───── Item ops ─────
   const deleteItem = (itemId) => {
+    window.playAudioTone && window.playAudioTone('delete');
     setCanvases(prev => {
       const c = prev[currentId];
       const item = c.items.find(i => i.id === itemId);
@@ -1451,6 +2415,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
   };
 
   const duplicateItem = (itemId) => {
+    window.playAudioTone && window.playAudioTone('create');
     setCanvases(prev => {
       const c = prev[currentId];
       const it = c.items.find(i => i.id === itemId);
@@ -1488,6 +2453,8 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
     const aspectRatio = sw / sh;
     
     let resizeMaster = null; // Locked to 'x' or 'y' on first move to prevent jumps
+    let wasSnappedX = false;
+    let wasSnappedY = false;
 
     const onMove = (ev) => {
       const dx = (ev.clientX - startX) / scale;
@@ -1500,15 +2467,91 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
 
       let nx = sx, ny = sy, nw = sw, nh = sh;
       
+      let activeGuidesX = [];
+      let activeGuidesY = [];
+      const snapThreshold = 10;
+      const MAX_ALIGN_DIST = 600;
+      const currentItems = current.items || [];
+
       if (ev.shiftKey || item.type === 'file') {
         const master = resizeMaster || 'x'; // default to x
         if (master === 'x') {
           if (corner.includes('r')) nw = Math.max(minW, sw + dx);
           if (corner.includes('l')) nw = Math.max(minW, sw - dx);
+
+          // Snap X
+          let bestDiffX = snapThreshold;
+          let snapXVal = null;
+          let guideY1 = null, guideY2 = null;
+          const myVal = corner.includes('r') ? (nx + nw) : (sx + sw - nw);
+
+          for (const other of currentItems) {
+            if (other.id === itemId || other.type === 'line') continue;
+            const ow = other.w || 200;
+            const oh = other.h || 120;
+            const centerY = ny + nh / 2;
+            const otherCenterY = other.y + oh / 2;
+            if (Math.abs(centerY - otherCenterY) < MAX_ALIGN_DIST) {
+              const otherXOpts = [other.x, other.x + ow/2, other.x + ow];
+              for (const otherVal of otherXOpts) {
+                const diff = Math.abs(myVal - otherVal);
+                if (diff < bestDiffX) {
+                  bestDiffX = diff;
+                  snapXVal = otherVal;
+                  guideY1 = Math.min(sy, other.y);
+                  guideY2 = Math.max(sy + sh, other.y + oh);
+                }
+              }
+            }
+          }
+          if (snapXVal !== null) {
+            if (corner.includes('r')) {
+              nw = snapXVal - nx;
+            } else {
+              nw = sx + sw - snapXVal;
+            }
+            activeGuidesX = [{ x: snapXVal, y1: guideY1, y2: guideY2 }];
+          }
+
           nh = Math.max(minH, Math.round(nw / aspectRatio));
         } else {
           if (corner.includes('b')) nh = Math.max(minH, sh + dy);
           if (corner.includes('t')) nh = Math.max(minH, sh - dy);
+
+          // Snap Y
+          let bestDiffY = snapThreshold;
+          let snapYVal = null;
+          let guideX1 = null, guideX2 = null;
+          const myVal = corner.includes('b') ? (ny + nh) : (sy + sh - nh);
+
+          for (const other of currentItems) {
+            if (other.id === itemId || other.type === 'line') continue;
+            const ow = other.w || 200;
+            const oh = other.h || 120;
+            const centerX = nx + nw / 2;
+            const otherCenterX = other.x + ow / 2;
+            if (Math.abs(centerX - otherCenterX) < MAX_ALIGN_DIST) {
+              const otherYOpts = [other.y, other.y + oh/2, other.y + oh];
+              for (const otherVal of otherYOpts) {
+                const diff = Math.abs(myVal - otherVal);
+                if (diff < bestDiffY) {
+                  bestDiffY = diff;
+                  snapYVal = otherVal;
+                  guideX1 = Math.min(sx, other.x);
+                  guideX2 = Math.max(sx + sw, other.x + ow);
+                }
+              }
+            }
+          }
+          if (snapYVal !== null) {
+            if (corner.includes('b')) {
+              nh = snapYVal - ny;
+            } else {
+              nh = sy + sh - snapYVal;
+            }
+            activeGuidesY = [{ y: snapYVal, x1: guideX1, x2: guideX2 }];
+          }
+
           nw = Math.max(minW, Math.round(nh * aspectRatio));
         }
         
@@ -1521,12 +2564,97 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
         if (corner.includes('b')) nh = Math.max(minH, sh + dy);
         if (corner.includes('l')) { nw = Math.max(minW, sw - dx); nx = sx + (sw - nw); }
         if (corner.includes('t')) { nh = Math.max(minH, sh - dy); ny = sy + (sh - nh); }
+
+        // Snap X
+        let bestDiffX = snapThreshold;
+        let snapXVal = null;
+        let guideY1 = null, guideY2 = null;
+        const myXVal = corner.includes('r') ? (nx + nw) : (corner.includes('l') ? nx : null);
+
+        if (myXVal !== null) {
+          for (const other of currentItems) {
+            if (other.id === itemId || other.type === 'line') continue;
+            const ow = other.w || 200;
+            const oh = other.h || 120;
+            const centerY = ny + nh / 2;
+            const otherCenterY = other.y + oh / 2;
+            if (Math.abs(centerY - otherCenterY) < MAX_ALIGN_DIST) {
+              const otherXOpts = [other.x, other.x + ow/2, other.x + ow];
+              for (const otherVal of otherXOpts) {
+                const diff = Math.abs(myXVal - otherVal);
+                if (diff < bestDiffX) {
+                  bestDiffX = diff;
+                  snapXVal = otherVal;
+                  guideY1 = Math.min(ny, other.y);
+                  guideY2 = Math.max(ny + nh, other.y + oh);
+                }
+              }
+            }
+          }
+          if (snapXVal !== null) {
+            if (corner.includes('r')) {
+              nw = snapXVal - nx;
+            } else if (corner.includes('l')) {
+              nx = snapXVal;
+              nw = (sx + sw) - nx;
+            }
+            activeGuidesX = [{ x: snapXVal, y1: guideY1, y2: guideY2 }];
+          }
+        }
+
+        // Snap Y
+        let bestDiffY = snapThreshold;
+        let snapYVal = null;
+        let guideX1 = null, guideX2 = null;
+        const myYVal = corner.includes('b') ? (ny + nh) : (corner.includes('t') ? ny : null);
+
+        if (myYVal !== null) {
+          for (const other of currentItems) {
+            if (other.id === itemId || other.type === 'line') continue;
+            const ow = other.w || 200;
+            const oh = other.h || 120;
+            const centerX = nx + nw / 2;
+            const otherCenterX = other.x + ow / 2;
+            if (Math.abs(centerX - otherCenterX) < MAX_ALIGN_DIST) {
+              const otherYOpts = [other.y, other.y + oh/2, other.y + oh];
+              for (const otherVal of otherYOpts) {
+                const diff = Math.abs(myYVal - otherVal);
+                if (diff < bestDiffY) {
+                  bestDiffY = diff;
+                  snapYVal = otherVal;
+                  guideX1 = Math.min(nx, other.x);
+                  guideX2 = Math.max(nx + nw, other.x + ow);
+                }
+              }
+            }
+          }
+          if (snapYVal !== null) {
+            if (corner.includes('b')) {
+              nh = snapYVal - ny;
+            } else if (corner.includes('t')) {
+              ny = snapYVal;
+              nh = (sy + sh) - ny;
+            }
+            activeGuidesY = [{ y: snapYVal, x1: guideX1, x2: guideX2 }];
+          }
+        }
       }
       
+      // Snap sound feedback
+      const currentlySnappedX = (activeGuidesX.length > 0);
+      const currentlySnappedY = (activeGuidesY.length > 0);
+      if ((currentlySnappedX && !wasSnappedX) || (currentlySnappedY && !wasSnappedY)) {
+        window.playAudioTone && window.playAudioTone('snap');
+      }
+      wasSnappedX = currentlySnappedX;
+      wasSnappedY = currentlySnappedY;
+
+      setGuides({ x: activeGuidesX, y: activeGuidesY });
       updateItemSilent(itemId, { x: nx, y: ny, w: nw, h: nh });
     };
     const onUp = () => {
       document.body.classList.remove('odi-busy');
+      setGuides(null);
       updateItem(itemId, {});
       window.removeEventListener('mousemove', onMove);
       window.removeEventListener('mouseup', onUp);
@@ -1538,7 +2666,15 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
   // ───── Nested board open ─────
   const openBoard = (canvasId, fromItemId) => {
     if (!canvases[canvasId]) {
-      const fromItem = current.items.find(i => i.id === fromItemId);
+      let fromItem = current.items.find(i => i.id === fromItemId);
+      if (!fromItem) {
+        for (const it of current.items) {
+          if (it.type === 'column' && it.children) {
+            const child = it.children.find(c => c.id === fromItemId);
+            if (child) { fromItem = child; break; }
+          }
+        }
+      }
       setCanvases(prev => ({
         ...prev,
         [canvasId]: {
@@ -1586,7 +2722,6 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
 
   const [editingChild, setEditingChildState] = useStateCanvas(null); // {colId, childId} | null
 
-  // ───── Callbacks for items ─────
   const callbacks = useMemoCanvas(() => ({
     openBoard,
     openDoc: (id, colId) => setDocOpen({ id, colId }),
@@ -1595,14 +2730,33 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
     getNestedItems,
     startEdit: (id) => setEditing(id),
     endEdit: () => setEditing(null),
-    selectItem: (id) => setSelected(id),
+    selectItem: (id) => {
+      setSelected(id);
+      let isColChild = false;
+      const c = canvases[currentId];
+      if (c && c.items) {
+        for (const it of c.items) {
+          if (it.type === 'column' && it.children && it.children.some(ch => ch.id === id)) {
+            isColChild = true;
+            break;
+          }
+        }
+      }
+      if (!isColChild) {
+        setEditingChildState(null);
+      }
+    },
     isSelectedItem: (id) => selected === id,
     resizeItemSilent: (id, patch) => updateItemSilent(id, patch),
     startColChildDrag,
     startAnchorDrag,
+    startDragTaskRow,
     editingChild,
     setEditingChild: (colId, childId) => setEditingChildState({ colId, childId }),
     updateColChild: (columnId, childId, patch) => {
+      if (patch.h !== undefined) {
+        console.log('[DEBUG-HEIGHT] Canvas updateColChild updating height for columnId =', columnId, 'childId =', childId, 'patch.h =', patch.h);
+      }
       setCanvases(prev => {
         const c = prev[currentId];
         const col = c.items.find(x => x.id === columnId);
@@ -1618,10 +2772,13 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
         }
         nextCanvases[currentId] = {
           ...c,
-          items: c.items.map(it => {
-            if (it.id !== columnId) return it;
-            return { ...it, children: (it.children || []).map(ch => ch.id === childId ? { ...ch, ...patch } : ch) };
-          })
+          items: withResizedColumn(
+            c.items.map(it => {
+              if (it.id !== columnId) return it;
+              return { ...it, children: (it.children || []).map(ch => ch.id === childId ? { ...ch, ...patch } : ch) };
+            }),
+            columnId
+          )
         };
         return nextCanvases;
       });
@@ -1679,6 +2836,11 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
   if (activeTool === 'line') wrapClass.push('linking');
 
   const selectedItem = (() => {
+    if (editingChild) {
+      const col = current.items.find(it => it.id === editingChild.colId);
+      const child = col?.children?.find(c => c.id === editingChild.childId);
+      if (child) return child;
+    }
     if (!selected) return null;
     for (const it of current.items) {
       if (it.id === selected) return it;
@@ -1828,22 +2990,106 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
         onToolDragStart={onToolDragStart}
         updateAvailable={updateAvailable}
         onUpdateClick={onUpdateClick}
+        volume={volume}
+        onChangeVolume={onChangeVolume}
       />
 
       {toolGhost && <ToolGhost {...toolGhost} lang={lang}/>}
 
-      {/* Contextual sidebar */}
-      {selectedItem && !captionFocusId && (
-        <window.ContextSidebar
-          item={selectedItem}
-          lang={lang}
-          onUpdate={(patch)=>updateItem(selectedItem.id, patch)}
-          onDelete={()=>deleteItem(selectedItem.id)}
-          onDuplicate={()=>duplicateItem(selectedItem.id)}
-          onOpen={selectedItem.type === 'board' ? ()=>openBoard(selectedItem.canvasId, selectedItem.id) : null}
-          onClose={()=>setSelected(null)}
-        />
-      )}
+      {/* Contextual sidebar — hidden while actively editing THIS node's text (format sidebar shows instead) */}
+      {selectedItem && !captionFocusId && editing !== selectedItem.id && (() => {
+        const isColChild = editingChild && selectedItem.id === editingChild.childId;
+        return (
+          <window.ContextSidebar
+            item={selectedItem}
+            lang={lang}
+            isColChild={isColChild}
+            onUpdate={(patch) => {
+              if (isColChild) {
+                callbacks.updateColChild(editingChild.colId, editingChild.childId, patch);
+              } else {
+                updateItem(selectedItem.id, patch);
+              }
+            }}
+            onDelete={() => {
+              if (isColChild) {
+                setCanvases(prev => {
+                  const c = prev[currentId];
+                  return { ...prev, [currentId]: {
+                    ...c,
+                    items: withResizedColumn(
+                      c.items.map(it => {
+                        if (it.id !== editingChild.colId) return it;
+                        return { ...it, children: (it.children || []).filter(ch => ch.id !== editingChild.childId) };
+                      }),
+                      editingChild.colId
+                    )
+                  }};
+                });
+                setEditingChildState(null);
+              } else {
+                deleteItem(selectedItem.id);
+              }
+            }}
+            onDuplicate={() => {
+              if (isColChild) {
+                setCanvases(prev => {
+                  const c = prev[currentId];
+                  const col = c.items.find(it => it.id === editingChild.colId);
+                  const child = col?.children?.find(ch => ch.id === editingChild.childId);
+                  if (!child) return prev;
+                  const copy = JSON.parse(JSON.stringify(child));
+                  copy.id = `it-${Date.now()}-${Math.floor(Math.random()*9999)}`;
+                  if (copy.type === 'board' && copy.canvasId) {
+                    const origCid = copy.canvasId;
+                    const newCid = `b-${Date.now()}-${Math.floor(Math.random()*9999)}`;
+                    copy.canvasId = newCid;
+                    const next = { ...prev, [currentId]: {
+                      ...c,
+                      items: withResizedColumn(
+                        c.items.map(it => {
+                          if (it.id !== editingChild.colId) return it;
+                          return { ...it, children: [...(it.children || []), copy] };
+                        }),
+                        editingChild.colId
+                      )
+                    }};
+                    duplicateCanvasState(next, origCid, newCid);
+                    return next;
+                  } else {
+                    return { ...prev, [currentId]: {
+                      ...c,
+                      items: withResizedColumn(
+                        c.items.map(it => {
+                          if (it.id !== editingChild.colId) return it;
+                          return { ...it, children: [...(it.children || []), copy] };
+                        }),
+                        editingChild.colId
+                      )
+                    }};
+                  }
+                });
+              } else {
+                duplicateItem(selectedItem.id);
+              }
+            }}
+            onOpen={selectedItem.type === 'board' ? () => {
+              if (isColChild) {
+                openBoard(selectedItem.canvasId, selectedItem.id);
+              } else {
+                openBoard(selectedItem.canvasId, selectedItem.id);
+              }
+            } : null}
+            onClose={() => {
+              if (isColChild) {
+                setEditingChildState(null);
+              } else {
+                setSelected(null);
+              }
+            }}
+          />
+        );
+      })()}
 
       {/* Connector sidebar (same style as item ctx) */}
       {selectedConn && (() => {
@@ -1862,7 +3108,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
               <span className="material-symbols-rounded">show_chart</span>
               <span>{window.t('Curva', 'Curve')}</span>
             </button>
-            <button className={`ctx-btn ${shape==='orthogonal' ? 'active' : ''}`} onClick={()=>updateConnector(conn.id, { shape: 'orthogonal', bend: { x: 0, y: 0 } })}>
+            <button className={`ctx-btn ${shape==='orthogonal' ? 'active' : ''}`} onClick={()=>updateConnector(conn.id, { shape: 'orthogonal', bend: { x: 0, y: 0 }, ortho: undefined })}>
               <span className="material-symbols-rounded">stairs</span>
               <span>{window.t('Recta', 'Right-angle')}</span>
             </button>
@@ -1888,7 +3134,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
               {CONN_COLORS.map(c => (
                 <button
                   key={c}
-                  onClick={()=>updateConnector(conn.id, { color: c })}
+                  onClick={()=>updateConnector(conn.id, { color: c, isColorExplicit: true })}
                   style={{
                     aspectRatio: 1,
                     borderRadius: '50%',
@@ -1947,7 +3193,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
       })()}
 
       {/* Text format sidebar (when editing a text-based item) */}
-      {editing && !captionFocusId && (() => {
+      {editing && editing === selected && !captionFocusId && (() => {
         const it = current.items.find(i => i.id === editing);
         if (!it || !['note','comment'].includes(it.type)) return null;
         return (
@@ -2008,6 +3254,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
                     onDragNodesEnd={commitItemsDrag}
                     panZoom={{ scale }}
                     screenToCanvas={screenToCanvas}
+                    theme={theme}
                   />
                 ))}
                 {/* preview of pending connector */}
@@ -2025,13 +3272,12 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
             </svg>
 
             {[...current.items].sort((a, b) => {
-              // Stack by interaction order: untouched (-1) at the bottom, last-touched at the top.
               const ai = zOrder.indexOf(a.id), bi = zOrder.indexOf(b.id);
               return ai - bi;
             }).map(item => {
               const matches = matchesSearch(item);
               const isEditing = editing === item.id;
-              const isDropTarget = dropTargetCol === item.id;
+              const isDropTarget = dropTargetCol === item.id || dropTargetTodo === item.id;
               const def = defaultDims(item.type);
               const rawScale = Math.min((item.w || def.w) / def.w, (item.h || def.h) / def.h);
               const nodeScale = item.type === 'column'
@@ -2063,6 +3309,13 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
                     }
                   }}
                   onContextMenu={(e)=>{
+                    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.closest('[contenteditable="true"]')) {
+                      return;
+                    }
+                    if (editing && editing !== item.id) {
+                      setEditing(null);
+                      setEditingChildState(null);
+                    }
                     e.preventDefault(); e.stopPropagation();
                     setSelected(item.id);
                     const rect = surfaceRef.current.getBoundingClientRect();
@@ -2072,7 +3325,6 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
                   <window.NodeErrorBoundary key={`eb-${item.id}`}>
                     <window.ItemRenderer item={item} lang={lang} editing={isEditing} callbacks={callbacks}/>
                   </window.NodeErrorBoundary>
-                  {/* Reactions */}
                   {item.reactions && Object.keys(item.reactions).length > 0 && (
                     <div className="item-reactions" style={{position:'absolute', left: 6, bottom: -10, zIndex: 6}}>
                       {Object.entries(item.reactions).map(([emoji, count]) => (
@@ -2093,13 +3345,17 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
                       {item.comments.length}
                     </div>
                   )}
-                  {/* Anchors */}
-                  {!isEditing && !activeTool && (
+                  {/* Single Milanote-style connection handle (connects to the node's center).
+                      Appears on hover; drag it onto another node to create an arrow. */}
+                  {!isEditing && !activeTool && item.type !== 'line' && (
                     <div className="anchors">
-                      <div className="anchor top"    onMouseDown={(e)=>startAnchorDrag(e, item.id, 'top')}/>
-                      <div className="anchor right"  onMouseDown={(e)=>startAnchorDrag(e, item.id, 'right')}/>
-                      <div className="anchor bottom" onMouseDown={(e)=>startAnchorDrag(e, item.id, 'bottom')}/>
-                      <div className="anchor left"   onMouseDown={(e)=>startAnchorDrag(e, item.id, 'left')}/>
+                      <div
+                        className="connect-handle"
+                        title={lang==='es'?'Arrastra para conectar':'Drag to connect'}
+                        onMouseDown={(e)=>startAnchorDrag(e, item.id, 'center')}
+                      >
+                        <span className="material-symbols-rounded">trip_origin</span>
+                      </div>
                     </div>
                   )}
                   {/* Resize handles */}
@@ -2129,8 +3385,11 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
                     selectedIds={selectedIds}
                     onSelect={(id)=>{ setSelectedConn(id); setSelected(null); }}
                     onUpdate={updateConnector}
+                    onDragNodes={dragItemsSilent}
+                    onDragNodesEnd={commitItemsDrag}
                     panZoom={{ scale }}
                     screenToCanvas={screenToCanvas}
+                    theme={theme}
                   />
                 ))}
               </g>
@@ -2145,6 +3404,38 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
             {marquee && (marquee.w > 2 || marquee.h > 2) && (
               <div className="marquee-rect" style={{ left: marquee.x, top: marquee.y, width: marquee.w, height: marquee.h }}/>
             )}
+
+            {/* Smart alignment guides (Canva-style) — inside the transform so they track the nodes */}
+            {guides && (guides.x?.length || guides.y?.length || guides.spacing?.length) ? (
+              <svg className="alignment-guides" width={bounds.w} height={bounds.h} viewBox={`0 0 ${bounds.w} ${bounds.h}`} style={{ overflow:'visible', position: 'absolute', left: 0, top: 0, pointerEvents: 'none', zIndex: 9000 }}>
+                {guides.x && guides.x.map((g, idx) => (
+                  <line key={`gx-${idx}`} x1={g.x} y1={g.y1} x2={g.x} y2={g.y2} stroke="#18a0fb" strokeWidth={1.5 / scale} strokeDasharray={`${4/scale} ${3/scale}`}/>
+                ))}
+                {guides.y && guides.y.map((g, idx) => (
+                  <line key={`gy-${idx}`} x1={g.x1} y1={g.y} x2={g.x2} y2={g.y} stroke="#18a0fb" strokeWidth={1.5 / scale} strokeDasharray={`${4/scale} ${3/scale}`}/>
+                ))}
+                {/* Equal-spacing brackets (pink bars showing equal gaps between nodes) */}
+                {guides.spacing && guides.spacing.map((s, idx) => {
+                  const cap = 5 / scale, sw = 2 / scale, col = 'var(--pink, #E58AB8)';
+                  if (s.horizontal) {
+                    return (
+                      <g key={`sp-${idx}`} stroke={col} strokeWidth={sw}>
+                        <line x1={s.x} y1={s.y} x2={s.x + s.w} y2={s.y}/>
+                        <line x1={s.x} y1={s.y - cap} x2={s.x} y2={s.y + cap}/>
+                        <line x1={s.x + s.w} y1={s.y - cap} x2={s.x + s.w} y2={s.y + cap}/>
+                      </g>
+                    );
+                  }
+                  return (
+                    <g key={`sp-${idx}`} stroke={col} strokeWidth={sw}>
+                      <line x1={s.x} y1={s.y} x2={s.x} y2={s.y + s.h}/>
+                      <line x1={s.x - cap} y1={s.y} x2={s.x + cap} y2={s.y}/>
+                      <line x1={s.x - cap} y1={s.y + s.h} x2={s.x + cap} y2={s.y + s.h}/>
+                    </g>
+                  );
+                })}
+              </svg>
+            ) : null}
 
             {/* Connector toolbar moved to left sidebar (rendered above) */}
           </div>
@@ -2211,9 +3502,6 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
               width: '32px', 
               height: '32px', 
               borderRadius: '2px', 
-              background: 'var(--paper)', 
-              border: '1.5px solid var(--line)', 
-              boxShadow: 'var(--pop-sm)', 
               display: 'flex', 
               alignItems: 'center', 
               justifyContent: 'center',
@@ -2231,6 +3519,9 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
                 position: 'absolute', 
                 bottom: '40px', 
                 right: '0', 
+                top: 'auto',
+                left: 'auto',
+                width: 'auto',
                 padding: '10px', 
                 display: 'flex', 
                 flexDirection: 'column', 
@@ -2410,9 +3701,42 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
         if (!fileItem) return null;
         return <window.FileViewerModal fileItem={fileItem} lang={lang} onClose={()=>setFileOpen(null)}/>;
       })()}
+
+      {/* Alignment Guides */}
+      {/* Dragged Task Ghost */}
+      {draggedTask && (
+        <div
+          className="todo-drag-ghost"
+          style={{
+            position: 'fixed',
+            left: draggedTask.x + 12,
+            top: draggedTask.y + 12,
+            pointerEvents: 'none',
+            zIndex: 99999,
+            background: 'var(--paper)',
+            border: '1.5px solid var(--wine)',
+            borderRadius: '3px',
+            padding: '8px 12px',
+            boxShadow: 'var(--pop-deep)',
+            fontSize: '12px',
+            fontWeight: '600',
+            color: 'var(--ink)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            maxWidth: '240px',
+            wordBreak: 'break-all',
+            opacity: 0.95
+          }}
+        >
+          <span className="material-symbols-rounded" style={{ fontSize: '15px', color: 'var(--wine)' }}>checklist</span>
+          <span>{draggedTask.text || '...'}</span>
+        </div>
+      )}
     </div>
   );
 }
 
 window.Canvas = Canvas;
+
 

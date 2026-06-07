@@ -8,6 +8,7 @@ package-lock.json
 # Electron compiles
 dist/
 dist-builder/
+dist2/
 
 # Environment configurations and logs
 .env
@@ -29,5 +30,4 @@ Thumbs.db
 *.sln
 
 # Exclude local marketing webpage from main Git repo
-# Website/ is no longer used since it's unified at the root
-
+Website/
