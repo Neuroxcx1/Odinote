@@ -36,6 +36,7 @@ function Home({ lang, setLang, theme, setTheme, onOpenProject, projects, onCreat
   const [modal, setModal] = useStateHome(false);
   const [section, setSection] = useStateHome('all');
   const [viewMode, setViewMode] = useStateHome('grid'); // 'grid' | 'list'
+  const [editProject, setEditProject] = useStateHome(null);
 
 
 
@@ -320,7 +321,7 @@ function Home({ lang, setLang, theme, setTheme, onOpenProject, projects, onCreat
                   <RecentCard key={p.id} project={p} lang={lang} t={t}
                     onOpen={()=>onOpenProject(p.id)}
                     onDelete={()=>onDelete(p.id)}
-                    onRename={onRename}
+                    onRenameClick={setEditProject}
                     onToggleStar={()=>onToggleStar(p.id)}
                   />
                 ))}
@@ -353,7 +354,7 @@ function Home({ lang, setLang, theme, setTheme, onOpenProject, projects, onCreat
                 isTrash={section==='trash'}
                 onOpen={()=>onOpenProject(p.id)}
                 onDelete={()=>onDelete(p.id)}
-                onRename={onRename}
+                onRenameClick={setEditProject}
                 onRestore={()=>onRestore(p.id)}
                 onPurge={()=>onPurge(p.id)}
                 onToggleStar={()=>onToggleStar(p.id)}
@@ -373,18 +374,22 @@ function Home({ lang, setLang, theme, setTheme, onOpenProject, projects, onCreat
           onCreate={(p)=>{ onCreate(p); setModal(false); onOpenProject(p.id); }}
         />
       )}
+      {editProject && (
+        <RenameProjectModal
+          project={editProject}
+          lang={lang}
+          onClose={()=>setEditProject(null)}
+          onSave={onRename}
+        />
+      )}
     </div>
   );
 }
 
-function RecentCard({ project, lang, t, onOpen, onDelete, onRename, onToggleStar }) {
+function RecentCard({ project, lang, t, onOpen, onDelete, onRenameClick, onToggleStar }) {
   const handleContextMenu = (e) => {
     e.preventDefault();
-    const currentName = project.name?.[lang] || project.name || '';
-    const newName = prompt(window.t('Cambiar nombre del proyecto:', 'Rename project:'), currentName);
-    if (newName && newName.trim()) {
-      onRename && onRename(project.id, newName.trim());
-    }
+    onRenameClick && onRenameClick(project);
   };
 
   return (
@@ -414,15 +419,11 @@ function RecentCard({ project, lang, t, onOpen, onDelete, onRename, onToggleStar
   );
 }
 
-function ProjectCard({ project, lang, t, onOpen, onDelete, onRename, onRestore, onPurge, onToggleStar, isTrash }) {
+function ProjectCard({ project, lang, t, onOpen, onDelete, onRenameClick, onRestore, onPurge, onToggleStar, isTrash }) {
   const handleContextMenu = (e) => {
     if (isTrash) return;
     e.preventDefault();
-    const currentName = project.name?.[lang] || project.name || '';
-    const newName = prompt(window.t('Cambiar nombre del proyecto:', 'Rename project:'), currentName);
-    if (newName && newName.trim()) {
-      onRename && onRename(project.id, newName.trim());
-    }
+    onRenameClick && onRenameClick(project);
   };
 
   return (
@@ -557,6 +558,74 @@ function NewProjectModal({ lang, onClose, onCreate }) {
             style={{opacity: name.trim() ? 1 : 0.5}}
           >
             {window.t('Crear proyecto', 'Create project')}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function RenameProjectModal({ project, lang, onClose, onSave }) {
+  const [name, setName]   = useStateHome(project.name?.[lang] || project.name || '');
+  const [emoji, setEmoji] = useStateHome(project.emoji || EMOJI_PRESETS[0]);
+  const [cover, setCover] = useStateHome(project.cover || COVER_PRESETS[0]);
+
+  const submit = () => {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    onSave(project.id, trimmed, emoji, cover);
+    onClose();
+  };
+
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="modal" onClick={(e)=>e.stopPropagation()}>
+        <h2>{window.t('Editar proyecto', 'Edit project')}</h2>
+        <p>{window.t('Cambia el nombre, ícono y portada de tu proyecto.', 'Change the name, icon, and cover of your project.')}</p>
+
+        <div className="field">
+          <label>{window.t('Nombre', 'Name')}</label>
+          <input
+            autoFocus
+            value={name}
+            onChange={(e)=>setName(e.target.value)}
+            onKeyDown={(e)=>{ if (e.key==='Enter') submit(); }}
+            placeholder={window.t('Nombre del proyecto…', 'Project name…')}
+          />
+        </div>
+
+        <div className="field">
+          <label>{window.t('Ícono', 'Icon')}</label>
+          <div className="emoji-row">
+            {EMOJI_PRESETS.map(e => (
+              <button key={e} className={`emoji-pick ${emoji===e?'active':''}`} onClick={()=>setEmoji(e)}>{e}</button>
+            ))}
+          </div>
+        </div>
+
+        <div className="field">
+          <label>{window.t('Portada', 'Cover')}</label>
+          <div className="cover-row">
+            {COVER_PRESETS.map(c => (
+              <button
+                key={c}
+                className={`cover-pick ${cover===c?'active':''}`}
+                style={{background: c, border: '1.5px solid var(--line)'}}
+                onClick={()=>setCover(c)}
+              />
+            ))}
+          </div>
+        </div>
+
+        <div className="modal-actions">
+          <button className="btn btn-ghost" onClick={onClose}>{window.t('Cancelar', 'Cancel')}</button>
+          <button
+            className="btn btn-primary"
+            onClick={submit}
+            disabled={!name.trim()}
+            style={{opacity: name.trim() ? 1 : 0.5}}
+          >
+            {window.t('Guardar cambios', 'Save changes')}
           </button>
         </div>
       </div>

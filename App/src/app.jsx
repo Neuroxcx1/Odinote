@@ -571,8 +571,8 @@ function App() {
     }));
   };
 
-  const renameProject = (projectId, newName) => {
-    setProjects(p => p.map(x => x.id === projectId ? { ...x, name: { es: newName, en: newName } } : x));
+  const renameProject = (projectId, newName, newEmoji, newCover) => {
+    setProjects(p => p.map(x => x.id === projectId ? { ...x, name: { es: newName, en: newName }, emoji: newEmoji, cover: newCover } : x));
     setCanvases(prev => {
       if (!prev[projectId]) return prev;
       return {
