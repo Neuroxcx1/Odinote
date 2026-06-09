@@ -3014,7 +3014,6 @@ body.odi-busy iframe { pointer-events: none !important; }
    FRAME CLICK TRANSPARENCY
    ========================================================================== */
 .item-frame .frame-header,
-.item-frame .handles,
 .item-frame .handle,
 .item-frame .connect-handle,
 .item-frame .anchors {

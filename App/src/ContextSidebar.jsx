@@ -71,7 +71,7 @@ function resolveStripColor(key) {
 
 function ContextSidebar({
   item, lang, onUpdate, onDelete, onDuplicate, onOpen,
-  onClose, isColChild,
+  onClose, isColChild, onStartEdit,
 }) {
   const [pane, setPane] = React.useState(null); // 'color' | 'emoji' | 'comments' | 'rename' | null
   const [focusedRowVersion, setFocusedRowVersion] = React.useState(0);
@@ -554,42 +554,7 @@ function ContextSidebar({
         )}
 
         {isFrame && (
-          <>
-            <button
-              className={`ctx-btn ${pane === 'frameTitle' ? 'active' : ''}`}
-              onClick={()=>setPane(pane === 'frameTitle' ? null : 'frameTitle')}
-              title={window.t('Cambiar título', 'Change title')}
-            >
-              <span className="material-symbols-rounded">title</span>
-              <span>{window.t('Título', 'Title')}</span>
-            </button>
-            <button
-              className={`ctx-btn ${pane === 'frameTitleColor' ? 'active' : ''}`}
-              onClick={()=>setPane(pane === 'frameTitleColor' ? null : 'frameTitleColor')}
-              title={window.t('Color del título', 'Title color')}
-            >
-              <div className="ctx-letter" style={{
-                fontWeight: 800,
-                fontSize: 14,
-                color: item.titleColor || '#1A1A1A',
-                background: item.titleColor ? 'none' : 'linear-gradient(90deg, #1A1A1A, #E6544F, #90B968)',
-                WebkitBackgroundClip: item.titleColor ? 'none' : 'text',
-                WebkitTextFillColor: item.titleColor ? 'none' : 'transparent',
-                backgroundClip: item.titleColor ? 'none' : 'text',
-              }}>
-                {item.titleColor && item.titleColor !== 'inherit' ? <span style={{color: item.titleColor}}>A</span> : 'A'}
-              </div>
-              <span>{window.t('Color', 'Color')}</span>
-            </button>
-            <button
-              className={`ctx-btn ${pane === 'frameAlign' ? 'active' : ''}`}
-              onClick={()=>setPane(pane === 'frameAlign' ? null : 'frameAlign')}
-              title={window.t('Alineación del título', 'Title alignment')}
-            >
-              <span className="material-symbols-rounded">format_align_center</span>
-              <span>{window.t('Alineación', 'Align')}</span>
-            </button>
-          </>
+          null
         )}
 
         {isBigTitle && (
@@ -626,8 +591,11 @@ function ContextSidebar({
         {isMap && (
           <>
             <button
-              className={`ctx-btn ${pane === 'mapUrl' ? 'active' : ''}`}
-              onClick={()=>setPane(pane === 'mapUrl' ? null : 'mapUrl')}
+              className="ctx-btn"
+              onClick={() => {
+                onStartEdit && onStartEdit();
+                window.playAudioTone && window.playAudioTone('click');
+              }}
               title={window.t('Editar enlace o dirección', 'Edit link or address')}
             >
               <span className="material-symbols-rounded">pin_drop</span>
@@ -981,91 +949,7 @@ function ContextSidebar({
         </div>
       )}
 
-      {pane === 'frameTitle' && (
-        <div className="ctx-popout">
-          <div className="ctx-pop-section">
-            <div className="ctx-pop-title">{window.t('Cambiar título del marco', 'Change frame title')}</div>
-            <label className="ctx-field" style={{ marginTop: '6px' }}>
-              <span>{window.t('Título', 'Title')}</span>
-              <input
-                type="text"
-                className="ctx-hex-input"
-                style={{ width: '100%', marginTop: '4px' }}
-                value={window.pickLang ? window.pickLang(item.title, lang) : ''}
-                placeholder={window.t('Escribe un título…', 'Write a title…')}
-                onChange={(e)=>onUpdate({ title: { es: e.target.value, en: e.target.value } })}
-                onClick={(e)=>e.stopPropagation()}
-                onMouseDown={(e)=>e.stopPropagation()}
-                autoFocus
-              />
-            </label>
-          </div>
-        </div>
-      )}
 
-      {pane === 'frameTitleColor' && (
-        <div className="ctx-popout">
-          <div className="ctx-pop-section">
-            <div className="ctx-pop-title">{window.t('Color del título', 'Title color')}</div>
-            <div className="text-color-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px', marginTop: '6px' }}>
-              {[
-                '#1A1A1A', '#595459', '#9A969A', '#FFFFFF',
-                '#E6544F', '#D88040', '#DDAF2C', '#90B968',
-                '#3CA59E', '#3D5A80', '#6C5FAF', '#955BA5',
-                '#993844', '#1F4D3F'
-              ].map(c => (
-                <button
-                  key={c}
-                  className="text-color-swatch"
-                  style={{
-                    background: c,
-                    width: '24px',
-                    height: '24px',
-                    borderRadius: '4px',
-                    border: c === '#FFFFFF' ? '1.5px solid var(--line-soft)' : '1.5px solid var(--line)',
-                    cursor: 'pointer'
-                  }}
-                  onClick={()=>{
-                    onUpdate({ titleColor: c });
-                  }}
-                  title={c}
-                />
-              ))}
-            </div>
-            <button
-              className="btn"
-              style={{ marginTop: 8, width: '100%', justifyContent: 'center', fontSize: 11.5 }}
-              onClick={()=>{
-                onUpdate({ titleColor: 'inherit' });
-              }}
-            >
-              <span className="material-symbols-rounded" style={{ fontSize: 14 }}>format_clear</span>
-              {window.t('Color por defecto', 'Default color')}
-            </button>
-          </div>
-        </div>
-      )}
-
-      {pane === 'frameAlign' && (
-        <div className="ctx-popout">
-          <div className="ctx-pop-section">
-            <div className="ctx-pop-title">{window.t('Alineación del título', 'Title alignment')}</div>
-            <div style={{ display: 'flex', gap: '6px', marginTop: '4px' }}>
-              {['left', 'center', 'right'].map(a => (
-                <button
-                  key={a}
-                  className={`ctx-btn ${(item.titleAlign || 'left') === a ? 'active' : ''}`}
-                  onClick={()=>onUpdate({ titleAlign: a })}
-                  style={{ minWidth: 36 }}
-                  title={a}
-                >
-                  <span className="material-symbols-rounded">{`format_align_${a}`}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
 
       {pane === 'bigtitleColor' && (
         <div className="ctx-popout">
@@ -1131,26 +1015,7 @@ function ContextSidebar({
         </div>
       )}
 
-      {pane === 'mapUrl' && (
-        <div className="ctx-popout">
-          <div className="ctx-pop-section">
-            <div className="ctx-pop-title">{window.t('Enlace o Dirección del Mapa', 'Map Link or Address')}</div>
-            <label className="ctx-field" style={{ marginTop: '6px' }}>
-              <span>{window.t('Dirección / Enlace', 'Address / Link')}</span>
-              <input
-                type="text"
-                className="ctx-hex-input"
-                style={{ width: '100%', marginTop: '4px' }}
-                value={item.url || ''}
-                placeholder={window.t('Ej: New York o link de Google Maps...', 'E.g. New York or Google Maps link...')}
-                onChange={(e)=>onUpdate({ url: e.target.value })}
-                onClick={(e)=>e.stopPropagation()}
-                onMouseDown={(e)=>e.stopPropagation()}
-              />
-            </label>
-          </div>
-        </div>
-      )}
+
 
 
     </>

@@ -3554,10 +3554,33 @@ function BigTitleItem({ item, lang, editing, onUpdate }) {
 // ──────────────── GOOGLE MAPS PREVIEW ────────────────
 const getMapsEmbedUrl = (url) => {
   if (!url) return '';
-  if (url.includes('output=embed') || url.includes('/embed')) {
-    return url;
+  let query = url.trim();
+
+  // Si ya es un enlace de embed nativo de Google, usarlo tal cual
+  if (query.includes('output=embed') || query.includes('/embed')) {
+    return query;
   }
-  return `https://maps.google.com/maps?q=${encodeURIComponent(url)}&t=&z=14&ie=UTF8&iwloc=&output=embed`;
+
+  // Si es un enlace normal de Google Maps del navegador
+  if (query.includes('google.com/maps') || query.includes('google.es/maps') || query.includes('google.co/maps') || query.includes('google.com.co/maps')) {
+    // 1. Intentar buscar /place/NOMBRE_LUGAR
+    const placeMatch = query.match(/\/place\/([^\/]+)/);
+    if (placeMatch && placeMatch[1]) {
+      try {
+        query = decodeURIComponent(placeMatch[1].replace(/\+/g, ' '));
+      } catch {
+        query = placeMatch[1].replace(/\+/g, ' ');
+      }
+    } else {
+      // 2. Intentar buscar coordenadas de tipo /@LAT,LON
+      const coordMatch = query.match(/\/@(-?\d+\.\d+),(-?\d+\.\d+)/);
+      if (coordMatch && coordMatch[1] && coordMatch[2]) {
+        query = `${coordMatch[1]},${coordMatch[2]}`;
+      }
+    }
+  }
+
+  return `https://maps.google.com/maps?q=${encodeURIComponent(query)}&t=&z=14&ie=UTF8&iwloc=&output=embed`;
 };
 
 function MapItem({ item, lang, onUpdate, editing, onEndEdit }) {

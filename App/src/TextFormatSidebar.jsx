@@ -8,6 +8,8 @@ function TextFormatSidebar({ item, lang, onUpdate, onClose, variant, noCodeQuote
   if (!item) return null;
   const isCaption = variant === 'caption'; // captions get only Color/H1/B/I/S/U (no lists, quote, code)
   const isBigTitle = item.type === 'bigtitle';
+  const isFrame = item.type === 'frame';
+  const isCustomPropType = isBigTitle || isFrame;
   const [active, setActive] = React.useState({});
   const [colorOpen, setColorOpen] = React.useState(false);
 
@@ -26,6 +28,13 @@ function TextFormatSidebar({ item, lang, onUpdate, onClose, variant, noCodeQuote
           alignCenter: (item.align || 'center') === 'center',
           alignRight: (item.align || 'center') === 'right',
           alignJustify: (item.align || 'center') === 'justify',
+        });
+      } else if (item.type === 'frame') {
+        setActive({
+          alignLeft: (item.titleAlign || 'left') === 'left',
+          alignCenter: (item.titleAlign || 'left') === 'center',
+          alignRight: (item.titleAlign || 'left') === 'right',
+          alignJustify: (item.titleAlign || 'left') === 'justify',
         });
       } else {
         setActive({
@@ -47,7 +56,7 @@ function TextFormatSidebar({ item, lang, onUpdate, onClose, variant, noCodeQuote
   React.useEffect(() => {
     const iv = setInterval(refresh, 250);
     return () => clearInterval(iv);
-  }, [item.id, item.align]);
+  }, [item.id, item.align, item.titleAlign]);
 
   // Helper: find the active contenteditable; if not focused, focus the note's editor
   const findEditor = () => {
@@ -93,18 +102,18 @@ function TextFormatSidebar({ item, lang, onUpdate, onClose, variant, noCodeQuote
         <div className="ctx-letter" style={{
           fontWeight: 800,
           fontSize: 14,
-          color: isBigTitle ? (item.textColor || '#1A1A1A') : '#E6544F',
-          background: isBigTitle && item.textColor && item.textColor !== 'inherit' ? 'none' : 'linear-gradient(90deg, #1A1A1A, #E6544F, #90B968)',
-          WebkitBackgroundClip: isBigTitle && item.textColor && item.textColor !== 'inherit' ? 'none' : 'text',
-          WebkitTextFillColor: isBigTitle && item.textColor && item.textColor !== 'inherit' ? 'none' : 'transparent',
-          backgroundClip: isBigTitle && item.textColor && item.textColor !== 'inherit' ? 'none' : 'text',
+          color: isBigTitle ? (item.textColor || '#1A1A1A') : (isFrame ? (item.titleColor || '#1A1A1A') : '#E6544F'),
+          background: isCustomPropType && (isBigTitle ? item.textColor : item.titleColor) && (isBigTitle ? item.textColor : item.titleColor) !== 'inherit' ? 'none' : 'linear-gradient(90deg, #1A1A1A, #E6544F, #90B968)',
+          WebkitBackgroundClip: isCustomPropType && (isBigTitle ? item.textColor : item.titleColor) && (isBigTitle ? item.textColor : item.titleColor) !== 'inherit' ? 'none' : 'text',
+          WebkitTextFillColor: isCustomPropType && (isBigTitle ? item.textColor : item.titleColor) && (isBigTitle ? item.textColor : item.titleColor) !== 'inherit' ? 'none' : 'transparent',
+          backgroundClip: isCustomPropType && (isBigTitle ? item.textColor : item.titleColor) && (isBigTitle ? item.textColor : item.titleColor) !== 'inherit' ? 'none' : 'text',
         }}>
-          {isBigTitle && item.textColor && item.textColor !== 'inherit' ? <span style={{color: item.textColor}}>A</span> : 'A'}
+          {isCustomPropType && (isBigTitle ? item.textColor : item.titleColor) && (isBigTitle ? item.textColor : item.titleColor) !== 'inherit' ? <span style={{color: isBigTitle ? item.textColor : item.titleColor}}>A</span> : 'A'}
         </div>
         <span>{lang==='es'?'Color':'Color'}</span>
       </button>
 
-      {!isCaption && !isBigTitle && (
+      {!isCaption && !isCustomPropType && (
         <>
           <button className="ctx-btn" onClick={()=>exec('formatBlock', '<h1>')}>
             <div className="ctx-letter" style={{fontWeight: 800, fontSize: 14}}>H1</div>
@@ -121,7 +130,7 @@ function TextFormatSidebar({ item, lang, onUpdate, onClose, variant, noCodeQuote
         </>
       )}
 
-      {!isBigTitle && (
+      {!isCustomPropType && (
         <>
           <button className={`ctx-btn ${active.bold ? 'active' : ''}`} onClick={()=>exec('bold')}>
             <div className="ctx-letter" style={{fontWeight: 800}}>B</div>
@@ -145,7 +154,7 @@ function TextFormatSidebar({ item, lang, onUpdate, onClose, variant, noCodeQuote
         </>
       )}
 
-      {(isBigTitle || !isCaption) && (
+      {(isCustomPropType || !isCaption) && (
         <>
           <div className="ctx-sep-h"/>
 
@@ -154,6 +163,8 @@ function TextFormatSidebar({ item, lang, onUpdate, onClose, variant, noCodeQuote
             onClick={()=>{
               if (isBigTitle) {
                 onUpdate({ align: 'left' });
+              } else if (isFrame) {
+                onUpdate({ titleAlign: 'left' });
               } else {
                 exec('justifyLeft');
               }
@@ -169,6 +180,8 @@ function TextFormatSidebar({ item, lang, onUpdate, onClose, variant, noCodeQuote
             onClick={()=>{
               if (isBigTitle) {
                 onUpdate({ align: 'center' });
+              } else if (isFrame) {
+                onUpdate({ titleAlign: 'center' });
               } else {
                 exec('justifyCenter');
               }
@@ -184,6 +197,8 @@ function TextFormatSidebar({ item, lang, onUpdate, onClose, variant, noCodeQuote
             onClick={()=>{
               if (isBigTitle) {
                 onUpdate({ align: 'right' });
+              } else if (isFrame) {
+                onUpdate({ titleAlign: 'right' });
               } else {
                 exec('justifyRight');
               }
@@ -199,6 +214,8 @@ function TextFormatSidebar({ item, lang, onUpdate, onClose, variant, noCodeQuote
             onClick={()=>{
               if (isBigTitle) {
                 onUpdate({ align: 'justify' });
+              } else if (isFrame) {
+                onUpdate({ titleAlign: 'justify' });
               } else {
                 exec('justifyFull');
               }
@@ -211,7 +228,7 @@ function TextFormatSidebar({ item, lang, onUpdate, onClose, variant, noCodeQuote
         </>
       )}
 
-      {!isCaption && !isBigTitle && (
+      {!isCaption && !isCustomPropType && (
         <>
           <div className="ctx-sep-h"/>
 
@@ -297,6 +314,8 @@ function TextFormatSidebar({ item, lang, onUpdate, onClose, variant, noCodeQuote
                 onClick={()=>{
                   if (isBigTitle) {
                     onUpdate({ textColor: c });
+                  } else if (isFrame) {
+                    onUpdate({ titleColor: c });
                   } else {
                     exec('foreColor', c);
                   }
@@ -312,6 +331,8 @@ function TextFormatSidebar({ item, lang, onUpdate, onClose, variant, noCodeQuote
             onClick={()=>{
               if (isBigTitle) {
                 onUpdate({ textColor: 'inherit' });
+              } else if (isFrame) {
+                onUpdate({ titleColor: 'inherit' });
               } else {
                 exec('removeFormat');
               }

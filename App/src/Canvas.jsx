@@ -3097,6 +3097,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
             item={selectedItem}
             lang={lang}
             isColChild={isColChild}
+            onStartEdit={() => setEditing(selectedItem.id)}
             onUpdate={(patch) => {
               if (isColChild) {
                 callbacks.updateColChild(editingChild.colId, editingChild.childId, patch);
@@ -3288,7 +3289,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
       {/* Text format sidebar (when editing a text-based item) */}
       {editing && editing === selected && !captionFocusId && (() => {
         const it = current.items.find(i => i.id === editing);
-        if (!it || !['note','comment','bigtitle'].includes(it.type)) return null;
+        if (!it || !['note','comment','bigtitle','frame'].includes(it.type)) return null;
         return (
           <window.TextFormatSidebar
             item={it}
