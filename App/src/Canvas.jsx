@@ -1028,6 +1028,25 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
         img.src = src;
       };
 
+      const fetchAndApplyImage = (url) => {
+        if (url.startsWith('data:')) {
+          applyImageSrc(url);
+          return;
+        }
+        e.preventDefault();
+        fetch(url)
+          .then(res => res.blob())
+          .then(blob => {
+            const fr = new FileReader();
+            fr.onload = () => applyImageSrc(fr.result);
+            fr.readAsDataURL(blob);
+          })
+          .catch(err => {
+            console.warn('Failed to fetch image, falling back to URL string:', err);
+            applyImageSrc(url);
+          });
+      };
+
       // 1) Intentar leer JSON estructurado de Odinote síncronamente desde el portapapeles
       let parsedOdiData = null;
       try {
@@ -1069,12 +1088,12 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
       if (types.includes('text/html')) {
         const html = cdata.getData('text/html');
         const match = html && html.match(/<img[^>]+src=["']([^"']+)["']/i);
-        if (match && match[1]) { applyImageSrc(match[1]); return; }
+        if (match && match[1]) { fetchAndApplyImage(match[1]); return; }
       }
       // 4) A plain URL pointing to an image
       const urlText = (cdata.getData('text/uri-list') || cdata.getData('text/plain') || '').split('\n')[0].trim();
       if (urlText && /^https?:\/\//i.test(urlText) && /\.(png|jpe?g|gif|webp|svg|bmp)(\?|$)/i.test(urlText)) {
-        applyImageSrc(urlText);
+        fetchAndApplyImage(urlText);
       }
     };
     document.addEventListener('paste', onDocPaste);

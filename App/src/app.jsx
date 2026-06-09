@@ -736,12 +736,20 @@ function App() {
   };
 
   const handleCut = () => {
-    document.execCommand('cut');
+    try {
+      document.execCommand('cut');
+    } catch (err) {
+      console.warn('Cut failed:', err);
+    }
     setContextMenu(null);
   };
 
   const handleCopy = () => {
-    document.execCommand('copy');
+    try {
+      document.execCommand('copy');
+    } catch (err) {
+      console.warn('Copy failed:', err);
+    }
     setContextMenu(null);
   };
 
@@ -749,8 +757,12 @@ function App() {
     try {
       const text = await navigator.clipboard.readText();
       document.execCommand('insertText', false, text);
-    } catch {
-      document.execCommand('paste');
+    } catch (err) {
+      try {
+        document.execCommand('paste');
+      } catch (e) {
+        console.warn('Paste failed:', e);
+      }
     }
     setContextMenu(null);
   };
