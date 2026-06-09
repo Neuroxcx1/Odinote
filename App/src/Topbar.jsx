@@ -147,43 +147,14 @@ function Topbar({
                 style={{ position: 'fixed', inset: 0, zIndex: 400 }} 
                 onClick={() => setExtraOpen(false)} 
               />
-              <div 
-                className="ctx-popout" 
-                style={{ 
-                  position: 'absolute', 
-                  top: '100%', 
-                  left: 0, 
-                  marginTop: '8px', 
-                  zIndex: 401, 
-                  padding: '8px', 
-                  display: 'flex', 
-                  flexDirection: 'column', 
-                  gap: '4px',
-                  minWidth: '130px',
-                  borderRadius: '4px',
-                  boxShadow: 'var(--pop-md)'
-                }}
-                onMouseDown={(e)=>e.stopPropagation()}
-              >
-                <div style={{ fontSize: '10px', fontWeight: '700', color: 'var(--text-soft, #595459)', marginBottom: '4px', paddingLeft: '4px' }}>
+              <div className="extra-tools-popout" onMouseDown={(e)=>e.stopPropagation()}>
+                <div className="extra-tools-title">
                   {window.t('EXTRAS', 'EXTRAS')}
                 </div>
                 {EXTRA_TOOLS.map(tool => (
                   <button
                     key={tool.id}
-                    className="tool press"
-                    style={{ 
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      gap: '8px', 
-                      width: '100%', 
-                      padding: '6px 12px',
-                      background: activeTool === tool.id ? 'var(--olive-light, #F0F6EA)' : 'none',
-                      border: 'none',
-                      borderRadius: '4px',
-                      textAlign: 'left',
-                      cursor: 'pointer'
-                    }}
+                    className="extra-tools-btn"
                     onMouseDown={(e) => {
                       setExtraOpen(false);
                       startToolDrag(e, tool.id);
@@ -195,20 +166,15 @@ function Topbar({
                     }}
                   >
                     <div
-                      className="tool-icon-mini"
+                      className="extra-tools-icon"
                       style={{
                         background: activeTool === tool.id ? 'var(--olive)' : tool.bg,
                         color: activeTool === tool.id ? 'white' : (tool.fg || 'var(--ink)'),
-                        width: '24px',
-                        height: '24px',
-                        borderRadius: '4px',
-                        display: 'grid',
-                        placeItems: 'center'
                       }}
                     >
-                      <span className="material-symbols-rounded" style={{ fontSize: '15px' }}>{tool.icon}</span>
+                      <span className="material-symbols-rounded" style={{ fontSize: '16px' }}>{tool.icon}</span>
                     </div>
-                    <span style={{ fontSize: '12.5px', fontWeight: '600', color: 'var(--ink)' }}>
+                    <span className="extra-tools-label">
                       {t[tool.label] || tool.id}
                     </span>
                   </button>

@@ -3560,10 +3560,50 @@ const getMapsEmbedUrl = (url) => {
   return `https://maps.google.com/maps?q=${encodeURIComponent(url)}&t=&z=14&ie=UTF8&iwloc=&output=embed`;
 };
 
-function MapItem({ item, lang, onUpdate }) {
+function MapItem({ item, lang, onUpdate, editing, onEndEdit }) {
   const title = pickLang(item.title, lang);
   const caption = pickLang(item.caption, lang);
+  const hasUrl = !!item.url;
   const embedUrl = getMapsEmbedUrl(item.url);
+
+  if (!hasUrl || editing) {
+    return (
+      <div className="map-card empty" style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', boxSizing: 'border-box' }}>
+        <div className="item-card" style={{ display: 'flex', flexDirection: 'column', height: '100%', padding: '12px', justifyContent: 'center', boxSizing: 'border-box' }}>
+          <div style={{ textAlign: 'center', marginBottom: '8px', color: 'var(--text-soft, #595459)' }}>
+            <span className="material-symbols-rounded" style={{ fontSize: '24px' }}>map</span>
+            <div style={{ fontSize: '11px', fontWeight: '800', marginTop: '2px' }}>
+              {window.t('Configurar Mapa de Google', 'Configure Google Map')}
+            </div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'var(--paper-2)', padding: '6px 8px', borderRadius: '4px', border: '1.5px solid var(--line)' }}>
+            <span className="material-symbols-rounded" style={{ fontSize: 16, color: 'var(--ink-3)' }}>pin_drop</span>
+            <input
+              className="link-input"
+              autoFocus
+              style={{ flex: 1, background: 'none', border: 'none', outline: 'none', fontSize: '12.5px', color: 'var(--ink)', width: '100%' }}
+              placeholder={window.t('Pega dirección o enlace de Maps…', 'Paste address or Maps link…')}
+              value={item.url || ''}
+              onClick={(e)=>e.stopPropagation()}
+              onMouseDown={(e)=>e.stopPropagation()}
+              onChange={(e)=>onUpdate({ url: e.target.value })}
+              onBlur={(e)=>{
+                const v = e.target.value.trim();
+                onUpdate({ url: v, _editing: false });
+                onEndEdit && onEndEdit();
+              }}
+              onKeyDown={(e)=>{
+                if (e.key === 'Enter' || e.key === 'Escape') e.target.blur();
+              }}
+            />
+          </div>
+          <div style={{ fontSize: '9px', color: 'var(--text-soft, #595459)', textAlign: 'center', marginTop: '6px' }}>
+            {window.t('Enter para confirmar · Esc para salir', 'Enter to confirm · Esc to exit')}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="map-card" style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', boxSizing: 'border-box' }}>
@@ -3665,7 +3705,7 @@ function ItemRenderer({ item, lang, editing, callbacks }) {
     case 'swatch':   return <SwatchItem item={item} lang={lang}/>;
     case 'frame':    return <FrameItem item={item} lang={lang} editing={editing} onUpdate={onUpdate}/>;
     case 'bigtitle': return <BigTitleItem item={item} lang={lang} editing={editing} onUpdate={onUpdate}/>;
-    case 'map':      return <MapItem item={item} lang={lang} onUpdate={onUpdate}/>;
+    case 'map':      return <MapItem item={item} lang={lang} editing={editing} onUpdate={onUpdate} onEndEdit={cb.endEdit}/>;
     default:         return <NoteItem  item={item} lang={lang}/>;
   }
 }

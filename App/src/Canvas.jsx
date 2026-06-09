@@ -1313,13 +1313,13 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
           });
           setSelected(item.id);
           // auto-enter edit mode for text types
-          if (['note','comment'].includes(item.type)) {
+          if (['note','comment','bigtitle'].includes(item.type)) {
             setTimeout(() => setEditing(item.id), 40);
           }
           if (item.type === 'doc') {
             setTimeout(() => setDocOpen({ id: item.id }), 40);
           }
-          if (item.type === 'link' || item.type === 'todo' || item.type === 'board' || item.type === 'column') {
+          if (['link','todo','board','column','map','frame'].includes(item.type)) {
             // for these, edit mode just allows inline rename / URL input
             setTimeout(() => setEditing(item.id), 40);
           }
@@ -3016,9 +3016,9 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
           return next;
         });
         setSelected(item.id);
-        if (['note','comment'].includes(item.type)) setTimeout(() => setEditing(item.id), 40);
+        if (['note','comment','bigtitle'].includes(item.type)) setTimeout(() => setEditing(item.id), 40);
         if (item.type === 'doc') setTimeout(() => setDocOpen({ id: item.id }), 40);
-        if (['link','todo','board','column'].includes(item.type)) setTimeout(() => setEditing(item.id), 40);
+        if (['link','todo','board','column','map','frame'].includes(item.type)) setTimeout(() => setEditing(item.id), 40);
       }
       setActiveTool(null);
     };
@@ -3288,7 +3288,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
       {/* Text format sidebar (when editing a text-based item) */}
       {editing && editing === selected && !captionFocusId && (() => {
         const it = current.items.find(i => i.id === editing);
-        if (!it || !['note','comment'].includes(it.type)) return null;
+        if (!it || !['note','comment','bigtitle'].includes(it.type)) return null;
         return (
           <window.TextFormatSidebar
             item={it}
@@ -3380,7 +3380,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
                 <div
                   key={item.id}
                   data-item-id={item.id}
-                  className={`item ${(selected === item.id || selectedIds.includes(item.id)) ? 'selected' : ''} ${item._dragging ? 'dragging' : ''} ${isEditing ? 'editing' : ''} ${item._new ? 'new-item' : ''} ${isDropTarget ? 'drop-target' : ''}`}
+                  className={`item ${item.type === 'frame' ? 'item-frame' : ''} ${(selected === item.id || selectedIds.includes(item.id)) ? 'selected' : ''} ${item._dragging ? 'dragging' : ''} ${isEditing ? 'editing' : ''} ${item._new ? 'new-item' : ''} ${isDropTarget ? 'drop-target' : ''}`}
                   style={{
                     left: item.x, top: item.y,
                     width: item.w !== undefined ? item.w : def.w,
@@ -3389,6 +3389,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
                     zIndex: selected === item.id ? 100 : (item.type === 'frame' ? 1 : 2),
                     opacity: matches ? 1 : 0.18,
                     transition: item._dragging ? 'none' : 'opacity 200ms ease',
+                    pointerEvents: item.type === 'frame' ? 'none' : 'auto',
                   }}
                   onMouseDown={(e)=>{
                     if (activeTool === 'line') { startLineDrag(e, item.id); return; }

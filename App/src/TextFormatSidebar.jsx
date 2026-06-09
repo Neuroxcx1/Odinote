@@ -7,6 +7,7 @@
 function TextFormatSidebar({ item, lang, onUpdate, onClose, variant, noCodeQuote }) {
   if (!item) return null;
   const isCaption = variant === 'caption'; // captions get only Color/H1/B/I/S/U (no lists, quote, code)
+  const isBigTitle = item.type === 'bigtitle';
   const [active, setActive] = React.useState({});
   const [colorOpen, setColorOpen] = React.useState(false);
 
@@ -19,21 +20,34 @@ function TextFormatSidebar({ item, lang, onUpdate, onClose, variant, noCodeQuote
 
   const refresh = () => {
     try {
-      setActive({
-        bold: document.queryCommandState('bold'),
-        italic: document.queryCommandState('italic'),
-        underline: document.queryCommandState('underline'),
-        strike: document.queryCommandState('strikeThrough'),
-        ul: document.queryCommandState('insertUnorderedList'),
-        ol: document.queryCommandState('insertOrderedList'),
-      });
+      if (item.type === 'bigtitle') {
+        setActive({
+          alignLeft: (item.align || 'center') === 'left',
+          alignCenter: (item.align || 'center') === 'center',
+          alignRight: (item.align || 'center') === 'right',
+          alignJustify: (item.align || 'center') === 'justify',
+        });
+      } else {
+        setActive({
+          bold: document.queryCommandState('bold'),
+          italic: document.queryCommandState('italic'),
+          underline: document.queryCommandState('underline'),
+          strike: document.queryCommandState('strikeThrough'),
+          ul: document.queryCommandState('insertUnorderedList'),
+          ol: document.queryCommandState('insertOrderedList'),
+          alignLeft: document.queryCommandState('justifyLeft'),
+          alignCenter: document.queryCommandState('justifyCenter'),
+          alignRight: document.queryCommandState('justifyRight'),
+          alignJustify: document.queryCommandState('justifyFull'),
+        });
+      }
     } catch {}
   };
 
   React.useEffect(() => {
     const iv = setInterval(refresh, 250);
     return () => clearInterval(iv);
-  }, []);
+  }, [item.id, item.align]);
 
   // Helper: find the active contenteditable; if not focused, focus the note's editor
   const findEditor = () => {
@@ -79,16 +93,18 @@ function TextFormatSidebar({ item, lang, onUpdate, onClose, variant, noCodeQuote
         <div className="ctx-letter" style={{
           fontWeight: 800,
           fontSize: 14,
-          color: '#E6544F',
-          background: 'linear-gradient(90deg, #1A1A1A, #E6544F, #90B968)',
-          WebkitBackgroundClip: 'text',
-          WebkitTextFillColor: 'transparent',
-          backgroundClip: 'text',
-        }}>A</div>
+          color: isBigTitle ? (item.textColor || '#1A1A1A') : '#E6544F',
+          background: isBigTitle && item.textColor && item.textColor !== 'inherit' ? 'none' : 'linear-gradient(90deg, #1A1A1A, #E6544F, #90B968)',
+          WebkitBackgroundClip: isBigTitle && item.textColor && item.textColor !== 'inherit' ? 'none' : 'text',
+          WebkitTextFillColor: isBigTitle && item.textColor && item.textColor !== 'inherit' ? 'none' : 'transparent',
+          backgroundClip: isBigTitle && item.textColor && item.textColor !== 'inherit' ? 'none' : 'text',
+        }}>
+          {isBigTitle && item.textColor && item.textColor !== 'inherit' ? <span style={{color: item.textColor}}>A</span> : 'A'}
+        </div>
         <span>{lang==='es'?'Color':'Color'}</span>
       </button>
 
-      {!isCaption && (
+      {!isCaption && !isBigTitle && (
         <>
           <button className="ctx-btn" onClick={()=>exec('formatBlock', '<h1>')}>
             <div className="ctx-letter" style={{fontWeight: 800, fontSize: 14}}>H1</div>
@@ -105,117 +121,167 @@ function TextFormatSidebar({ item, lang, onUpdate, onClose, variant, noCodeQuote
         </>
       )}
 
-      <button className={`ctx-btn ${active.bold ? 'active' : ''}`} onClick={()=>exec('bold')}>
-        <div className="ctx-letter" style={{fontWeight: 800}}>B</div>
-        <span>{lang==='es'?'Negrita':'Bold'}</span>
-      </button>
+      {!isBigTitle && (
+        <>
+          <button className={`ctx-btn ${active.bold ? 'active' : ''}`} onClick={()=>exec('bold')}>
+            <div className="ctx-letter" style={{fontWeight: 800}}>B</div>
+            <span>{lang==='es'?'Negrita':'Bold'}</span>
+          </button>
 
-      <button className={`ctx-btn ${active.italic ? 'active' : ''}`} onClick={()=>exec('italic')}>
-        <div className="ctx-letter" style={{fontStyle: 'italic', fontWeight: 700}}>I</div>
-        <span>{lang==='es'?'Cursiva':'Italic'}</span>
-      </button>
+          <button className={`ctx-btn ${active.italic ? 'active' : ''}`} onClick={()=>exec('italic')}>
+            <div className="ctx-letter" style={{fontStyle: 'italic', fontWeight: 700}}>I</div>
+            <span>{lang==='es'?'Cursiva':'Italic'}</span>
+          </button>
 
-      <button className={`ctx-btn ${active.strike ? 'active' : ''}`} onClick={()=>exec('strikeThrough')}>
-        <div className="ctx-letter" style={{textDecoration: 'line-through', fontWeight: 700}}>S</div>
-        <span>{lang==='es'?'Tachado':'Strike'}</span>
-      </button>
+          <button className={`ctx-btn ${active.strike ? 'active' : ''}`} onClick={()=>exec('strikeThrough')}>
+            <div className="ctx-letter" style={{textDecoration: 'line-through', fontWeight: 700}}>S</div>
+            <span>{lang==='es'?'Tachado':'Strike'}</span>
+          </button>
 
-      <button className={`ctx-btn ${active.underline ? 'active' : ''}`} onClick={()=>exec('underline')}>
-        <div className="ctx-letter" style={{textDecoration: 'underline', fontWeight: 700}}>U</div>
-        <span>{lang==='es'?'Subrayado':'Underline'}</span>
-      </button>
-
-      {!isCaption && <>
-      <div className="ctx-sep-h"/>
-
-      <button className="ctx-btn" onClick={()=>exec('justifyLeft')} title={lang==='es'?'Alinear a la izquierda':'Align left'}>
-        <span className="material-symbols-rounded">format_align_left</span>
-        <span>{lang==='es'?'Izquierda':'Left'}</span>
-      </button>
-
-      <button className="ctx-btn" onClick={()=>exec('justifyCenter')} title={lang==='es'?'Centrar':'Align center'}>
-        <span className="material-symbols-rounded">format_align_center</span>
-        <span>{lang==='es'?'Centrar':'Center'}</span>
-      </button>
-
-      <button className="ctx-btn" onClick={()=>exec('justifyRight')} title={lang==='es'?'Alinear a la derecha':'Align right'}>
-        <span className="material-symbols-rounded">format_align_right</span>
-        <span>{lang==='es'?'Derecha':'Right'}</span>
-      </button>
-
-      <button className="ctx-btn" onClick={()=>exec('justifyFull')} title={lang==='es'?'Justificar':'Justify'}>
-        <span className="material-symbols-rounded">format_align_justify</span>
-        <span>{lang==='es'?'Justificar':'Justify'}</span>
-      </button>
-
-      <div className="ctx-sep-h"/>
-
-      <button className={`ctx-btn ${active.ul ? 'active' : ''}`} onClick={()=>exec('insertUnorderedList')}>
-        <span className="material-symbols-rounded">format_list_bulleted</span>
-        <span>{lang==='es'?'Lista':'Bullets'}</span>
-      </button>
-
-      <button className={`ctx-btn ${active.ol ? 'active' : ''}`} onClick={()=>exec('insertOrderedList')}>
-        <span className="material-symbols-rounded">format_list_numbered</span>
-        <span>{lang==='es'?'Numerada':'Numbered'}</span>
-      </button>
-
-      {!noCodeQuote && (
-      <button className="ctx-btn" onClick={()=>exec('formatBlock', 'BLOCKQUOTE')}>
-        <span className="material-symbols-rounded">format_quote</span>
-        <span>{lang==='es'?'Cita':'Quote'}</span>
-      </button>
+          <button className={`ctx-btn ${active.underline ? 'active' : ''}`} onClick={()=>exec('underline')}>
+            <div className="ctx-letter" style={{textDecoration: 'underline', fontWeight: 700}}>U</div>
+            <span>{lang==='es'?'Subrayado':'Underline'}</span>
+          </button>
+        </>
       )}
 
-      {!noCodeQuote && (
-      <button className="ctx-btn" onClick={()=>{
-        const ed = findEditor();
-        if (!ed) return;
-        const sel = window.getSelection();
-        if (sel && !sel.isCollapsed && sel.toString().includes('\n') === false && sel.toString().length < 60) {
-          // inline code — short single-line selection
-          const range = sel.getRangeAt(0);
-          const code = document.createElement('code');
-          code.appendChild(range.extractContents());
-          range.insertNode(code);
-        } else {
-          // block code — wrap selection (or insert empty block) in <pre><code>
-          let content = '';
-          if (sel && !sel.isCollapsed) {
-            const range = sel.getRangeAt(0);
-            content = range.toString();
-            range.deleteContents();
-          }
-          const pre = document.createElement('pre');
-          const code = document.createElement('code');
-          code.textContent = content || '// código';
-          pre.appendChild(code);
-          if (sel && sel.rangeCount) {
-            sel.getRangeAt(0).insertNode(pre);
-          } else {
-            ed.appendChild(pre);
-          }
-          // ensure a trailing paragraph after pre so user can click below
-          let next = pre.nextSibling;
-          if (!next || (next.nodeType === 1 && next.tagName === 'PRE')) {
-            const p = document.createElement('p');
-            p.appendChild(document.createElement('br'));
-            pre.parentNode.insertBefore(p, pre.nextSibling);
-          }
-          if (window.hljs) {
-            try {
-              code.textContent = code.textContent;
-              window.hljs.highlightElement(code);
-            } catch {}
-          }
-        }
-        ed.dispatchEvent(new Event('input', { bubbles: true }));
-      }}>
-        <span className="material-symbols-rounded">code</span>
-        <span>{lang==='es'?'Código':'Code'}</span>
-      </button>
+      {(isBigTitle || !isCaption) && (
+        <>
+          <div className="ctx-sep-h"/>
+
+          <button
+            className={`ctx-btn ${active.alignLeft ? 'active' : ''}`}
+            onClick={()=>{
+              if (isBigTitle) {
+                onUpdate({ align: 'left' });
+              } else {
+                exec('justifyLeft');
+              }
+            }}
+            title={lang==='es'?'Alinear a la izquierda':'Align left'}
+          >
+            <span className="material-symbols-rounded">format_align_left</span>
+            <span>{lang==='es'?'Izquierda':'Left'}</span>
+          </button>
+
+          <button
+            className={`ctx-btn ${active.alignCenter ? 'active' : ''}`}
+            onClick={()=>{
+              if (isBigTitle) {
+                onUpdate({ align: 'center' });
+              } else {
+                exec('justifyCenter');
+              }
+            }}
+            title={lang==='es'?'Centrar':'Align center'}
+          >
+            <span className="material-symbols-rounded">format_align_center</span>
+            <span>{lang==='es'?'Centrar':'Center'}</span>
+          </button>
+
+          <button
+            className={`ctx-btn ${active.alignRight ? 'active' : ''}`}
+            onClick={()=>{
+              if (isBigTitle) {
+                onUpdate({ align: 'right' });
+              } else {
+                exec('justifyRight');
+              }
+            }}
+            title={lang==='es'?'Alinear a la derecha':'Align right'}
+          >
+            <span className="material-symbols-rounded">format_align_right</span>
+            <span>{lang==='es'?'Derecha':'Right'}</span>
+          </button>
+
+          <button
+            className={`ctx-btn ${active.alignJustify ? 'active' : ''}`}
+            onClick={()=>{
+              if (isBigTitle) {
+                onUpdate({ align: 'justify' });
+              } else {
+                exec('justifyFull');
+              }
+            }}
+            title={lang==='es'?'Justificar':'Justify'}
+          >
+            <span className="material-symbols-rounded">format_align_justify</span>
+            <span>{lang==='es'?'Justificar':'Justify'}</span>
+          </button>
+        </>
       )}
-      </>}
+
+      {!isCaption && !isBigTitle && (
+        <>
+          <div className="ctx-sep-h"/>
+
+          <button className={`ctx-btn ${active.ul ? 'active' : ''}`} onClick={()=>exec('insertUnorderedList')}>
+            <span className="material-symbols-rounded">format_list_bulleted</span>
+            <span>{lang==='es'?'Lista':'Bullets'}</span>
+          </button>
+
+          <button className={`ctx-btn ${active.ol ? 'active' : ''}`} onClick={()=>exec('insertOrderedList')}>
+            <span className="material-symbols-rounded">format_list_numbered</span>
+            <span>{lang==='es'?'Numerada':'Numbered'}</span>
+          </button>
+
+          {!noCodeQuote && (
+          <button className="ctx-btn" onClick={()=>exec('formatBlock', 'BLOCKQUOTE')}>
+            <span className="material-symbols-rounded">format_quote</span>
+            <span>{lang==='es'?'Cita':'Quote'}</span>
+          </button>
+          )}
+
+          {!noCodeQuote && (
+          <button className="ctx-btn" onClick={()=>{
+            const ed = findEditor();
+            if (!ed) return;
+            const sel = window.getSelection();
+            if (sel && !sel.isCollapsed && sel.toString().includes('\n') === false && sel.toString().length < 60) {
+              // inline code — short single-line selection
+              const range = sel.getRangeAt(0);
+              const code = document.createElement('code');
+              code.appendChild(range.extractContents());
+              range.insertNode(code);
+            } else {
+              // block code — wrap selection (or insert empty block) in <pre><code>
+              let content = '';
+              if (sel && !sel.isCollapsed) {
+                const range = sel.getRangeAt(0);
+                content = range.toString();
+                range.deleteContents();
+              }
+              const pre = document.createElement('pre');
+              const code = document.createElement('code');
+              code.textContent = content || '// código';
+              pre.appendChild(code);
+              if (sel && sel.rangeCount) {
+                sel.getRangeAt(0).insertNode(pre);
+              } else {
+                ed.appendChild(pre);
+              }
+              // ensure a trailing paragraph after pre so user can click below
+              let next = pre.nextSibling;
+              if (!next || (next.nodeType === 1 && next.tagName === 'PRE')) {
+                const p = document.createElement('p');
+                p.appendChild(document.createElement('br'));
+                pre.parentNode.insertBefore(p, pre.nextSibling);
+              }
+              if (window.hljs) {
+                try {
+                  code.textContent = code.textContent;
+                  window.hljs.highlightElement(code);
+                } catch {}
+              }
+            }
+            ed.dispatchEvent(new Event('input', { bubbles: true }));
+          }}>
+            <span className="material-symbols-rounded">code</span>
+            <span>{lang==='es'?'Código':'Code'}</span>
+          </button>
+          )}
+        </>
+      )}
     </div>
 
     {colorOpen && (
@@ -229,7 +295,11 @@ function TextFormatSidebar({ item, lang, onUpdate, onClose, variant, noCodeQuote
                 className="text-color-swatch"
                 style={{background: c, border: c === '#FFFFFF' ? '1.5px solid var(--line-soft)' : '1.5px solid var(--line)'}}
                 onClick={()=>{
-                  exec('foreColor', c);
+                  if (isBigTitle) {
+                    onUpdate({ textColor: c });
+                  } else {
+                    exec('foreColor', c);
+                  }
                   setColorOpen(false);
                 }}
                 title={c}
@@ -240,7 +310,11 @@ function TextFormatSidebar({ item, lang, onUpdate, onClose, variant, noCodeQuote
             className="btn"
             style={{marginTop: 8, width: '100%', justifyContent: 'center', fontSize: 11.5}}
             onClick={()=>{
-              exec('removeFormat');
+              if (isBigTitle) {
+                onUpdate({ textColor: 'inherit' });
+              } else {
+                exec('removeFormat');
+              }
               setColorOpen(false);
             }}
           >

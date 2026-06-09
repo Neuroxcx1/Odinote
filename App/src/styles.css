@@ -2931,6 +2931,112 @@ body.odi-busy iframe { pointer-events: none !important; }
   box-shadow: var(--pop-md);
 }
 
+/* ==========================================================================
+   EXTRA TOOLS POPUP (MENÚ MÁS) & INTERACTIVES
+   ========================================================================== */
+.extra-tools-popout {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: 8px;
+  z-index: 401;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 140px;
+  border-radius: 8px;
+  background: var(--paper);
+  border: 1.5px solid var(--line);
+  box-shadow: var(--pop-md);
+  animation: ctx-slide-in 180ms var(--e-out);
+}
 
+[data-theme="dark"] .extra-tools-popout {
+  background: #3A383A;
+  border-color: #1A1A1A;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.35);
+}
 
+.extra-tools-title {
+  font-family: var(--font-display);
+  font-size: 9.5px;
+  font-weight: 800;
+  color: var(--text-soft, #595459);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 4px;
+  padding-left: 6px;
+}
 
+.extra-tools-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 10px;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  text-align: left;
+  cursor: pointer;
+  transition: all 100ms ease;
+}
+
+.extra-tools-btn:hover {
+  background: var(--bg-2, #F0EDE9);
+}
+
+[data-theme="dark"] .extra-tools-btn:hover {
+  background: #4A484A;
+}
+
+.extra-tools-icon {
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  display: grid;
+  place-items: center;
+  transition: transform 100ms ease;
+}
+
+.extra-tools-btn:hover .extra-tools-icon {
+  transform: scale(1.08);
+}
+
+.extra-tools-label {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+/* ==========================================================================
+   FRAME CLICK TRANSPARENCY
+   ========================================================================== */
+.item-frame .frame-header,
+.item-frame .handles,
+.item-frame .handle,
+.item-frame .connect-handle,
+.item-frame .anchors {
+  pointer-events: auto !important;
+}
+
+/* ==========================================================================
+   ACTIVE BUTTON VERDE FEEDBACK
+   ========================================================================== */
+.ctx-btn.active {
+  background: var(--olive-light, #F0F6EA) !important;
+  color: var(--green, #6A8546) !important;
+}
+.ctx-btn.active .material-symbols-rounded,
+.ctx-btn.active .ctx-letter {
+  color: var(--green, #6A8546) !important;
+}
+[data-theme="dark"] .ctx-btn.active {
+  background: #324329 !important;
+  color: #9ECB75 !important;
+}
+[data-theme="dark"] .ctx-btn.active .material-symbols-rounded,
+[data-theme="dark"] .ctx-btn.active .ctx-letter {
+  color: #9ECB75 !important;
+}
