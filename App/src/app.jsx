@@ -571,6 +571,20 @@ function App() {
     }));
   };
 
+  const renameProject = (projectId, newName) => {
+    setProjects(p => p.map(x => x.id === projectId ? { ...x, name: { es: newName, en: newName } } : x));
+    setCanvases(prev => {
+      if (!prev[projectId]) return prev;
+      return {
+        ...prev,
+        [projectId]: {
+          ...prev[projectId],
+          title: { es: newName, en: newName }
+        }
+      };
+    });
+  };
+
   // Soft delete → moves the project to the Trash (recoverable). Canvas data is kept.
   const deleteProject = (projectId) => {
     setProjects(p => p.map(x => x.id === projectId ? { ...x, deleted: true, starred: false } : x));
@@ -750,6 +764,7 @@ function App() {
       onOpenProject={openProject}
       onCreate={createProject}
       onDelete={deleteProject}
+      onRename={renameProject}
       onRestore={restoreProject}
       onPurge={purgeProject}
       onToggleStar={toggleStarProject}

@@ -30,7 +30,7 @@ const COVER_PRESETS = [
 ];
 const EMOJI_PRESETS = ['⚔️','🌾','🚀','🧩','🎲','🗺️','🏰','🐉','🎮','🌙','🔥','💎','🎨','📚','💡','🎯'];
 
-function Home({ lang, setLang, theme, setTheme, onOpenProject, projects, onCreate, onDelete, onRestore, onPurge, onToggleStar, onExport, onImport, vaultPath, onOpenVault, onCloseVault, updateAvailable, onUpdateClick }) {
+function Home({ lang, setLang, theme, setTheme, onOpenProject, projects, onCreate, onDelete, onRename, onRestore, onPurge, onToggleStar, onExport, onImport, vaultPath, onOpenVault, onCloseVault, updateAvailable, onUpdateClick }) {
   const t = window.TRANSLATIONS[lang];
   const [query, setQuery] = useStateHome('');
   const [modal, setModal] = useStateHome(false);
@@ -320,6 +320,7 @@ function Home({ lang, setLang, theme, setTheme, onOpenProject, projects, onCreat
                   <RecentCard key={p.id} project={p} lang={lang} t={t}
                     onOpen={()=>onOpenProject(p.id)}
                     onDelete={()=>onDelete(p.id)}
+                    onRename={onRename}
                     onToggleStar={()=>onToggleStar(p.id)}
                   />
                 ))}
@@ -352,6 +353,7 @@ function Home({ lang, setLang, theme, setTheme, onOpenProject, projects, onCreat
                 isTrash={section==='trash'}
                 onOpen={()=>onOpenProject(p.id)}
                 onDelete={()=>onDelete(p.id)}
+                onRename={onRename}
                 onRestore={()=>onRestore(p.id)}
                 onPurge={()=>onPurge(p.id)}
                 onToggleStar={()=>onToggleStar(p.id)}
@@ -375,9 +377,18 @@ function Home({ lang, setLang, theme, setTheme, onOpenProject, projects, onCreat
   );
 }
 
-function RecentCard({ project, lang, t, onOpen, onDelete, onToggleStar }) {
+function RecentCard({ project, lang, t, onOpen, onDelete, onRename, onToggleStar }) {
+  const handleContextMenu = (e) => {
+    e.preventDefault();
+    const currentName = project.name?.[lang] || project.name || '';
+    const newName = prompt(window.t('Cambiar nombre del proyecto:', 'Rename project:'), currentName);
+    if (newName && newName.trim()) {
+      onRename && onRename(project.id, newName.trim());
+    }
+  };
+
   return (
-    <div className="ms-recent-card" onClick={onOpen}>
+    <div className="ms-recent-card" onClick={onOpen} onContextMenu={handleContextMenu}>
       <div className="ms-recent-cover" style={{background: project.cover}}>
         <div className="ms-recent-emoji">{project.emoji}</div>
         <div className="ms-card-actions" onClick={(e)=>e.stopPropagation()}>
@@ -403,11 +414,22 @@ function RecentCard({ project, lang, t, onOpen, onDelete, onToggleStar }) {
   );
 }
 
-function ProjectCard({ project, lang, t, onOpen, onDelete, onRestore, onPurge, onToggleStar, isTrash }) {
+function ProjectCard({ project, lang, t, onOpen, onDelete, onRename, onRestore, onPurge, onToggleStar, isTrash }) {
+  const handleContextMenu = (e) => {
+    if (isTrash) return;
+    e.preventDefault();
+    const currentName = project.name?.[lang] || project.name || '';
+    const newName = prompt(window.t('Cambiar nombre del proyecto:', 'Rename project:'), currentName);
+    if (newName && newName.trim()) {
+      onRename && onRename(project.id, newName.trim());
+    }
+  };
+
   return (
     <div
       className="ms-project-card"
       onClick={isTrash ? undefined : onOpen}
+      onContextMenu={handleContextMenu}
       style={{position:'relative'}}
     >
       <div className="ms-project-cover" style={{ background: project.cover }}>
