@@ -139,7 +139,7 @@ function App() {
   const [loading, setLoading]   = useStateApp(true);
 
   const [view, setView]         = useStateApp({ kind: 'home' });
-  const [lang, setLang]         = useStateApp('es');
+  const [lang, setLang]         = useStateApp('en');
   const [theme, setTheme]       = useStateApp('light');
   const [projects, setProjects] = useStateApp(window.SAMPLE_PROJECTS);
   const [canvases, setCanvases] = useStateApp(JSON.parse(JSON.stringify(window.INITIAL_CANVASES)));
