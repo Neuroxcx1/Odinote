@@ -2856,5 +2856,81 @@ body.odi-busy iframe { pointer-events: none !important; }
   background: #2A282A;
 }
 
+/* ==========================================================================
+   FRAME ITEM (MARCO DE AGRUPACIÓN)
+   ========================================================================== */
+.frame-card {
+  border: 2px dashed var(--line);
+  border-radius: 6px;
+  background: transparent;
+  transition: border-color 140ms ease, background 140ms ease;
+  overflow: hidden;
+}
+
+.frame-card:hover, .item.selected .frame-card {
+  border-color: var(--wine, #7B2D26);
+}
+
+.frame-header {
+  background: color-mix(in srgb, var(--line-soft, #E5E1DD) 25%, transparent);
+}
+
+/* Colores específicos de fondo y borde para los Frames */
+.frame-card.c-white  { border-color: color-mix(in srgb, var(--c-white, #FFFFFF) 40%, var(--line)); background: color-mix(in srgb, var(--c-white, #FFFFFF) 6%, transparent); }
+.frame-card.c-cream  { border-color: color-mix(in srgb, var(--c-cream, #FEF7E0) 50%, var(--line)); background: color-mix(in srgb, var(--c-cream, #FEF7E0) 8%, transparent); }
+.frame-card.c-sage   { border-color: color-mix(in srgb, var(--c-sage, #E8F0DA) 60%, var(--line)); background: color-mix(in srgb, var(--c-sage, #E8F0DA) 8%, transparent); }
+.frame-card.c-rose   { border-color: color-mix(in srgb, var(--c-rose, #FBDFDD) 60%, var(--line)); background: color-mix(in srgb, var(--c-rose, #FBDFDD) 8%, transparent); }
+.frame-card.c-stone  { border-color: color-mix(in srgb, var(--c-stone, #DCDCE1) 60%, var(--line)); background: color-mix(in srgb, var(--c-stone, #DCDCE1) 8%, transparent); }
+.frame-card.c-mist   { border-color: color-mix(in srgb, var(--c-mist, #ECEBEB) 60%, var(--line)); background: color-mix(in srgb, var(--c-mist, #ECEBEB) 8%, transparent); }
+.frame-card.c-olive  { border-color: var(--c-olive, #6A8546); background: color-mix(in srgb, var(--c-olive, #6A8546) 12%, transparent); }
+.frame-card.c-wine   { border-color: var(--c-wine, #993844); background: color-mix(in srgb, var(--c-wine, #993844) 12%, transparent); }
+.frame-card.c-red    { border-color: var(--c-red, #E6544F); background: color-mix(in srgb, var(--c-red, #E6544F) 10%, transparent); }
+.frame-card.c-sky    { border-color: var(--c-sky, #8AC1E8); background: color-mix(in srgb, var(--c-sky, #8AC1E8) 10%, transparent); }
+.frame-card.c-yellow { border-color: var(--c-yellow, #F7DA84); background: color-mix(in srgb, var(--c-yellow, #F7DA84) 10%, transparent); }
+.frame-card.c-orange { border-color: var(--c-orange, #F5A66B); background: color-mix(in srgb, var(--c-orange, #F5A66B) 10%, transparent); }
+.frame-card.c-pink   { border-color: var(--c-pink, #E58AB8); background: color-mix(in srgb, var(--c-pink, #E58AB8) 10%, transparent); }
+.frame-card.c-purple { border-color: var(--c-purple, #B084D0); background: color-mix(in srgb, var(--c-purple, #B084D0) 10%, transparent); }
+.frame-card.c-dark   { border-color: var(--c-dark, #595459); background: color-mix(in srgb, var(--c-dark, #595459) 10%, transparent); }
+.frame-card.c-transparent { border-color: var(--line); background: transparent; }
+
+/* ==========================================================================
+   BIG TITLE ITEM (TÍTULO GIGANTE TRANSPARENTE)
+   ========================================================================== */
+.bigtitle-card {
+  border: 1px dashed transparent;
+  border-radius: 4px;
+  transition: border-color 140ms ease;
+  box-sizing: border-box;
+}
+
+.item:hover .bigtitle-card, .item.selected .bigtitle-card {
+  border-color: var(--line-soft, #E5E1DD);
+}
+
+.bigtitle-edit:empty::before {
+  content: attr(data-placeholder);
+  color: var(--ink-3, #9A969A);
+  font-weight: 400;
+  font-style: italic;
+  opacity: 0.6;
+}
+
+/* ==========================================================================
+   MAP ITEM (GOOGLE MAPS)
+   ========================================================================== */
+.map-card .item-card {
+  background: var(--paper);
+  border: 1.5px solid var(--line);
+  border-radius: 4px;
+  box-shadow: var(--pop-sm);
+  transition: box-shadow 140ms ease, border-color 140ms ease;
+}
+
+.item:hover .map-card .item-card, .item.selected .map-card .item-card {
+  border-color: var(--wine, #7B2D26);
+  box-shadow: var(--pop-md);
+}
+
+
 
 

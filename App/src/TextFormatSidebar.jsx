@@ -128,6 +128,28 @@ function TextFormatSidebar({ item, lang, onUpdate, onClose, variant, noCodeQuote
       {!isCaption && <>
       <div className="ctx-sep-h"/>
 
+      <button className="ctx-btn" onClick={()=>exec('justifyLeft')} title={lang==='es'?'Alinear a la izquierda':'Align left'}>
+        <span className="material-symbols-rounded">format_align_left</span>
+        <span>{lang==='es'?'Izquierda':'Left'}</span>
+      </button>
+
+      <button className="ctx-btn" onClick={()=>exec('justifyCenter')} title={lang==='es'?'Centrar':'Align center'}>
+        <span className="material-symbols-rounded">format_align_center</span>
+        <span>{lang==='es'?'Centrar':'Center'}</span>
+      </button>
+
+      <button className="ctx-btn" onClick={()=>exec('justifyRight')} title={lang==='es'?'Alinear a la derecha':'Align right'}>
+        <span className="material-symbols-rounded">format_align_right</span>
+        <span>{lang==='es'?'Derecha':'Right'}</span>
+      </button>
+
+      <button className="ctx-btn" onClick={()=>exec('justifyFull')} title={lang==='es'?'Justificar':'Justify'}>
+        <span className="material-symbols-rounded">format_align_justify</span>
+        <span>{lang==='es'?'Justificar':'Justify'}</span>
+      </button>
+
+      <div className="ctx-sep-h"/>
+
       <button className={`ctx-btn ${active.ul ? 'active' : ''}`} onClick={()=>exec('insertUnorderedList')}>
         <span className="material-symbols-rounded">format_list_bulleted</span>
         <span>{lang==='es'?'Lista':'Bullets'}</span>

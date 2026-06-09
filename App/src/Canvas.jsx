@@ -158,6 +158,23 @@ function makeNewItem(type, x, y, w, h, lang) {
       return { ...base, type: 'color', ...defaultSize(220, 240), hex: randomHex(), showHex: true };
     case 'file':
       return { ...base, type: 'file', ...defaultSize(230, 150), name: '', src: '', size: 0, fileType: '', showPreview: false, showInfo: false, _triggerFilePick: true };
+    case 'frame':
+      return { ...base, type: 'frame', ...defaultSize(400, 400),
+        color: 'transparent',
+        title: { es: 'Nuevo marco', en: 'New frame' },
+        titleColor: 'inherit',
+        titleAlign: 'left',
+        children: [] };
+    case 'bigtitle':
+      return { ...base, type: 'bigtitle', ...defaultSize(300, 80),
+        color: 'transparent',
+        align: 'center',
+        content: { es: 'Título Grande', en: 'Large Title' } };
+    case 'map':
+      return { ...base, type: 'map', ...defaultSize(380, 280),
+        title: { es: 'Mapa de Google', en: 'Google Map' },
+        url: '',
+        caption: { es: '', en: '' } };
     default:
       return null;
   }
@@ -1473,6 +1490,23 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
     const multiStart = isMultiDrag
       ? current.items.filter(it => selectedIds.includes(it.id)).map(it => ({ id: it.id, x: it.x, y: it.y }))
       : null;
+    
+    // Frame drag: snapshot geometrically-contained items
+    let frameChildrenStart = null;
+    if (item.type === 'frame' && !isMultiDrag) {
+      const frameRect = { x: item.x, y: item.y, w: item.w || 400, h: item.h || 400 };
+      const inside = current.items.filter(it => {
+        if (it.id === itemId || it.type === 'line') return false;
+        const itW = it.w !== undefined ? it.w : (defaultDims ? defaultDims(it.type).w : 200);
+        const itH = it.h !== undefined ? it.h : (defaultDims ? defaultDims(it.type).h : 120);
+        const cx = it.x + itW / 2;
+        const cy = it.y + itH / 2;
+        return cx >= frameRect.x && cx <= frameRect.x + frameRect.w &&
+               cy >= frameRect.y && cy <= frameRect.y + frameRect.h;
+      });
+      frameChildrenStart = inside.map(it => ({ id: it.id, x: it.x, y: it.y }));
+    }
+
     const startConnectors = (current.connectors || []).map(co => ({
       id: co.id,
       ortho: (co.ortho || []).map(p => ({ x: p.x, y: p.y }))
@@ -1732,6 +1766,31 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
         return;
       }
 
+      if (frameChildrenStart && frameChildrenStart.length > 0) {
+        const finalDx = targetX - startItemX;
+        const finalDy = targetY - startItemY;
+        _setCanvases(prev => {
+          const c = prev[currentId];
+          return {
+            ...prev,
+            [currentId]: {
+              ...c,
+              items: c.items.map(it => {
+                if (it.id === itemId) {
+                  return { ...it, x: targetX, y: targetY, _dragging: true };
+                }
+                const fc = frameChildrenStart.find(x => x.id === it.id);
+                if (fc) {
+                  return { ...it, x: fc.x + finalDx, y: fc.y + finalDy, _dragging: true };
+                }
+                return it;
+              })
+            }
+          };
+        });
+        return;
+      }
+
       updateItemSilent(itemId, { x: targetX, y: targetY, _dragging: true });
 
       // detect column drop target (item being dragged is NOT itself a column)
@@ -1807,6 +1866,21 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
         });
         return;
       }
+
+      if (frameChildrenStart && frameChildrenStart.length > 0) {
+        setCanvases(prev => {
+          const c = prev[currentId];
+          return {
+            ...prev,
+            [currentId]: {
+              ...c,
+              items: c.items.map(it => (it.id === itemId || frameChildrenStart.some(x => x.id === it.id)) ? { ...it, _dragging: false } : it)
+            }
+          };
+        });
+        return;
+      }
+
       if (currentDropCol) {
         // ABSORB item into column
         setCanvases(prev => {
@@ -3312,7 +3386,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
                     width: item.w !== undefined ? item.w : def.w,
                     height: item.h !== undefined ? item.h : def.h,
                     '--node-scale': nodeScale,
-                    zIndex: selected === item.id ? 100 : 2,
+                    zIndex: selected === item.id ? 100 : (item.type === 'frame' ? 1 : 2),
                     opacity: matches ? 1 : 0.18,
                     transition: item._dragging ? 'none' : 'opacity 200ms ease',
                   }}
@@ -3323,7 +3397,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
                   onDoubleClick={(e)=>{
                     if (item.type === 'doc') { e.stopPropagation(); setDocOpen({ id: item.id }); return; }
                     if (item.type === 'board') return;
-                    if (['note','comment','todo','column','link','board'].includes(item.type)) {
+                    if (['note','comment','todo','column','link','board','frame','bigtitle'].includes(item.type)) {
                       e.stopPropagation(); setEditing(item.id);
                     }
                   }}

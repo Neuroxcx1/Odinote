@@ -23,6 +23,12 @@ const TOOLS = [
   { id: 'line',     icon: 'arrow_outward', label: 'tool_line',     bg: '#FFFFFF' },
 ];
 
+const EXTRA_TOOLS = [
+  { id: 'frame',    icon: 'crop_free',     label: 'tool_frame',    bg: '#E6544F', fg: 'white' },
+  { id: 'bigtitle', icon: 'title',         label: 'tool_bigtitle', bg: '#90B968', fg: 'white' },
+  { id: 'map',      icon: 'map',           label: 'tool_map',      bg: '#E1DFE3' },
+];
+
 function Topbar({
   lang, setLang,
   theme, setTheme,
@@ -35,6 +41,7 @@ function Topbar({
   volume, onChangeVolume,
 }) {
   const t = window.TRANSLATIONS[lang];
+  const [extraOpen, setExtraOpen] = React.useState(false);
 
   const startToolDrag = (e, toolId) => {
     if (e.button !== 0) return;
@@ -100,7 +107,7 @@ function Topbar({
             {idx === 13 && <div className="tool-divider"/>}
             <button
               className={`tool press ${activeTool === tool.id ? 'active' : ''}`}
-              title={`${t[tool.label]} · ${window.t('Arrastra al canvas o clic', 'Drag to canvas or click')}`}
+              title={`${t[tool.label] || tool.id} · ${window.t('Arrastra al canvas o clic', 'Drag to canvas or click')}`}
               onMouseDown={(e)=>startToolDrag(e, tool.id)}
               onClick={() => window.playAudioTone && window.playAudioTone('click')}
             >
@@ -113,10 +120,103 @@ function Topbar({
               >
                 <span className="material-symbols-rounded">{tool.icon}</span>
               </div>
-              <div className="tool-label">{t[tool.label]}</div>
+              <div className="tool-label">{t[tool.label] || tool.id}</div>
             </button>
           </React.Fragment>
         ))}
+
+        {/* Botón de tres puntos para herramientas extras */}
+        <div style={{ position: 'relative' }}>
+          <button
+            className={`tool press ${extraOpen ? 'active' : ''}`}
+            title={window.t('Más herramientas', 'More tools')}
+            onClick={() => {
+              setExtraOpen(o => !o);
+              window.playAudioTone && window.playAudioTone('click');
+            }}
+          >
+            <div className="tool-icon" style={{ background: '#E1DFE3', color: 'var(--ink)' }}>
+              <span className="material-symbols-rounded">more_horiz</span>
+            </div>
+            <div className="tool-label">{window.t('Más', 'More')}</div>
+          </button>
+
+          {extraOpen && (
+            <>
+              <div 
+                style={{ position: 'fixed', inset: 0, zIndex: 400 }} 
+                onClick={() => setExtraOpen(false)} 
+              />
+              <div 
+                className="ctx-popout" 
+                style={{ 
+                  position: 'absolute', 
+                  top: '100%', 
+                  left: 0, 
+                  marginTop: '8px', 
+                  zIndex: 401, 
+                  padding: '8px', 
+                  display: 'flex', 
+                  flexDirection: 'column', 
+                  gap: '4px',
+                  minWidth: '130px',
+                  borderRadius: '4px',
+                  boxShadow: 'var(--pop-md)'
+                }}
+                onMouseDown={(e)=>e.stopPropagation()}
+              >
+                <div style={{ fontSize: '10px', fontWeight: '700', color: 'var(--text-soft, #595459)', marginBottom: '4px', paddingLeft: '4px' }}>
+                  {window.t('EXTRAS', 'EXTRAS')}
+                </div>
+                {EXTRA_TOOLS.map(tool => (
+                  <button
+                    key={tool.id}
+                    className="tool press"
+                    style={{ 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      gap: '8px', 
+                      width: '100%', 
+                      padding: '6px 12px',
+                      background: activeTool === tool.id ? 'var(--olive-light, #F0F6EA)' : 'none',
+                      border: 'none',
+                      borderRadius: '4px',
+                      textAlign: 'left',
+                      cursor: 'pointer'
+                    }}
+                    onMouseDown={(e) => {
+                      setExtraOpen(false);
+                      startToolDrag(e, tool.id);
+                    }}
+                    onClick={() => {
+                      setExtraOpen(false);
+                      window.playAudioTone && window.playAudioTone('click');
+                      setActiveTool(tool.id);
+                    }}
+                  >
+                    <div
+                      className="tool-icon-mini"
+                      style={{
+                        background: activeTool === tool.id ? 'var(--olive)' : tool.bg,
+                        color: activeTool === tool.id ? 'white' : (tool.fg || 'var(--ink)'),
+                        width: '24px',
+                        height: '24px',
+                        borderRadius: '4px',
+                        display: 'grid',
+                        placeItems: 'center'
+                      }}
+                    >
+                      <span className="material-symbols-rounded" style={{ fontSize: '15px' }}>{tool.icon}</span>
+                    </div>
+                    <span style={{ fontSize: '12.5px', fontWeight: '600', color: 'var(--ink)' }}>
+                      {t[tool.label] || tool.id}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
       </div>
 
       <div className="topbar-spacer" style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center' }}>
@@ -253,4 +353,4 @@ function Topbar({
 }
 
 window.Topbar = Topbar;
-window.TOOLS = TOOLS;
+window.TOOLS = [...TOOLS, ...EXTRA_TOOLS];

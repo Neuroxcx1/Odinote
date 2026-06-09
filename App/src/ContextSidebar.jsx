@@ -97,6 +97,9 @@ function ContextSidebar({
   const isColor = item.type === 'color';
   const isFile = item.type === 'file';
   const isDoc = item.type === 'doc';
+  const isFrame = item.type === 'frame';
+  const isBigTitle = item.type === 'bigtitle';
+  const isMap = item.type === 'map';
 
   const downloadDocPdf = () => {
     if (!window.html2pdf) return;
@@ -550,6 +553,52 @@ function ContextSidebar({
           </>
         )}
 
+        {isFrame && (
+          <button
+            className={`ctx-btn ${pane === 'frameAlign' ? 'active' : ''}`}
+            onClick={()=>setPane(pane === 'frameAlign' ? null : 'frameAlign')}
+            title={window.t('Alineación del título', 'Title alignment')}
+          >
+            <span className="material-symbols-rounded">format_align_center</span>
+            <span>{window.t('Alineación', 'Align')}</span>
+          </button>
+        )}
+
+        {isBigTitle && (
+          <button
+            className={`ctx-btn ${pane === 'bigtitleAlign' ? 'active' : ''}`}
+            onClick={()=>setPane(pane === 'bigtitleAlign' ? null : 'bigtitleAlign')}
+            title={window.t('Alineación del texto', 'Text alignment')}
+          >
+            <span className="material-symbols-rounded">format_align_center</span>
+            <span>{window.t('Alineación', 'Align')}</span>
+          </button>
+        )}
+
+        {isMap && (
+          <>
+            <button
+              className={`ctx-btn ${pane === 'mapUrl' ? 'active' : ''}`}
+              onClick={()=>setPane(pane === 'mapUrl' ? null : 'mapUrl')}
+              title={window.t('Editar enlace o dirección', 'Edit link or address')}
+            >
+              <span className="material-symbols-rounded">pin_drop</span>
+              <span>{window.t('Dirección', 'Address')}</span>
+            </button>
+            <button
+              className={`ctx-btn ${item.showCaption === true ? 'active' : ''}`}
+              onClick={()=>{
+                const show = item.showCaption !== true;
+                onUpdate({ showCaption: show, h: show ? (item.h || 280) + 40 : Math.max(160, (item.h || 280) - 40) });
+              }}
+              title={window.t('Leyenda', 'Caption')}
+            >
+              <span className="material-symbols-rounded">notes</span>
+              <span>{window.t('Leyenda', 'Caption')}</span>
+            </button>
+          </>
+        )}
+
         <div className="ctx-sep-h"/>
 
         <button className="ctx-btn" onClick={onDuplicate} title={window.t('Duplicar', 'Duplicate')}>
@@ -568,6 +617,23 @@ function ContextSidebar({
           <div className="ctx-pop-section">
             <div className="ctx-pop-title">{isColumn ? (window.t('Color de la franja', 'Strip color')) : (window.t('Color de fondo', 'Background'))}</div>
             <div className="ctx-sticky-grid">
+              {(isFrame || isBigTitle) && (
+                <button
+                  className={`ctx-sticky-swatch ${(item.color || 'transparent') === 'transparent' ? 'active' : ''}`}
+                  style={{ 
+                    background: 'transparent', 
+                    border: '1.5px dashed var(--line, #121214)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer'
+                  }}
+                  onClick={()=>onUpdate({ color: 'transparent' })}
+                  title={window.t('Transparente', 'Transparent')}
+                >
+                  <span className="material-symbols-rounded" style={{ fontSize: '14px', color: 'var(--ink)' }}>close</span>
+                </button>
+              )}
               {STICKY_PALETTE.map(p => (
                 <button
                   key={p.key}
@@ -863,6 +929,69 @@ function ContextSidebar({
                 </button>
               ))}
             </div>
+          </div>
+        </div>
+      )}
+
+      {pane === 'frameAlign' && (
+        <div className="ctx-popout">
+          <div className="ctx-pop-section">
+            <div className="ctx-pop-title">{window.t('Alineación del título', 'Title alignment')}</div>
+            <div style={{ display: 'flex', gap: '6px', marginTop: '4px' }}>
+              {['left', 'center', 'right'].map(a => (
+                <button
+                  key={a}
+                  className={`ctx-btn ${(item.titleAlign || 'left') === a ? 'active' : ''}`}
+                  onClick={()=>onUpdate({ titleAlign: a })}
+                  style={{ minWidth: 36 }}
+                  title={a}
+                >
+                  <span className="material-symbols-rounded">{`format_align_${a}`}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {pane === 'bigtitleAlign' && (
+        <div className="ctx-popout">
+          <div className="ctx-pop-section">
+            <div className="ctx-pop-title">{window.t('Alineación del texto', 'Text alignment')}</div>
+            <div style={{ display: 'flex', gap: '6px', marginTop: '4px' }}>
+              {['left', 'center', 'right'].map(a => (
+                <button
+                  key={a}
+                  className={`ctx-btn ${(item.align || 'center') === a ? 'active' : ''}`}
+                  onClick={()=>onUpdate({ align: a })}
+                  style={{ minWidth: 36 }}
+                  title={a}
+                >
+                  <span className="material-symbols-rounded">{`format_align_${a}`}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {pane === 'mapUrl' && (
+        <div className="ctx-popout">
+          <div className="ctx-pop-section">
+            <div className="ctx-pop-title">{window.t('Enlace o Dirección del Mapa', 'Map Link or Address')}</div>
+            <label className="ctx-field" style={{ marginTop: '6px' }}>
+              <span>{window.t('Dirección / Enlace', 'Address / Link')}</span>
+              <input
+                type="text"
+                className="ctx-hex-input"
+                style={{ width: '100%', marginTop: '4px' }}
+                value={item.url || ''}
+                placeholder={window.t('Ej: New York o link de Google Maps...', 'E.g. New York or Google Maps link...')}
+                onChange={(e)=>onUpdate({ url: e.target.value })}
+                onClick={(e)=>e.stopPropagation()}
+                onMouseDown={(e)=>e.stopPropagation()}
+              />
+            </label>
           </div>
         </div>
       )}

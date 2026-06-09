@@ -3424,6 +3424,188 @@ function FileViewerModal({ fileItem, lang, onClose }) {
   );
 }
 
+// ──────────────── FRAME ( Obsidian/Milanote style grouping marco ) ────────────────
+function FrameItem({ item, lang, editing, onUpdate }) {
+  const text = pickLang(item.title, lang);
+  const cls = colorClass(item.color || 'transparent');
+  const align = item.titleAlign || 'left';
+  const titleColor = item.titleColor || 'inherit';
+
+  const handleTitleChange = (val) => {
+    onUpdate({ title: { es: val, en: val } });
+  };
+
+  return (
+    <div className={`frame-card c-${cls}`} style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', boxSizing: 'border-box' }}>
+      <div 
+        className="frame-header" 
+        style={{ 
+          textAlign: align, 
+          padding: '8px 12px', 
+          borderBottom: '1px dashed var(--line-soft, #E5E1DD)',
+          pointerEvents: 'auto',
+          cursor: 'move'
+        }}
+      >
+        {editing ? (
+          <input
+            type="text"
+            value={text}
+            onChange={(e) => handleTitleChange(e.target.value)}
+            className="frame-title-input"
+            style={{ 
+              width: '100%', 
+              background: 'none', 
+              border: 'none', 
+              outline: 'none', 
+              fontWeight: 800,
+              fontSize: '14px',
+              fontFamily: 'var(--font-display)',
+              textAlign: align,
+              color: titleColor === 'inherit' ? 'var(--ink)' : titleColor
+            }}
+            onClick={(e)=>e.stopPropagation()}
+            onMouseDown={(e)=>e.stopPropagation()}
+            placeholder={window.t('Nombre del marco', 'Frame name')}
+            autoFocus
+          />
+        ) : (
+          <div 
+            className="frame-title" 
+            style={{ 
+              fontWeight: 800, 
+              fontSize: '14px', 
+              fontFamily: 'var(--font-display)',
+              color: titleColor === 'inherit' ? 'var(--ink)' : titleColor,
+              textAlign: align
+            }}
+          >
+            {text || window.t('Sin título', 'Untitled')}
+          </div>
+        )}
+      </div>
+      <div className="frame-body" style={{ flex: 1, pointerEvents: 'none' }}>
+        {/* Cuerpo vacío transparente para agrupamiento */}
+      </div>
+    </div>
+  );
+}
+
+// ──────────────── BIG TITLE ( head heading ) ────────────────
+function BigTitleItem({ item, lang, editing, onUpdate }) {
+  const text = pickLang(item.content, lang);
+  const ref = React.useRef(null);
+  const align = item.align || 'center';
+  const color = item.textColor || 'inherit';
+
+  React.useEffect(() => {
+    if (!ref.current) return;
+    if (ref.current.innerText !== (text || '')) {
+      ref.current.innerText = text || '';
+    }
+  }, [item.id, text]);
+
+  const onInput = () => {
+    if (!ref.current) return;
+    onUpdate({ content: { es: ref.current.innerText, en: ref.current.innerText } });
+  };
+
+  return (
+    <div 
+      className="bigtitle-card" 
+      style={{ 
+        width: '100%', 
+        height: '100%', 
+        display: 'flex', 
+        alignItems: 'center', 
+        justifyContent: align === 'center' ? 'center' : (align === 'right' ? 'flex-end' : 'flex-start'),
+        background: 'transparent',
+        border: 'none',
+        boxShadow: 'none'
+      }}
+    >
+      <div
+        ref={ref}
+        contentEditable={editing}
+        suppressContentEditableWarning
+        className="bigtitle-edit"
+        onInput={onInput}
+        onClick={(e)=>editing && e.stopPropagation()}
+        onMouseDown={(e)=>editing && e.stopPropagation()}
+        style={{
+          fontFamily: 'var(--font-display)',
+          fontSize: '32px',
+          fontWeight: 800,
+          textAlign: align,
+          color: color === 'inherit' ? 'var(--ink)' : color,
+          background: 'none',
+          border: 'none',
+          outline: 'none',
+          width: '100%',
+          cursor: editing ? 'text' : 'move',
+          padding: '4px'
+        }}
+        data-placeholder={window.t('Escribe un título…', 'Write a title…')}
+      />
+    </div>
+  );
+}
+
+// ──────────────── GOOGLE MAPS PREVIEW ────────────────
+const getMapsEmbedUrl = (url) => {
+  if (!url) return '';
+  if (url.includes('output=embed') || url.includes('/embed')) {
+    return url;
+  }
+  return `https://maps.google.com/maps?q=${encodeURIComponent(url)}&t=&z=14&ie=UTF8&iwloc=&output=embed`;
+};
+
+function MapItem({ item, lang, onUpdate }) {
+  const title = pickLang(item.title, lang);
+  const caption = pickLang(item.caption, lang);
+  const embedUrl = getMapsEmbedUrl(item.url);
+
+  return (
+    <div className="map-card" style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', boxSizing: 'border-box' }}>
+      <div className="item-card" style={{ display: 'flex', flexDirection: 'column', height: '100%', padding: '12px', boxSizing: 'border-box' }}>
+        <div className="map-title" style={{ fontWeight: 800, fontSize: '13px', fontFamily: 'var(--font-display)', marginBottom: '8px', color: 'var(--ink)' }}>
+          {title || window.t('Mapa de Google', 'Google Map')}
+        </div>
+        
+        <div className="map-iframe-container" style={{ flex: 1, background: 'var(--bg-2, #ECEAE6)', borderRadius: '4px', overflow: 'hidden', border: '1.5px solid var(--line-soft, #E5E1DD)', minHeight: 0 }}>
+          {embedUrl ? (
+            <iframe
+              title="Google Maps Preview"
+              src={embedUrl}
+              width="100%"
+              height="100%"
+              style={{ border: 0, display: 'block' }}
+              allowFullScreen=""
+              loading="lazy"
+            />
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', padding: '20px', textAlign: 'center', color: 'var(--text-soft, #595459)', boxSizing: 'border-box' }}>
+              <span className="material-symbols-rounded" style={{ fontSize: '32px', marginBottom: '8px' }}>pin_drop</span>
+              <div style={{ fontSize: '11.5px', fontWeight: '700' }}>
+                {window.t('Sin dirección configurada', 'No address configured')}
+              </div>
+              <div style={{ fontSize: '10px', marginTop: '4px' }}>
+                {window.t('Pega un enlace o dirección en la configuración lateral', 'Paste a link or address in the sidebar settings')}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {caption && (
+          <div className="map-caption" style={{ marginTop: '8px', fontSize: '11px', color: 'var(--text-soft, #595459)', borderTop: '1px dashed var(--line-soft, #E5E1DD)', paddingTop: '6px' }}>
+            {caption}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ──────────────── TITLE (heading) ────────────────
 function TitleItem({ item, lang }) {
   return (
@@ -3481,6 +3663,9 @@ function ItemRenderer({ item, lang, editing, callbacks }) {
     case 'file':     return <FileItem  item={item} lang={lang} onUpdate={onUpdate} onOpenFile={cb.openFile}/>;
     case 'title':    return <TitleItem item={item} lang={lang}/>;
     case 'swatch':   return <SwatchItem item={item} lang={lang}/>;
+    case 'frame':    return <FrameItem item={item} lang={lang} editing={editing} onUpdate={onUpdate}/>;
+    case 'bigtitle': return <BigTitleItem item={item} lang={lang} editing={editing} onUpdate={onUpdate}/>;
+    case 'map':      return <MapItem item={item} lang={lang} onUpdate={onUpdate}/>;
     default:         return <NoteItem  item={item} lang={lang}/>;
   }
 }
