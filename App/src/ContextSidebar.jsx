@@ -316,7 +316,7 @@ function ContextSidebar({
               if (show) {
                 onUpdate(isColChild ? { showPreview: true } : { showPreview: true, w: 300, h: 240 });
               } else {
-                onUpdate(isColChild ? { showPreview: false } : { showPreview: false, w: 220, h: 62 });
+                onUpdate(isColChild ? { showPreview: false } : { showPreview: false, w: 300, h: 62 });
               }
             }}
             title={window.t('Vista previa', 'Preview')}
@@ -554,7 +554,19 @@ function ContextSidebar({
         )}
 
         {isFrame && (
-          null
+          <>
+            <button
+              className="ctx-btn"
+              onClick={() => {
+                onStartEdit && onStartEdit();
+                window.playAudioTone && window.playAudioTone('click');
+              }}
+              title={window.t('Cambiar título', 'Change title')}
+            >
+              <span className="material-symbols-rounded">title</span>
+              <span>{window.t('Título', 'Title')}</span>
+            </button>
+          </>
         )}
 
         {isBigTitle && (
@@ -593,6 +605,17 @@ function ContextSidebar({
             <button
               className="ctx-btn"
               onClick={() => {
+                onUpdate({ _editingTitle: true });
+                window.playAudioTone && window.playAudioTone('click');
+              }}
+              title={window.t('Cambiar título', 'Change title')}
+            >
+              <span className="material-symbols-rounded">title</span>
+              <span>{window.t('Título', 'Title')}</span>
+            </button>
+            <button
+              className="ctx-btn"
+              onClick={() => {
                 onStartEdit && onStartEdit();
                 window.playAudioTone && window.playAudioTone('click');
               }}
@@ -606,6 +629,13 @@ function ContextSidebar({
               onClick={()=>{
                 const show = item.showCaption !== true;
                 onUpdate({ showCaption: show, h: show ? (item.h || 280) + 40 : Math.max(160, (item.h || 280) - 40) });
+                if (show) {
+                  setTimeout(() => {
+                    const el = document.querySelector(`[data-item-id="${item.id}"] .map-caption-input .rich-caption`);
+                    if (el) el.focus();
+                  }, 50);
+                }
+                window.playAudioTone && window.playAudioTone('click');
               }}
               title={window.t('Leyenda', 'Caption')}
             >
@@ -948,8 +978,6 @@ function ContextSidebar({
           </div>
         </div>
       )}
-
-
 
       {pane === 'bigtitleColor' && (
         <div className="ctx-popout">

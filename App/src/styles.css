@@ -1166,6 +1166,7 @@ body.odi-busy iframe { pointer-events: none !important; }
   min-height: 80px;
   background: var(--bg-2);
   overflow-y: auto;
+  overflow-x: hidden;
 }
 .column-card.drop-target .item-card { outline: 3px dashed var(--olive); outline-offset: 2px; }
 .column-card.drop-target .column-body { background: var(--olive-l); }
@@ -1207,7 +1208,15 @@ body.odi-busy iframe { pointer-events: none !important; }
 .col-child-wrap > .doc-card,
 .col-child-wrap > .board-card,
 .col-child-wrap > .comment-card,
-.col-child-wrap > .cal-mb {
+.col-child-wrap > .cal-mb,
+.col-child-wrap > .table-card,
+.col-child-wrap > .audio-card,
+.col-child-wrap > .color-card,
+.col-child-wrap > .file-card,
+.col-child-wrap > .map-card,
+.col-child-wrap > .frame-card,
+.col-child-wrap > .title-card,
+.col-child-wrap > .swatch-card {
   width: 100% !important;
   height: 100% !important;
 }
@@ -1689,7 +1698,7 @@ body.odi-busy iframe { pointer-events: none !important; }
    ============================================ */
 /* Lines layer sits BELOW the nodes (items use z-index 2 / 100 when selected)
    so arrows never paint over a node. */
-.connectors { position: absolute; inset: 0; pointer-events: none; overflow: visible; z-index: 1; }
+.connectors { position: absolute; inset: 0; pointer-events: none; overflow: visible; z-index: -1; }
 /* Handles layer sits ABOVE every node so the center anchors stay grabbable. */
 .connectors-top { z-index: 110; }
 .connector-path { fill: none; stroke: var(--ink); stroke-width: 2; stroke-linecap: round; pointer-events: stroke; cursor: pointer; }

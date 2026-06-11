@@ -45,6 +45,7 @@ function colorClass(c) {
   const map = {
     yellow:'cream', pink:'rose', mint:'sage', sky:'stone',
     lavender:'wine', lav:'wine', coral:'cream', lime:'sage', paper:'white',
+    green: 'olive', red: 'wine',
   };
   return map[c] || c || 'white';
 }
@@ -705,7 +706,9 @@ function LinkItem({ item, lang, onUpdate, editing, onEndEdit }) {
               onBlur={(e)=>{
                 // Apply the link and exit edit mode automatically — no Enter required
                 const v = e.target.value.trim();
-                const grow = v && !item._grewForUrl ? { h: Math.max(item.h || 0, 290), _grewForUrl: true } : {};
+                const grow = v
+                  ? (!item._grewForUrl ? { h: Math.max(item.h || 0, 290), _grewForUrl: true } : {})
+                  : { h: 74, _grewForUrl: false };
                 onUpdate({ url: v, _editing: false, ...grow });
                 onEndEdit && onEndEdit();
               }}
@@ -1339,7 +1342,7 @@ function ColumnItem({ item, lang, onUpdate, editing, callbacks }) {
                                   child.type === 'doc' ? 90 :
                                   child.type === 'comment' ? 80 :
                                   child.type === 'calendar' ? 220 : 90));
-            const w = (item.w || 240) - 24;
+            const w = (item.w || 240) - 36;
             const isEditingChild = callbacks.editingChild && callbacks.editingChild.colId === item.id && callbacks.editingChild.childId === child.id;
             const isSelected = callbacks.isSelectedItem?.(child.id);
             return (
@@ -3425,9 +3428,9 @@ function FileViewerModal({ fileItem, lang, onClose }) {
 }
 
 // ──────────────── FRAME ( Obsidian/Milanote style grouping marco ) ────────────────
-function FrameItem({ item, lang, editing, onUpdate }) {
+function FrameItem({ item, lang, editing, onUpdate, callbacks }) {
   const text = pickLang(item.title, lang);
-  const cls = colorClass(item.color || 'transparent');
+  const cls = item.color === 'green' ? 'olive' : (item.color || 'transparent');
   const align = item.titleAlign || 'left';
   const titleColor = item.titleColor || 'inherit';
 
@@ -3445,6 +3448,12 @@ function FrameItem({ item, lang, editing, onUpdate }) {
           borderBottom: '1px dashed var(--line-soft, #E5E1DD)',
           pointerEvents: 'auto',
           cursor: 'move'
+        }}
+        onDoubleClick={(e) => {
+          e.stopPropagation();
+          if (callbacks && callbacks.startEdit) {
+            callbacks.startEdit(item.id);
+          }
         }}
       >
         {editing ? (
@@ -3466,6 +3475,18 @@ function FrameItem({ item, lang, editing, onUpdate }) {
             }}
             onClick={(e)=>e.stopPropagation()}
             onMouseDown={(e)=>e.stopPropagation()}
+            onBlur={(e) => {
+              const v = e.target.value.trim();
+              onUpdate({ title: { es: v, en: v } });
+              if (callbacks && callbacks.endEdit) {
+                callbacks.endEdit();
+              }
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === 'Escape') {
+                e.target.blur();
+              }
+            }}
             placeholder={window.t('Nombre del marco', 'Frame name')}
             autoFocus
           />
@@ -3583,11 +3604,13 @@ const getMapsEmbedUrl = (url) => {
   return `https://maps.google.com/maps?q=${encodeURIComponent(query)}&t=&z=14&ie=UTF8&iwloc=&output=embed`;
 };
 
-function MapItem({ item, lang, onUpdate, editing, onEndEdit }) {
+function MapItem({ item, lang, onUpdate, editing, onEndEdit, callbacks }) {
   const title = pickLang(item.title, lang);
   const caption = pickLang(item.caption, lang);
   const hasUrl = !!item.url;
   const embedUrl = getMapsEmbedUrl(item.url);
+  const align = item.titleAlign || 'left';
+  const titleColor = item.titleColor || 'inherit';
 
   if (!hasUrl || editing) {
     return (
@@ -3612,7 +3635,12 @@ function MapItem({ item, lang, onUpdate, editing, onEndEdit }) {
               onChange={(e)=>onUpdate({ url: e.target.value })}
               onBlur={(e)=>{
                 const v = e.target.value.trim();
-                onUpdate({ url: v, _editing: false });
+                const patch = { url: v, _editing: false };
+                if (v) {
+                  patch.w = 340;
+                  patch.h = 280;
+                }
+                onUpdate(patch);
                 onEndEdit && onEndEdit();
               }}
               onKeyDown={(e)=>{
@@ -3631,21 +3659,21 @@ function MapItem({ item, lang, onUpdate, editing, onEndEdit }) {
   return (
     <div className="map-card" style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', boxSizing: 'border-box' }}>
       <div className="item-card" style={{ display: 'flex', flexDirection: 'column', height: '100%', padding: '12px', boxSizing: 'border-box' }}>
-        <div className="map-title" style={{ fontWeight: 800, fontSize: '13px', fontFamily: 'var(--font-display)', marginBottom: '8px', color: 'var(--ink)' }}>
-          {title || window.t('Mapa de Google', 'Google Map')}
-        </div>
         
-        <div className="map-iframe-container" style={{ flex: 1, background: 'var(--bg-2, #ECEAE6)', borderRadius: '4px', overflow: 'hidden', border: '1.5px solid var(--line-soft, #E5E1DD)', minHeight: 0 }}>
+        <div className="map-iframe-container" style={{ flex: 1, background: 'var(--bg-2, #ECEAE6)', borderRadius: '4px', overflow: 'hidden', border: '1.5px solid var(--line-soft, #E5E1DD)', minHeight: 0, position: 'relative' }}>
           {embedUrl ? (
-            <iframe
-              title="Google Maps Preview"
-              src={embedUrl}
-              width="100%"
-              height="100%"
-              style={{ border: 0, display: 'block' }}
-              allowFullScreen=""
-              loading="lazy"
-            />
+            <>
+              <iframe
+                title="Google Maps Preview"
+                src={embedUrl}
+                width="100%"
+                height="100%"
+                style={{ border: 0, display: 'block' }}
+                allowFullScreen=""
+                loading="lazy"
+                onMouseDown={(e)=>e.stopPropagation()}
+              />
+            </>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', padding: '20px', textAlign: 'center', color: 'var(--text-soft, #595459)', boxSizing: 'border-box' }}>
               <span className="material-symbols-rounded" style={{ fontSize: '32px', marginBottom: '8px' }}>pin_drop</span>
@@ -3659,9 +3687,78 @@ function MapItem({ item, lang, onUpdate, editing, onEndEdit }) {
           )}
         </div>
 
-        {caption && (
-          <div className="map-caption" style={{ marginTop: '8px', fontSize: '11px', color: 'var(--text-soft, #595459)', borderTop: '1px dashed var(--line-soft, #E5E1DD)', paddingTop: '6px' }}>
-            {caption}
+        <div className="map-info-row" style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '10px', color: 'var(--text-soft, #595459)', fontSize: '11px', fontFamily: 'var(--font-body)' }}>
+          <span className="material-symbols-rounded" style={{ fontSize: '15px', color: '#EA4335' }}>pin_drop</span>
+          <span style={{
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            flex: 1
+          }}>
+            {item.url}
+          </span>
+        </div>
+
+        {item.showTitle !== false && (
+          item._editingTitle === true ? (
+            <input
+              type="text"
+              className="map-title-input"
+              value={title}
+              placeholder={window.t('Google Maps', 'Google Maps')}
+              onChange={(e) => onUpdate({ title: { es: e.target.value, en: e.target.value } })}
+              onClick={(e)=>e.stopPropagation()}
+              onMouseDown={(e)=>e.stopPropagation()}
+              onBlur={(e) => {
+                const v = e.target.value.trim();
+                onUpdate({ title: { es: v, en: v }, _editingTitle: false });
+              }}
+              onKeyDown={(e)=>{
+                if (e.key === 'Enter' || e.key === 'Escape') {
+                  e.target.blur();
+                }
+              }}
+              style={{
+                fontWeight: 800,
+                fontSize: '14px',
+                fontFamily: 'var(--font-display)',
+                marginTop: '8px',
+                color: titleColor === 'inherit' ? 'var(--ink)' : titleColor,
+                textAlign: align,
+                width: '100%',
+                background: 'none',
+                border: 'none',
+                outline: 'none',
+                padding: 0
+              }}
+              autoFocus
+            />
+          ) : (
+            <div 
+              className="map-title" 
+              style={{ 
+                fontWeight: 800, 
+                fontSize: '14px', 
+                fontFamily: 'var(--font-display)', 
+                marginTop: '8px', 
+                color: titleColor === 'inherit' ? 'var(--ink)' : titleColor,
+                textAlign: align,
+                cursor: 'pointer',
+                userSelect: 'none'
+              }}
+              onDoubleClick={(e) => {
+                e.stopPropagation();
+                onUpdate({ _editingTitle: true });
+              }}
+            >
+              {title || window.t('Google Maps', 'Google Maps')}
+            </div>
+          )
+        )}
+
+        {item.showCaption && (
+          <div className="map-caption-wrap" style={{ marginTop: '8px', borderTop: '1px dashed var(--line-soft, #E5E1DD)', paddingTop: '6px' }}>
+            <NodeCaption item={item} lang={lang} onUpdate={onUpdate} className="map-caption-input" autoGrow/>
           </div>
         )}
       </div>
@@ -3726,9 +3823,9 @@ function ItemRenderer({ item, lang, editing, callbacks }) {
     case 'file':     return <FileItem  item={item} lang={lang} onUpdate={onUpdate} onOpenFile={cb.openFile}/>;
     case 'title':    return <TitleItem item={item} lang={lang}/>;
     case 'swatch':   return <SwatchItem item={item} lang={lang}/>;
-    case 'frame':    return <FrameItem item={item} lang={lang} editing={editing} onUpdate={onUpdate}/>;
+    case 'frame':    return <FrameItem item={item} lang={lang} editing={editing} onUpdate={onUpdate} callbacks={cb}/>;
     case 'bigtitle': return <BigTitleItem item={item} lang={lang} editing={editing} onUpdate={onUpdate}/>;
-    case 'map':      return <MapItem item={item} lang={lang} editing={editing} onUpdate={onUpdate} onEndEdit={cb.endEdit}/>;
+    case 'map':      return <MapItem item={item} lang={lang} editing={editing} onUpdate={onUpdate} onEndEdit={cb.endEdit} callbacks={cb}/>;
     default:         return <NoteItem  item={item} lang={lang}/>;
   }
 }

@@ -16,25 +16,26 @@ const {
 
 // Column auto-resize helpers
 function colChildHeight(c) {
-  return c.h || (c.type === 'note' ? 90 :
-                 c.type === 'todo' ? 140 :
-                 c.type === 'link' ? 180 :
-                 c.type === 'image' ? 140 :
-                 c.type === 'audio' ? 140 :
-                 c.type === 'doc' ? 90 :
-                 c.type === 'board' ? 130 :
-                 c.type === 'comment' ? 80 :
-                 c.type === 'calendar' ? 240 : 90);
+  if (c.type === 'board') {
+    return c.showPreview === false ? 58 : (c.h || 200);
+  }
+  if (c.h !== undefined && c.h !== null) return c.h;
+  return c.type === 'note' ? 90 :
+         c.type === 'todo' ? 140 :
+         c.type === 'link' ? 180 :
+         c.type === 'image' ? 140 :
+         c.type === 'doc' ? 90 :
+         c.type === 'comment' ? 80 :
+         c.type === 'calendar' ? 220 : 90;
 }
 function colNeededHeight(col, isEmpty) {
-  const headerH = 42;
-  const padding = 22;
+  const headerH = 40;
+  const padding = 20; // top 10px + bottom 10px
   const gap = 7;
-  const adderH = 36;
-  if (isEmpty) return Math.max(160, padding + headerH + 90);
+  if (isEmpty) return 160;
   const childrenH = (col.children || []).reduce((s, c) => s + colChildHeight(c), 0);
   const gaps = ((col.children || []).length - 1) * gap;
-  return padding + headerH + childrenH + gaps + adderH;
+  return headerH + padding + childrenH + gaps;
 }
 function withResizedColumn(items, colId) {
   return items.map(it => {
@@ -52,7 +53,7 @@ function defaultDims(type) {
     case 'todo':     return { w: 300, h: 230 };
     case 'doc':      return { w: 300, h: 210 };
     case 'image':    return { w: 300, h: 220 };
-    case 'link':     return { w: 340, h: 230 };
+    case 'link':     return { w: 400, h: 74 };
     case 'board':    return { w: 300, h: 240 };
     case 'column':   return { w: 320, h: 380 };
     case 'comment':  return { w: 280, h: 150 };
@@ -61,6 +62,9 @@ function defaultDims(type) {
     case 'audio':    return { w: 320, h: 140 };
     case 'color':    return { w: 220, h: 240 };
     case 'file':     return { w: 230, h: 150 };
+    case 'frame':    return { w: 400, h: 400 };
+    case 'bigtitle': return { w: 300, h: 80 };
+    case 'map':      return { w: 340, h: 280 };
     default:         return { w: 260, h: 160 };
   }
 }
@@ -114,7 +118,7 @@ function randomHex() {
 function makeNewItem(type, x, y, w, h, lang) {
   const id = `it-${Date.now()}-${Math.floor(Math.random()*9999)}`;
   const base = { id, x, y, _new: true };
-  const defaultSize = (defW, defH) => ({ w: Math.max(120, w || defW), h: Math.max(80, h || defH) });
+  const defaultSize = (defW, defH) => ({ w: Math.max(80, w || defW), h: Math.max(40, h || defH) });
   switch (type) {
     case 'note':
       return { ...base, type: 'note', ...defaultSize(300, 120), color: 'white', content: { es: '', en: '' } };
@@ -129,7 +133,7 @@ function makeNewItem(type, x, y, w, h, lang) {
     case 'image':
       return { ...base, type: 'image', ...defaultSize(300, 220) };
     case 'link':
-      return { ...base, type: 'link', ...defaultSize(380, 110), url: '', showPreview: true };
+      return { ...base, type: 'link', ...defaultSize(400, 74), url: '', showPreview: true };
     case 'board': {
       const cid = `b-${Date.now()}-${Math.floor(Math.random()*9999)}`;
       return { ...base, type: 'board', ...defaultSize(300, 240), color: 'white',
@@ -171,7 +175,7 @@ function makeNewItem(type, x, y, w, h, lang) {
         align: 'center',
         content: { es: 'Título Grande', en: 'Large Title' } };
     case 'map':
-      return { ...base, type: 'map', ...defaultSize(380, 280),
+      return { ...base, type: 'map', ...defaultSize(340, 280),
         title: { es: 'Mapa de Google', en: 'Google Map' },
         url: '',
         caption: { es: '', en: '' } };
@@ -626,6 +630,22 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
     const el = surfaceRef.current;
     if (!el) return;
     const onWheel = (e) => {
+      const target = e.target;
+      const isScrollable = (element) => {
+        if (!element || element === el) return false;
+        if (element.tagName === 'IFRAME') return true;
+        const style = window.getComputedStyle(element);
+        const overflowY = style.overflowY || '';
+        const overflowX = style.overflowX || '';
+        const isScrollableY = (overflowY === 'auto' || overflowY === 'scroll') && element.scrollHeight > element.clientHeight;
+        const isScrollableX = (overflowX === 'auto' || overflowX === 'scroll') && element.scrollWidth > element.clientWidth;
+        if (isScrollableY || isScrollableX) return true;
+        return isScrollable(element.parentElement);
+      };
+      if (isScrollable(target)) {
+        return; // Allow native scroll / pan / zoom behavior inside the iframe/scrollable area
+      }
+
       if (e.ctrlKey || e.metaKey) {
         e.preventDefault();
         const rect = el.getBoundingClientRect();
@@ -3090,7 +3110,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
       {toolGhost && <ToolGhost {...toolGhost} lang={lang}/>}
 
       {/* Contextual sidebar — hidden while actively editing THIS node's text (format sidebar shows instead) */}
-      {selectedItem && !captionFocusId && editing !== selectedItem.id && (() => {
+      {selectedItem && !captionFocusId && editing !== selectedItem.id && !selectedItem._editingTitle && (() => {
         const isColChild = editingChild && selectedItem.id === editingChild.childId;
         return (
           <window.ContextSidebar
@@ -3287,16 +3307,25 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
       })()}
 
       {/* Text format sidebar (when editing a text-based item) */}
-      {editing && editing === selected && !captionFocusId && (() => {
-        const it = current.items.find(i => i.id === editing);
-        if (!it || !['note','comment','bigtitle','frame'].includes(it.type)) return null;
+      {((editing && editing === selected) || (selectedItem && selectedItem.type === 'map' && selectedItem._editingTitle)) && !captionFocusId && (() => {
+        const it = selectedItem;
+        if (!it) return null;
+        const isEditingMapTitle = it.type === 'map' && it._editingTitle;
+        const isEditingTextNode = editing && editing === selected && ['note','comment','bigtitle','frame'].includes(it.type);
+        if (!isEditingTextNode && !isEditingMapTitle) return null;
         return (
           <window.TextFormatSidebar
             item={it}
             lang={lang}
             noCodeQuote={it.type === 'comment'}
             onUpdate={(patch)=>updateItem(it.id, patch)}
-            onClose={()=>setEditing(null)}
+            onClose={()=>{
+              if (isEditingMapTitle) {
+                updateItem(it.id, { _editingTitle: false });
+              } else {
+                setEditing(null);
+              }
+            }}
           />
         );
       })()}
@@ -3387,7 +3416,9 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
                     width: item.w !== undefined ? item.w : def.w,
                     height: item.h !== undefined ? item.h : def.h,
                     '--node-scale': nodeScale,
-                    zIndex: selected === item.id ? 100 : (item.type === 'frame' ? 1 : 2),
+                    zIndex: (selected === item.id || selectedIds.includes(item.id))
+                      ? (item.type === 'frame' ? 1.5 : 100)
+                      : (item.type === 'frame' ? 1 : 2),
                     opacity: matches ? 1 : 0.18,
                     transition: item._dragging ? 'none' : 'opacity 200ms ease',
                     pointerEvents: item.type === 'frame' ? 'none' : 'auto',
@@ -3399,7 +3430,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
                   onDoubleClick={(e)=>{
                     if (item.type === 'doc') { e.stopPropagation(); setDocOpen({ id: item.id }); return; }
                     if (item.type === 'board') return;
-                    if (['note','comment','todo','column','link','board','frame','bigtitle'].includes(item.type)) {
+                    if (['note','comment','todo','column','link','board','bigtitle'].includes(item.type)) {
                       e.stopPropagation(); setEditing(item.id);
                     }
                   }}

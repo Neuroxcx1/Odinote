@@ -180,8 +180,16 @@ function edgeIntersect(item, tx, ty) {
   const hw = item.w / 2, hh = item.h / 2;
   const sx = dx !== 0 ? hw / Math.abs(dx) : Infinity;
   const sy = dy !== 0 ? hh / Math.abs(dy) : Infinity;
-  const s = Math.min(sx, sy);
-  return { x: cx + dx * s, y: cy + dy * s };
+  
+  const s = item.isColumn ? sx : Math.min(sx, sy);
+  let rx = cx + dx * s;
+  let ry = cy + dy * s;
+  
+  if (item.isColumn) {
+    ry = Math.max(item.y, Math.min(item.y + item.h, ry));
+  }
+  
+  return { x: rx, y: ry };
 }
 
 // Legacy helpers kept for backward compatibility (Canvas still calls these for creation)
@@ -190,6 +198,26 @@ function getAnchorPoint(item, anchor) {
   return getCenter(item); // always the center now
 }
 function closestAnchorTo() { return 'center'; }
+function localDefaultDims(type) {
+  switch (type) {
+    case 'note':     return { w: 300, h: 120 };
+    case 'todo':     return { w: 300, h: 230 };
+    case 'doc':      return { w: 300, h: 210 };
+    case 'image':    return { w: 300, h: 220 };
+    case 'link':     return { w: 340, h: 230 };
+    case 'board':    return { w: 300, h: 240 };
+    case 'column':   return { w: 320, h: 380 };
+    case 'comment':  return { w: 280, h: 150 };
+    case 'calendar': return { w: 520, h: 420 };
+    case 'table':    return { w: 380, h: 220 };
+    case 'audio':    return { w: 320, h: 140 };
+    case 'color':    return { w: 220, h: 240 };
+    case 'file':     return { w: 230, h: 150 };
+    case 'map':      return { w: 340, h: 280 };
+    default:         return { w: 260, h: 160 };
+  }
+}
+
 function getNodeRect(itemId, items) {
   if (!items) return null;
   const topItem = items.find(i => i.id === itemId);
@@ -197,45 +225,47 @@ function getNodeRect(itemId, items) {
     let w = topItem.w;
     let h = topItem.h;
     if (w === undefined || h === undefined) {
-      const def = (window.defaultDims && window.defaultDims(topItem.type)) || { w: 200, h: 200 };
+      const def = localDefaultDims(topItem.type);
       if (w === undefined) w = def.w;
       if (h === undefined) h = def.h;
     }
-    return { id: topItem.id, x: topItem.x, y: topItem.y, w, h };
+    return { id: topItem.id, x: topItem.x, y: topItem.y, w, h, isColumn: topItem.type === 'column' };
   }
   for (const it of items) {
     if (it.type === 'column' && it.children) {
       const idx = it.children.findIndex(c => c.id === itemId);
       if (idx !== -1) {
         const child = it.children[idx];
-        let relY = 52;
+        let relY = 40; // updated column header height
         for (let i = 0; i < idx; i++) {
           const prev = it.children[i];
-          const prevH = prev.h || (prev.type === 'note' ? 90 :
-                                  prev.type === 'todo' ? 140 :
-                                  prev.type === 'link' ? 180 :
-                                  prev.type === 'image' ? 140 :
-                                  prev.type === 'doc' ? 90 :
-                                  prev.type === 'board' ? 130 :
-                                  prev.type === 'comment' ? 80 :
-                                  prev.type === 'calendar' ? 220 : 90);
+          const prevH = prev.type === 'board'
+            ? (prev.showPreview === false ? 58 : (prev.h || 200))
+            : (prev.h || (prev.type === 'note' ? 90 :
+                          prev.type === 'todo' ? 140 :
+                          prev.type === 'link' ? 180 :
+                          prev.type === 'image' ? 140 :
+                          prev.type === 'doc' ? 90 :
+                          prev.type === 'comment' ? 80 :
+                          prev.type === 'calendar' ? 220 : 90));
           relY += prevH + 7;
         }
-        const w = (it.w || 320) - 24;
-        const h = child.h || (child.type === 'note' ? 90 :
-                              child.type === 'todo' ? 140 :
-                              child.type === 'link' ? 180 :
-                              child.type === 'image' ? 140 :
-                              child.type === 'doc' ? 90 :
-                              child.type === 'board' ? 130 :
-                              child.type === 'comment' ? 80 :
-                              child.type === 'calendar' ? 220 : 90);
+        const h = child.type === 'board'
+          ? (child.showPreview === false ? 58 : (child.h || 200))
+          : (child.h || (child.type === 'note' ? 90 :
+                        child.type === 'todo' ? 140 :
+                        child.type === 'link' ? 180 :
+                        child.type === 'image' ? 140 :
+                        child.type === 'doc' ? 90 :
+                        child.type === 'comment' ? 80 :
+                        child.type === 'calendar' ? 220 : 90));
         return {
           id: child.id,
-          x: it.x + 12,
+          x: it.x,
           y: it.y + relY,
-          w: w,
-          h: h
+          w: it.w || 320,
+          h: h,
+          isColumn: true
         };
       }
     }
@@ -278,7 +308,7 @@ function Connector({ conn, items, selected, selectedIds, onSelect, onUpdate, onD
     const gg = Math.min(g, l * 0.6);
     return { x: from.x + (dx / l) * gg, y: from.y + (dy / l) * gg };
   };
-  const GAP = 12;
+  const GAP = 16;
 
   let eA, eB, p1, p2, qx, qy, path, hx, hy, angleEnd, angleStart, exADir, exBDir;
   let orthoWaypoints = null;   // user-draggable interior waypoints (Miro-style)
@@ -686,7 +716,7 @@ function Connector({ conn, items, selected, selectedIds, onSelect, onUpdate, onD
         overlay.style.pointerEvents = oldPE;
       }
 
-      const itemEl = el?.closest('.item');
+      const itemEl = el?.closest('.item, .col-child-wrap');
       const targetId = itemEl?.getAttribute('data-item-id');
       if (targetId) {
         const newEnd = { itemId: targetId };

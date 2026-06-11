@@ -9,7 +9,8 @@ function TextFormatSidebar({ item, lang, onUpdate, onClose, variant, noCodeQuote
   const isCaption = variant === 'caption'; // captions get only Color/H1/B/I/S/U (no lists, quote, code)
   const isBigTitle = item.type === 'bigtitle';
   const isFrame = item.type === 'frame';
-  const isCustomPropType = isBigTitle || isFrame;
+  const isMap = item.type === 'map';
+  const isCustomPropType = isBigTitle || isFrame || isMap;
   const [active, setActive] = React.useState({});
   const [colorOpen, setColorOpen] = React.useState(false);
 
@@ -29,7 +30,7 @@ function TextFormatSidebar({ item, lang, onUpdate, onClose, variant, noCodeQuote
           alignRight: (item.align || 'center') === 'right',
           alignJustify: (item.align || 'center') === 'justify',
         });
-      } else if (item.type === 'frame') {
+      } else if (item.type === 'frame' || item.type === 'map') {
         setActive({
           alignLeft: (item.titleAlign || 'left') === 'left',
           alignCenter: (item.titleAlign || 'left') === 'center',
@@ -102,7 +103,7 @@ function TextFormatSidebar({ item, lang, onUpdate, onClose, variant, noCodeQuote
         <div className="ctx-letter" style={{
           fontWeight: 800,
           fontSize: 14,
-          color: isBigTitle ? (item.textColor || '#1A1A1A') : (isFrame ? (item.titleColor || '#1A1A1A') : '#E6544F'),
+          color: isBigTitle ? (item.textColor || '#1A1A1A') : ((isFrame || isMap) ? (item.titleColor || '#1A1A1A') : '#E6544F'),
           background: isCustomPropType && (isBigTitle ? item.textColor : item.titleColor) && (isBigTitle ? item.textColor : item.titleColor) !== 'inherit' ? 'none' : 'linear-gradient(90deg, #1A1A1A, #E6544F, #90B968)',
           WebkitBackgroundClip: isCustomPropType && (isBigTitle ? item.textColor : item.titleColor) && (isBigTitle ? item.textColor : item.titleColor) !== 'inherit' ? 'none' : 'text',
           WebkitTextFillColor: isCustomPropType && (isBigTitle ? item.textColor : item.titleColor) && (isBigTitle ? item.textColor : item.titleColor) !== 'inherit' ? 'none' : 'transparent',
@@ -163,7 +164,7 @@ function TextFormatSidebar({ item, lang, onUpdate, onClose, variant, noCodeQuote
             onClick={()=>{
               if (isBigTitle) {
                 onUpdate({ align: 'left' });
-              } else if (isFrame) {
+              } else if (isFrame || isMap) {
                 onUpdate({ titleAlign: 'left' });
               } else {
                 exec('justifyLeft');
@@ -180,7 +181,7 @@ function TextFormatSidebar({ item, lang, onUpdate, onClose, variant, noCodeQuote
             onClick={()=>{
               if (isBigTitle) {
                 onUpdate({ align: 'center' });
-              } else if (isFrame) {
+              } else if (isFrame || isMap) {
                 onUpdate({ titleAlign: 'center' });
               } else {
                 exec('justifyCenter');
@@ -197,7 +198,7 @@ function TextFormatSidebar({ item, lang, onUpdate, onClose, variant, noCodeQuote
             onClick={()=>{
               if (isBigTitle) {
                 onUpdate({ align: 'right' });
-              } else if (isFrame) {
+              } else if (isFrame || isMap) {
                 onUpdate({ titleAlign: 'right' });
               } else {
                 exec('justifyRight');
@@ -214,7 +215,7 @@ function TextFormatSidebar({ item, lang, onUpdate, onClose, variant, noCodeQuote
             onClick={()=>{
               if (isBigTitle) {
                 onUpdate({ align: 'justify' });
-              } else if (isFrame) {
+              } else if (isFrame || isMap) {
                 onUpdate({ titleAlign: 'justify' });
               } else {
                 exec('justifyFull');
@@ -314,7 +315,7 @@ function TextFormatSidebar({ item, lang, onUpdate, onClose, variant, noCodeQuote
                 onClick={()=>{
                   if (isBigTitle) {
                     onUpdate({ textColor: c });
-                  } else if (isFrame) {
+                  } else if (isFrame || isMap) {
                     onUpdate({ titleColor: c });
                   } else {
                     exec('foreColor', c);
@@ -331,7 +332,7 @@ function TextFormatSidebar({ item, lang, onUpdate, onClose, variant, noCodeQuote
             onClick={()=>{
               if (isBigTitle) {
                 onUpdate({ textColor: 'inherit' });
-              } else if (isFrame) {
+              } else if (isFrame || isMap) {
                 onUpdate({ titleColor: 'inherit' });
               } else {
                 exec('removeFormat');
