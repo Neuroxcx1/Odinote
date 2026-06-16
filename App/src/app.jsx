@@ -198,7 +198,7 @@ function App() {
       }
 
       const cleanLatest = latestVersion.replace(/^v/, '');
-      const cleanCurrent = '1.0.2'; // matches package.json
+      const cleanCurrent = '1.0.3'; // matches package.json
 
       const latestParts = cleanLatest.split('.').map(Number);
       const currentParts = cleanCurrent.split('.').map(Number);
