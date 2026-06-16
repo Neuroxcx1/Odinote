@@ -3048,3 +3048,39 @@ body.odi-busy iframe { pointer-events: none !important; }
 [data-theme="dark"] .ctx-btn.active .ctx-letter {
   color: #9ECB75 !important;
 }
+
+/* ==========================================================================
+   FEEDBACK BUTTON (GITHUB DISCUSSIONS LINK)
+   ========================================================================== */
+.feedback-topbar-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  background: var(--paper);
+  border: 1.5px solid var(--line);
+  color: var(--ink-2) !important;
+  border-radius: 99px;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 12.5px;
+  transition: transform 120ms var(--e-out), background 120ms, border-color 120ms;
+  margin-right: 12px;
+  cursor: pointer;
+  text-decoration: none;
+  z-index: 10;
+}
+.feedback-topbar-btn:hover {
+  background: var(--bg-2);
+  border-color: var(--wine, #7B2D26);
+  color: var(--wine, #7B2D26) !important;
+  transform: translateY(-1px);
+}
+[data-theme="dark"] .feedback-topbar-btn {
+  background: #3A383A;
+  border-color: #1A1A1A;
+}
+[data-theme="dark"] .feedback-topbar-btn:hover {
+  background: #2A282A;
+  color: #FF8A5B !important;
+}

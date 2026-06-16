@@ -187,6 +187,14 @@ function Topbar({
 
       <div className="topbar-spacer" style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center' }}>
         <button
+          className="feedback-topbar-btn"
+          onClick={() => window.open('https://github.com/Neuroxcx1/Odinote/discussions', '_blank', 'noopener,noreferrer')}
+          title={window.t('Comenta o danos tu feedback en GitHub', 'Give us feedback or suggestions on GitHub')}
+        >
+          <span className="material-symbols-rounded" style={{ fontSize: '15px' }}>forum</span>
+          <span>{window.t('Feedback', 'Feedback')}</span>
+        </button>
+        <button
           className="kofi-topbar-btn"
           onClick={() => window.open('https://ko-fi.com/W3G31ZYE06', '_blank', 'noopener,noreferrer')}
           title={window.t('Apóyame en Ko-fi', 'Support me on Ko-fi')}
