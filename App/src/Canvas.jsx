@@ -746,6 +746,49 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
       if (matchShortcut(window.shortcuts.selectAll)) {
         e.preventDefault(); selectAllItems();
       }
+      // Ctrl+X: cut the selected items and their connectors
+      if ((e.metaKey || e.ctrlKey) && e.key === 'x') {
+        const af = document.activeElement;
+        if (af &&
+            ((af.tagName || '').toLowerCase() === 'input' ||
+             (af.tagName || '').toLowerCase() === 'textarea' ||
+             (af.isContentEditable && af !== pasteIntRef.current))) {
+          return; // Let native cut handle it
+        }
+
+        const selectedItems = current.items.filter(it => selectedIds.includes(it.id) || (selectedIds.length === 0 && it.id === selected));
+        if (selectedItems.length > 0) {
+          e.preventDefault();
+          const selectedItemIds = selectedItems.map(it => it.id);
+          const selectedConnectors = (current.connectors || []).filter(co =>
+            selectedIds.includes(co.id) ||
+            (selectedItemIds.includes(co.fromEnd?.itemId) && selectedItemIds.includes(co.toEnd?.itemId))
+          );
+          
+          const copiedData = {
+            odinote: true,
+            items: JSON.parse(JSON.stringify(selectedItems)),
+            connectors: JSON.parse(JSON.stringify(selectedConnectors)),
+          };
+          window._odiCopiedData = copiedData;
+          window._odiCopiedItem = copiedData.items[0];
+          navigator.clipboard.writeText(JSON.stringify(copiedData)).catch(err => {
+            console.warn('Could not write to system clipboard', err);
+          });
+
+          // Delete the cut items
+          setCanvases(prev => {
+            const c = prev[currentId];
+            return { ...prev, [currentId]: {
+              ...c,
+              items: c.items.filter(it => !selectedItemIds.includes(it.id)),
+              connectors: (c.connectors || []).filter(co => !selectedItemIds.includes(co.id) && !selectedItemIds.includes(co.fromEnd?.itemId) && !selectedItemIds.includes(co.toEnd?.itemId)),
+            }};
+          });
+          setSelectedIds([]); setSelected(null);
+        }
+      }
+
       // Ctrl+C: copy the selected items and their connectors
       if ((e.metaKey || e.ctrlKey) && e.key === 'c' && !e.shiftKey) {
         const af = document.activeElement;
