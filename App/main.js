@@ -313,8 +313,32 @@ ipcMain.handle('set-spellchecker-languages', async (event, langs) => {
     } catch (err) {
       logToFile(`Error setting spellchecker languages: ${err.message}`);
     }
+});
+
+ipcMain.handle('open-custom-dictionary', async () => {
+  logToFile('IPC Call: open-custom-dictionary');
+  const dictPath = path.join(app.getPath('userData'), 'Custom Dictionary.txt');
+  try {
+    if (!fs.existsSync(dictPath)) {
+      fs.writeFileSync(dictPath, '', 'utf-8');
+    }
+    await shell.openPath(dictPath);
+    return true;
+  } catch (err) {
+    logToFile(`IPC open-custom-dictionary ERROR: ${err.message}`);
+    return false;
   }
-  return false;
+});
+
+ipcMain.handle('open-user-data-folder', async () => {
+  logToFile('IPC Call: open-user-data-folder');
+  try {
+    await shell.openPath(app.getPath('userData'));
+    return true;
+  } catch (err) {
+    logToFile(`IPC open-user-data-folder ERROR: ${err.message}`);
+    return false;
+  }
 });
 
 app.whenReady().then(() => {

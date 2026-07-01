@@ -14,5 +14,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
   replaceMisspelling: (suggestion) => ipcRenderer.invoke('replace-misspelling', suggestion),
   addToDictionary: (word) => ipcRenderer.invoke('add-to-dictionary', word),
-  setSpellcheckerLanguages: (langs) => ipcRenderer.invoke('set-spellchecker-languages', langs)
+  setSpellcheckerLanguages: (langs) => ipcRenderer.invoke('set-spellchecker-languages', langs),
+  openCustomDictionary: () => ipcRenderer.invoke('open-custom-dictionary'),
+  openUserDataFolder: () => ipcRenderer.invoke('open-user-data-folder')
 });

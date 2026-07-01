@@ -39,6 +39,7 @@ function Topbar({
   onToolDragStart,
   updateAvailable, onUpdateClick,
   volume, onChangeVolume,
+  onSettingsClick,
 }) {
   const t = window.TRANSLATIONS[lang];
   const [extraOpen, setExtraOpen] = React.useState(false);
@@ -273,6 +274,14 @@ function Topbar({
             title={`${Math.round(volume * 100)}%`}
           />
         </div>
+        <button
+          className="icon-btn lift settings-btn"
+          title={window.t('Ajustes', 'Settings')}
+          onClick={() => { onSettingsClick && onSettingsClick(); window.playAudioTone && window.playAudioTone('click'); }}
+          style={{ marginRight: '4px' }}
+        >
+          <span className="material-symbols-rounded">settings</span>
+        </button>
         <button
           className="icon-btn lift theme-btn"
           title={theme==='dark'?'Light mode':'Dark mode'}

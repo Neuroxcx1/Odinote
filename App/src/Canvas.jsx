@@ -367,7 +367,7 @@ function duplicateCanvasState(state, origId, newId) {
   });
 }
 
-function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn, setCanvases: setExtCanvases, updateAvailable, onUpdateClick, volume, onChangeVolume }) {
+function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn, setCanvases: setExtCanvases, updateAvailable, onUpdateClick, volume, onChangeVolume, onSettingsClick }) {
   const [canvases, _setCanvases] = useStateCanvas(() => canvasesIn || JSON.parse(JSON.stringify(window.INITIAL_CANVASES)));
   // Stable ref to App's setter — avoids the infinite loop caused by it being a dep on every render
   const setExtCanvasesRef = useRefCanvas(setExtCanvases);
@@ -3096,6 +3096,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
         lang={lang} setLang={setLang}
         theme={theme} setTheme={setTheme}
         crumbs={crumbs} onCrumb={onCrumb} onCrumbRename={onCrumbRename}
+        onSettingsClick={onSettingsClick}
         activeTool={activeTool} setActiveTool={setActiveTool}
         onHome={onHome}
         onUndo={undo} onRedo={redo}

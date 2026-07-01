@@ -1812,18 +1812,18 @@ window.UI_WORDS = {
     "ar": "تعذر التحقق من وجود تحديثات. يرجى التحقق من الاتصال.",
     "ru": "Не удалось проверить наличие обновлений. Проверьте свое соединение."
   },
-  "¡Estás al día! Odinote está en su versión más reciente (v1.0.2).": {
-    "es": "¡Estás al día! Odinote está en su versión más reciente (v1.0.2).",
-    "en": "You are up to date! Odinote is on the latest version (v1.0.2).",
-    "fr": "Vous êtes à jour ! Odinote est dans sa version la plus récente (v1.0.2).",
-    "de": "Sie sind auf dem neuesten Stand! Odinote ist in der neuesten Version (v1.0.2).",
-    "it": "Sei al passo con gli aggiornamenti! Odinote è all'ultima versione (v1.0.2).",
-    "pt": "Você está atualizado! O Odinote está na versão mais recente (v1.0.2).",
-    "zh": "您已是最新版本！Odinote 处于最新版本 (v1.0.2)。",
-    "ja": "最新の状態です！Odinoteは最新バージョン (v1.0.2) です。",
-    "ko": "최신 버전입니다! Odinote가 최신 버전(v1.0.2)입니다.",
-    "ar": "أنت على أحدث إصدار! أودينوت في أحدث إصدار (v1.0.2).",
-    "ru": "Вы в курсе! Odinote находится в самой последней версии (v1.0.2)."
+  "¡Estás al día! Odinote está en su versión más reciente (%v).": {
+    "es": "¡Estás al día! Odinote está en su versión más reciente (%v).",
+    "en": "You are up to date! Odinote is on the latest version (%v).",
+    "fr": "Vous êtes à jour ! Odinote est dans sa version la plus récente (%v).",
+    "de": "Sie sind auf dem neuesten Stand! Odinote ist in der neuesten Version (%v).",
+    "it": "Sei al passo con gli aggiornamenti! Odinote è all'ultima versione (%v).",
+    "pt": "Você está atualizado! O Odinote está na versão mais recente (%v).",
+    "zh": "您已是最新版本！Odinote 处于最新版本 (%v)。",
+    "ja": "最新の状態です！Odinoteは最新バージョン (%v) です。",
+    "ko": "최신 버전입니다! Odinote가 최신 버전(%v)입니다.",
+    "ar": "أنت على أحدث إصدار! أودينوت في أحدث إصدار (%v).",
+    "ru": "Вы в курсе! Odinote находится в самой последней версии (%v)."
   },
   "No se pudo leer la boveda seleccionada.": {
     "es": "No se pudo leer la boveda seleccionada.",

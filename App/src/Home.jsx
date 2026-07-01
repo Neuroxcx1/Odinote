@@ -30,7 +30,7 @@ const COVER_PRESETS = [
 ];
 const EMOJI_PRESETS = ['⚔️','🌾','🚀','🧩','🎲','🗺️','🏰','🐉','🎮','🌙','🔥','💎','🎨','📚','💡','🎯'];
 
-function Home({ lang, setLang, theme, setTheme, onOpenProject, projects, onCreate, onDelete, onRename, onRestore, onPurge, onToggleStar, onExport, onImport, vaultPath, onOpenVault, onCloseVault, updateAvailable, onUpdateClick }) {
+function Home({ lang, setLang, theme, setTheme, onOpenProject, projects, onCreate, onDelete, onRename, onRestore, onPurge, onToggleStar, onExport, onImport, vaultPath, onOpenVault, onCloseVault, updateAvailable, onUpdateClick, onSettingsClick }) {
   const t = window.TRANSLATIONS[lang];
   const [query, setQuery] = useStateHome('');
   const [modal, setModal] = useStateHome(false);
@@ -210,6 +210,14 @@ function Home({ lang, setLang, theme, setTheme, onOpenProject, projects, onCreat
                 </span>
               </button>
             )}
+            <button
+              className="icon-btn lift settings-btn"
+              title={window.t('Ajustes', 'Settings')}
+              onClick={onSettingsClick}
+              style={{ marginRight: '6px' }}
+            >
+              <span className="material-symbols-rounded">settings</span>
+            </button>
             <button
               className="icon-btn lift"
               onClick={()=>setTheme(theme === 'dark' ? 'light' : 'dark')}

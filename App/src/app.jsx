@@ -147,6 +147,7 @@ function App() {
   const [updateAvailable, setUpdateAvailable] = useStateApp(false);
   const [checkingUpdates, setCheckingUpdates] = useStateApp(false);
   const [contextMenu, setContextMenu] = useStateApp(null);
+  const [settingsOpen, setSettingsOpen] = useStateApp(false);
   const [volume, setVolume] = useStateApp(() => {
     const val = localStorage.getItem('odinote.volume');
     return val !== null ? parseFloat(val) : 0.5;
@@ -185,7 +186,7 @@ function App() {
       const data = await res.json();
       if (!Array.isArray(data) || data.length === 0) {
         if (manual) {
-          alert(window.t(`¡Estás al día! Odinote está en su versión más reciente (v${cleanCurrent}).`, `You are up to date! Odinote is on the latest version (v${cleanCurrent}).`));
+          alert(window.t('¡Estás al día! Odinote está en su versión más reciente (%v).', 'You are up to date! Odinote is on the latest version (%v).').replace('%v', 'v' + cleanCurrent));
         }
         return;
       }
@@ -193,7 +194,7 @@ function App() {
       const latestVersion = latestRelease.tag_name;
       if (!latestVersion) {
         if (manual) {
-          alert(window.t(`¡Estás al día! Odinote está en su versión más reciente (v${cleanCurrent}).`, `You are up to date! Odinote is on the latest version (v${cleanCurrent}).`));
+          alert(window.t('¡Estás al día! Odinote está en su versión más reciente (%v).', 'You are up to date! Odinote is on the latest version (%v).').replace('%v', 'v' + cleanCurrent));
         }
         return;
       }
@@ -223,7 +224,7 @@ function App() {
       } else {
         setUpdateAvailable(false);
         if (manual) {
-          alert(window.t(`¡Estás al día! Odinote está en su versión más reciente (v${cleanCurrent}).`, `You are up to date! Odinote is on the latest version (v${cleanCurrent}).`));
+          alert(window.t('¡Estás al día! Odinote está en su versión más reciente (%v).', 'You are up to date! Odinote is on the latest version (%v).').replace('%v', 'v' + cleanCurrent));
         }
       }
     } catch (err) {
@@ -833,6 +834,7 @@ function App() {
       onCloseVault={closeLocalVault}
       updateAvailable={updateAvailable}
       onUpdateClick={handleUpdateClick}
+      onSettingsClick={() => setSettingsOpen(true)}
     />;
   } else {
     activeView = <window.Canvas
@@ -847,6 +849,7 @@ function App() {
       onUpdateClick={handleUpdateClick}
       volume={volume}
       onChangeVolume={setVolume}
+      onSettingsClick={() => setSettingsOpen(true)}
     />;
   }
 
@@ -925,6 +928,143 @@ function App() {
                 <span>{lang === 'es' ? 'Copiar' : 'Copy'}</span>
               </button>
             )}
+          </div>
+        </div>
+      )}
+
+      {settingsOpen && (
+        <div className="doc-modal-overlay" style={{ zIndex: 10000, display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.45)' }} onClick={() => setSettingsOpen(false)}>
+          <div 
+            className="doc-modal-window" 
+            style={{ 
+              width: '450px', 
+              maxHeight: '80vh', 
+              padding: '24px', 
+              borderRadius: '16px', 
+              background: 'var(--bg-card, #FFFFFF)', 
+              border: '1.5px solid var(--line-soft, #E5E1DD)', 
+              boxShadow: '0 8px 30px rgba(0,0,0,0.12)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '16px'
+            }} 
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--line-soft, #E5E1DD)', paddingBottom: '12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--wine, #7B2D26)' }}>
+                <span className="material-symbols-rounded" style={{ fontSize: '24px' }}>settings</span>
+                <span style={{ fontWeight: '700', fontSize: '18px' }}>
+                  {window.t('Ajustes de Odinote', 'Odinote Settings')}
+                </span>
+              </div>
+              <button 
+                className="icon-btn" 
+                onClick={() => setSettingsOpen(false)}
+                style={{ background: 'transparent', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              >
+                <span className="material-symbols-rounded" style={{ fontSize: '20px', color: 'var(--text-soft, #595459)' }}>close</span>
+              </button>
+            </div>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', overflowY: 'auto' }}>
+              {/* Sección Corrector Ortográfico */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <div style={{ fontWeight: '600', fontSize: '14px', color: 'var(--wine, #7B2D26)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span className="material-symbols-rounded" style={{ fontSize: '18px' }}>spellcheck</span>
+                  <span>{window.t('Corrector Ortográfico', 'Spellchecker Dictionary')}</span>
+                </div>
+                <p style={{ fontSize: '12.5px', color: 'var(--text-soft, #595459)', margin: 0, lineHeight: '1.5' }}>
+                  {window.t(
+                    'Las palabras que agregas al diccionario (haciendo clic derecho sobre una palabra subrayada en rojo) se guardan localmente en tu sistema en el archivo "Custom Dictionary.txt".',
+                    'Words you add to the dictionary (by right-clicking a word underlined in red) are saved locally on your system in the "Custom Dictionary.txt" file.'
+                  )}
+                </p>
+                <p style={{ fontSize: '12px', color: 'var(--text-soft, #595459)', margin: 0, lineHeight: '1.5', background: 'var(--bg-main, #FAF8F6)', padding: '10px', borderRadius: '8px', border: '1px dashed var(--line-soft, #E5E1DD)' }}>
+                  <strong>{window.t('¿Cómo corregir errores?', 'How to remove a word?')}</strong><br/>
+                  {window.t(
+                    'Si agregaste una palabra por error y quieres que vuelva a aparecer como incorrecta, abre el archivo con el botón de abajo y elimina la línea de esa palabra.',
+                    'If you added a word by mistake and want it to be marked as misspelled again, open the file using the button below and delete that word\'s line.'
+                  )}
+                </p>
+                
+                {window.electronAPI ? (
+                  <div style={{ display: 'flex', gap: '10px', marginTop: '4px' }}>
+                    <button
+                      className="ms-new-btn"
+                      style={{ 
+                        flex: 1, 
+                        padding: '10px 12px', 
+                        fontSize: '12.5px', 
+                        background: 'var(--wine, #7B2D26)', 
+                        color: 'white', 
+                        border: 'none', 
+                        borderRadius: '8px', 
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '6px',
+                        fontWeight: '600'
+                      }}
+                      onClick={() => {
+                        window.electronAPI.openCustomDictionary();
+                      }}
+                    >
+                      <span className="material-symbols-rounded" style={{ fontSize: '18px' }}>edit_note</span>
+                      <span>{window.t('Abrir Diccionario (.txt)', 'Open Dictionary (.txt)')}</span>
+                    </button>
+                    
+                    <button
+                      className="btn btn-ghost"
+                      style={{ 
+                        padding: '10px 12px', 
+                        fontSize: '12.5px', 
+                        background: 'transparent', 
+                        color: 'var(--text, #1A1A1A)', 
+                        border: '1.5px solid var(--line-soft, #E5E1DD)', 
+                        borderRadius: '8px', 
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '6px'
+                      }}
+                      onClick={() => {
+                        window.electronAPI.openUserDataFolder();
+                      }}
+                      title={window.t('Abrir carpeta del sistema', 'Open system folder')}
+                    >
+                      <span className="material-symbols-rounded" style={{ fontSize: '18px' }}>folder</span>
+                    </button>
+                  </div>
+                ) : (
+                  <p style={{ fontSize: '11px', color: 'var(--wine)', margin: 0, fontWeight: '500' }}>
+                    {window.t(
+                      'La edición directa del diccionario solo está disponible en la versión de escritorio.',
+                      'Direct dictionary editing is only available in the desktop application.'
+                    )}
+                  </p>
+                )}
+              </div>
+            </div>
+            
+            <div style={{ display: 'flex', justifyContent: 'flex-end', borderTop: '1px solid var(--line-soft, #E5E1DD)', paddingTop: '12px', marginTop: '4px' }}>
+              <button
+                className="btn btn-ghost"
+                onClick={() => setSettingsOpen(false)}
+                style={{ 
+                  padding: '8px 16px', 
+                  fontSize: '13px', 
+                  borderRadius: '8px', 
+                  border: '1.5px solid var(--line-soft, #E5E1DD)', 
+                  cursor: 'pointer',
+                  background: 'transparent',
+                  color: 'var(--text, #1A1A1A)'
+                }}
+              >
+                {window.t('Cerrar', 'Close')}
+              </button>
+            </div>
           </div>
         </div>
       )}
