@@ -16,5 +16,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   addToDictionary: (word) => ipcRenderer.invoke('add-to-dictionary', word),
   setSpellcheckerLanguages: (langs) => ipcRenderer.invoke('set-spellchecker-languages', langs),
   openCustomDictionary: () => ipcRenderer.invoke('open-custom-dictionary'),
-  openUserDataFolder: () => ipcRenderer.invoke('open-user-data-folder')
+  openUserDataFolder: () => ipcRenderer.invoke('open-user-data-folder'),
+  fetchImageBase64: (url) => ipcRenderer.invoke('fetch-image-base64', url)
 });

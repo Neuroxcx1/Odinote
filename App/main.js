@@ -343,6 +343,21 @@ ipcMain.handle('open-user-data-folder', async () => {
   }
 });
 
+ipcMain.handle('fetch-image-base64', async (event, url) => {
+  logToFile(`IPC Call: fetch-image-base64 for ${url}`);
+  try {
+    const { net } = require('electron');
+    const response = await net.fetch(url);
+    const buffer = await response.arrayBuffer();
+    const contentType = response.headers.get('content-type') || 'image/png';
+    const base64 = Buffer.from(buffer).toString('base64');
+    return `data:${contentType};base64,${base64}`;
+  } catch (err) {
+    logToFile(`IPC fetch-image-base64 ERROR: ${err.message}`);
+    throw err;
+  }
+});
+
 app.whenReady().then(() => {
   logToFile('App whenReady triggered.');
   createWindow();

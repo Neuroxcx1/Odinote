@@ -836,8 +836,73 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
     const onDrop = (e) => {
       // Don't intercept drops while a fullscreen modal (doc editor / file viewer) is open
       if (docOpen || fileOpen) return;
-      const file = e.dataTransfer?.files?.[0];
-      if (!file) return;
+      let file = e.dataTransfer?.files?.[0];
+      if (!file) {
+        const urlList = e.dataTransfer?.getData('text/uri-list');
+        const html = e.dataTransfer?.getData('text/html');
+        let imgUrl = urlList ? urlList.split('\n')[0].trim() : '';
+        if (!imgUrl && html) {
+          const match = html.match(/<img[^>]+src=["']([^"']+)["']/i);
+          if (match && match[1]) imgUrl = match[1];
+        }
+        if (imgUrl && (imgUrl.startsWith('http://') || imgUrl.startsWith('https://') || imgUrl.startsWith('data:'))) {
+          e.preventDefault();
+          const targetEl = e.target?.closest?.('[data-item-id]');
+          const targetId = targetEl?.dataset?.itemId;
+          const targetItem = targetId ? current.items.find(i => i.id === targetId) : null;
+          const pt = screenToCanvas(e.clientX, e.clientY);
+          const applyDroppedImageSrc = (src) => {
+            const img = new Image();
+            img.onload = () => {
+              const ratio = img.naturalWidth / img.naturalHeight;
+              if (targetItem && targetItem.type === 'image') {
+                const w = targetItem.w || 260;
+                updateItem(targetId, { src, name: 'image.png', w, h: Math.max(60, Math.round(w / ratio)) });
+              } else {
+                const w = 300;
+                const h = Math.max(60, Math.round(w / ratio));
+                const newItem = makeNewItem('image', pt.x - w / 2, pt.y - h / 2, w, h, lang);
+                newItem.src = src;
+                newItem.name = 'image.png';
+                newItem.w = w;
+                newItem.h = h;
+                setCanvases(prev => {
+                  const c = prev[currentId];
+                  return { ...prev, [currentId]: { ...c, items: [...c.items, newItem] } };
+                });
+                setSelected(newItem.id);
+              }
+            };
+            img.src = src;
+          };
+          if (imgUrl.startsWith('data:')) {
+            applyDroppedImageSrc(imgUrl);
+          } else {
+            if (window.electronAPI && window.electronAPI.fetchImageBase64) {
+              window.electronAPI.fetchImageBase64(imgUrl)
+                .then(applyDroppedImageSrc)
+                .catch(err => {
+                  console.warn('Failed to fetch dropped image via IPC:', err);
+                  applyDroppedImageSrc(imgUrl);
+                });
+            } else {
+              fetch(imgUrl)
+                .then(r => r.blob())
+                .then(blob => {
+                  const fr = new FileReader();
+                  fr.onload = () => applyDroppedImageSrc(fr.result);
+                  fr.readAsDataURL(blob);
+                })
+                .catch(err => {
+                  console.warn('Failed to fetch dropped image, fallback to URL:', err);
+                  applyDroppedImageSrc(imgUrl);
+                });
+            }
+          }
+          return;
+        }
+        return;
+      }
 
       const isImg = file.type.startsWith('image/');
       const isAud = file.type.startsWith('audio/');
@@ -1071,17 +1136,28 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
           return;
         }
         e.preventDefault();
-        fetch(url)
-          .then(res => res.blob())
-          .then(blob => {
-            const fr = new FileReader();
-            fr.onload = () => applyImageSrc(fr.result);
-            fr.readAsDataURL(blob);
-          })
-          .catch(err => {
-            console.warn('Failed to fetch image, falling back to URL string:', err);
-            applyImageSrc(url);
-          });
+        if (window.electronAPI && window.electronAPI.fetchImageBase64) {
+          window.electronAPI.fetchImageBase64(url)
+            .then(base64 => {
+              applyImageSrc(base64);
+            })
+            .catch(err => {
+              console.warn('Failed to fetch image via IPC, falling back to URL string:', err);
+              applyImageSrc(url);
+            });
+        } else {
+          fetch(url)
+            .then(res => res.blob())
+            .then(blob => {
+              const fr = new FileReader();
+              fr.onload = () => applyImageSrc(fr.result);
+              fr.readAsDataURL(blob);
+            })
+            .catch(err => {
+              console.warn('Failed to fetch image, falling back to URL string:', err);
+              applyImageSrc(url);
+            });
+        }
       };
 
       // 1) Intentar leer JSON estructurado de Odinote síncronamente desde el portapapeles
@@ -1516,7 +1592,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
     if (item.type === 'frame' && !isMultiDrag) {
       const frameRect = { x: item.x, y: item.y, w: item.w || 400, h: item.h || 400 };
       const inside = current.items.filter(it => {
-        if (it.id === itemId || it.type === 'line') return false;
+        if (it.id === itemId || it.type === 'line' || it.type === 'frame') return false;
         const itW = it.w !== undefined ? it.w : (defaultDims ? defaultDims(it.type).w : 200);
         const itH = it.h !== undefined ? it.h : (defaultDims ? defaultDims(it.type).h : 120);
         const cx = it.x + itW / 2;
@@ -2565,6 +2641,42 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
     const minW = 100, minH = 50;
     const aspectRatio = sw / sh;
     
+    // Multi-resize logic setup
+    const isMulti = selectedIds.length > 1 && selectedIds.includes(itemId);
+    let groupStarts = null;
+    let groupMinX = Infinity, groupMinY = Infinity, groupMaxX = -Infinity, groupMaxY = -Infinity;
+    let groupW = 0, groupH = 0;
+    
+    if (isMulti) {
+      const selectedItems = current.items.filter(it => selectedIds.includes(it.id));
+      for (const it of selectedItems) {
+        const w = it.w !== undefined ? it.w : (it.type === 'frame' ? 400 : 200);
+        const h = it.h !== undefined ? it.h : (it.type === 'frame' ? 400 : 120);
+        if (it.x < groupMinX) groupMinX = it.x;
+        if (it.y < groupMinY) groupMinY = it.y;
+        if (it.x + w > groupMaxX) groupMaxX = it.x + w;
+        if (it.y + h > groupMaxY) groupMaxY = it.y + h;
+      }
+      groupW = groupMaxX - groupMinX;
+      groupH = groupMaxY - groupMinY;
+      
+      groupStarts = selectedItems.map(it => {
+        const w = it.w !== undefined ? it.w : (it.type === 'frame' ? 400 : 200);
+        const h = it.h !== undefined ? it.h : (it.type === 'frame' ? 400 : 120);
+        return {
+          id: it.id,
+          relX: groupW > 0 ? (it.x - groupMinX) / groupW : 0,
+          relY: groupH > 0 ? (it.y - groupMinY) / groupH : 0,
+          relW: groupW > 0 ? w / groupW : 0,
+          relH: groupH > 0 ? h / groupH : 0,
+          startX: it.x,
+          startY: it.y,
+          startW: w,
+          startH: h
+        };
+      });
+    }
+    
     let resizeMaster = null; // Locked to 'x' or 'y' on first move to prevent jumps
     let wasSnappedX = false;
     let wasSnappedY = false;
@@ -2763,7 +2875,42 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
       wasSnappedY = currentlySnappedY;
 
       setGuides({ x: activeGuidesX, y: activeGuidesY });
-      updateItemSilent(itemId, { x: nx, y: ny, w: nw, h: nh });
+      if (isMulti && groupStarts) {
+        const scaleX = sw > 0 ? nw / sw : 1;
+        const scaleY = sh > 0 ? nh / sh : 1;
+        _setCanvases(prev => {
+          const c = prev[currentId];
+          return {
+            ...prev,
+            [currentId]: {
+              ...c,
+              items: c.items.map(it => {
+                const gs = groupStarts.find(x => x.id === it.id);
+                if (gs) {
+                  const newW = Math.max(minW, gs.startW * scaleX);
+                  const newH = Math.max(minH, gs.startH * scaleY);
+                  let newX = gs.startX;
+                  let newY = gs.startY;
+                  if (corner.includes('r')) {
+                    newX = groupMinX + gs.relX * (groupW * scaleX);
+                  } else if (corner.includes('l')) {
+                    newX = groupMaxX - (1 - gs.relX) * (groupW * scaleX);
+                  }
+                  if (corner.includes('b')) {
+                    newY = groupMinY + gs.relY * (groupH * scaleY);
+                  } else if (corner.includes('t')) {
+                    newY = groupMaxY - (1 - gs.relY) * (groupH * scaleY);
+                  }
+                  return { ...it, x: newX, y: newY, w: newW, h: newH };
+                }
+                return it;
+              })
+            }
+          };
+        });
+      } else {
+        updateItemSilent(itemId, { x: nx, y: ny, w: nw, h: nh });
+      }
     };
     const onUp = () => {
       document.body.classList.remove('odi-busy');
@@ -3432,7 +3579,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
                   onDoubleClick={(e)=>{
                     if (item.type === 'doc') { e.stopPropagation(); setDocOpen({ id: item.id }); return; }
                     if (item.type === 'board') return;
-                    if (['note','comment','todo','column','link','board','bigtitle'].includes(item.type)) {
+                    if (['note','comment','todo','column','link','board','bigtitle','frame'].includes(item.type)) {
                       e.stopPropagation(); setEditing(item.id);
                     }
                   }}
@@ -3487,7 +3634,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
                     </div>
                   )}
                   {/* Resize handles */}
-                  {selected === item.id && !isEditing && (
+                  {(selected === item.id || (selectedIds.includes(item.id) && selectedIds.length > 1)) && !isEditing && (
                     <div className="handles">
                       <div className="handle tl" onMouseDown={(e)=>startResize(e, item.id, 'tl')}/>
                       <div className="handle tr" onMouseDown={(e)=>startResize(e, item.id, 'tr')}/>
