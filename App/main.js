@@ -46,6 +46,17 @@ function createWindow() {
   const { session } = require('electron');
   if (session.defaultSession) {
     try {
+      session.defaultSession.clearCache();
+    } catch(e) {}
+  }
+  if (mainWindow.webContents && mainWindow.webContents.session) {
+    try {
+      mainWindow.webContents.session.clearCache();
+    } catch(e) {}
+  }
+
+  if (session.defaultSession) {
+    try {
       session.defaultSession.setSpellCheckerLanguages([
         'es-ES', 'es-419', 'es',
         'fr-FR', 'fr',
