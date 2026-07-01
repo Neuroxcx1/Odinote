@@ -3084,3 +3084,98 @@ body.odi-busy iframe { pointer-events: none !important; }
   background: #2A282A;
   color: #FF8A5B !important;
 }
+
+/* ==========================================================================
+   RESPONSIVE DESIGN SYSTEM — TOPBAR & TOOLS (1080p and smaller screens)
+   ========================================================================== */
+
+/* En resoluciones de 1600px o menos, reducimos ligeramente los paddings y márgenes */
+@media (max-width: 1600px) {
+  .topbar {
+    gap: 8px;
+    padding: 6px 10px;
+  }
+  .tools {
+    padding: 4px;
+  }
+  .tool {
+    padding: 4px 6px;
+  }
+  .tool .tool-icon {
+    width: 32px;
+    height: 32px;
+  }
+  .tool .material-symbols-rounded {
+    font-size: 19px;
+  }
+  .kofi-topbar-btn, .feedback-topbar-btn {
+    margin-right: 6px;
+    padding: 6px 12px;
+    font-size: 12px;
+  }
+}
+
+/* En resoluciones de 1400px o menos, ocultamos el texto de Feedback y Apoyar para ahorrar espacio, convirtiéndolos en botones de iconos circulares */
+@media (max-width: 1400px) {
+  .feedback-topbar-btn span:not(.material-symbols-rounded),
+  .kofi-topbar-btn span:not(.material-symbols-rounded) {
+    display: none;
+  }
+  .feedback-topbar-btn, .kofi-topbar-btn {
+    width: 38px;
+    height: 38px;
+    padding: 0;
+    justify-content: center;
+    border-radius: 50%;
+    margin-right: 4px;
+  }
+  .feedback-topbar-btn::before, .feedback-topbar-btn::after,
+  .kofi-topbar-btn::before, .kofi-topbar-btn::after {
+    border-radius: 50%;
+  }
+  .volume-slider {
+    width: 50px; /* Acortar slider de volumen */
+  }
+}
+
+/* En resoluciones de 1280px o menos (como laptops u pantallas escaladas), ocultamos el texto de las herramientas centrales para que solo queden los iconos, similar a Figma o Miro */
+@media (max-width: 1280px) {
+  .tool .tool-label {
+    display: none;
+  }
+  .tool {
+    padding: 4px;
+    gap: 0;
+  }
+  .tools {
+    gap: 2px;
+  }
+  .crumbs {
+    max-width: 220px; /* Limitar el tamaño máximo de las migas de pan */
+  }
+  .crumb {
+    max-width: 100px;
+  }
+  .volume-ctrl {
+    gap: 2px;
+  }
+  .volume-slider {
+    width: 40px;
+  }
+}
+
+/* En pantallas aún más pequeñas (1024px o menos), ocultamos el slider de volumen del todo */
+@media (max-width: 1024px) {
+  .volume-slider {
+    display: none;
+  }
+  .volume-ctrl {
+    margin-right: 0;
+  }
+  .crumbs {
+    max-width: 150px;
+  }
+  .crumb {
+    max-width: 70px;
+  }
+}
