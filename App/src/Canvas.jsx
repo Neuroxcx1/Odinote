@@ -1434,7 +1434,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
     setShowBgSelector(false);
 
     // panning
-    if (e.button === 1 || e.altKey || e.shiftKey) {
+    if (e.button === 1 || e.altKey) {
       e.preventDefault();
       const startX = e.clientX, startY = e.clientY, startPan = { ...pan };
       const onMove = (ev) => setPan({ x: startPan.x + ev.clientX - startX, y: startPan.y + ev.clientY - startY });
@@ -1542,6 +1542,10 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
       setMarquee(null);
 
       if (!didDrag) {
+        if (e.shiftKey || ev.shiftKey) {
+          // Si hace Shift+Clic en el lienzo vacio, no deseleccionamos nada
+          return;
+        }
         // Click on empty canvas → just deselect
         setSelected(null);
         setSelectedIds([]);
@@ -1561,8 +1565,20 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
         // intersection test (any overlap counts)
         return !(ix + iw < rx || ix > rx + rw || iy + ih < ry || iy > ry + rh);
       }).map(it => it.id);
-      setSelectedIds(hits);
-      setSelected(hits.length === 1 ? hits[0] : null);
+
+      if (e.shiftKey || ev.shiftKey) {
+        // Seleccion aditiva con Shift
+        let baseSelected = [...selectedIds];
+        if (selected && !baseSelected.includes(selected)) {
+          baseSelected.push(selected);
+        }
+        const union = Array.from(new Set([...baseSelected, ...hits]));
+        setSelectedIds(union);
+        setSelected(union.length === 1 ? union[0] : null);
+      } else {
+        setSelectedIds(hits);
+        setSelected(hits.length === 1 ? hits[0] : null);
+      }
       setSelectedConn(null);
       setEditing(null);
       setEditingChildState(null);
@@ -1637,6 +1653,101 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
   // ───── Item drag (with column drop detection) ─────
   const startDragItem = (e, itemId) => {
     if (e.target.closest('input, textarea, button, .todo-check, .swatch-btn, .anchor, .todo-add, .cal-mb-input, .cal-mb-cell, .cal-mb-nav')) return;
+
+    if (e.shiftKey) {
+      e.stopPropagation();
+      e.preventDefault();
+      // Iniciar el marquee de selección desde esta posición
+      const startPt = screenToCanvas(e.clientX, e.clientY);
+      let didDrag = false;
+      setMarquee({ sx: startPt.x, sy: startPt.y, x: startPt.x, y: startPt.y, w: 0, h: 0 });
+
+      const onMove = (ev) => {
+        const p = screenToCanvas(ev.clientX, ev.clientY);
+        const dx = ev.clientX - e.clientX;
+        const dy = ev.clientY - e.clientY;
+        if (Math.abs(dx) > 3 || Math.abs(dy) > 3) didDrag = true;
+        setMarquee({
+          sx: startPt.x, sy: startPt.y,
+          x: Math.min(startPt.x, p.x),
+          y: Math.min(startPt.y, p.y),
+          w: Math.abs(p.x - startPt.x),
+          h: Math.abs(p.y - startPt.y),
+        });
+      };
+
+      const onUp = (ev) => {
+        window.removeEventListener('mousemove', onMove);
+        window.removeEventListener('mouseup', onUp);
+        setMarquee(null);
+
+        if (!didDrag) {
+          // Fue un Shift+Clic individual -> Hacer toggle del item en la selección
+          let nextSelectedIds = [...selectedIds];
+          if (selected && !nextSelectedIds.includes(selected)) {
+            nextSelectedIds.push(selected);
+          }
+          if (nextSelectedIds.includes(itemId)) {
+            nextSelectedIds = nextSelectedIds.filter(id => id !== itemId);
+          } else {
+            nextSelectedIds.push(itemId);
+          }
+          
+          if (nextSelectedIds.length === 1) {
+            setSelected(nextSelectedIds[0]);
+            setSelectedIds([]);
+          } else if (nextSelectedIds.length > 1) {
+            setSelected(null);
+            setSelectedIds(nextSelectedIds);
+          } else {
+            setSelected(null);
+            setSelectedIds([]);
+          }
+          setSelectedConn(null);
+          setEditing(null);
+          setEditingChildState(null);
+          return;
+        }
+
+        // Fue un Shift+Arrastrar -> Seleccionar los elementos dentro del recuadro
+        // y agregarlos/combinarlos con la selección existente
+        const p = screenToCanvas(ev.clientX, ev.clientY);
+        const rx = Math.min(startPt.x, p.x);
+        const ry = Math.min(startPt.y, p.y);
+        const rw = Math.abs(p.x - startPt.x);
+        const rh = Math.abs(p.y - startPt.y);
+        const hits = current.items.filter(it => {
+          const ix = it.x, iy = it.y, iw = it.w, ih = it.h;
+          return !(ix + iw < rx || ix > rx + rw || iy + ih < ry || iy > ry + rh);
+        }).map(it => it.id);
+
+        // Agregamos los nuevos elementos seleccionados a los que ya estaban
+        let baseSelected = [...selectedIds];
+        if (selected && !baseSelected.includes(selected)) {
+          baseSelected.push(selected);
+        }
+        
+        // Unir ambas listas de forma única
+        const union = Array.from(new Set([...baseSelected, ...hits]));
+        if (union.length === 1) {
+          setSelected(union[0]);
+          setSelectedIds([]);
+        } else if (union.length > 1) {
+          setSelected(null);
+          setSelectedIds(union);
+        } else {
+          setSelected(null);
+          setSelectedIds([]);
+        }
+        setSelectedConn(null);
+        setEditing(null);
+        setEditingChildState(null);
+      };
+
+      window.addEventListener('mousemove', onMove);
+      window.addEventListener('mouseup', onUp);
+      return;
+    }
     // A column may only be grabbed by its top strip — clicking the gray body just selects it
     // (so its children stay interactive and the body isn't a drag handle).
     {
@@ -1824,7 +1935,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
           const L = Ls[0], R = Rs[0];
           const lr = L.x + (L.w||200), rl = R.x;
           const gapL = targetX - lr, gapR = rl - (targetX + w);
-          if (gapL > 0 && gapR > 0 && Math.abs(gapL - gapR) < SPACE_T * 2) {
+          if (gapL > -SPACE_T && gapR > -SPACE_T && Math.abs(gapL - gapR) < SPACE_T * 2) {
             const free = rl - lr - w;
             targetX = lr + free / 2;
             const gy = targetY + h / 2;
@@ -1838,7 +1949,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
           const B = Ls[0], A = Ls[1];
           const gapAB = B.x - (A.x + (A.w||200));
           const gapBTarget = targetX - (B.x + (B.w||200));
-          if (gapAB > 0 && gapBTarget > 0 && Math.abs(gapAB - gapBTarget) < SPACE_T * 2) {
+          if (gapAB > 0 && gapBTarget > -SPACE_T && Math.abs(gapAB - gapBTarget) < SPACE_T * 2) {
             targetX = B.x + (B.w||200) + gapAB;
             const gy = targetY + h / 2;
             spacing.push({ x: A.x + (A.w||200), y: gy, w: gapAB, horizontal: true });
@@ -1851,7 +1962,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
           const A = Rs[0], B = Rs[1];
           const gapAB = B.x - (A.x + (A.w||200));
           const gapTargetA = A.x - (targetX + w);
-          if (gapAB > 0 && gapTargetA > 0 && Math.abs(gapAB - gapTargetA) < SPACE_T * 2) {
+          if (gapAB > 0 && gapTargetA > -SPACE_T && Math.abs(gapAB - gapTargetA) < SPACE_T * 2) {
             targetX = A.x - gapAB - w;
             const gy = targetY + h / 2;
             spacing.push({ x: targetX + w, y: gy, w: A.x - (targetX + w), horizontal: true });
@@ -1872,7 +1983,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
           const T = Ts[0], Bn = Bns[0];
           const tb = T.y + (T.h||120), bt = Bn.y;
           const gapT = targetY - tb, gapB = bt - (targetY + h);
-          if (gapT > 0 && gapB > 0 && Math.abs(gapT - gapB) < SPACE_T * 2) {
+          if (gapT > -SPACE_T && gapB > -SPACE_T && Math.abs(gapT - gapB) < SPACE_T * 2) {
             const free = bt - tb - h;
             targetY = tb + free / 2;
             const gx = targetX + w / 2;
@@ -1886,7 +1997,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
           const B = Ts[0], A = Ts[1];
           const gapAB = B.y - (A.y + (A.h||120));
           const gapBTarget = targetY - (B.y + (B.h||120));
-          if (gapAB > 0 && gapBTarget > 0 && Math.abs(gapAB - gapBTarget) < SPACE_T * 2) {
+          if (gapAB > 0 && gapBTarget > -SPACE_T && Math.abs(gapAB - gapBTarget) < SPACE_T * 2) {
             targetY = B.y + (B.h||120) + gapAB;
             const gx = targetX + w / 2;
             spacing.push({ x: gx, y: A.y + (A.h||120), h: gapAB, horizontal: false });
@@ -1899,7 +2010,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
           const A = Bns[0], B = Bns[1];
           const gapAB = B.y - (A.y + (A.h||120));
           const gapTargetA = A.y - (targetY + h);
-          if (gapAB > 0 && gapTargetA > 0 && Math.abs(gapAB - gapTargetA) < SPACE_T * 2) {
+          if (gapAB > 0 && gapTargetA > -SPACE_T && Math.abs(gapAB - gapTargetA) < SPACE_T * 2) {
             targetY = A.y - gapAB - h;
             const gx = targetX + w / 2;
             spacing.push({ x: gx, y: targetY + h, h: A.y - (targetY + h), horizontal: false });
