@@ -1067,6 +1067,11 @@ function App() {
                     { keys: ['Shift', 'Click'], desc: window.t('Selección múltiple (individual)', 'Add/remove from selection') },
                     { keys: ['Shift', 'Arrastrar'], desc: window.t('Selección por recuadro múltiple', 'Add to selection with box') },
                     { keys: ['Alt', 'Arrastrar'], desc: window.t('Desplazar lienzo (Paneo)', 'Pan the canvas') },
+                    { keys: ['Ctrl', 'Rueda'], desc: window.t('Acercar / Alejar (Zoom)', 'Zoom In / Out') },
+                    { keys: ['↑', '↓', '←', '→'], desc: window.t('Mover nodo seleccionado', 'Move selected node') },
+                    { keys: ['Doble Clic'], desc: window.t('Editar texto / Renombrar nodo', 'Edit text / Rename node') },
+                    { keys: ['Clic Derecho'], desc: window.t('Menú de creación rápida / Opciones', 'Quick-create menu / Options') },
+                    { keys: ['Tab', 'Enter'], desc: window.t('Navegar y editar celdas (Tablas)', 'Navigate and edit cells (Tables)') },
                     { keys: ['Supr', 'Backspace'], desc: window.t('Eliminar elemento seleccionado', 'Delete selected item') },
                     { keys: ['/'], desc: window.t('Enfocar buscador del lienzo', 'Focus search box') },
                     { keys: ['Esc'], desc: window.t('Cerrar editor / Limpiar selección', 'Close editor / Clear selection') }
