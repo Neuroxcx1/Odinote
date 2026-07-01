@@ -6,6 +6,7 @@ const http = require('http');
 
 let mainWindow;
 let serverInstance;
+let activeVaultPath = '';
 
 // Setup a logging path in the app's persistent user data directory
 const logPath = path.join(app.getPath('userData'), 'odinote-debug.log');
@@ -115,11 +116,6 @@ function createWindow() {
     }
 
     const decodedPath = decodeURIComponent(rawPath);
-    const filePath = path.join(__dirname, decodedPath);
-    const ext = path.extname(filePath).toLowerCase();
-
-    logToFile(`HTTP Request: ${req.method} ${req.url} -> Resolved: ${filePath}`);
-
     const mimeTypes = {
       '.html': 'text/html; charset=utf-8',
       '.css': 'text/css; charset=utf-8',
@@ -128,6 +124,7 @@ function createWindow() {
       '.json': 'application/json; charset=utf-8',
       '.png': 'image/png',
       '.jpg': 'image/jpeg',
+      '.jpeg': 'image/jpeg',
       '.gif': 'image/gif',
       '.svg': 'image/svg+xml',
       '.ico': 'image/x-icon',
@@ -135,6 +132,37 @@ function createWindow() {
       '.woff2': 'font/woff2',
       '.ttf': 'font/ttf'
     };
+
+    if (decodedPath.startsWith('/vault-media/')) {
+      if (!activeVaultPath) {
+        logToFile(`HTTP Server: No active vault path when requesting: ${decodedPath}`);
+        res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
+        res.end('404 No Active Vault');
+        return;
+      }
+      const relativePart = decodedPath.replace('/vault-media/', ''); // e.g., media/web_image_abc.png
+      const filePath = path.join(activeVaultPath, relativePart);
+      const ext = path.extname(filePath).toLowerCase();
+
+      logToFile(`HTTP Request (Vault): ${req.method} ${req.url} -> Resolved: ${filePath}`);
+
+      fs.readFile(filePath, (err, content) => {
+        if (err) {
+          logToFile(`[404] Vault file not found: ${filePath} (${err.message})`);
+          res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
+          res.end('404 Not Found in Vault');
+        } else {
+          res.writeHead(200, { 'Content-Type': mimeTypes[ext] || 'application/octet-stream' });
+          res.end(content);
+        }
+      });
+      return;
+    }
+
+    const filePath = path.join(__dirname, decodedPath);
+    const ext = path.extname(filePath).toLowerCase();
+
+    logToFile(`HTTP Request: ${req.method} ${req.url} -> Resolved: ${filePath}`);
 
     fs.readFile(filePath, (err, content) => {
       if (err) {
@@ -237,6 +265,7 @@ ipcMain.handle('select-folder', async () => {
 
 ipcMain.handle('read-vault', async (event, folderPath) => {
   logToFile(`IPC Call: read-vault at ${folderPath}`);
+  activeVaultPath = folderPath;
   const filePath = path.join(folderPath, 'odinote.json');
   try {
     if (fs.existsSync(filePath)) {
@@ -254,6 +283,7 @@ ipcMain.handle('read-vault', async (event, folderPath) => {
 
 ipcMain.handle('write-vault', async (event, { folderPath, data }) => {
   logToFile(`IPC Call: write-vault at ${folderPath}`);
+  activeVaultPath = folderPath;
   const filePath = path.join(folderPath, 'odinote.json');
   try {
     fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf-8');

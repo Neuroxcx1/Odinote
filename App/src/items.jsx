@@ -6,6 +6,27 @@
 // • Calendar: Miro-style month grid with event cards
 // =====================================================
 
+function resolveMediaSrc(src) {
+  if (!src) return '';
+  if (src.startsWith('data:') || src.startsWith('http://') || src.startsWith('https://')) {
+    return src;
+  }
+  if (src.startsWith('file:///') || src.includes(':/') || src.includes(':\\')) {
+    const mediaMatch = src.match(/media\/[^/]+$/i);
+    if (mediaMatch) {
+      return `/vault-media/${mediaMatch[0]}`;
+    }
+  }
+  if (src.startsWith('media/')) {
+    return `/vault-media/${src}`;
+  }
+  if (src.startsWith('/vault-media/')) {
+    return src;
+  }
+  return src;
+}
+window.resolveMediaSrc = resolveMediaSrc;
+
 // Safety net: if a single node throws during render, show a small fallback for THAT node
 // instead of blanking the whole app.
 class NodeErrorBoundary extends React.Component {
@@ -557,7 +578,7 @@ function ImageItem({ item, lang, onUpdate }) {
         {hasImage ? (
           <div
             className="image-frame"
-            style={{ backgroundImage: `url(${item.src})` }}
+            style={{ backgroundImage: `url(${window.resolveMediaSrc(item.src)})` }}
             onDoubleClick={(e)=>{ e.stopPropagation(); fileRef.current?.click(); }}
           >
             {item.showCaption && <NodeCaption item={item} lang={lang} onUpdate={onUpdate} className="image-caption"/>}
@@ -2992,7 +3013,7 @@ function AudioItem({ item, lang, onUpdate }) {
         {/* Custom audio element */}
         <audio
           ref={audioRef}
-          src={item.src}
+          src={window.resolveMediaSrc(item.src)}
           onTimeUpdate={handleTimeUpdate}
           onLoadedMetadata={handleLoadedMetadata}
           onEnded={handleEnded}
@@ -3314,11 +3335,11 @@ function FileItem({ item, lang, onUpdate, onOpenFile }) {
               onDoubleClick={(e)=>{ e.stopPropagation(); onOpenFile && onOpenFile(item.id); }}
               title={window.t('Doble clic para ver completo', 'Double-click to view full')}
             >
-              {kind === 'image' && <img src={item.src} alt={item.name}/>}
-              {kind === 'pdf' && <iframe title={item.name} src={item.src}/>}
+              {kind === 'image' && <img src={window.resolveMediaSrc(item.src)} alt={item.name}/>}
+              {kind === 'pdf' && <iframe title={item.name} src={window.resolveMediaSrc(item.src)}/>}
               {kind === 'text' && (
                 <div className="file-page-scale" style={{ width: REF, transform: `scale(${scale})`, transformOrigin: 'top left' }}>
-                  <FilePreviewText src={item.src}/>
+                  <FilePreviewText src={window.resolveMediaSrc(item.src)}/>
                 </div>
               )}
               {(kind === 'docx' || kind === 'excel') && (
@@ -3407,9 +3428,9 @@ function FileViewerModal({ fileItem, lang, onClose }) {
           </button>
         </div>
         <div className={`file-viewer-body kind-${kind}`}>
-          {kind === 'image' && <img src={fileItem.src} alt={fileItem.name}/>}
-          {kind === 'pdf' && <iframe title={fileItem.name} src={fileItem.src}/>}
-          {kind === 'text' && <FilePreviewText src={fileItem.src}/>}
+          {kind === 'image' && <img src={window.resolveMediaSrc(fileItem.src)} alt={fileItem.name}/>}
+          {kind === 'pdf' && <iframe title={fileItem.name} src={window.resolveMediaSrc(fileItem.src)}/>}
+          {kind === 'text' && <FilePreviewText src={window.resolveMediaSrc(fileItem.src)}/>}
           {(kind === 'docx' || kind === 'excel') && (
             docHtml
               ? <div className="file-doc-html file-doc-page" dangerouslySetInnerHTML={{ __html: docHtml }}/>
