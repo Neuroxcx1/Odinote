@@ -381,8 +381,12 @@ ipcMain.handle('download-media-to-vault', async (event, { folderPath, url, fileN
       fs.mkdirSync(mediaDir, { recursive: true });
     }
     
-    // Descargar imagen usando Electron native net API
-    const response = await net.fetch(url);
+    // Descargar imagen usando Electron native net API con User-Agent de navegador
+    const response = await net.fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+      }
+    });
     if (!response.ok) throw new Error(`HTTP status ${response.status}`);
     const arrayBuffer = await response.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
@@ -391,8 +395,18 @@ ipcMain.handle('download-media-to-vault', async (event, { folderPath, url, fileN
     const crypto = require('crypto');
     const hash = crypto.createHash('sha256').update(buffer).digest('hex').slice(0, 16);
     
-    const fileExt = path.extname(fileName) || '.png';
-    const baseName = path.basename(fileName, fileExt).replace(/[^a-zA-Z0-9._-]/g, '_');
+    const contentType = response.headers.get('content-type') || 'image/png';
+    let fileExt = '.png';
+    if (contentType.includes('jpeg') || contentType.includes('jpg')) fileExt = '.jpg';
+    else if (contentType.includes('gif')) fileExt = '.gif';
+    else if (contentType.includes('webp')) fileExt = '.webp';
+    else if (contentType.includes('svg')) fileExt = '.svg';
+    else if (contentType.includes('png')) fileExt = '.png';
+    else {
+      fileExt = path.extname(fileName) || '.png';
+    }
+
+    const baseName = path.basename(fileName, path.extname(fileName) || '.png').replace(/[^a-zA-Z0-9._-]/g, '_');
     const finalName = `${baseName}_${hash}${fileExt}`;
     const destPath = path.join(mediaDir, finalName);
     

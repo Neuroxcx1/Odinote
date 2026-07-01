@@ -829,8 +829,11 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
   // ───── Document-level drag-drop: replace image/audio OR create a new image/audio node ─────
   useEffectCanvas(() => {
     const onDragOver = (e) => {
-      if (e.dataTransfer && Array.from(e.dataTransfer.types || []).some(t => t === 'Files' || t === 'files')) {
-        e.preventDefault();
+      if (e.dataTransfer) {
+        const types = Array.from(e.dataTransfer.types || []);
+        if (types.some(t => t === 'Files' || t === 'files' || t === 'text/uri-list' || t === 'text/html' || t === 'text/plain')) {
+          e.preventDefault();
+        }
       }
     };
     const onDrop = (e) => {
@@ -1700,7 +1703,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
       const MAX_ALIGN_DIST = 600; // Constante de proximidad física perpendicular
 
       for (const other of currentItems) {
-        if (other.id === itemId || other.type === 'line' || other.type === 'frame') continue;
+        if (other.id === itemId || other.type === 'line') continue;
         const ow = other.w || 200;
         const oh = other.h || 120;
 
@@ -1713,11 +1716,13 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
           // X alignments: left, center, right, left-to-right, right-to-left
           const xOpts = [
             { dragVal: targetX,       otherVal: other.x,        guideVal: other.x,        offset: 0 },
-            { dragVal: targetX + w/2, otherVal: other.x + ow/2, guideVal: other.x + ow/2, offset: -w/2 },
             { dragVal: targetX + w,   otherVal: other.x + ow,   guideVal: other.x + ow,   offset: -w },
             { dragVal: targetX,       otherVal: other.x + ow,   guideVal: other.x + ow,   offset: 0 },
             { dragVal: targetX + w,   otherVal: other.x,        guideVal: other.x,        offset: -w }
           ];
+          if (other.type !== 'frame') {
+            xOpts.push({ dragVal: targetX + w/2, otherVal: other.x + ow/2, guideVal: other.x + ow/2, offset: -w/2 });
+          }
           for (const opt of xOpts) {
             const diff = Math.abs(opt.dragVal - opt.otherVal);
             if (diff < bestDiffX) {
@@ -1741,11 +1746,13 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
           // Y alignments: top, middle, bottom, top-to-bottom, bottom-to-top
           const yOpts = [
             { dragVal: targetY,       otherVal: other.y,        guideVal: other.y,        offset: 0 },
-            { dragVal: targetY + h/2, otherVal: other.y + oh/2, guideVal: other.y + oh/2, offset: -h/2 },
             { dragVal: targetY + h,   otherVal: other.y + oh,   guideVal: other.y + oh,   offset: -h },
             { dragVal: targetY,       otherVal: other.y + oh,   guideVal: other.y + oh,   offset: 0 },
             { dragVal: targetY + h,   otherVal: other.y,        guideVal: other.y,        offset: -h }
           ];
+          if (other.type !== 'frame') {
+            yOpts.push({ dragVal: targetY + h/2, otherVal: other.y + oh/2, guideVal: other.y + oh/2, offset: -h/2 });
+          }
           for (const opt of yOpts) {
             const diff = Math.abs(opt.dragVal - opt.otherVal);
             if (diff < bestDiffY) {
@@ -2760,13 +2767,13 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
           const myVal = corner.includes('r') ? (nx + nw) : (sx + sw - nw);
 
           for (const other of currentItems) {
-            if (other.id === itemId || other.type === 'line' || other.type === 'frame') continue;
+            if (other.id === itemId || other.type === 'line') continue;
             const ow = other.w || 200;
             const oh = other.h || 120;
             const centerY = ny + nh / 2;
             const otherCenterY = other.y + oh / 2;
             if (Math.abs(centerY - otherCenterY) < MAX_ALIGN_DIST) {
-              const otherXOpts = [other.x, other.x + ow/2, other.x + ow];
+              const otherXOpts = other.type === 'frame' ? [other.x, other.x + ow] : [other.x, other.x + ow/2, other.x + ow];
               for (const otherVal of otherXOpts) {
                 const diff = Math.abs(myVal - otherVal);
                 if (diff < bestDiffX) {
@@ -2799,13 +2806,13 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
           const myVal = corner.includes('b') ? (ny + nh) : (sy + sh - nh);
 
           for (const other of currentItems) {
-            if (other.id === itemId || other.type === 'line' || other.type === 'frame') continue;
+            if (other.id === itemId || other.type === 'line') continue;
             const ow = other.w || 200;
             const oh = other.h || 120;
             const centerX = nx + nw / 2;
             const otherCenterX = other.x + ow / 2;
             if (Math.abs(centerX - otherCenterX) < MAX_ALIGN_DIST) {
-              const otherYOpts = [other.y, other.y + oh/2, other.y + oh];
+              const otherYOpts = other.type === 'frame' ? [other.y, other.y + oh] : [other.y, other.y + oh/2, other.y + oh];
               for (const otherVal of otherYOpts) {
                 const diff = Math.abs(myVal - otherVal);
                 if (diff < bestDiffY) {
@@ -2847,13 +2854,13 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
 
         if (myXVal !== null) {
           for (const other of currentItems) {
-            if (other.id === itemId || other.type === 'line' || other.type === 'frame') continue;
+            if (other.id === itemId || other.type === 'line') continue;
             const ow = other.w || 200;
             const oh = other.h || 120;
             const centerY = ny + nh / 2;
             const otherCenterY = other.y + oh / 2;
             if (Math.abs(centerY - otherCenterY) < MAX_ALIGN_DIST) {
-              const otherXOpts = [other.x, other.x + ow/2, other.x + ow];
+              const otherXOpts = other.type === 'frame' ? [other.x, other.x + ow] : [other.x, other.x + ow/2, other.x + ow];
               for (const otherVal of otherXOpts) {
                 const diff = Math.abs(myXVal - otherVal);
                 if (diff < bestDiffX) {
@@ -2884,13 +2891,13 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
 
         if (myYVal !== null) {
           for (const other of currentItems) {
-            if (other.id === itemId || other.type === 'line' || other.type === 'frame') continue;
+            if (other.id === itemId || other.type === 'line') continue;
             const ow = other.w || 200;
             const oh = other.h || 120;
             const centerX = nx + nw / 2;
             const otherCenterX = other.x + ow / 2;
             if (Math.abs(centerX - otherCenterX) < MAX_ALIGN_DIST) {
-              const otherYOpts = [other.y, other.y + oh/2, other.y + oh];
+              const otherYOpts = other.type === 'frame' ? [other.y, other.y + oh] : [other.y, other.y + oh/2, other.y + oh];
               for (const otherVal of otherYOpts) {
                 const diff = Math.abs(myYVal - otherVal);
                 if (diff < bestDiffY) {
