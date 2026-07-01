@@ -313,6 +313,8 @@ ipcMain.handle('set-spellchecker-languages', async (event, langs) => {
     } catch (err) {
       logToFile(`Error setting spellchecker languages: ${err.message}`);
     }
+  }
+  return false;
 });
 
 ipcMain.handle('open-custom-dictionary', async () => {
