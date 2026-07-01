@@ -15,6 +15,7 @@ try {
     if (k && k.startsWith('odinote.state.') && k !== STORE_KEY) {
       localStorage.removeItem(k);
     }
+  }
 } catch {}
 
 // Global shortcuts configuration

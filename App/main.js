@@ -92,6 +92,11 @@ function createWindow() {
   // Hide default menu bar
   mainWindow.setMenuBarVisibility(false);
 
+  // Redirect renderer console messages to main log
+  mainWindow.webContents.on('console-message', (event, level, message, line, sourceId) => {
+    logToFile(`[RENDERER CONSOLE] [Level ${level}] ${message} (at ${sourceId}:${line})`);
+  });
+
   // Handle spellcheck suggestions and custom HTML context menu
   mainWindow.webContents.on('context-menu', (event, params) => {
     event.preventDefault();
