@@ -670,6 +670,16 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
   // ───── Keyboard ─────
   useEffectCanvas(() => {
     const onKey = (e) => {
+      const matchShortcut = (s) => {
+        if (!s || !window.shortcuts) return false;
+        const eKey = e.key.toLowerCase();
+        const configKey = s.key.toLowerCase();
+        const hasCtrl = e.ctrlKey || e.metaKey;
+        return eKey === configKey &&
+               hasCtrl === !!s.ctrl &&
+               e.shiftKey === !!s.shift &&
+               e.altKey === !!s.alt;
+      };
       // While the read-only file viewer is open, don't run canvas shortcuts (it has its own Esc)
       if (fileOpen) return;
       const tag = (e.target.tagName || '').toLowerCase();
@@ -730,10 +740,10 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
       if ((e.key === 'Backspace' || e.key === 'Delete') && selectedConn) {
         e.preventDefault(); deleteConnector(selectedConn);
       }
-      if ((e.metaKey || e.ctrlKey) && e.key === 'd' && selected) {
+      if (matchShortcut(window.shortcuts.duplicate) && selected) {
         e.preventDefault(); duplicateItem(selected);
       }
-      if ((e.metaKey || e.ctrlKey) && e.key === 'a') {
+      if (matchShortcut(window.shortcuts.selectAll)) {
         e.preventDefault(); selectAllItems();
       }
       // Ctrl+C: copy the selected items and their connectors
@@ -767,9 +777,9 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
           });
         }
       }
-      if ((e.metaKey || e.ctrlKey) && e.key === 'z' && !e.shiftKey) { e.preventDefault(); undo(); }
-      if ((e.metaKey || e.ctrlKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) { e.preventDefault(); redo(); }
-      if (e.key === '/' && !contextMenu) {
+      if (matchShortcut(window.shortcuts.undo)) { e.preventDefault(); undo(); }
+      if (matchShortcut(window.shortcuts.redo)) { e.preventDefault(); redo(); }
+      if (matchShortcut(window.shortcuts.search) && !contextMenu) {
         e.preventDefault();
         document.querySelector('.mini-search input')?.focus();
       }

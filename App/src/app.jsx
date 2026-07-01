@@ -15,8 +15,23 @@ try {
     if (k && k.startsWith('odinote.state.') && k !== STORE_KEY) {
       localStorage.removeItem(k);
     }
-  }
 } catch {}
+
+// Global shortcuts configuration
+window.shortcuts = {
+  undo: { key: 'z', ctrl: true, shift: false, alt: false, label: 'Ctrl + Z' },
+  redo: { key: 'y', ctrl: true, shift: false, alt: false, label: 'Ctrl + Y' },
+  duplicate: { key: 'd', ctrl: true, shift: false, alt: false, label: 'Ctrl + D' },
+  selectAll: { key: 'a', ctrl: true, shift: false, alt: false, label: 'Ctrl + A' },
+  search: { key: '/', ctrl: false, shift: false, alt: false, label: '/' },
+};
+
+try {
+  const savedShortcuts = localStorage.getItem('odinote.custom_shortcuts');
+  if (savedShortcuts) {
+    window.shortcuts = { ...window.shortcuts, ...JSON.parse(savedShortcuts) };
+  }
+} catch (e) {}
 
 // IndexedDB Persistence Layer
 const DB_NAME = 'OdinoteDB';
@@ -148,6 +163,57 @@ function App() {
   const [checkingUpdates, setCheckingUpdates] = useStateApp(false);
   const [contextMenu, setContextMenu] = useStateApp(null);
   const [settingsOpen, setSettingsOpen] = useStateApp(false);
+  const [shState, setShState] = useStateApp(window.shortcuts || {});
+  const [listeningKey, setListeningKey] = useStateApp(null); // 'undo' | 'redo' | etc.
+
+  useEffectApp(() => {
+    if (!listeningKey) return;
+    const handleCapture = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      
+      const key = e.key.toLowerCase();
+      // Ignorar teclas modificadoras solas
+      if (['control', 'shift', 'alt', 'meta'].includes(key)) return;
+      
+      const ctrl = e.ctrlKey || e.metaKey;
+      const shift = e.shiftKey;
+      const alt = e.altKey;
+      
+      const parts = [];
+      if (ctrl) parts.push('Ctrl');
+      if (shift) parts.push('Shift');
+      if (alt) parts.push('Alt');
+      parts.push(e.key.toUpperCase());
+      const label = parts.join(' + ');
+
+      const updated = {
+        ...shState,
+        [listeningKey]: { key: e.key, ctrl, shift, alt, label }
+      };
+      
+      setShState(updated);
+      window.shortcuts = updated;
+      localStorage.setItem('odinote.custom_shortcuts', JSON.stringify(updated));
+      setListeningKey(null);
+    };
+
+    window.addEventListener('keydown', handleCapture, true);
+    return () => window.removeEventListener('keydown', handleCapture, true);
+  }, [listeningKey, shState]);
+
+  const handleResetShortcuts = () => {
+    const defaults = {
+      undo: { key: 'z', ctrl: true, shift: false, alt: false, label: 'Ctrl + Z' },
+      redo: { key: 'y', ctrl: true, shift: false, alt: false, label: 'Ctrl + Y' },
+      duplicate: { key: 'd', ctrl: true, shift: false, alt: false, label: 'Ctrl + D' },
+      selectAll: { key: 'a', ctrl: true, shift: false, alt: false, label: 'Ctrl + A' },
+      search: { key: '/', ctrl: false, shift: false, alt: false, label: '/' },
+    };
+    setShState(defaults);
+    window.shortcuts = defaults;
+    localStorage.removeItem('odinote.custom_shortcuts');
+  };
   const [volume, setVolume] = useStateApp(() => {
     const val = localStorage.getItem('odinote.volume');
     return val !== null ? parseFloat(val) : 0.5;
@@ -939,8 +1005,8 @@ function App() {
           <div 
             className="doc-modal-window" 
             style={{ 
-              width: '450px', 
-              maxHeight: '80vh', 
+              width: '680px', 
+              maxHeight: '90vh', 
               padding: '24px', 
               borderRadius: '16px', 
               background: 'var(--bg-card, #FFFFFF)', 
@@ -1051,51 +1117,120 @@ function App() {
 
               {/* Sección Gestor de Atajos de Teclado */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', borderTop: '1px solid var(--line-soft, #E5E1DD)', paddingTop: '14px', marginTop: '4px' }}>
-                <div style={{ fontWeight: '600', fontSize: '14px', color: 'var(--wine, #7B2D26)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <span className="material-symbols-rounded" style={{ fontSize: '18px' }}>keyboard</span>
-                  <span>{window.t('Atajos de Teclado', 'Keyboard Shortcuts')}</span>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ fontWeight: '600', fontSize: '14px', color: 'var(--wine, #7B2D26)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span className="material-symbols-rounded" style={{ fontSize: '18px' }}>keyboard</span>
+                    <span>{window.t('Atajos de Teclado', 'Keyboard Shortcuts')}</span>
+                  </div>
+                  <button
+                    className="btn btn-ghost"
+                    onClick={handleResetShortcuts}
+                    style={{ 
+                      padding: '4px 8px', 
+                      fontSize: '11px', 
+                      borderRadius: '6px', 
+                      border: '1px solid var(--line-soft, #E5E1DD)', 
+                      cursor: 'pointer',
+                      background: 'transparent',
+                      color: 'var(--text-soft, #595459)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px'
+                    }}
+                  >
+                    <span className="material-symbols-rounded" style={{ fontSize: '14px' }}>restore</span>
+                    <span>{window.t('Restablecer', 'Reset')}</span>
+                  </button>
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '180px', overflowY: 'auto', paddingRight: '4px' }}>
-                  {[
-                    { keys: ['Ctrl', 'Z'], desc: window.t('Deshacer acción', 'Undo action') },
-                    { keys: ['Ctrl', 'Y'], desc: window.t('Rehacer acción', 'Redo action') },
-                    { keys: ['Ctrl', 'C'], desc: window.t('Copiar nodos seleccionados', 'Copy selected nodes') },
-                    { keys: ['Ctrl', 'V'], desc: window.t('Pegar nodos / archivos', 'Paste nodes or files') },
-                    { keys: ['Ctrl', 'X'], desc: window.t('Cortar nodos seleccionados', 'Cut selected nodes') },
-                    { keys: ['Ctrl', 'D'], desc: window.t('Duplicar nodo', 'Duplicate selected node') },
-                    { keys: ['Ctrl', 'A'], desc: window.t('Seleccionar todo', 'Select all items') },
-                    { keys: ['Shift', 'Click'], desc: window.t('Selección múltiple (individual)', 'Add/remove from selection') },
-                    { keys: ['Shift', 'Arrastrar'], desc: window.t('Selección por recuadro múltiple', 'Add to selection with box') },
-                    { keys: ['Alt', 'Arrastrar'], desc: window.t('Desplazar lienzo (Paneo)', 'Pan the canvas') },
-                    { keys: ['Ctrl', 'Rueda'], desc: window.t('Acercar / Alejar (Zoom)', 'Zoom In / Out') },
-                    { keys: ['↑', '↓', '←', '→'], desc: window.t('Mover nodo seleccionado', 'Move selected node') },
-                    { keys: ['Doble Clic'], desc: window.t('Editar texto / Renombrar nodo', 'Edit text / Rename node') },
-                    { keys: ['Clic Derecho'], desc: window.t('Menú de creación rápida / Opciones', 'Quick-create menu / Options') },
-                    { keys: ['Tab', 'Enter'], desc: window.t('Navegar y editar celdas (Tablas)', 'Navigate and edit cells (Tables)') },
-                    { keys: ['Supr', 'Backspace'], desc: window.t('Eliminar elemento seleccionado', 'Delete selected item') },
-                    { keys: ['/'], desc: window.t('Enfocar buscador del lienzo', 'Focus search box') },
-                    { keys: ['Esc'], desc: window.t('Cerrar editor / Limpiar selección', 'Close editor / Clear selection') }
-                  ].map((sh, idx) => (
-                    <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px', padding: '6px 8px', background: 'var(--bg-main, #FAF8F6)', borderRadius: '6px', border: '1.5px solid var(--line-soft, #E5E1DD)' }}>
-                      <span style={{ color: 'var(--text, #1A1A1A)', fontWeight: '500' }}>{sh.desc}</span>
-                      <div style={{ display: 'flex', gap: '3px' }}>
-                        {sh.keys.map((k, ki) => (
-                          <kbd key={ki} style={{ 
-                            background: 'var(--bg-card, #FFFFFF)', 
-                            color: 'var(--text, #1A1A1A)', 
-                            border: '1.5px solid var(--line, #595459)', 
-                            borderRadius: '4px', 
-                            padding: '1.5px 5px', 
-                            fontSize: '10.5px', 
-                            fontWeight: '700', 
-                            boxShadow: '1px 1px 0 var(--line, #595459)',
-                            fontFamily: 'var(--font-mono, monospace)',
-                            margin: 0
-                          }}>{k}</kbd>
-                        ))}
-                      </div>
+                
+                <p style={{ fontSize: '12px', color: 'var(--text-soft, #595459)', margin: '0 0 4px 0', lineHeight: '1.4' }}>
+                  {window.t(
+                    'Haz clic sobre cualquiera de los atajos configurables para cambiar su combinación de teclas asignada.',
+                    'Click on any of the configurable shortcuts to rebind its key combination.'
+                  )}
+                </p>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', maxHeight: '280px', overflowY: 'auto', paddingRight: '4px' }}>
+                  {/* Atajos Configurables */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <div style={{ fontSize: '11px', fontWeight: '700', color: 'var(--wine, #7B2D26)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '2px' }}>
+                      {window.t('Personalizables', 'Configurable')}
                     </div>
-                  ))}
+                    {[
+                      { id: 'undo', desc: window.t('Deshacer acción', 'Undo action') },
+                      { id: 'redo', desc: window.t('Rehacer acción', 'Redo action') },
+                      { id: 'duplicate', desc: window.t('Duplicar nodo', 'Duplicate selected node') },
+                      { id: 'selectAll', desc: window.t('Seleccionar todo', 'Select all items') },
+                      { id: 'search', desc: window.t('Enfocar buscador del lienzo', 'Focus search box') }
+                    ].map((sh) => {
+                      const cfg = shState[sh.id] || {};
+                      const isListening = listeningKey === sh.id;
+                      return (
+                        <div key={sh.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px', padding: '6px 8px', background: 'var(--bg-main, #FAF8F6)', borderRadius: '6px', border: '1.5px solid var(--line-soft, #E5E1DD)' }}>
+                          <span style={{ color: 'var(--text, #1A1A1A)', fontWeight: '500' }}>{sh.desc}</span>
+                          <button
+                            onClick={() => setListeningKey(isListening ? null : sh.id)}
+                            style={{
+                              background: isListening ? 'var(--wine-l, #FBDFDD)' : 'var(--bg-card, #FFFFFF)',
+                              color: isListening ? 'var(--wine, #E6544F)' : 'var(--text, #1A1A1A)',
+                              border: isListening ? '1.5px solid var(--wine, #E6544F)' : '1.5px solid var(--line, #595459)',
+                              borderRadius: '4px',
+                              padding: '2px 6px',
+                              fontSize: '10.5px',
+                              fontWeight: '700',
+                              cursor: 'pointer',
+                              boxShadow: isListening ? 'none' : '1px 1px 0 var(--line, #595459)',
+                              fontFamily: 'var(--font-mono, monospace)'
+                            }}
+                          >
+                            {isListening ? window.t('Pulsa teclas...', 'Press keys...') : cfg.label || 'None'}
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Atajos Estáticos */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <div style={{ fontSize: '11px', fontWeight: '700', color: 'var(--wine, #7B2D26)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '2px' }}>
+                      {window.t('Fijos de Sistema', 'System Fixed')}
+                    </div>
+                    {[
+                      { keys: ['Ctrl', 'C'], desc: window.t('Copiar nodos', 'Copy nodes') },
+                      { keys: ['Ctrl', 'V'], desc: window.t('Pegar nodos / archivos', 'Paste nodes or files') },
+                      { keys: ['Ctrl', 'X'], desc: window.t('Cortar nodos', 'Cut nodes') },
+                      { keys: ['Shift', 'Click'], desc: window.t('Selección múltiple individual', 'Toggle item selection') },
+                      { keys: ['Shift', 'Arrastrar'], desc: window.t('Seleccionar por recuadro', 'Box selection') },
+                      { keys: ['Alt', 'Arrastrar'], desc: window.t('Desplazar lienzo (Paneo)', 'Pan the canvas') },
+                      { keys: ['Ctrl', 'Rueda'], desc: window.t('Acercar / Alejar (Zoom)', 'Zoom In / Out') },
+                      { keys: ['↑', '↓', '←', '→'], desc: window.t('Mover nodo seleccionado', 'Move selected node') },
+                      { keys: ['Doble Clic'], desc: window.t('Editar texto / Renombrar', 'Edit text / Rename') },
+                      { keys: ['Clic Derecho'], desc: window.t('Creación rápida / Opciones', 'Quick-create / Options') },
+                      { keys: ['Tab', 'Enter'], desc: window.t('Navegar y editar celdas (Tablas)', 'Navigate and edit cells (Tables)') },
+                      { keys: ['Supr', 'Backspace'], desc: window.t('Eliminar elemento', 'Delete item') },
+                      { keys: ['Esc'], desc: window.t('Limpiar selección / Cerrar', 'Clear selection / Close') }
+                    ].map((sh, idx) => (
+                      <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px', padding: '6px 8px', background: 'var(--bg-main, #FAF8F6)', borderRadius: '6px', border: '1.5px solid var(--line-soft, #E5E1DD)' }}>
+                        <span style={{ color: 'var(--text, #1A1A1A)', fontWeight: '500' }}>{sh.desc}</span>
+                        <div style={{ display: 'flex', gap: '3px' }}>
+                          {sh.keys.map((k, ki) => (
+                            <kbd key={ki} style={{ 
+                              background: 'var(--bg-card, #FFFFFF)', 
+                              color: 'var(--text, #1A1A1A)', 
+                              border: '1.5px solid var(--line, #595459)', 
+                              borderRadius: '4px', 
+                              padding: '1.5px 5px', 
+                              fontSize: '10px', 
+                              fontWeight: '700', 
+                              boxShadow: '1px 1px 0 var(--line, #595459)',
+                              fontFamily: 'var(--font-mono, monospace)',
+                              margin: 0
+                            }}>{k}</kbd>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
             </div>
