@@ -358,6 +358,46 @@ ipcMain.handle('fetch-image-base64', async (event, url) => {
   }
 });
 
+ipcMain.handle('download-media-to-vault', async (event, { folderPath, url, fileName }) => {
+  logToFile(`IPC Call: download-media-to-vault from ${url} to vault ${folderPath}`);
+  try {
+    const path = require('path');
+    const fs = require('fs');
+    const { net } = require('electron');
+    
+    const mediaDir = path.join(folderPath, 'media');
+    if (!fs.existsSync(mediaDir)) {
+      fs.mkdirSync(mediaDir, { recursive: true });
+    }
+    
+    // Descargar imagen usando Electron native net API
+    const response = await net.fetch(url);
+    if (!response.ok) throw new Error(`HTTP status ${response.status}`);
+    const arrayBuffer = await response.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+    
+    // Generar un hash único del contenido para evitar duplicados
+    const crypto = require('crypto');
+    const hash = crypto.createHash('sha256').update(buffer).digest('hex').slice(0, 16);
+    
+    const fileExt = path.extname(fileName) || '.png';
+    const baseName = path.basename(fileName, fileExt).replace(/[^a-zA-Z0-9._-]/g, '_');
+    const finalName = `${baseName}_${hash}${fileExt}`;
+    const destPath = path.join(mediaDir, finalName);
+    
+    if (!fs.existsSync(destPath)) {
+      fs.writeFileSync(destPath, buffer);
+      logToFile(`IPC download-media-to-vault: Saved successfully to media/${finalName}`);
+    } else {
+      logToFile(`IPC download-media-to-vault: Reuse existing: media/${finalName}`);
+    }
+    return `media/${finalName}`;
+  } catch (err) {
+    logToFile(`IPC download-media-to-vault ERROR: ${err.message}`);
+    throw err;
+  }
+});
+
 app.whenReady().then(() => {
   logToFile('App whenReady triggered.');
   createWindow();

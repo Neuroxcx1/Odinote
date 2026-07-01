@@ -851,6 +851,7 @@ function App() {
       volume={volume}
       onChangeVolume={setVolume}
       onSettingsClick={() => setSettingsOpen(true)}
+      vaultPath={vaultPath}
     />;
   }
 

@@ -367,7 +367,7 @@ function duplicateCanvasState(state, origId, newId) {
   });
 }
 
-function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn, setCanvases: setExtCanvases, updateAvailable, onUpdateClick, volume, onChangeVolume, onSettingsClick }) {
+function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn, setCanvases: setExtCanvases, updateAvailable, onUpdateClick, volume, onChangeVolume, onSettingsClick, vaultPath }) {
   const [canvases, _setCanvases] = useStateCanvas(() => canvasesIn || JSON.parse(JSON.stringify(window.INITIAL_CANVASES)));
   // Stable ref to App's setter — avoids the infinite loop caused by it being a dep on every render
   const setExtCanvasesRef = useRefCanvas(setExtCanvases);
@@ -878,7 +878,30 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
           if (imgUrl.startsWith('data:')) {
             applyDroppedImageSrc(imgUrl);
           } else {
-            if (window.electronAPI && window.electronAPI.fetchImageBase64) {
+            if (window.electronAPI && window.electronAPI.downloadMediaToVault && vaultPath) {
+              let tentativeName = 'web_image.png';
+              try {
+                const parsedUrl = new URL(imgUrl);
+                const base = parsedUrl.pathname.split('/').pop();
+                if (base && base.includes('.')) tentativeName = base;
+              } catch(e) {}
+              window.electronAPI.downloadMediaToVault(vaultPath, imgUrl, tentativeName)
+                .then(relativePath => {
+                  const normalizedRelative = relativePath.replace(/\\/g, '/');
+                  const absolutePath = `file:///${vaultPath.replace(/\\/g, '/')}/${normalizedRelative}`;
+                  applyDroppedImageSrc(absolutePath);
+                })
+                .catch(err => {
+                  console.warn('Failed to download dropped image via IPC, falling back to base64 fetch:', err);
+                  if (window.electronAPI.fetchImageBase64) {
+                    window.electronAPI.fetchImageBase64(imgUrl)
+                      .then(applyDroppedImageSrc)
+                      .catch(() => applyDroppedImageSrc(imgUrl));
+                  } else {
+                    applyDroppedImageSrc(imgUrl);
+                  }
+                });
+            } else if (window.electronAPI && window.electronAPI.fetchImageBase64) {
               window.electronAPI.fetchImageBase64(imgUrl)
                 .then(applyDroppedImageSrc)
                 .catch(err => {
@@ -1136,7 +1159,33 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
           return;
         }
         e.preventDefault();
-        if (window.electronAPI && window.electronAPI.fetchImageBase64) {
+        if (window.electronAPI && window.electronAPI.downloadMediaToVault && vaultPath) {
+          let tentativeName = 'web_image.png';
+          try {
+            const parsedUrl = new URL(url);
+            const base = parsedUrl.pathname.split('/').pop();
+            if (base && base.includes('.')) tentativeName = base;
+          } catch(e) {}
+          window.electronAPI.downloadMediaToVault(vaultPath, url, tentativeName)
+            .then(relativePath => {
+              const normalizedRelative = relativePath.replace(/\\/g, '/');
+              const absolutePath = `file:///${vaultPath.replace(/\\/g, '/')}/${normalizedRelative}`;
+              applyImageSrc(absolutePath);
+            })
+            .catch(err => {
+              console.warn('Failed to download image to vault directly via IPC, falling back to base64 fetch:', err);
+              if (window.electronAPI.fetchImageBase64) {
+                window.electronAPI.fetchImageBase64(url)
+                  .then(applyImageSrc)
+                  .catch(err2 => {
+                    console.warn('Failed base64 fetch too, fallback to URL:', err2);
+                    applyImageSrc(url);
+                  });
+              } else {
+                applyImageSrc(url);
+              }
+            });
+        } else if (window.electronAPI && window.electronAPI.fetchImageBase64) {
           window.electronAPI.fetchImageBase64(url)
             .then(base64 => {
               applyImageSrc(base64);
@@ -1640,8 +1689,8 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
       let activeGuidesX = [];
       let activeGuidesY = [];
 
-      // Smart alignment guides relative to other items (ALWAYS active, disabled for frames)
-      const snapThreshold = item.type === 'frame' ? 0 : 12;
+      // Smart alignment guides relative to other items (ALWAYS active)
+      const snapThreshold = 12;
       const w = item.w || 200;
       const h = item.h || 120;
       let bestDiffX = snapThreshold;
@@ -2694,7 +2743,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
       
       let activeGuidesX = [];
       let activeGuidesY = [];
-      const snapThreshold = item.type === 'frame' ? 0 : 10;
+      const snapThreshold = 10;
       const MAX_ALIGN_DIST = 600;
       const currentItems = current.items || [];
 
