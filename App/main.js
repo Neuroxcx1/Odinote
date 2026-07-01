@@ -41,6 +41,25 @@ function createWindow() {
         { role: 'paste' },
         { role: 'selectall' }
       ]
+    },
+    {
+      label: 'View',
+      submenu: [
+        {
+          label: 'Toggle Developer Tools',
+          accelerator: 'F12',
+          click: (item, focusedWindow) => {
+            if (focusedWindow) focusedWindow.webContents.toggleDevTools();
+          }
+        },
+        {
+          label: 'Toggle Developer Tools (CmdOrCtrl+Shift+I)',
+          accelerator: 'CmdOrCtrl+Shift+I',
+          click: (item, focusedWindow) => {
+            if (focusedWindow) focusedWindow.webContents.toggleDevTools();
+          }
+        }
+      ]
     }
   ];
   const menu = Menu.buildFromTemplate(template);
