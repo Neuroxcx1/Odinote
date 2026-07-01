@@ -218,6 +218,9 @@ Object.assign(window, { SAMPLE_PROJECTS, INITIAL_CANVASES });
 const createLangProxy = (langObj, langKey) => {
   return new Proxy(langObj, {
     get(target, prop) {
+      if (typeof prop === 'symbol' || (typeof prop === 'string' && (prop.startsWith('$$') || ['prototype', 'constructor', 'toJSON', 'toString', 'valueOf', 'then'].includes(prop)))) {
+        return target[prop];
+      }
       if (prop in target) return target[prop];
       // Fallback to english translation key, then spanish translation key
       const fallbackLang = langKey === 'en' ? 'es' : 'en';
@@ -237,6 +240,9 @@ const TRANSLATIONS_PROXY = new Proxy(
   }, {}),
   {
     get(target, prop) {
+      if (typeof prop === 'symbol' || (typeof prop === 'string' && (prop.startsWith('$$') || ['prototype', 'constructor', 'then'].includes(prop)))) {
+        return target[prop];
+      }
       if (prop in target) {
         return target[prop];
       }
