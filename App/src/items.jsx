@@ -3492,7 +3492,7 @@ function FrameItem({ item, lang, editing, onUpdate, callbacks }) {
               fontSize: '14px',
               fontFamily: 'var(--font-display)',
               textAlign: align,
-              color: titleColor === 'inherit' ? 'var(--ink)' : titleColor
+              color: titleColor === 'inherit' ? 'var(--frame-title-color, var(--ink))' : titleColor
             }}
             onClick={(e)=>e.stopPropagation()}
             onMouseDown={(e)=>e.stopPropagation()}
@@ -3518,7 +3518,7 @@ function FrameItem({ item, lang, editing, onUpdate, callbacks }) {
               fontWeight: 800, 
               fontSize: '14px', 
               fontFamily: 'var(--font-display)',
-              color: titleColor === 'inherit' ? 'var(--ink)' : titleColor,
+              color: titleColor === 'inherit' ? 'var(--frame-title-color, var(--ink))' : titleColor,
               textAlign: align
             }}
           >

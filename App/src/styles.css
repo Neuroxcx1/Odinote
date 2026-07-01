@@ -69,7 +69,7 @@
 }
 
 [data-theme="dark"] {
-  /* Only override bg + topbar + contextual menus; keep items light */
+  --frame-title-color: #F0EEF0;
 }
 body[data-theme="dark"] { background: #2A282A; }
 [data-theme="dark"] .canvas-wrap {
@@ -93,6 +93,7 @@ body[data-theme="dark"] { background: #2A282A; }
 [data-theme="dark"] .icon-btn .material-symbols-rounded { color: #F0EEF0; }
 [data-theme="dark"] .avatar { color: white; }
 [data-theme="dark"] .lang-switch { background: #3A383A; }
+[data-theme="dark"] .lang-switch span { color: #F0EEF0 !important; }
 [data-theme="dark"] .lang-switch button { color: #F0EEF0; }
 [data-theme="dark"] .lang-switch button.active { background: #F0EEF0; color: #1A1A1A; }
 [data-theme="dark"] .zoom-ctrls { background: #3A383A; }
@@ -3079,6 +3080,7 @@ body.odi-busy iframe { pointer-events: none !important; }
 [data-theme="dark"] .feedback-topbar-btn {
   background: #3A383A;
   border-color: #1A1A1A;
+  color: #F0EEF0 !important;
 }
 [data-theme="dark"] .feedback-topbar-btn:hover {
   background: #2A282A;
