@@ -17,6 +17,11 @@
   --line-soft: rgba(89,84,89,0.22);
   --line-softer: rgba(89,84,89,0.10);
 
+  --bg-card:   #FFFFFF;
+  --bg-main:   #FAF8F6;
+  --text:      #1A1A1A;
+  --text-soft: #595459;
+
   /* Brand palette (user-defined) */
   --pal-grey:   #E1DFE3;
   --pal-dark:   #595459;
@@ -70,6 +75,11 @@
 
 [data-theme="dark"] {
   --frame-title-color: #F0EEF0;
+  --bg-card:           #3A383A;
+  --bg-main:           #2A282A;
+  --text:              #F0EEF0;
+  --text-soft:         #A5A1A5;
+  --line-soft:         #1A1A1A;
 }
 body[data-theme="dark"] { background: #2A282A; }
 [data-theme="dark"] .canvas-wrap {

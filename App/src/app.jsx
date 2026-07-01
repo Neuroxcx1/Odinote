@@ -1040,13 +1040,58 @@ function App() {
                     </button>
                   </div>
                 ) : (
-                  <p style={{ fontSize: '11px', color: 'var(--wine)', margin: 0, fontWeight: '500' }}>
-                    {window.t(
-                      'La edición directa del diccionario solo está disponible en la versión de escritorio.',
-                      'Direct dictionary editing is only available in the desktop application.'
-                    )}
-                  </p>
+                   <p style={{ fontSize: '11px', color: 'var(--wine)', margin: 0, fontWeight: '500' }}>
+                     {window.t(
+                       'La edición directa del diccionario solo está disponible en la versión de escritorio.',
+                       'Direct dictionary editing is only available in the desktop application.'
+                     )}
+                   </p>
                 )}
+              </div>
+
+              {/* Sección Gestor de Atajos de Teclado */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', borderTop: '1px solid var(--line-soft, #E5E1DD)', paddingTop: '14px', marginTop: '4px' }}>
+                <div style={{ fontWeight: '600', fontSize: '14px', color: 'var(--wine, #7B2D26)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span className="material-symbols-rounded" style={{ fontSize: '18px' }}>keyboard</span>
+                  <span>{window.t('Atajos de Teclado', 'Keyboard Shortcuts')}</span>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '180px', overflowY: 'auto', paddingRight: '4px' }}>
+                  {[
+                    { keys: ['Ctrl', 'Z'], desc: window.t('Deshacer acción', 'Undo action') },
+                    { keys: ['Ctrl', 'Y'], desc: window.t('Rehacer acción', 'Redo action') },
+                    { keys: ['Ctrl', 'C'], desc: window.t('Copiar nodos seleccionados', 'Copy selected nodes') },
+                    { keys: ['Ctrl', 'V'], desc: window.t('Pegar nodos / archivos', 'Paste nodes or files') },
+                    { keys: ['Ctrl', 'X'], desc: window.t('Cortar nodos seleccionados', 'Cut selected nodes') },
+                    { keys: ['Ctrl', 'D'], desc: window.t('Duplicar nodo', 'Duplicate selected node') },
+                    { keys: ['Ctrl', 'A'], desc: window.t('Seleccionar todo', 'Select all items') },
+                    { keys: ['Shift', 'Click'], desc: window.t('Selección múltiple (individual)', 'Add/remove from selection') },
+                    { keys: ['Shift', 'Arrastrar'], desc: window.t('Selección por recuadro múltiple', 'Add to selection with box') },
+                    { keys: ['Alt', 'Arrastrar'], desc: window.t('Desplazar lienzo (Paneo)', 'Pan the canvas') },
+                    { keys: ['Supr', 'Backspace'], desc: window.t('Eliminar elemento seleccionado', 'Delete selected item') },
+                    { keys: ['/'], desc: window.t('Enfocar buscador del lienzo', 'Focus search box') },
+                    { keys: ['Esc'], desc: window.t('Cerrar editor / Limpiar selección', 'Close editor / Clear selection') }
+                  ].map((sh, idx) => (
+                    <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px', padding: '6px 8px', background: 'var(--bg-main, #FAF8F6)', borderRadius: '6px', border: '1.5px solid var(--line-soft, #E5E1DD)' }}>
+                      <span style={{ color: 'var(--text, #1A1A1A)', fontWeight: '500' }}>{sh.desc}</span>
+                      <div style={{ display: 'flex', gap: '3px' }}>
+                        {sh.keys.map((k, ki) => (
+                          <kbd key={ki} style={{ 
+                            background: 'var(--bg-card, #FFFFFF)', 
+                            color: 'var(--text, #1A1A1A)', 
+                            border: '1.5px solid var(--line, #595459)', 
+                            borderRadius: '4px', 
+                            padding: '1.5px 5px', 
+                            fontSize: '10.5px', 
+                            fontWeight: '700', 
+                            boxShadow: '1px 1px 0 var(--line, #595459)',
+                            fontFamily: 'var(--font-mono, monospace)',
+                            margin: 0
+                          }}>{k}</kbd>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
             

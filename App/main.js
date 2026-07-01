@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, shell, Menu } = require('electron');
 app.commandLine.appendSwitch('disable-features', 'WinUseBrowserSpellChecker');
 const path = require('path');
 const fs = require('fs');
@@ -28,6 +28,23 @@ try {
 
 function createWindow() {
   logToFile('Initializing BrowserWindow...');
+
+  const template = [
+    {
+      label: 'Edit',
+      submenu: [
+        { role: 'undo' },
+        { role: 'redo' },
+        { type: 'separator' },
+        { role: 'cut' },
+        { role: 'copy' },
+        { role: 'paste' },
+        { role: 'selectall' }
+      ]
+    }
+  ];
+  const menu = Menu.buildFromTemplate(template);
+  Menu.setApplicationMenu(menu);
   
   mainWindow = new BrowserWindow({
     width: 1280,
