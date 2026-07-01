@@ -165,12 +165,13 @@ function App() {
   const checkUpdates = async (manual = false) => {
     if (checkingUpdates) return;
     if (manual) setCheckingUpdates(true);
+    const cleanCurrent = '1.0.4'; // matches package.json
     try {
       if (MOCK_UPDATE_TEST) {
         await new Promise(resolve => setTimeout(resolve, 1000));
         setUpdateAvailable(true);
         if (manual) {
-          alert(window.t('¡Nueva versión disponible: v1.0.3! Haz clic en la campana para descargarla.', 'New version available: v1.0.3! Click the bell to download it.'));
+          alert(window.t('¡Nueva versión disponible: v1.0.5! Haz clic en la campana para descargarla.', 'New version available: v1.0.5! Click the bell to download it.'));
         }
         return;
       }
@@ -184,7 +185,7 @@ function App() {
       const data = await res.json();
       if (!Array.isArray(data) || data.length === 0) {
         if (manual) {
-          alert(window.t('¡Estás al día! Odinote está en su versión más reciente (v1.0.2).', 'You are up to date! Odinote is on the latest version (v1.0.2).'));
+          alert(window.t(`¡Estás al día! Odinote está en su versión más reciente (v${cleanCurrent}).`, `You are up to date! Odinote is on the latest version (v${cleanCurrent}).`));
         }
         return;
       }
@@ -192,13 +193,12 @@ function App() {
       const latestVersion = latestRelease.tag_name;
       if (!latestVersion) {
         if (manual) {
-          alert(window.t('¡Estás al día! Odinote está en su versión más reciente (v1.0.2).', 'You are up to date! Odinote is on the latest version (v1.0.2).'));
+          alert(window.t(`¡Estás al día! Odinote está en su versión más reciente (v${cleanCurrent}).`, `You are up to date! Odinote is on the latest version (v${cleanCurrent}).`));
         }
         return;
       }
 
       const cleanLatest = latestVersion.replace(/^v/, '');
-      const cleanCurrent = '1.0.3'; // matches package.json
 
       const latestParts = cleanLatest.split('.').map(Number);
       const currentParts = cleanCurrent.split('.').map(Number);
@@ -223,7 +223,7 @@ function App() {
       } else {
         setUpdateAvailable(false);
         if (manual) {
-          alert(window.t('¡Estás al día! Odinote está en su versión más reciente (v1.0.2).', 'You are up to date! Odinote is on the latest version (v1.0.2).'));
+          alert(window.t(`¡Estás al día! Odinote está en su versión más reciente (v${cleanCurrent}).`, `You are up to date! Odinote is on the latest version (v${cleanCurrent}).`));
         }
       }
     } catch (err) {
@@ -251,15 +251,61 @@ function App() {
     }
   };
 
-  // Prevent Ctrl + Mousewheel zoom
+  // Prevent Ctrl + Mousewheel zoom & Sanitize rich text paste in all contentEditables
   useEffectApp(() => {
     const handleWheel = (e) => {
       if (e.ctrlKey) {
         e.preventDefault();
       }
     };
+    
+    const handleGlobalPaste = (e) => {
+      const activeEl = document.activeElement;
+      if (activeEl && activeEl.isContentEditable) {
+        if (e.defaultPrevented) return;
+        
+        const text = ((e.clipboardData && e.clipboardData.getData('text/plain')) || '').trim();
+        // If it's a single bare URL, let the local handlers process it (e.g. DocModal autolink)
+        if (text && !/\s/.test(text) && /^(https?:\/\/|www\.)\S+$/i.test(text)) {
+          return;
+        }
+        
+        const html = e.clipboardData.getData('text/html');
+        if (html) {
+          e.preventDefault();
+          const parser = new DOMParser();
+          const doc = parser.parseFromString(html, 'text/html');
+          
+          const cleanNode = (node) => {
+            if (node.nodeType === Node.ELEMENT_NODE) {
+              const attrNames = Array.from(node.attributes).map(attr => attr.name);
+              attrNames.forEach(name => {
+                if (!['href', 'src', 'alt', 'target', 'checked', 'type'].includes(name)) {
+                  node.removeAttribute(name);
+                }
+              });
+              
+              if (['style', 'script', 'meta', 'link'].includes(node.tagName.toLowerCase())) {
+                node.remove();
+                return;
+              }
+            }
+            Array.from(node.childNodes).forEach(cleanNode);
+          };
+          
+          cleanNode(doc.body);
+          document.execCommand('insertHTML', false, doc.body.innerHTML);
+        }
+      }
+    };
+
     window.addEventListener('wheel', handleWheel, { passive: false });
-    return () => window.removeEventListener('wheel', handleWheel);
+    document.addEventListener('paste', handleGlobalPaste, true);
+    
+    return () => {
+      window.removeEventListener('wheel', handleWheel);
+      document.removeEventListener('paste', handleGlobalPaste, true);
+    };
   }, []);
 
   // Listen to IPC event for Electron custom context menu
