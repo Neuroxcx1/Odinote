@@ -263,6 +263,7 @@ function App() {
     const handleGlobalPaste = (e) => {
       const activeEl = document.activeElement;
       if (activeEl && activeEl.isContentEditable) {
+        if (activeEl.hasAttribute('data-paste-interceptor')) return;
         if (e.defaultPrevented) return;
         
         const text = ((e.clipboardData && e.clipboardData.getData('text/plain')) || '').trim();

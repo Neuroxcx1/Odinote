@@ -1564,8 +1564,8 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
       let activeGuidesX = [];
       let activeGuidesY = [];
 
-      // Smart alignment guides relative to other items (ALWAYS active)
-      const snapThreshold = 12;
+      // Smart alignment guides relative to other items (ALWAYS active, disabled for frames)
+      const snapThreshold = item.type === 'frame' ? 0 : 12;
       const w = item.w || 200;
       const h = item.h || 120;
       let bestDiffX = snapThreshold;
@@ -2582,7 +2582,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
       
       let activeGuidesX = [];
       let activeGuidesY = [];
-      const snapThreshold = 10;
+      const snapThreshold = item.type === 'frame' ? 0 : 10;
       const MAX_ALIGN_DIST = 600;
       const currentItems = current.items || [];
 
@@ -3083,6 +3083,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
         ref={pasteIntRef}
         contentEditable
         suppressContentEditableWarning
+        data-paste-interceptor="true"
         onPaste={onPasteIntercept}
         onInput={(e) => { e.currentTarget.innerHTML = ''; }}
         onKeyDown={(e) => {
