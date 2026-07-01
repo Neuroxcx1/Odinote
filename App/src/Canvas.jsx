@@ -1575,7 +1575,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
       const MAX_ALIGN_DIST = 600; // Constante de proximidad física perpendicular
 
       for (const other of currentItems) {
-        if (other.id === itemId || other.type === 'line') continue;
+        if (other.id === itemId || other.type === 'line' || other.type === 'frame') continue;
         const ow = other.w || 200;
         const oh = other.h || 120;
 
@@ -2599,7 +2599,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
           const myVal = corner.includes('r') ? (nx + nw) : (sx + sw - nw);
 
           for (const other of currentItems) {
-            if (other.id === itemId || other.type === 'line') continue;
+            if (other.id === itemId || other.type === 'line' || other.type === 'frame') continue;
             const ow = other.w || 200;
             const oh = other.h || 120;
             const centerY = ny + nh / 2;
@@ -2638,7 +2638,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
           const myVal = corner.includes('b') ? (ny + nh) : (sy + sh - nh);
 
           for (const other of currentItems) {
-            if (other.id === itemId || other.type === 'line') continue;
+            if (other.id === itemId || other.type === 'line' || other.type === 'frame') continue;
             const ow = other.w || 200;
             const oh = other.h || 120;
             const centerX = nx + nw / 2;
@@ -2686,7 +2686,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
 
         if (myXVal !== null) {
           for (const other of currentItems) {
-            if (other.id === itemId || other.type === 'line') continue;
+            if (other.id === itemId || other.type === 'line' || other.type === 'frame') continue;
             const ow = other.w || 200;
             const oh = other.h || 120;
             const centerY = ny + nh / 2;
@@ -2723,7 +2723,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
 
         if (myYVal !== null) {
           for (const other of currentItems) {
-            if (other.id === itemId || other.type === 'line') continue;
+            if (other.id === itemId || other.type === 'line' || other.type === 'frame') continue;
             const ow = other.w || 200;
             const oh = other.h || 120;
             const centerX = nx + nw / 2;
