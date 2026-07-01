@@ -855,26 +855,43 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
           const targetItem = targetId ? current.items.find(i => i.id === targetId) : null;
           const pt = screenToCanvas(e.clientX, e.clientY);
           const applyDroppedImageSrc = (src) => {
-            const img = new Image();
-            img.onload = () => {
-              const ratio = img.naturalWidth / img.naturalHeight;
+            const defW = 300;
+            const defH = 220;
+
+            const insertDroppedNode = (wVal, hVal) => {
               if (targetItem && targetItem.type === 'image') {
-                const w = targetItem.w || 260;
-                updateItem(targetId, { src, name: 'image.png', w, h: Math.max(60, Math.round(w / ratio)) });
+                updateItem(targetId, { src, name: 'image.png', w: wVal, h: hVal });
               } else {
-                const w = 300;
-                const h = Math.max(60, Math.round(w / ratio));
-                const newItem = makeNewItem('image', pt.x - w / 2, pt.y - h / 2, w, h, lang);
+                const newItem = makeNewItem('image', pt.x - wVal / 2, pt.y - hVal / 2, wVal, hVal, lang);
                 newItem.src = src;
                 newItem.name = 'image.png';
-                newItem.w = w;
-                newItem.h = h;
+                newItem.w = wVal;
+                newItem.h = hVal;
                 setCanvases(prev => {
                   const c = prev[currentId];
                   return { ...prev, [currentId]: { ...c, items: [...c.items, newItem] } };
                 });
                 setSelected(newItem.id);
               }
+            };
+
+            if (src.startsWith('file:///')) {
+              insertDroppedNode(defW, defH);
+              return;
+            }
+
+            const img = new Image();
+            img.onload = () => {
+              const ratio = img.naturalWidth / img.naturalHeight;
+              if (targetItem && targetItem.type === 'image') {
+                const w = targetItem.w || 260;
+                insertDroppedNode(w, Math.max(60, Math.round(w / ratio)));
+              } else {
+                insertDroppedNode(defW, Math.max(60, Math.round(defW / ratio)));
+              }
+            };
+            img.onerror = () => {
+              insertDroppedNode(defW, defH);
             };
             img.src = src;
           };
@@ -1132,15 +1149,13 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
       const applyImageSrc = (src) => {
         e.preventDefault();
         const selItem = selected ? current.items.find(i => i.id === selected) : null;
-        const img = new Image();
-        img.onload = () => {
-          const ratio = img.naturalWidth / img.naturalHeight;
+        
+        const insertImageNode = (wVal, hVal) => {
           if (selItem && selItem.type === 'image') {
-            const w = selItem.w || 260;
-            updateItem(selected, { src, w, h: Math.max(60, Math.round(w / ratio)) });
+            updateItem(selected, { src, w: wVal, h: hVal });
           } else {
-            const w = 300;
-            const h = Math.max(60, Math.round(w / ratio));
+            const w = wVal;
+            const h = hVal;
             const m = lastMouseRef.current || { x: 0, y: 0 };
             const pt = screenToCanvas(m.x, m.y);
             const newItem = makeNewItem('image', pt.x - w / 2, pt.y - h / 2, w, h, lang);
@@ -1152,7 +1167,28 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
             setSelected(newItem.id);
           }
         };
-        img.onerror = () => { if (selItem && selItem.type === 'image') updateItem(selected, { src }); };
+
+        const defW = 300;
+        const defH = 220;
+
+        if (src.startsWith('file:///')) {
+          insertImageNode(defW, defH);
+          return;
+        }
+
+        const img = new Image();
+        img.onload = () => {
+          const ratio = img.naturalWidth / img.naturalHeight;
+          if (selItem && selItem.type === 'image') {
+            const w = selItem.w || 260;
+            insertImageNode(w, Math.max(60, Math.round(w / ratio)));
+          } else {
+            insertImageNode(defW, Math.max(60, Math.round(defW / ratio)));
+          }
+        };
+        img.onerror = () => {
+          insertImageNode(defW, defH);
+        };
         img.src = src;
       };
 
@@ -1700,7 +1736,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
       let bestDiffY = snapThreshold;
 
       const currentItems = current.items || [];
-      const MAX_ALIGN_DIST = 600; // Constante de proximidad física perpendicular
+      const MAX_ALIGN_DIST = 99999; // Constante de proximidad física perpendicular
 
       for (const other of currentItems) {
         if (other.id === itemId || other.type === 'line') continue;
@@ -2178,7 +2214,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
       let bestDiffY = snapThreshold;
 
       const currentItems = current.items || [];
-      const MAX_ALIGN_DIST = 600;
+      const MAX_ALIGN_DIST = 99999;
 
       for (const other of currentItems) {
         if (other.id === extractedId || other.type === 'line') continue;
@@ -2751,7 +2787,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
       let activeGuidesX = [];
       let activeGuidesY = [];
       const snapThreshold = 10;
-      const MAX_ALIGN_DIST = 600;
+      const MAX_ALIGN_DIST = 99999;
       const currentItems = current.items || [];
 
       if (ev.shiftKey || item.type === 'file') {
