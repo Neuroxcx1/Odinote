@@ -18,5 +18,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   openCustomDictionary: () => ipcRenderer.invoke('open-custom-dictionary'),
   openUserDataFolder: () => ipcRenderer.invoke('open-user-data-folder'),
   fetchImageBase64: (url) => ipcRenderer.invoke('fetch-image-base64', url),
-  downloadMediaToVault: (folderPath, url, fileName) => ipcRenderer.invoke('download-media-to-vault', { folderPath, url, fileName })
+  downloadMediaToVault: (folderPath, url, fileName) => ipcRenderer.invoke('download-media-to-vault', { folderPath, url, fileName }),
+  getCustomDictionaryWords: () => ipcRenderer.invoke('get-custom-dictionary-words'),
+  removeWordFromDictionary: (word) => ipcRenderer.invoke('remove-word-from-dictionary', word)
 });

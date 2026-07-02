@@ -438,6 +438,14 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
   const [pan, setPan] = useStateCanvas({ x: 40, y: 20 });
   const [scale, setScale] = useStateCanvas(1);
   const [showBgSelector, setShowBgSelector] = useStateCanvas(false);
+  const [windowSize, setWindowSize] = useStateCanvas({ w: window.innerWidth, h: window.innerHeight });
+  useEffectCanvas(() => {
+    const handleResize = () => {
+      setWindowSize({ w: window.innerWidth, h: window.innerHeight });
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // Refs to always have the latest pan, scale, and currentId in cleanup effects
   const panRef = useRefCanvas(pan);
@@ -449,6 +457,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
 
   // Load saved camera when currentId changes
   useEffectCanvas(() => {
+    setCroppingId(null);
     const saved = canvases[currentId];
     if (saved && saved.pan && saved.scale !== undefined) {
       setPan(saved.pan);
@@ -538,6 +547,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
   // undo stack
   const [history, setHistory] = useStateCanvas([]);
   const [historyIdx, setHistoryIdx] = useStateCanvas(-1);
+  const [croppingId, setCroppingId] = useStateCanvas(null);
 
   // alignment guides and dragged task ghost
   const [guides, setGuides] = useStateCanvas(null);
@@ -753,19 +763,58 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
         document.querySelector('.mini-search input')?.focus();
       }
     };
+    const onMouseDownCapture = (e) => {
+      if (e.button === 1 && e.ctrlKey) {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        const startX = e.clientX, startY = e.clientY, startPan = { ...panRef.current };
+        const onMove = (ev) => {
+          setPan({ x: startPan.x + ev.clientX - startX, y: startPan.y + ev.clientY - startY });
+        };
+        const onUp = () => {
+          window.removeEventListener('mousemove', onMove);
+          window.removeEventListener('mouseup', onUp);
+        };
+        window.addEventListener('mousemove', onMove);
+        window.addEventListener('mouseup', onUp);
+      }
+    };
     window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    window.addEventListener('mousedown', onMouseDownCapture, { capture: true });
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      window.removeEventListener('mousedown', onMouseDownCapture, { capture: true });
+    };
   });
 
-  // ───── Focus the paste interceptor whenever an image node is selected ─────
+  // ───── Focus the paste interceptor whenever any node or connector is selected ─────
   useEffectCanvas(() => {
-    if (!selected) return;
-    const selItem = current.items.find(i => i.id === selected);
-    if (selItem?.type === 'image') {
-      const t = setTimeout(() => pasteIntRef.current?.focus(), 30);
-      return () => clearTimeout(t);
-    }
-  }, [selected]);
+    if (!selected && selectedIds.length === 0 && !selectedConn) return;
+    
+    // Check if user is actively editing a text field or contentEditable
+    const activeEl = document.activeElement;
+    const isEditing = activeEl && (
+      activeEl.tagName === 'INPUT' || 
+      activeEl.tagName === 'TEXTAREA' || 
+      activeEl.isContentEditable
+    );
+    if (isEditing) return;
+
+    const t = setTimeout(() => {
+      // Re-verify after timeout to avoid race conditions
+      const currActive = document.activeElement;
+      const currEditing = currActive && (
+        currActive.tagName === 'INPUT' || 
+        currActive.tagName === 'TEXTAREA' || 
+        currActive.isContentEditable
+      );
+      if (!currEditing) {
+        pasteIntRef.current?.focus();
+      }
+    }, 50);
+    return () => clearTimeout(t);
+  }, [selected, selectedIds, selectedConn]);
 
   // ───── Reset the connector label input when the selected connector changes ─────
   useEffectCanvas(() => { setConnLabelOpen(false); }, [selectedConn]);
@@ -1277,16 +1326,22 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
       }
     };
     const onDocCopy = (e) => {
-      if (docOpen || fileOpen) return;
+      console.log('[CLIPBOARD DEBUG] onDocCopy event fired');
+      if (docOpen || fileOpen) {
+        console.log('[CLIPBOARD DEBUG] Ignored: docOpen or fileOpen is true');
+        return;
+      }
       const af = document.activeElement;
       if (af &&
           ((af.tagName || '').toLowerCase() === 'input' ||
            (af.tagName || '').toLowerCase() === 'textarea' ||
            (af.isContentEditable && af !== pasteIntRef.current))) {
+        console.log('[CLIPBOARD DEBUG] Ignored: Focus is on editable element:', af);
         return; // Let native copy handle it
       }
 
       const selectedItems = current.items.filter(it => selectedIds.includes(it.id) || (selectedIds.length === 0 && it.id === selected));
+      console.log('[CLIPBOARD DEBUG] Selected items for copy:', selectedItems);
       if (selectedItems.length > 0) {
         e.preventDefault();
         const selectedItemIds = selectedItems.map(it => it.id);
@@ -1303,21 +1358,42 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
         window._odiCopiedData = copiedData;
         window._odiCopiedItem = copiedData.items[0];
         
-        e.clipboardData.setData('text/plain', JSON.stringify(copiedData));
+        const jsonStr = JSON.stringify(copiedData);
+        console.log('[CLIPBOARD DEBUG] Serialized JSON string size:', jsonStr.length);
+        
+        if (e.clipboardData) {
+          e.clipboardData.setData('text/plain', jsonStr);
+          console.log('[CLIPBOARD DEBUG] Synchronous e.clipboardData.setData executed');
+        } else {
+          console.warn('[CLIPBOARD DEBUG] e.clipboardData is not available');
+        }
+
+        // Async fallback write
+        setTimeout(() => {
+          navigator.clipboard.writeText(jsonStr)
+            .then(() => console.log('[CLIPBOARD DEBUG] Copy Async navigator.clipboard.writeText successful'))
+            .catch(err => console.error('[CLIPBOARD DEBUG] Copy Async navigator.clipboard.writeText failed:', err));
+        }, 0);
       }
     };
 
     const onDocCut = (e) => {
-      if (docOpen || fileOpen) return;
+      console.log('[CLIPBOARD DEBUG] onDocCut event fired');
+      if (docOpen || fileOpen) {
+        console.log('[CLIPBOARD DEBUG] Ignored: docOpen or fileOpen is true');
+        return;
+      }
       const af = document.activeElement;
       if (af &&
           ((af.tagName || '').toLowerCase() === 'input' ||
            (af.tagName || '').toLowerCase() === 'textarea' ||
            (af.isContentEditable && af !== pasteIntRef.current))) {
+        console.log('[CLIPBOARD DEBUG] Ignored: Focus is on editable element:', af);
         return; // Let native cut handle it
       }
 
       const selectedItems = current.items.filter(it => selectedIds.includes(it.id) || (selectedIds.length === 0 && it.id === selected));
+      console.log('[CLIPBOARD DEBUG] Selected items for cut:', selectedItems);
       if (selectedItems.length > 0) {
         e.preventDefault();
         const selectedItemIds = selectedItems.map(it => it.id);
@@ -1334,7 +1410,22 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
         window._odiCopiedData = copiedData;
         window._odiCopiedItem = copiedData.items[0];
         
-        e.clipboardData.setData('text/plain', JSON.stringify(copiedData));
+        const jsonStr = JSON.stringify(copiedData);
+        console.log('[CLIPBOARD DEBUG] Serialized JSON string size:', jsonStr.length);
+        
+        if (e.clipboardData) {
+          e.clipboardData.setData('text/plain', jsonStr);
+          console.log('[CLIPBOARD DEBUG] Synchronous e.clipboardData.setData executed');
+        } else {
+          console.warn('[CLIPBOARD DEBUG] e.clipboardData is not available');
+        }
+
+        // Async fallback write
+        setTimeout(() => {
+          navigator.clipboard.writeText(jsonStr)
+            .then(() => console.log('[CLIPBOARD DEBUG] Cut Async navigator.clipboard.writeText successful'))
+            .catch(err => console.error('[CLIPBOARD DEBUG] Cut Async navigator.clipboard.writeText failed:', err));
+        }, 0);
 
         // Delete the cut items
         setCanvases(prev => {
@@ -1362,9 +1453,11 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
   // ───── Coordinates ─────
   const screenToCanvas = (clientX, clientY) => {
     const rect = surfaceRef.current.getBoundingClientRect();
+    const p = panRef.current || pan;
+    const s = scaleRef.current || scale;
     return {
-      x: (clientX - rect.left - pan.x) / scale,
-      y: (clientY - rect.top - pan.y) / scale,
+      x: (clientX - rect.left - p.x) / s,
+      y: (clientY - rect.top - p.y) / s,
     };
   };
 
@@ -1605,6 +1698,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
           return;
         }
         // Click on empty canvas → just deselect
+        if (croppingId) setCroppingId(null);
         setSelected(null);
         setSelectedIds([]);
         setSelectedConn(null);
@@ -1619,7 +1713,8 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
       const rw = Math.abs(p.x - startPt.x);
       const rh = Math.abs(p.y - startPt.y);
       const hits = current.items.filter(it => {
-        const ix = it.x, iy = it.y, iw = it.w, ih = it.h;
+        const ix = it.x, iy = it.y, iw = it.w;
+        const ih = it.type === 'frame' ? 36 : it.h;
         // intersection test (any overlap counts)
         return !(ix + iw < rx || ix > rx + rw || iy + ih < ry || iy > ry + rh);
       }).map(it => it.id);
@@ -1816,6 +1911,18 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
           setSelected(itemId); setSelectedIds([]); setSelectedConn(null); setContextMenu(null);
           setEditingChildState(null);
         }
+      return;
+    }
+    }
+    {
+      const draggedItem = current.items.find(i => i.id === itemId);
+      if (draggedItem && draggedItem.type === 'frame' && !e.target.closest('.frame-header')) {
+        e.stopPropagation();
+        setSelected(itemId);
+        setSelectedIds([]);
+        setSelectedConn(null);
+        setContextMenu(null);
+        setEditingChildState(null);
         return;
       }
     }
@@ -3249,6 +3356,8 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
     openFile: (id) => setFileOpen({ id }),
     updateItem,
     getNestedItems,
+    croppingId,
+    setCroppingId,
     startEdit: (id) => setEditing(id),
     endEdit: () => setEditing(null),
     selectItem: (id) => {
@@ -3305,7 +3414,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
       });
     },
   // eslint-disable-next-line
-  }), [currentId, canvases, editingChild, selected]);
+  }), [currentId, canvases, editingChild, selected, croppingId]);
 
   // ───── Breadcrumbs ─────
   const crumbs = useMemoCanvas(() => {
@@ -3527,6 +3636,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
             item={selectedItem}
             lang={lang}
             isColChild={isColChild}
+            callbacks={callbacks}
             onStartEdit={() => setEditing(selectedItem.id)}
             onUpdate={(patch) => {
               if (isColChild) {
@@ -3831,9 +3941,10 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
                       : (item.type === 'frame' ? 1 : 2),
                     opacity: matches ? 1 : 0.18,
                     transition: item._dragging ? 'none' : 'opacity 200ms ease',
-                    pointerEvents: item.type === 'frame' ? 'none' : 'auto',
+                    pointerEvents: 'auto',
                   }}
                   onMouseDown={(e)=>{
+                    if (croppingId === item.id) { e.stopPropagation(); return; }
                     if (activeTool === 'line') { startLineDrag(e, item.id); return; }
                     startDragItem(e, item.id);
                   }}
@@ -3841,7 +3952,11 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
                     if (item.type === 'doc') { e.stopPropagation(); setDocOpen({ id: item.id }); return; }
                     if (item.type === 'board') return;
                     if (['note','comment','todo','column','link','board','bigtitle','frame'].includes(item.type)) {
-                      e.stopPropagation(); setEditing(item.id);
+                      e.stopPropagation();
+                      setSelected(item.id);
+                      setSelectedIds([]);
+                      setSelectedConn(null);
+                      setEditing(item.id);
                     }
                   }}
                   onContextMenu={(e)=>{
@@ -3895,7 +4010,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
                     </div>
                   )}
                   {/* Resize handles */}
-                  {(selected === item.id || (selectedIds.includes(item.id) && selectedIds.length > 1)) && !isEditing && (
+                  {(selected === item.id || (selectedIds.includes(item.id) && selectedIds.length > 1)) && !isEditing && croppingId !== item.id && (
                     <div className="handles">
                       <div className="handle tl" onMouseDown={(e)=>startResize(e, item.id, 'tl')}/>
                       <div className="handle tr" onMouseDown={(e)=>startResize(e, item.id, 'tr')}/>
@@ -4193,6 +4308,12 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
                 <button onClick={()=>{ setEditing(it.id); setContextMenu(null); }}>
                   <span className="material-symbols-rounded">edit</span>
                   {window.t('Editar', 'Edit')}
+                </button>
+              )}
+              {it.type === 'image' && (
+                <button onClick={()=>{ setCroppingId(it.id); setContextMenu(null); }}>
+                  <span className="material-symbols-rounded">crop</span>
+                  {window.t('Recortar imagen', 'Crop Image')}
                 </button>
               )}
               {it.type === 'doc' && (

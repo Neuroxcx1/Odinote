@@ -71,7 +71,7 @@ function resolveStripColor(key) {
 
 function ContextSidebar({
   item, lang, onUpdate, onDelete, onDuplicate, onOpen,
-  onClose, isColChild, onStartEdit,
+  onClose, isColChild, onStartEdit, callbacks,
 }) {
   const [pane, setPane] = React.useState(null); // 'color' | 'emoji' | 'comments' | 'rename' | null
   const [focusedRowVersion, setFocusedRowVersion] = React.useState(0);
@@ -100,6 +100,7 @@ function ContextSidebar({
   const isFrame = item.type === 'frame';
   const isBigTitle = item.type === 'bigtitle';
   const isMap = item.type === 'map';
+  const isCurrentlyCropping = isImage && callbacks?.croppingId === item.id;
 
   const downloadDocPdf = () => {
     if (!window.html2pdf) return;
@@ -140,6 +141,10 @@ function ContextSidebar({
         <button
           className="ctx-close"
           onClick={()=>{
+            if (isCurrentlyCropping) {
+              callbacks.setCroppingId(null);
+              return;
+            }
             // Step 1: if a sub-pane is open, just close it
             if (pane) { setPane(null); return; }
             // Step 2: if a table cell is focused, deselect cell to go back to table-level menu
@@ -152,8 +157,19 @@ function ContextSidebar({
           <span className="material-symbols-rounded">arrow_back</span>
         </button>
 
-        {!tableCell && !isImage && (
+        {isCurrentlyCropping ? (
           <button
+            className="ctx-btn"
+            onClick={() => callbacks.setCroppingId(null)}
+            title={window.t('Listo', 'Done')}
+          >
+            <span className="material-symbols-rounded">done</span>
+            <span>{window.t('Listo', 'Done')}</span>
+          </button>
+        ) : (
+          <>
+            {!tableCell && !isImage && (
+              <button
             className={`ctx-btn ${(pane === 'color' || pane === 'colorHex') ? 'active' : ''}`}
             onClick={()=> isColor ? setPane(pane === 'colorHex' ? null : 'colorHex') : setPane(pane === 'color' ? null : 'color')}
             title="Color"
@@ -550,6 +566,32 @@ function ContextSidebar({
               <span className="material-symbols-rounded">swap_horiz</span>
               <span>{window.t('Cambiar', 'Change')}</span>
             </button>
+            <button
+              className={`ctx-btn ${callbacks?.croppingId === item.id ? 'active' : ''}`}
+              onClick={() => {
+                if (callbacks) {
+                  callbacks.setCroppingId(callbacks.croppingId === item.id ? null : item.id);
+                }
+              }}
+              title={window.t('Recortar imagen', 'Crop image')}
+            >
+              <span className="material-symbols-rounded">crop</span>
+              <span>{window.t('Recortar', 'Crop')}</span>
+            </button>
+            <button
+              className="ctx-btn"
+              onClick={() => {
+                const ratio = item.naturalRatio || 1;
+                onUpdate({
+                  crop: { x: 0, y: 0, w: 100, h: 100 },
+                  h: Math.max(60, Math.round(item.w / ratio))
+                });
+              }}
+              title={window.t('Aspecto original', 'Original aspect')}
+            >
+              <span className="material-symbols-rounded">aspect_ratio</span>
+              <span>{window.t('Restaurar', 'Restore')}</span>
+            </button>
           </>
         )}
 
@@ -565,6 +607,36 @@ function ContextSidebar({
             >
               <span className="material-symbols-rounded">title</span>
               <span>{window.t('Título', 'Title')}</span>
+            </button>
+            <button
+              className="ctx-btn"
+              onClick={() => {
+                const sizes = [12, 14, 18, 24, 30, 36, 48, 60];
+                const titleSize = item.titleSize || 14;
+                const idx = sizes.indexOf(titleSize);
+                const next = idx < sizes.length - 1 ? sizes[idx + 1] : sizes[sizes.length - 1];
+                onUpdate({ titleSize: next });
+                window.playAudioTone && window.playAudioTone('click');
+              }}
+              title={window.t('Aumentar tamaño del título', 'Increase title size')}
+            >
+              <span className="material-symbols-rounded">text_increase</span>
+              <span>{window.t('Aumentar Título', 'Increase Title')}</span>
+            </button>
+            <button
+              className="ctx-btn"
+              onClick={() => {
+                const sizes = [12, 14, 18, 24, 30, 36, 48, 60];
+                const titleSize = item.titleSize || 14;
+                const idx = sizes.indexOf(titleSize);
+                const next = idx > 0 ? sizes[idx - 1] : sizes[0];
+                onUpdate({ titleSize: next });
+                window.playAudioTone && window.playAudioTone('click');
+              }}
+              title={window.t('Disminuir tamaño del título', 'Decrease title size')}
+            >
+              <span className="material-symbols-rounded">text_decrease</span>
+              <span>{window.t('Disminuir Título', 'Decrease Title')}</span>
             </button>
           </>
         )}
@@ -655,6 +727,8 @@ function ContextSidebar({
           <span className="material-symbols-rounded">delete</span>
           <span>{window.t('Eliminar', 'Delete')}</span>
         </button>
+          </>
+        )}
       </div>
 
       {/* Popout panes */}

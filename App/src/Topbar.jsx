@@ -7,26 +7,26 @@ const TOOLS = [
   { id: 'note',     icon: 'sticky_note_2', label: 'tool_note',     bg: '#90B968', fg: 'white' },
   { id: 'todo',     icon: 'checklist',     label: 'tool_todo',     bg: '#90B968', fg: 'white' },
   { id: 'doc',      icon: 'description',   label: 'tool_doc',      bg: '#90B968', fg: 'white' },
-  { id: 'comment',  icon: 'forum',         label: 'tool_comment',  bg: '#90B968', fg: 'white' },
+  { id: 'bigtitle', icon: 'title',         label: 'tool_bigtitle', bg: '#90B968', fg: 'white' },
   // Medios / archivos → gris
-  { id: 'image',    icon: 'image',         label: 'tool_image',    bg: '#E1DFE3' },
-  { id: 'file',     icon: 'draft',         label: 'tool_file',     bg: '#E1DFE3' },
-  { id: 'audio',    icon: 'audiotrack',    label: 'tool_audio',    bg: '#E1DFE3' },
-  { id: 'link',     icon: 'link',          label: 'tool_link',     bg: '#E1DFE3' },
-  { id: 'color',    icon: 'palette',       label: 'tool_color',    bg: '#E1DFE3' },
+  { id: 'image',    icon: 'image',         label: 'tool_image',    bg: '#E1DFE3', fg: '#1A1A1A' },
+  { id: 'audio',    icon: 'audiotrack',    label: 'tool_audio',    bg: '#E1DFE3', fg: '#1A1A1A' },
+  { id: 'link',     icon: 'link',          label: 'tool_link',     bg: '#E1DFE3', fg: '#1A1A1A' },
+  { id: 'color',    icon: 'palette',       label: 'tool_color',    bg: '#E1DFE3', fg: '#1A1A1A' },
   // Estructura → rojo
   { id: 'board',    icon: 'dashboard',     label: 'tool_board',    bg: '#E6544F', fg: 'white' },
   { id: 'column',   icon: 'view_column',   label: 'tool_column',   bg: '#E6544F', fg: 'white' },
   { id: 'table',    icon: 'table_chart',   label: 'tool_table',    bg: '#E6544F', fg: 'white' },
   { id: 'calendar', icon: 'calendar_month',label: 'tool_calendar', bg: '#E6544F', fg: 'white' },
   // Conector → blanco
-  { id: 'line',     icon: 'arrow_outward', label: 'tool_line',     bg: '#FFFFFF' },
+  { id: 'line',     icon: 'arrow_outward', label: 'tool_line',     bg: '#FFFFFF', fg: '#1A1A1A' },
 ];
 
 const EXTRA_TOOLS = [
   { id: 'frame',    icon: 'crop_free',     label: 'tool_frame',    bg: '#E6544F', fg: 'white' },
-  { id: 'bigtitle', icon: 'title',         label: 'tool_bigtitle', bg: '#90B968', fg: 'white' },
-  { id: 'map',      icon: 'map',           label: 'tool_map',      bg: '#E1DFE3' },
+  { id: 'comment',  icon: 'forum',         label: 'tool_comment',  bg: '#90B968', fg: 'white' },
+  { id: 'file',     icon: 'draft',         label: 'tool_file',     bg: '#E1DFE3', fg: '#1A1A1A' },
+  { id: 'map',      icon: 'map',           label: 'tool_map',      bg: '#E1DFE3', fg: '#1A1A1A' },
 ];
 
 function Topbar({
@@ -104,8 +104,8 @@ function Topbar({
         {TOOLS.map((tool, idx) => (
           <React.Fragment key={tool.id}>
             {idx === 4 && <div className="tool-divider"/>}
-            {idx === 9 && <div className="tool-divider"/>}
-            {idx === 13 && <div className="tool-divider"/>}
+            {idx === 8 && <div className="tool-divider"/>}
+            {idx === 12 && <div className="tool-divider"/>}
             <button
               className={`tool press ${activeTool === tool.id ? 'active' : ''}`}
               title={`${t[tool.label] || tool.id} · ${window.t('Arrastra al canvas o clic', 'Drag to canvas or click')}`}
@@ -136,7 +136,7 @@ function Topbar({
               window.playAudioTone && window.playAudioTone('click');
             }}
           >
-            <div className="tool-icon" style={{ background: '#E1DFE3', color: 'var(--ink)' }}>
+            <div className="tool-icon" style={{ background: '#E1DFE3', color: '#1A1A1A' }}>
               <span className="material-symbols-rounded">more_horiz</span>
             </div>
             <div className="tool-label">{window.t('Más', 'More')}</div>

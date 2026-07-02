@@ -8,8 +8,8 @@
   --bg:        #ECEBEB;
   --bg-2:      #E2E1E1;
   --bg-3:      #D5D4D4;
-  --paper:     #FFFFFF;
-  --paper-2:   #F6F5F5;
+  --paper:     #FAF9F6;
+  --paper-2:   #F3F2EE;
   --ink:       #1A1A1A;
   --ink-2:     #595459;
   --ink-3:     #8E8A8E;
@@ -17,8 +17,8 @@
   --line-soft: rgba(89,84,89,0.22);
   --line-softer: rgba(89,84,89,0.10);
 
-  --bg-card:   #FFFFFF;
-  --bg-main:   #FAF8F6;
+  --bg-card:   #FAF9F6;
+  --bg-main:   #F4F3EF;
   --text:      #1A1A1A;
   --text-soft: #595459;
 
@@ -38,7 +38,7 @@
   --wine-2:  #F2A8A4;
 
   /* sticky tints */
-  --c-white:  #FFFFFF;
+  --c-white:  #FAF9F6;
   --c-cream:  #FEF7E0;
   --c-sage:   #E8F0DA;
   --c-rose:   #FBDFDD;
@@ -74,12 +74,26 @@
 }
 
 [data-theme="dark"] {
+  --bg:        #232123;
+  --bg-2:      #2A282A;
+  --bg-3:      #333133;
+  --paper:     #3A383A;
+  --paper-2:   #2E2C2E;
+  --ink:       #F0EEF0;
+  --ink-2:     #A5A1A5;
+  --ink-3:     #7A767A;
+  --line:      #1A1A1A;
+  --line-soft: rgba(26,26,26,0.3);
+  --line-softer: rgba(26,26,26,0.15);
+
   --frame-title-color: #F0EEF0;
   --bg-card:           #3A383A;
   --bg-main:           #2A282A;
   --text:              #F0EEF0;
   --text-soft:         #A5A1A5;
-  --line-soft:         #1A1A1A;
+}
+[data-theme="dark"] .frame-card {
+  --line: #8A878A;
 }
 body[data-theme="dark"] { background: #2A282A; }
 [data-theme="dark"] .canvas-wrap {
@@ -130,6 +144,9 @@ body[data-theme="dark"] { background: #2A282A; }
 [data-theme="dark"] .ms-section-link,
 [data-theme="dark"] .ms-view-toggle button { color: #A5A1A5; }
 [data-theme="dark"] .ms-nav-item:hover { background: #383638; color: #fff; }
+[data-theme="dark"] .ms-nav-item.active { color: #1A1A1A !important; }
+[data-theme="dark"] .ms-nav-item.active .material-symbols-rounded { color: var(--olive) !important; }
+[data-theme="dark"] .ms-nav-item.active .ms-nav-count { color: #595459 !important; }
 [data-theme="dark"] .ms-side-foot { border-color: #1A1A1A; }
 [data-theme="dark"] .ms-search { background: #3A383A; border-color: #1A1A1A; }
 [data-theme="dark"] .ms-search input { color: #F0EEF0; }
@@ -1709,7 +1726,7 @@ body.odi-busy iframe { pointer-events: none !important; }
    ============================================ */
 /* Lines layer sits BELOW the nodes (items use z-index 2 / 100 when selected)
    so arrows never paint over a node. */
-.connectors { position: absolute; inset: 0; pointer-events: none; overflow: visible; z-index: 1; }
+.connectors { position: absolute; inset: 0; pointer-events: none; overflow: visible; z-index: 3; }
 /* Handles layer sits ABOVE every node so the center anchors stay grabbable. */
 .connectors-top { z-index: 110; }
 .connector-path { fill: none; stroke: var(--ink); stroke-width: 2; stroke-linecap: round; pointer-events: stroke; cursor: pointer; }
@@ -2593,7 +2610,7 @@ body.odi-busy iframe { pointer-events: none !important; }
   align-items: center;
   gap: 6px;
   padding: 8px 18px;
-  background: linear-gradient(135deg, #FF5E5B, #FF8A5B, #FFD700, #E6544F, #FF5E5B);
+  background: linear-gradient(135deg, #E6544F, #FF5E5B, #B83A36, #E6544F);
   background-size: 300% 100%;
   animation: kofi-gradient-shift 6s ease infinite;
   color: white !important;
@@ -2602,9 +2619,9 @@ body.odi-busy iframe { pointer-events: none !important; }
   font-weight: 700;
   font-size: 13.5px;
   transition: transform 140ms var(--e-out), box-shadow 140ms var(--e-out), border-color 140ms;
-  box-shadow: 0 4px 16px rgba(255, 94, 91, 0.45), 0 0 8px rgba(255, 215, 0, 0.2);
+  box-shadow: 0 4px 16px rgba(230, 84, 79, 0.4), 0 0 8px rgba(255, 94, 91, 0.15);
   margin-right: 12px;
-  border: 1.5px solid rgba(255, 255, 255, 0.45);
+  border: 1.5px solid rgba(255, 255, 255, 0.25);
   position: relative;
   z-index: 10;
   cursor: pointer;
@@ -2613,27 +2630,27 @@ body.odi-busy iframe { pointer-events: none !important; }
 .kofi-topbar-btn::before {
   content: '';
   position: absolute;
-  top: -5px; left: -5px; right: -5px; bottom: -5px;
+  top: -4px; left: -4px; right: -4px; bottom: -4px;
   border-radius: 99px;
-  background: conic-gradient(from 0deg, #FF5E5B, #FFD700, #E6544F, #FFD700, #FF5E5B);
-  filter: blur(6px);
+  background: conic-gradient(from 0deg, #E6544F, #FF5E5B, #B83A36, #FF5E5B, #E6544F);
+  filter: blur(5px);
   animation: lava-sway 12s ease-in-out infinite;
   z-index: -1;
   pointer-events: none;
-  opacity: 0.55;
+  opacity: 0.25;
   transition: opacity 250ms ease, filter 250ms ease;
 }
 .kofi-topbar-btn::after {
   content: '';
   position: absolute;
-  top: -4px; left: -4px; right: -4px; bottom: -4px;
+  top: -3px; left: -3px; right: -3px; bottom: -3px;
   border-radius: 99px;
-  background: radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.7) 0%, rgba(255, 215, 0, 0.4) 40%, rgba(255, 94, 91, 0.2) 70%, transparent 100%);
-  filter: blur(3px);
+  background: radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.3) 0%, rgba(255, 94, 91, 0.2) 60%, transparent 100%);
+  filter: blur(2px);
   animation: crescent-glow 8s ease-in-out infinite;
   z-index: -1;
   pointer-events: none;
-  opacity: 0.65;
+  opacity: 0.25;
   transition: opacity 250ms ease, filter 250ms ease;
 }
 .kofi-topbar-btn:hover {
@@ -2885,6 +2902,7 @@ body.odi-busy iframe { pointer-events: none !important; }
   background: transparent;
   transition: border-color 140ms ease, background 140ms ease;
   overflow: hidden;
+  pointer-events: none;
 }
 
 .frame-card:hover, .item.selected .frame-card {
@@ -3034,9 +3052,9 @@ body.odi-busy iframe { pointer-events: none !important; }
    FRAME CLICK TRANSPARENCY
    ========================================================================== */
 .item-frame .frame-header,
+.item-frame .frame-header *,
 .item-frame .handle,
-.item-frame .connect-handle,
-.item-frame .anchors {
+.item-frame .connect-handle {
   pointer-events: auto !important;
 }
 

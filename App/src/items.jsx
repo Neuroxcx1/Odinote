@@ -84,7 +84,7 @@ function NoteItem({ item, lang, editing, onUpdate }) {
   const text = pickLang(item.content, lang);
   const bg = window.resolveStickyColor ? window.resolveStickyColor(item.color || 'white') : null;
   const isDarkBg = ['olive','wine','dark','green','red','purple'].includes(item.color);
-  const textColor = isDarkBg ? 'white' : 'inherit';
+  const textColor = isDarkBg ? 'white' : '#1A1A1A';
   const ref = React.useRef(null);
 
   // Ensure every <pre> has an editable <p> sibling after it (so user can click below)
@@ -531,10 +531,12 @@ function NodeCaption({ item, lang, onUpdate, className, placeholder, style, auto
 }
 
 // ──────────────── IMAGE ────────────────
-function ImageItem({ item, lang, onUpdate }) {
+function ImageItem({ item, lang, onUpdate, callbacks }) {
+  const cb = callbacks || {};
   const fileRef = React.useRef(null);
   const hasImage = !!item.src;
   const bg = window.resolveStickyColor ? window.resolveStickyColor(item.color || 'white') : null;
+  const [naturalRatio, setNaturalRatio] = React.useState(null);
   const onUpdateRef = React.useRef(onUpdate);
   React.useEffect(() => { onUpdateRef.current = onUpdate; }, [onUpdate]);
   const itemWRef = React.useRef(item.w);
@@ -548,8 +550,9 @@ function ImageItem({ item, lang, onUpdate }) {
       const img = new Image();
       img.onload = () => {
         const ratio = img.naturalWidth / img.naturalHeight;
+        setNaturalRatio(ratio);
         const w = itemWRef.current || 260;
-        onUpdateRef.current({ src, w, h: Math.max(60, Math.round(w / ratio)) });
+        onUpdateRef.current({ src, w, h: Math.max(60, Math.round(w / ratio)), naturalRatio: ratio });
       };
       img.onerror = () => onUpdateRef.current({ src });
       img.src = src;
@@ -572,24 +575,225 @@ function ImageItem({ item, lang, onUpdate }) {
     }
   }, [item._triggerImagePick]);
 
+  const crop = item.crop || { x: 0, y: 0, w: 100, h: 100 };
+  const isCropping = cb.croppingId === item.id;
+
+  const startCropDrag = (e, handle) => {
+    e.stopPropagation();
+    e.preventDefault();
+
+    const startX = e.clientX;
+    const startY = e.clientY;
+    
+    const imgFrame = e.currentTarget.parentElement;
+    if (!imgFrame) return;
+    const rect = imgFrame.getBoundingClientRect();
+
+    const initialCrop = { ...crop };
+
+    const onMove = (ev) => {
+      const dx = ev.clientX - startX;
+      const dy = ev.clientY - startY;
+
+      const dpX = (dx / rect.width) * 100;
+      const dpY = (dy / rect.height) * 100;
+
+      let newX = initialCrop.x;
+      let newY = initialCrop.y;
+      let newW = initialCrop.w;
+      let newH = initialCrop.h;
+
+      if (handle === 'tl') {
+        newX = Math.max(0, Math.min(initialCrop.x + initialCrop.w - 10, initialCrop.x + dpX));
+        newW = initialCrop.x + initialCrop.w - newX;
+        newY = Math.max(0, Math.min(initialCrop.y + initialCrop.h - 10, initialCrop.y + dpY));
+        newH = initialCrop.y + initialCrop.h - newY;
+      } else if (handle === 'tr') {
+        newW = Math.max(10, Math.min(100 - initialCrop.x, initialCrop.w + dpX));
+        newY = Math.max(0, Math.min(initialCrop.y + initialCrop.h - 10, initialCrop.y + dpY));
+        newH = initialCrop.y + initialCrop.h - newY;
+      } else if (handle === 'bl') {
+        newX = Math.max(0, Math.min(initialCrop.x + initialCrop.w - 10, initialCrop.x + dpX));
+        newW = initialCrop.x + initialCrop.w - newX;
+        newH = Math.max(10, Math.min(100 - initialCrop.y, initialCrop.h + dpY));
+      } else if (handle === 'br') {
+        newW = Math.max(10, Math.min(100 - initialCrop.x, initialCrop.w + dpX));
+        newH = Math.max(10, Math.min(100 - initialCrop.y, initialCrop.h + dpY));
+      }
+
+      onUpdate({
+        crop: {
+          x: parseFloat(newX.toFixed(2)),
+          y: parseFloat(newY.toFixed(2)),
+          w: parseFloat(newW.toFixed(2)),
+          h: parseFloat(newH.toFixed(2))
+        }
+      });
+    };
+
+    const onUp = () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  };
+  
+  let frameW = '100%';
+  let frameH = '100%';
+  let frameLeft = '0px';
+  let frameTop = '0px';
+
+  if (!isCropping && naturalRatio && item.w && item.h) {
+    const cropAspect = naturalRatio * (crop.w / crop.h);
+    const cardAspect = item.w / item.h;
+    if (cropAspect > cardAspect) {
+      const pct = (cardAspect / cropAspect) * 100;
+      frameW = '100%';
+      frameH = `${pct}%`;
+      frameTop = `${(100 - pct) / 2}%`;
+    } else {
+      const pct = (cropAspect / cardAspect) * 100;
+      frameW = `${pct}%`;
+      frameH = '100%';
+      frameLeft = `${(100 - pct) / 2}%`;
+    }
+  }
+
   return (
     <div className={`image-card${hasImage ? '' : ' empty'}`} style={{width:'100%', height:'100%'}}>
       <div className="item-card" style={{ backgroundColor: hasImage ? 'transparent' : bg }}>
         {hasImage ? (
           <div
             className="image-frame"
-            style={{ backgroundImage: `url(${window.resolveMediaSrc(item.src)})` }}
-            onDoubleClick={(e)=>{ e.stopPropagation(); fileRef.current?.click(); }}
+            style={{ width: frameW, height: frameH, overflow: 'hidden', position: 'absolute', left: frameLeft, top: frameTop }}
+            onDoubleClick={(e)=>{ e.stopPropagation(); if (!isCropping) fileRef.current?.click(); }}
           >
+            <img 
+              src={window.resolveMediaSrc(item.src)} 
+              draggable={false}
+              onLoad={(e) => {
+                const img = e.currentTarget;
+                if (img.naturalWidth && img.naturalHeight) {
+                  const ratio = img.naturalWidth / img.naturalHeight;
+                  setNaturalRatio(ratio);
+                  if (item.naturalRatio !== ratio) {
+                    onUpdate({ naturalRatio: ratio });
+                  }
+                }
+              }}
+              style={{
+                position: 'absolute',
+                width: isCropping ? '100%' : `${(100 / crop.w) * 100}%`,
+                height: isCropping ? '100%' : `${(100 / crop.h) * 100}%`,
+                left: isCropping ? 0 : `${(-crop.x / crop.w) * 100}%`,
+                top: isCropping ? 0 : `${(-crop.y / crop.h) * 100}%`,
+                objectFit: 'fill',
+                pointerEvents: 'none'
+              }}
+            />
+            {isCropping && (
+              <>
+                {/* Capas de mascara blanca semitransparente */}
+                <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: `${crop.y}%`, background: 'rgba(255,255,255,0.5)', pointerEvents: 'none' }} />
+                <div style={{ position: 'absolute', top: `${crop.y + crop.h}%`, left: 0, right: 0, bottom: 0, background: 'rgba(255,255,255,0.5)', pointerEvents: 'none' }} />
+                <div style={{ position: 'absolute', top: `${crop.y}%`, left: 0, width: `${crop.x}%`, height: `${crop.h}%`, background: 'rgba(255,255,255,0.5)', pointerEvents: 'none' }} />
+                <div style={{ position: 'absolute', top: `${crop.y}%`, left: `${crop.x + crop.w}%`, right: 0, height: `${crop.h}%`, background: 'rgba(255,255,255,0.5)', pointerEvents: 'none' }} />
+
+                {/* Rectangulo punteado del area visible */}
+                <div 
+                  style={{
+                    position: 'absolute',
+                    left: `${crop.x}%`,
+                    top: `${crop.y}%`,
+                    width: `${crop.w}%`,
+                    height: `${crop.h}%`,
+                    border: '1.5px dashed var(--olive, #6A8546)',
+                    boxSizing: 'border-box',
+                    pointerEvents: 'none'
+                  }}
+                />
+
+                {/* Tiradores de recorte interactivos */}
+                <div 
+                  className="crop-handle tl" 
+                  onMouseDown={(e) => startCropDrag(e, 'tl')}
+                  style={{
+                    position: 'absolute',
+                    left: `calc(${crop.x}% - 6px)`,
+                    top: `calc(${crop.y}% - 6px)`,
+                    width: '12px',
+                    height: '12px',
+                    background: '#FFFFFF',
+                    border: '2px solid var(--olive, #6A8546)',
+                    borderRadius: '2px',
+                    cursor: 'nwse-resize',
+                    zIndex: 15
+                  }}
+                />
+                <div 
+                  className="crop-handle tr" 
+                  onMouseDown={(e) => startCropDrag(e, 'tr')}
+                  style={{
+                    position: 'absolute',
+                    left: `calc(${crop.x + crop.w}% - 6px)`,
+                    top: `calc(${crop.y}% - 6px)`,
+                    width: '12px',
+                    height: '12px',
+                    background: '#FFFFFF',
+                    border: '2px solid var(--olive, #6A8546)',
+                    borderRadius: '2px',
+                    cursor: 'nesw-resize',
+                    zIndex: 15
+                  }}
+                />
+                <div 
+                  className="crop-handle bl" 
+                  onMouseDown={(e) => startCropDrag(e, 'bl')}
+                  style={{
+                    position: 'absolute',
+                    left: `calc(${crop.x}% - 6px)`,
+                    top: `calc(${crop.y + crop.h}% - 6px)`,
+                    width: '12px',
+                    height: '12px',
+                    background: '#FFFFFF',
+                    border: '2px solid var(--olive, #6A8546)',
+                    borderRadius: '2px',
+                    cursor: 'nesw-resize',
+                    zIndex: 15
+                  }}
+                />
+                <div 
+                  className="crop-handle br" 
+                  onMouseDown={(e) => startCropDrag(e, 'br')}
+                  style={{
+                    position: 'absolute',
+                    left: `calc(${crop.x + crop.w}% - 6px)`,
+                    top: `calc(${crop.y + crop.h}% - 6px)`,
+                    width: '12px',
+                    height: '12px',
+                    background: '#FFFFFF',
+                    border: '2px solid var(--olive, #6A8546)',
+                    borderRadius: '2px',
+                    cursor: 'nwse-resize',
+                    zIndex: 15
+                  }}
+                />
+
+              </>
+            )}
             {item.showCaption && <NodeCaption item={item} lang={lang} onUpdate={onUpdate} className="image-caption"/>}
-            <button
-              className="image-change-btn"
-              onClick={(e)=>{ e.stopPropagation(); fileRef.current?.click(); }}
-              onMouseDown={(e)=>e.stopPropagation()}
-              title={window.t('Cambiar imagen', 'Change image')}
-            >
-              <span className="material-symbols-rounded">swap_horiz</span>
-            </button>
+            {!isCropping && (
+              <button
+                className="image-change-btn"
+                onClick={(e)=>{ e.stopPropagation(); fileRef.current?.click(); }}
+                onMouseDown={(e)=>e.stopPropagation()}
+                title={window.t('Cambiar imagen', 'Change image')}
+              >
+                <span className="material-symbols-rounded">swap_horiz</span>
+              </button>
+            )}
           </div>
         ) : item.bg ? (
           <div
@@ -1696,7 +1900,7 @@ function DocItem({ item, lang, onOpenDoc }) {
     <div className="doc-card" style={{width:'100%', height:'100%'}}>
       <div
         className="item-card"
-        style={{ background: bg, color: isDarkBg ? 'white' : 'inherit' }}
+        style={{ background: bg, color: isDarkBg ? 'white' : '#1A1A1A' }}
         onDoubleClick={(e)=>{ e.stopPropagation(); onOpenDoc && onOpenDoc(item.id); }}
       >
         {compact ? (
@@ -3448,15 +3652,31 @@ function FileViewerModal({ fileItem, lang, onClose }) {
   );
 }
 
-// ──────────────── FRAME ( Obsidian/Milanote style grouping marco ) ────────────────
 function FrameItem({ item, lang, editing, onUpdate, callbacks }) {
   const text = pickLang(item.title, lang);
   const cls = item.color === 'green' ? 'olive' : (item.color || 'transparent');
   const align = item.titleAlign || 'left';
   const titleColor = item.titleColor || 'inherit';
+  const titleSize = item.titleSize || 14;
 
   const handleTitleChange = (val) => {
     onUpdate({ title: { es: val, en: val } });
+  };
+
+  const increaseSize = (e) => {
+    e.stopPropagation();
+    const sizes = [12, 14, 18, 24, 30, 36, 48, 60];
+    const idx = sizes.indexOf(titleSize);
+    const next = idx < sizes.length - 1 ? sizes[idx + 1] : sizes[sizes.length - 1];
+    onUpdate({ titleSize: next });
+  };
+
+  const decreaseSize = (e) => {
+    e.stopPropagation();
+    const sizes = [12, 14, 18, 24, 30, 36, 48, 60];
+    const idx = sizes.indexOf(titleSize);
+    const next = idx > 0 ? sizes[idx - 1] : sizes[0];
+    onUpdate({ titleSize: next });
   };
 
   return (
@@ -3464,11 +3684,14 @@ function FrameItem({ item, lang, editing, onUpdate, callbacks }) {
       <div 
         className="frame-header" 
         style={{ 
-          textAlign: align, 
-          padding: '8px 12px', 
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'flex-start',
+          padding: '6px 12px', 
           borderBottom: '1px dashed var(--line-soft, #E5E1DD)',
           pointerEvents: 'auto',
-          cursor: 'move'
+          cursor: 'move',
+          gap: '8px'
         }}
         onDoubleClick={(e) => {
           e.stopPropagation();
@@ -3477,54 +3700,56 @@ function FrameItem({ item, lang, editing, onUpdate, callbacks }) {
           }
         }}
       >
-        {editing ? (
-          <input
-            type="text"
-            value={text}
-            onChange={(e) => handleTitleChange(e.target.value)}
-            className="frame-title-input"
-            style={{ 
-              width: '100%', 
-              background: 'none', 
-              border: 'none', 
-              outline: 'none', 
-              fontWeight: 800,
-              fontSize: '14px',
-              fontFamily: 'var(--font-display)',
-              textAlign: align,
-              color: titleColor === 'inherit' ? 'var(--frame-title-color, var(--ink))' : titleColor
-            }}
-            onClick={(e)=>e.stopPropagation()}
-            onMouseDown={(e)=>e.stopPropagation()}
-            onBlur={(e) => {
-              const v = e.target.value.trim();
-              onUpdate({ title: { es: v, en: v } });
-              if (callbacks && callbacks.endEdit) {
-                callbacks.endEdit();
-              }
-            }}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' || e.key === 'Escape') {
-                e.target.blur();
-              }
-            }}
-            placeholder={window.t('Nombre del marco', 'Frame name')}
-            autoFocus
-          />
-        ) : (
-          <div 
-            className="frame-title" 
-            style={{ 
-              fontWeight: 800, 
-              fontSize: '14px', 
-              fontFamily: 'var(--font-display)',
-              color: titleColor === 'inherit' ? 'var(--frame-title-color, var(--ink))' : titleColor,
-              textAlign: align
-            }}
-          >
-            {text || window.t('Sin título', 'Untitled')}
-          </div>
-        )}
+        <div style={{ flex: 1, textAlign: align }}>
+          {editing ? (
+            <input
+              type="text"
+              value={text}
+              onChange={(e) => handleTitleChange(e.target.value)}
+              className="frame-title-input"
+              style={{ 
+                width: '100%', 
+                background: 'none', 
+                border: 'none', 
+                outline: 'none', 
+                fontWeight: 800,
+                fontSize: `${titleSize}px`,
+                fontFamily: 'var(--font-display)',
+                textAlign: align,
+                color: titleColor === 'inherit' ? 'var(--frame-title-color, var(--ink))' : titleColor
+              }}
+              onClick={(e)=>e.stopPropagation()}
+              onMouseDown={(e)=>e.stopPropagation()}
+              onBlur={(e) => {
+                const v = e.target.value.trim();
+                onUpdate({ title: { es: v, en: v } });
+                if (callbacks && callbacks.endEdit) {
+                  callbacks.endEdit();
+                }
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === 'Escape') {
+                  e.target.blur();
+                }
+              }}
+              placeholder={window.t('Nombre del marco', 'Frame name')}
+              autoFocus
+            />
+          ) : (
+            <div 
+              className="frame-title" 
+              style={{ 
+                fontWeight: 800, 
+                fontSize: `${titleSize}px`, 
+                fontFamily: 'var(--font-display)',
+                color: titleColor === 'inherit' ? 'var(--frame-title-color, var(--ink))' : titleColor,
+                textAlign: align
+              }}
+            >
+              {text || window.t('Sin título', 'Untitled')}
+            </div>
+          )}
+        </div>
       </div>
       <div className="frame-body" style={{ flex: 1, pointerEvents: 'none' }}>
         {/* Cuerpo vacío transparente para agrupamiento */}
@@ -3552,18 +3777,24 @@ function BigTitleItem({ item, lang, editing, onUpdate }) {
     onUpdate({ content: { es: ref.current.innerText, en: ref.current.innerText } });
   };
 
+  const hasColor = item.color && item.color !== 'transparent';
+  const bg = hasColor && window.resolveStickyColor ? window.resolveStickyColor(item.color) : 'transparent';
+
   return (
     <div 
-      className="bigtitle-card" 
+      className={`bigtitle-card ${hasColor ? 'has-bg' : ''}`}
       style={{ 
         width: '100%', 
         height: '100%', 
         display: 'flex', 
         alignItems: 'center', 
         justifyContent: align === 'center' ? 'center' : (align === 'right' ? 'flex-end' : 'flex-start'),
-        background: 'transparent',
-        border: 'none',
-        boxShadow: 'none'
+        background: bg,
+        border: hasColor ? '1.5px solid var(--line)' : 'none',
+        borderRadius: hasColor ? '8px' : '0px',
+        boxShadow: hasColor ? 'var(--pop-sm)' : 'none',
+        boxSizing: 'border-box',
+        padding: hasColor ? '8px 12px' : '0px'
       }}
     >
       <div
@@ -3830,7 +4061,7 @@ function ItemRenderer({ item, lang, editing, callbacks }) {
   };
   switch (item.type) {
     case 'note':     return <NoteItem  item={item} lang={lang} editing={editing} onUpdate={onUpdate}/>;
-    case 'image':    return <ImageItem item={item} lang={lang} onUpdate={onUpdate}/>;
+    case 'image':    return <ImageItem item={item} lang={lang} onUpdate={onUpdate} callbacks={cb}/>;
     case 'link':     return <LinkItem  item={item} lang={lang} editing={editing} onUpdate={onUpdate} onEndEdit={cb.endEdit}/>;
     case 'todo':     return <TodoItem  item={item} lang={lang} editing={editing} onUpdate={onUpdate} callbacks={cb}/>;
     case 'column':   return <ColumnItem item={item} lang={lang} editing={editing} onUpdate={onUpdate} callbacks={cb}/>;

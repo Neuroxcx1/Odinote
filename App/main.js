@@ -414,6 +414,61 @@ ipcMain.handle('open-custom-dictionary', async () => {
   }
 });
 
+const writeDictionaryGrouped = (dictPath, words) => {
+  const spanishPattern = /[áéíóúñüÁÉÍÓÚÑÜ]/i;
+  const esWords = Array.from(new Set(words.filter(w => spanishPattern.test(w) && !w.startsWith('[') && !w.includes('checksum')))).sort();
+  const enWords = Array.from(new Set(words.filter(w => !spanishPattern.test(w) && !w.startsWith('[') && !w.includes('checksum')))).sort();
+  
+  let newContent = '';
+  if (esWords.length > 0) {
+    newContent += '[spanish]\n' + esWords.join('\n') + '\n\n';
+  }
+  if (enWords.length > 0) {
+    newContent += '[english]\n' + enWords.join('\n') + '\n\n';
+  }
+  newContent += 'checksum_v1 = 7535b60698ebf565ca21f40b422470c8\n';
+  fs.writeFileSync(dictPath, newContent, 'utf-8');
+};
+
+ipcMain.handle('get-custom-dictionary-words', async () => {
+  logToFile('IPC Call: get-custom-dictionary-words');
+  const dictPath = path.join(app.getPath('userData'), 'Custom Dictionary.txt');
+  try {
+    if (fs.existsSync(dictPath)) {
+      const content = fs.readFileSync(dictPath, 'utf-8');
+      const words = content.split('\n')
+        .map(line => line.trim())
+        .filter(line => line && !line.includes('checksum') && !line.startsWith('['));
+      
+      // Re-ordenar y estructurar el archivo fisico
+      writeDictionaryGrouped(dictPath, words);
+      return words;
+    }
+  } catch (err) {
+    logToFile(`IPC get-custom-dictionary-words ERROR: ${err.message}`);
+  }
+  return [];
+});
+
+ipcMain.handle('remove-word-from-dictionary', async (event, word) => {
+  logToFile(`IPC Call: remove-word-from-dictionary for word: ${word}`);
+  const dictPath = path.join(app.getPath('userData'), 'Custom Dictionary.txt');
+  try {
+    if (fs.existsSync(dictPath)) {
+      const content = fs.readFileSync(dictPath, 'utf-8');
+      const words = content.split('\n')
+        .map(line => line.trim())
+        .filter(line => line && !line.includes('checksum') && !line.startsWith('[') && line !== word);
+      
+      writeDictionaryGrouped(dictPath, words);
+      return true;
+    }
+  } catch (err) {
+    logToFile(`IPC remove-word-from-dictionary ERROR: ${err.message}`);
+  }
+  return false;
+});
+
 ipcMain.handle('open-user-data-folder', async () => {
   logToFile('IPC Call: open-user-data-folder');
   try {

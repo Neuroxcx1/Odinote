@@ -164,6 +164,15 @@ function App() {
   const [checkingUpdates, setCheckingUpdates] = useStateApp(false);
   const [contextMenu, setContextMenu] = useStateApp(null);
   const [settingsOpen, setSettingsOpen] = useStateApp(false);
+  const [dictWords, setDictWords] = useStateApp([]);
+
+  useEffectApp(() => {
+    if (settingsOpen && window.electronAPI && window.electronAPI.getCustomDictionaryWords) {
+      window.electronAPI.getCustomDictionaryWords().then(words => {
+        setDictWords(words || []);
+      });
+    }
+  }, [settingsOpen]);
   const [shState, setShState] = useStateApp(window.shortcuts || {});
   const [listeningKey, setListeningKey] = useStateApp(null); // 'undo' | 'redo' | etc.
 
@@ -1057,55 +1066,117 @@ function App() {
                 </p>
                 
                 {window.electronAPI ? (
-                  <div style={{ display: 'flex', gap: '10px', marginTop: '4px' }}>
-                    <button
-                      className="ms-new-btn"
-                      style={{ 
-                        flex: 1, 
-                        padding: '10px 12px', 
-                        fontSize: '12.5px', 
-                        background: 'var(--wine, #7B2D26)', 
-                        color: 'white', 
-                        border: 'none', 
-                        borderRadius: '8px', 
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '6px',
-                        fontWeight: '600'
-                      }}
-                      onClick={() => {
-                        window.electronAPI.openCustomDictionary();
-                      }}
-                    >
-                      <span className="material-symbols-rounded" style={{ fontSize: '18px' }}>edit_note</span>
-                      <span>{window.t('Abrir Diccionario (.txt)', 'Open Dictionary (.txt)')}</span>
-                    </button>
-                    
-                    <button
-                      className="btn btn-ghost"
-                      style={{ 
-                        padding: '10px 12px', 
-                        fontSize: '12.5px', 
-                        background: 'transparent', 
-                        color: 'var(--text, #1A1A1A)', 
-                        border: '1.5px solid var(--line-soft, #E5E1DD)', 
-                        borderRadius: '8px', 
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '6px'
-                      }}
-                      onClick={() => {
-                        window.electronAPI.openUserDataFolder();
-                      }}
-                      title={window.t('Abrir carpeta del sistema', 'Open system folder')}
-                    >
-                      <span className="material-symbols-rounded" style={{ fontSize: '18px' }}>folder</span>
-                    </button>
-                  </div>
+                  <>
+                    <div style={{ display: 'flex', gap: '10px', marginTop: '4px' }}>
+                      <button
+                        className="ms-new-btn"
+                        style={{ 
+                          flex: 1, 
+                          padding: '10px 12px', 
+                          fontSize: '12.5px', 
+                          background: 'var(--wine, #7B2D26)', 
+                          color: 'white', 
+                          border: 'none', 
+                          borderRadius: '8px', 
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '6px',
+                          fontWeight: '600'
+                        }}
+                        onClick={() => {
+                          window.electronAPI.openCustomDictionary();
+                        }}
+                      >
+                        <span className="material-symbols-rounded" style={{ fontSize: '18px' }}>edit_note</span>
+                        <span>{window.t('Abrir Diccionario (.txt)', 'Open Dictionary (.txt)')}</span>
+                      </button>
+                      
+                      <button
+                        className="btn btn-ghost"
+                        style={{ 
+                          padding: '10px 12px', 
+                          fontSize: '12.5px', 
+                          background: 'transparent', 
+                          color: 'var(--text, #1A1A1A)', 
+                          border: '1.5px solid var(--line-soft, #E5E1DD)', 
+                          borderRadius: '8px', 
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '6px'
+                        }}
+                        onClick={() => {
+                          window.electronAPI.openUserDataFolder();
+                        }}
+                        title={window.t('Abrir carpeta del sistema', 'Open system folder')}
+                      >
+                        <span className="material-symbols-rounded" style={{ fontSize: '18px' }}>folder</span>
+                      </button>
+                    </div>
+
+                    {dictWords.length > 0 && (() => {
+                      const spanishPattern = /[áéíóúñüÁÉÍÓÚÑÜ]/i;
+                      const esWords = dictWords.filter(w => spanishPattern.test(w));
+                      const enWords = dictWords.filter(w => !spanishPattern.test(w));
+                      
+                      const renderWordList = (words) => (
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '6px' }}>
+                          {words.map(w => (
+                            <div 
+                              key={w} 
+                              style={{ 
+                                display: 'flex', 
+                                alignItems: 'center', 
+                                gap: '6px', 
+                                background: 'var(--paper, #FFFFFF)', 
+                                border: '1px solid var(--line-soft, rgba(89,84,89,0.22))', 
+                                borderRadius: '4px', 
+                                padding: '2px 6px',
+                                fontSize: '11px',
+                                color: 'var(--text, #1A1A1A)'
+                              }}
+                            >
+                              <span>{w}</span>
+                              <span 
+                                className="material-symbols-rounded" 
+                                style={{ fontSize: '13px', cursor: 'pointer', color: 'var(--wine, #E6544F)' }}
+                                title={window.t('Eliminar', 'Delete')}
+                                onClick={() => {
+                                  window.electronAPI.removeWordFromDictionary(w).then(success => {
+                                    if (success) {
+                                      setDictWords(prev => prev.filter(x => x !== w));
+                                    }
+                                  });
+                                }}
+                              >
+                                close
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      );
+
+                      return (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '10px', padding: '12px', background: 'var(--bg-2, #E2E1E1)', borderRadius: '8px', maxHeight: '180px', overflowY: 'auto', border: '1px solid var(--line-soft, rgba(89,84,89,0.22))' }}>
+                          {esWords.length > 0 && (
+                            <div>
+                              <div style={{ fontSize: '11px', fontWeight: '800', color: 'var(--wine, #E6544F)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{window.t('Español', 'Spanish')}</div>
+                              {renderWordList(esWords)}
+                            </div>
+                          )}
+                          {enWords.length > 0 && (
+                            <div style={{ marginTop: esWords.length > 0 ? '10px' : '0' }}>
+                              <div style={{ fontSize: '11px', fontWeight: '800', color: 'var(--wine, #E6544F)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{window.t('Inglés y Otros', 'English & Others')}</div>
+                              {renderWordList(enWords)}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
+                  </>
                 ) : (
                    <p style={{ fontSize: '11px', color: 'var(--wine)', margin: 0, fontWeight: '500' }}>
                      {window.t(
@@ -1200,6 +1271,8 @@ function App() {
                       { keys: ['Ctrl', 'C'], desc: window.t('Copiar nodos', 'Copy nodes') },
                       { keys: ['Ctrl', 'V'], desc: window.t('Pegar nodos / archivos', 'Paste nodes or files') },
                       { keys: ['Ctrl', 'X'], desc: window.t('Cortar nodos', 'Cut nodes') },
+                      { keys: ['F12', 'Ctrl+Shift+I'], desc: window.t('Consola de depuración', 'Toggle DevTools') },
+                      { keys: ['Ctrl', 'Botón Central'], desc: window.t('Paneo de cámara global', 'Global camera panning') },
                       { keys: ['Shift', 'Click'], desc: window.t('Selección múltiple individual', 'Toggle item selection') },
                       { keys: ['Shift', 'Arrastrar'], desc: window.t('Seleccionar por recuadro', 'Box selection') },
                       { keys: ['Alt', 'Arrastrar'], desc: window.t('Desplazar lienzo (Paneo)', 'Pan the canvas') },
