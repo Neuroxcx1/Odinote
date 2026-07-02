@@ -1917,12 +1917,6 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
     {
       const draggedItem = current.items.find(i => i.id === itemId);
       if (draggedItem && draggedItem.type === 'frame' && !e.target.closest('.frame-header')) {
-        e.stopPropagation();
-        setSelected(itemId);
-        setSelectedIds([]);
-        setSelectedConn(null);
-        setContextMenu(null);
-        setEditingChildState(null);
         return;
       }
     }
