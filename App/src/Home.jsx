@@ -470,7 +470,21 @@ function RecentCard({ project, lang, t, onOpen, onDelete, onRenameClick, onToggl
         </div>
       </div>
       <div className="ms-recent-body">
-        <div className="ms-recent-title">{project.name?.[lang] || project.name}</div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+          <div className="ms-recent-title" style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {project.name?.[lang] || project.name}
+          </div>
+          {(project.isPublic || project.isRemote) ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: 'var(--olive, #6A8546)', flexShrink: 0 }} title={window.t('Proyecto Online', 'Online Project')}>
+              <span className="material-symbols-rounded" style={{ fontSize: '18px', fontVariationSettings: '"FILL" 1' }}>cloud</span>
+              <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--olive, #6A8546)', display: 'inline-block', boxShadow: '0 0 6px var(--olive, #6A8546)' }} />
+            </div>
+          ) : (
+            <div style={{ display: 'flex', alignItems: 'center', color: 'var(--line-soft, #A5A19C)', flexShrink: 0 }} title={window.t('Solo local', 'Local only')}>
+              <span className="material-symbols-rounded" style={{ fontSize: '18px' }}>cloud_off</span>
+            </div>
+          )}
+        </div>
         <div className="ms-recent-meta">
           <span>{project.items} {t.items_count}</span>
           <span className="dot"/>
@@ -528,7 +542,21 @@ function ProjectCard({ project, lang, t, onOpen, onDelete, onRenameClick, onRest
         </div>
       </div>
       <div className="ms-project-body">
-        <div className="ms-project-title">{project.name?.[lang] || project.name}</div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+          <div className="ms-project-title" style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {project.name?.[lang] || project.name}
+          </div>
+          {(project.isPublic || project.isRemote) ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: 'var(--olive, #6A8546)', flexShrink: 0 }} title={window.t('Proyecto Online', 'Online Project')}>
+              <span className="material-symbols-rounded" style={{ fontSize: '18px', fontVariationSettings: '"FILL" 1' }}>cloud</span>
+              <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--olive, #6A8546)', display: 'inline-block', boxShadow: '0 0 6px var(--olive, #6A8546)' }} />
+            </div>
+          ) : (
+            <div style={{ display: 'flex', alignItems: 'center', color: 'var(--line-soft, #A5A19C)', flexShrink: 0 }} title={window.t('Solo local', 'Local only')}>
+              <span className="material-symbols-rounded" style={{ fontSize: '18px' }}>cloud_off</span>
+            </div>
+          )}
+        </div>
         <div className="ms-project-meta">
           <span>{project.items} {t.items_count}</span>
           <span className="dot"/>
