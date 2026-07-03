@@ -905,12 +905,13 @@ body.dragging-task .item-card { pointer-events: auto !important; }
   box-shadow: var(--pop-sm);
   display: grid; place-items: center;
   pointer-events: auto; cursor: crosshair;
-  opacity: 0; transform: scale(0.7);
+  opacity: 0; transform: scale(calc(0.7 * var(--handle-scale, 1)));
   transition: opacity 130ms var(--e-out), transform 130ms var(--e-out), background 100ms;
   z-index: 6;
+  transform-origin: center;
 }
-.item:hover .connect-handle, .col-child-wrap:hover .connect-handle { opacity: 1; transform: scale(1); }
-.connect-handle:hover { background: var(--olive); }
+.item:hover .connect-handle, .col-child-wrap:hover .connect-handle { opacity: 1; transform: scale(calc(1 * var(--handle-scale, 1))); }
+.connect-handle:hover { background: var(--olive); transform: scale(calc(1.15 * var(--handle-scale, 1))); }
 .connect-handle .material-symbols-rounded { font-size: 16px; color: var(--olive); }
 .connect-handle:hover .material-symbols-rounded { color: #fff; }
 
@@ -1561,7 +1562,10 @@ body.odi-busy iframe { pointer-events: none !important; }
 }
 .image-card:hover .image-change-btn { opacity: 1; }
 .image-change-btn:hover { background: white; transform: translate(-1px, -1px); box-shadow: 2px 2px 0 var(--line); }
-.image-change-btn .material-symbols-rounded { font-size: calc(16px * var(--node-scale, 1)); color: var(--ink); }
+.image-change-btn .material-symbols-rounded { font-size: calc(16px * var(--node-scale, 1)); color: var(--brand-gray-dark, #1A1A1A); }
+[data-theme="dark"] .image-change-btn { background: rgba(30, 30, 30, 0.92); }
+[data-theme="dark"] .image-change-btn:hover { background: rgba(45, 45, 45, 1); }
+[data-theme="dark"] .image-change-btn .material-symbols-rounded { color: #FAF9F6; }
 .image-card.drag-over .item-card { outline: 2px dashed var(--olive); outline-offset: 2px; background: var(--olive-l); }
 
 /* Calendar day with image */
@@ -2100,7 +2104,24 @@ body.odi-busy iframe { pointer-events: none !important; }
 
 /* Resize handles */
 .handles { position: absolute; inset: -6px; pointer-events: none; }
-.handle { position: absolute; width: 10px; height: 10px; background: var(--paper); border: 1.5px solid var(--olive); border-radius: 2px; pointer-events: auto; }
+.handle { 
+  position: absolute; 
+  width: 10px; 
+  height: 10px; 
+  background: var(--paper); 
+  border: 1.5px solid var(--olive); 
+  border-radius: 2px; 
+  pointer-events: auto; 
+  transform: scale(var(--handle-scale, 1));
+  transform-origin: center;
+  z-index: 10;
+}
+.handle::before {
+  content: '';
+  position: absolute;
+  top: -8px; left: -8px; right: -8px; bottom: -8px;
+  pointer-events: auto;
+}
 .handle.tl { top: 0; left: 0; cursor: nwse-resize; }
 .handle.tr { top: 0; right: 0; cursor: nesw-resize; }
 .handle.bl { bottom: 0; left: 0; cursor: nesw-resize; }

@@ -3872,7 +3872,15 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
       >
         <div
           className="canvas-surface"
-          style={{ left: 0, top: 0, transform: `translate(${pan.x}px, ${pan.y}px) scale(${scale})`, transformOrigin: '0 0', width: bounds.w, height: bounds.h }}
+          style={{ 
+            left: 0, 
+            top: 0, 
+            transform: `translate(${pan.x}px, ${pan.y}px) scale(${scale})`, 
+            transformOrigin: '0 0', 
+            width: bounds.w, 
+            height: bounds.h,
+            '--handle-scale': Math.min(3, 1 / scale)
+          }}
         >
           <div className="canvas-content" style={{width: bounds.w, height: bounds.h}}>
             <svg className="connectors" width={bounds.w} height={bounds.h} viewBox={`0 0 ${bounds.w} ${bounds.h}`} style={{ overflow:'visible' }}>
