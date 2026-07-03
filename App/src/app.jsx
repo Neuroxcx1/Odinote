@@ -255,11 +255,17 @@ function App() {
         localStorage.setItem('odinote.google_profile', JSON.stringify(profile));
         setWaitingForWebLogin(false);
         setUserModalOpen(false);
-        window.customAlert(window.t('¡Sesión iniciada con éxito mediante Google!', 'Successfully signed in with Google!'));
+        showToast(window.t('¡Sesión iniciada con éxito mediante Google!', 'Successfully signed in with Google!'));
       });
       return unsubscribe;
     }
   }, []);
+
+  useEffectApp(() => {
+    if (userProfile && userProfile.accessToken) {
+      syncProjectsFromGoogleDrive(userProfile.accessToken);
+    }
+  }, [userProfile]);
 
   const [sharingModalOpen, setSharingModalOpen] = useStateApp(false);
   const [activeSharingProjectId, setActiveSharingProjectId] = useStateApp(null);
@@ -687,36 +693,62 @@ function App() {
         'Content-Type': 'application/json'
       };
 
-      // 1. Buscar la carpeta "Odinote Canvases"
-      const searchFolderUrl = `https://www.googleapis.com/drive/v3/files?q=name='Odinote Canvases' and mimeType='application/vnd.google-apps.folder' and trashed=false&fields=files(id)`;
-      const searchRes = await fetch(searchFolderUrl, { headers });
-      if (!searchRes.ok) return;
-      const searchData = await searchRes.json();
-      let folderId = '';
+      // 1. Obtener o crear la carpeta "Odinote"
+      const searchRootUrl = `https://www.googleapis.com/drive/v3/files?q=name='Odinote' and mimeType='application/vnd.google-apps.folder' and trashed=false&fields=files(id)`;
+      const searchRootRes = await fetch(searchRootUrl, { headers });
+      if (!searchRootRes.ok) return;
+      const searchRootData = await searchRootRes.json();
+      let rootFolderId = '';
       
-      if (searchData.files && searchData.files.length > 0) {
-        folderId = searchData.files[0].id;
+      if (searchRootData.files && searchRootData.files.length > 0) {
+        rootFolderId = searchRootData.files[0].id;
       } else {
-        // Crear la carpeta
-        const createFolderUrl = 'https://www.googleapis.com/drive/v3/files';
-        const createFolderRes = await fetch(createFolderUrl, {
+        const createRootRes = await fetch('https://www.googleapis.com/drive/v3/files', {
           method: 'POST',
           headers,
           body: JSON.stringify({
-            name: 'Odinote Canvases',
+            name: 'Odinote',
             mimeType: 'application/vnd.google-apps.folder'
           })
         });
-        if (!createFolderRes.ok) return;
-        const createFolderData = await createFolderRes.json();
-        folderId = createFolderData.id;
+        if (!createRootRes.ok) return;
+        const createRootData = await createRootRes.json();
+        rootFolderId = createRootData.id;
       }
 
-      if (!folderId) return;
+      if (!rootFolderId) return;
 
-      // 2. Buscar si ya existe el archivo JSON del proyecto
-      const fileName = `odinote_project_${projectId}.json`;
-      const searchFileUrl = `https://www.googleapis.com/drive/v3/files?q=name='${fileName}' and '${folderId}' in parents and trashed=false&fields=files(id)`;
+      // 2. Obtener o crear la carpeta con el nombre del proyecto dentro de "Odinote"
+      const searchProjFolderUrl = `https://www.googleapis.com/drive/v3/files?q=name='${projectName}' and '${rootFolderId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false&fields=files(id)`;
+      const searchProjFolderRes = await fetch(searchProjFolderUrl, { headers });
+      if (!searchProjFolderRes.ok) return;
+      const searchProjFolderData = await searchProjFolderRes.json();
+      let projFolderId = '';
+
+      if (searchProjFolderData.files && searchProjFolderData.files.length > 0) {
+        projFolderId = searchProjFolderData.files[0].id;
+      } else {
+        const createProjFolderRes = await fetch('https://www.googleapis.com/drive/v3/files', {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            name: projectName,
+            mimeType: 'application/vnd.google-apps.folder',
+            parents: [rootFolderId]
+          })
+        });
+        if (!createProjFolderRes.ok) return;
+        const createProjFolderData = await createProjFolderRes.json();
+        projFolderId = createProjFolderData.id;
+      }
+
+      if (!projFolderId) return;
+
+      // Guardar el ID de la carpeta del proyecto en localStorage para las subidas de imagenes
+      localStorage.setItem(`odinote.gdrive_folder_${projectId}`, projFolderId);
+
+      // 3. Buscar si ya existe "canvas_state.json" en esa carpeta
+      const searchFileUrl = `https://www.googleapis.com/drive/v3/files?q=name='canvas_state.json' and '${projFolderId}' in parents and trashed=false&fields=files(id)`;
       const fileSearchRes = await fetch(searchFileUrl, { headers });
       if (!fileSearchRes.ok) return;
       const fileSearchData = await fileSearchRes.json();
@@ -731,7 +763,7 @@ function App() {
 
       if (fileSearchData.files && fileSearchData.files.length > 0) {
         fileId = fileSearchData.files[0].id;
-        // Actualizar el archivo existente (PATCH media upload)
+        // Actualizar canvas_state.json
         const updateUrl = `https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`;
         await fetch(updateUrl, {
           method: 'PATCH',
@@ -742,15 +774,15 @@ function App() {
           body: projectDataContent
         });
       } else {
-        // Crear el archivo (POST multipart upload)
+        // Crear canvas_state.json
         const boundary = '-------314159265358979323846';
         const delimiter = `\r\n--${boundary}\r\n`;
         const closeDelim = `\r\n--${boundary}--`;
         
         const metadata = {
-          name: fileName,
+          name: 'canvas_state.json',
           mimeType: 'application/json',
-          parents: [folderId]
+          parents: [projFolderId]
         };
 
         const multipartBody = 
@@ -774,6 +806,163 @@ function App() {
       }
     } catch (err) {
       console.error('Error synchronizing project file to Google Drive:', err);
+    }
+  };
+
+  const uploadMediaToGoogleDriveReal = async (projectId, item, accessToken) => {
+    try {
+      const folderId = localStorage.getItem(`odinote.gdrive_folder_${projectId}`);
+      if (!folderId) return null;
+
+      // Extraer base64 data
+      const parts = item.src.split(',');
+      if (parts.length < 2) return null;
+      const mime = parts[0].match(/:(.*?);/)[1];
+
+      const ext = mime.split('/')[1] || 'png';
+      const fileName = `media_${item.id}.${ext}`;
+
+      // Crear el archivo (POST multipart upload)
+      const boundary = '-------314159265358979323846';
+      const delimiter = `\r\n--${boundary}\r\n`;
+      const closeDelim = `\r\n--${boundary}--`;
+      
+      const metadata = {
+        name: fileName,
+        mimeType: mime,
+        parents: [folderId]
+      };
+
+      const multipartBody = 
+        delimiter +
+        'Content-Type: application/json; charset=UTF-8\r\n\r\n' +
+        JSON.stringify(metadata) +
+        delimiter +
+        `Content-Type: ${mime}\r\n` +
+        'Content-Transfer-Encoding: base64\r\n\r\n' +
+        parts[1] +
+        closeDelim;
+
+      const uploadUrl = 'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart';
+      const uploadRes = await fetch(uploadUrl, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': `multipart/related; boundary=${boundary}`
+        },
+        body: multipartBody
+      });
+
+      if (!uploadRes.ok) return null;
+      const fileData = await uploadRes.json();
+      const fileId = fileData.id;
+
+      // Dar permiso público de lectura para que cualquiera pueda cargarlo en el canvas web/local
+      const permUrl = `https://www.googleapis.com/drive/v3/files/${fileId}/permissions`;
+      await fetch(permUrl, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          role: 'reader',
+          type: 'anyone'
+        })
+      });
+
+      // Devolver la URL de descarga directa
+      return `https://drive.google.com/uc?export=view&id=${fileId}`;
+    } catch (err) {
+      console.error('Error uploading media to Google Drive:', err);
+      return null;
+    }
+  };
+
+  const syncProjectsFromGoogleDrive = async (accessToken) => {
+    if (!accessToken) return;
+    try {
+      const headers = { 'Authorization': `Bearer ${accessToken}` };
+      
+      // 1. Buscar la carpeta "Odinote"
+      const searchRootUrl = `https://www.googleapis.com/drive/v3/files?q=name='Odinote' and mimeType='application/vnd.google-apps.folder' and trashed=false&fields=files(id)`;
+      const searchRootRes = await fetch(searchRootUrl, { headers });
+      if (!searchRootRes.ok) return;
+      const searchRootData = await searchRootRes.json();
+      if (!searchRootData.files || searchRootData.files.length === 0) return;
+      const rootFolderId = searchRootData.files[0].id;
+
+      // 2. Listar las subcarpetas dentro de "Odinote"
+      const listSubfoldersUrl = `https://www.googleapis.com/drive/v3/files?q='${rootFolderId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false&fields=files(id, name)`;
+      const subfoldersRes = await fetch(listSubfoldersUrl, { headers });
+      if (!subfoldersRes.ok) return;
+      const subfoldersData = await subfoldersRes.json();
+      if (!subfoldersData.files || subfoldersData.files.length === 0) return;
+
+      let hasImportedAny = false;
+      const importedProjects = [];
+      const importedCanvases = {};
+
+      for (const folder of subfoldersData.files) {
+        // 3. Buscar "canvas_state.json" dentro de la subcarpeta
+        const searchFileUrl = `https://www.googleapis.com/drive/v3/files?q=name='canvas_state.json' and '${folder.id}' in parents and trashed=false&fields=files(id)`;
+        const fileRes = await fetch(searchFileUrl, { headers });
+        if (!fileRes.ok) continue;
+        const fileData = await fileRes.json();
+        if (!fileData.files || fileData.files.length === 0) continue;
+        const fileId = fileData.files[0].id;
+
+        // 4. Descargar "canvas_state.json"
+        const downloadUrl = `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`;
+        const downloadRes = await fetch(downloadUrl, { headers });
+        if (!downloadRes.ok) continue;
+        const projJSON = await downloadRes.json();
+
+        if (projJSON && projJSON.projectId) {
+          hasImportedAny = true;
+          
+          localStorage.setItem(`odinote.gdrive_folder_${projJSON.projectId}`, folder.id);
+
+          const projectMetaData = {
+            id: projJSON.projectId,
+            name: projJSON.name,
+            emoji: projJSON.emoji || '🗒️',
+            cover: projJSON.cover || 'var(--bg-card, #FFFFFF)',
+            starred: false,
+            isPublic: true,
+            useGoogleDrive: true,
+            items: Object.keys(projJSON.canvases || {}).length,
+            updated: { en: 'Synced', es: 'Sincronizado' }
+          };
+          importedProjects.push(projectMetaData);
+          
+          Object.assign(importedCanvases, projJSON.canvases);
+        }
+      }
+
+      if (hasImportedAny) {
+        setProjects(prev => {
+          const next = [...prev];
+          importedProjects.forEach(ip => {
+            const idx = next.findIndex(p => p.id === ip.id);
+            if (idx !== -1) {
+              next[idx] = { ...next[idx], ...ip };
+            } else {
+              next.push(ip);
+            }
+          });
+          return next;
+        });
+
+        setCanvases(prev => ({
+          ...prev,
+          ...importedCanvases
+        }));
+
+        window.showToast && window.showToast(window.t('¡Proyectos sincronizados desde Google Drive!', 'Projects synchronized from Google Drive!'));
+      }
+    } catch (err) {
+      console.error('Error auto-syncing projects from Google Drive:', err);
     }
   };
 
@@ -825,6 +1014,36 @@ function App() {
         const activeProj = projects.find(p => p.id === view.projectId);
         if (activeProj && activeProj.useGoogleDrive) {
           const now = Date.now();
+          
+          // 3.1 Escaneo y subida de imagenes Base64 locales a Google Drive
+          const currentCanvas = canvases[view.projectId];
+          if (currentCanvas && currentCanvas.items) {
+            let changedMedia = false;
+            const updatedItems = await Promise.all(currentCanvas.items.map(async (item) => {
+              if (item.src && item.src.startsWith('data:')) {
+                const driveUrl = await uploadMediaToGoogleDriveReal(view.projectId, item, userProfile.accessToken);
+                if (driveUrl) {
+                  changedMedia = true;
+                  return { ...item, src: driveUrl };
+                }
+              }
+              return item;
+            }));
+
+            if (changedMedia) {
+              setCanvases(prev => ({
+                ...prev,
+                [view.projectId]: {
+                  ...currentCanvas,
+                  items: updatedItems
+                }
+              }));
+              // Forzar un save de la nueva URL en el proximo render
+              return;
+            }
+          }
+
+          // 3.2 Sincronización del archivo JSON del proyecto a Google Drive
           if (now - lastGoogleDriveSyncTimeRef.current > 10000) {
             lastGoogleDriveSyncTimeRef.current = now;
             uploadToGoogleDriveReal(view.projectId, activeProj.name, canvases, userProfile.accessToken);
@@ -1702,16 +1921,20 @@ function App() {
                         } else {
                           const provider = new firebase.auth.GoogleAuthProvider();
                           provider.setCustomParameters({ prompt: 'select_account' });
+                          provider.addScope('https://www.googleapis.com/auth/drive.file');
                           firebase.auth().signInWithPopup(provider)
                             .then((result) => {
                               const user = result.user;
+                              const credential = result.credential;
                               const userProfileData = {
                                 name: user.displayName || 'Google User',
                                 email: user.email,
-                                picture: user.photoURL || (user.displayName ? user.displayName.charAt(0) : 'G')
+                                picture: user.photoURL || (user.displayName ? user.displayName.charAt(0) : 'G'),
+                                accessToken: credential ? credential.accessToken : null
                               };
                               setUserProfile(userProfileData);
                               localStorage.setItem('odinote.google_profile', JSON.stringify(userProfileData));
+                              showToast(window.t('¡Sesión iniciada con éxito mediante Google!', 'Successfully signed in with Google!'));
                             })
                             .catch((err) => {
                               console.error("Auth web error:", err);
