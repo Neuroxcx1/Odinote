@@ -196,6 +196,22 @@ function App() {
   const [localGuestName, setLocalGuestName] = useStateApp('');
   const [localGuestAvatar, setLocalGuestAvatar] = useStateApp('🦊');
   const [customDialog, setCustomDialog] = useStateApp(null);
+  
+  const [toast, setToast] = useStateApp(null);
+  const lastGoogleDriveSyncTimeRef = React.useRef(0);
+
+  const showToast = (message, type = 'success') => {
+    setToast({ message, type });
+    window.playAudioTone && window.playAudioTone('click');
+  };
+  window.showToast = showToast;
+
+  React.useEffect(() => {
+    if (toast) {
+      const timer = setTimeout(() => setToast(null), 3500);
+      return () => clearTimeout(timer);
+    }
+  }, [toast]);
 
   // Definicion de metodos globales de Dialog para evitar alerts sincronos molestos en Electron
   React.useEffect(() => {
@@ -663,6 +679,104 @@ function App() {
     return nextCanvases;
   };
 
+  const uploadToGoogleDriveReal = async (projectId, projectName, canvasesData, accessToken) => {
+    if (!accessToken) return;
+    try {
+      const headers = {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json'
+      };
+
+      // 1. Buscar la carpeta "Odinote Canvases"
+      const searchFolderUrl = `https://www.googleapis.com/drive/v3/files?q=name='Odinote Canvases' and mimeType='application/vnd.google-apps.folder' and trashed=false&fields=files(id)`;
+      const searchRes = await fetch(searchFolderUrl, { headers });
+      if (!searchRes.ok) return;
+      const searchData = await searchRes.json();
+      let folderId = '';
+      
+      if (searchData.files && searchData.files.length > 0) {
+        folderId = searchData.files[0].id;
+      } else {
+        // Crear la carpeta
+        const createFolderUrl = 'https://www.googleapis.com/drive/v3/files';
+        const createFolderRes = await fetch(createFolderUrl, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            name: 'Odinote Canvases',
+            mimeType: 'application/vnd.google-apps.folder'
+          })
+        });
+        if (!createFolderRes.ok) return;
+        const createFolderData = await createFolderRes.json();
+        folderId = createFolderData.id;
+      }
+
+      if (!folderId) return;
+
+      // 2. Buscar si ya existe el archivo JSON del proyecto
+      const fileName = `odinote_project_${projectId}.json`;
+      const searchFileUrl = `https://www.googleapis.com/drive/v3/files?q=name='${fileName}' and '${folderId}' in parents and trashed=false&fields=files(id)`;
+      const fileSearchRes = await fetch(searchFileUrl, { headers });
+      if (!fileSearchRes.ok) return;
+      const fileSearchData = await fileSearchRes.json();
+      let fileId = '';
+
+      const projectDataContent = JSON.stringify({
+        projectId,
+        name: projectName,
+        canvases: canvasesData,
+        syncedAt: new Date().toISOString()
+      });
+
+      if (fileSearchData.files && fileSearchData.files.length > 0) {
+        fileId = fileSearchData.files[0].id;
+        // Actualizar el archivo existente (PATCH media upload)
+        const updateUrl = `https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`;
+        await fetch(updateUrl, {
+          method: 'PATCH',
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json'
+          },
+          body: projectDataContent
+        });
+      } else {
+        // Crear el archivo (POST multipart upload)
+        const boundary = '-------314159265358979323846';
+        const delimiter = `\r\n--${boundary}\r\n`;
+        const closeDelim = `\r\n--${boundary}--`;
+        
+        const metadata = {
+          name: fileName,
+          mimeType: 'application/json',
+          parents: [folderId]
+        };
+
+        const multipartBody = 
+          delimiter +
+          'Content-Type: application/json; charset=UTF-8\r\n\r\n' +
+          JSON.stringify(metadata) +
+          delimiter +
+          'Content-Type: application/json\r\n\r\n' +
+          projectDataContent +
+          closeDelim;
+
+        const createUrl = 'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart';
+        await fetch(createUrl, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': `multipart/related; boundary=${boundary}`
+          },
+          body: multipartBody
+        });
+      }
+    } catch (err) {
+      console.error('Error synchronizing project file to Google Drive:', err);
+    }
+  };
+
   // persist — debounced so IndexedDB/Vault writes don't run on every single keystroke/drag frame.
   useEffectApp(() => {
     if (loading) return;
@@ -702,6 +816,18 @@ function App() {
             }, { merge: true });
           } catch (err) {
             console.error('Failed to sync to Firestore:', err);
+          }
+        }
+      }
+
+      // 3. Sincronización real con Google Drive si está habilitado
+      if (userProfile && userProfile.accessToken && view.projectId) {
+        const activeProj = projects.find(p => p.id === view.projectId);
+        if (activeProj && activeProj.useGoogleDrive) {
+          const now = Date.now();
+          if (now - lastGoogleDriveSyncTimeRef.current > 10000) {
+            lastGoogleDriveSyncTimeRef.current = now;
+            uploadToGoogleDriveReal(view.projectId, activeProj.name, canvases, userProfile.accessToken);
           }
         }
       }
@@ -2160,42 +2286,93 @@ function App() {
                 <button
                   className="btn btn-primary"
                   onClick={() => {
-                    const token = tokenInputRef.current?.value;
+                    const token = tokenInputRef.current?.value.trim();
                     if (!token) return;
                     if (!userProfile?.name) {
-                      alert(window.t('Configura tu nombre en tu perfil antes de unirte.', 'Configure your name in your profile before joining.'));
+                      showToast(window.t('Configura tu nombre en tu perfil antes de unirte.', 'Configure your name in your profile before joining.'), 'error');
                       setUserModalOpen(true);
                       return;
                     }
                     
-                    // Simulación: Creamos un proyecto remoto de prueba
-                    const remoteId = 'remote-' + Math.random().toString(36).substr(2, 9);
-                    const newProj = {
-                      id: remoteId,
-                      name: { en: 'Remote Workspace (Simulated)', es: 'Puesto Remoto (Simulado)' },
-                      emoji: '☁️',
-                      cover: 'linear-gradient(135deg, #A8BEE4 0%, #D5E1F6 100%)',
-                      starred: false,
-                      isPublic: true,
-                      isRemote: true,
-                      shareToken: token,
-                      items: 4,
-                      updated: { en: 'Just now', es: 'Ahora mismo' }
-                    };
-                    setProjects(prev => [newProj, ...prev]);
+                    if (firestoreDB) {
+                      showToast(window.t('Conectando al servidor...', 'Connecting to server...'));
+                      firestoreDB.collection('workspaces').doc(token).get()
+                        .then((doc) => {
+                          if (!doc.exists) {
+                            showToast(window.t('Token no válido o puesto de trabajo inexistente.', 'Invalid token or non-existent workspace.'), 'error');
+                            return;
+                          }
+                          const data = doc.data();
+                          const remoteId = token; // El ID del proyecto remoto local es el mismo token
 
-                    // Inicializamos el lienzo remoto simulado
-                    setCanvases(prev => ({
-                      ...prev,
-                      [remoteId]: [
-                        { id: '1', type: 'bigtitle', x: 200, y: 150, width: 400, height: 60, title: { es: '¡Conectado con éxito!', en: 'Connected successfully!' } },
-                        { id: '2', type: 'note', x: 200, y: 250, width: 220, height: 120, content: { es: 'Este lienzo está sincronizado a través de la red (simulado).', en: 'This canvas is synchronized over the network (simulated).' }, color: '#FAF9F6' },
-                        { id: '3', type: 'note', x: 450, y: 250, width: 220, height: 120, content: { es: 'Puedes agregar y editar tarjetas como de costumbre.', en: 'You can add and edit cards as usual.' }, color: '#FAF9F6' }
-                      ]
-                    }));
+                          const remoteProj = {
+                            id: remoteId,
+                            name: data.name || { en: 'Remote Workspace', es: 'Puesto Remoto' },
+                            emoji: data.emoji || '☁️',
+                            cover: data.cover || 'linear-gradient(135deg, #A8BEE4 0%, #D5E1F6 100%)',
+                            starred: false,
+                            isPublic: true,
+                            isRemote: true,
+                            shareToken: token,
+                            items: Object.keys(data.canvases || {}).length,
+                            updated: { en: 'Just now', es: 'Ahora mismo' }
+                          };
 
-                    setJoiningModalOpen(false);
-                    alert(window.t('¡Conectado al puesto de trabajo de tu amigo con éxito!', 'Connected to your friend\'s workspace successfully!'));
+                          setProjects(prev => {
+                            if (prev.some(p => p.id === remoteId)) return prev;
+                            return [remoteProj, ...prev];
+                          });
+
+                          if (data.canvases) {
+                            setCanvases(prev => ({
+                              ...prev,
+                              [remoteId]: cleanCanvases(data.canvases)
+                            }));
+                          }
+
+                          setJoiningModalOpen(false);
+                          showToast(window.t('¡Conectado al puesto de trabajo de tu amigo con éxito!', 'Connected to your friend\'s workspace successfully!'));
+                          
+                          // Abrir el proyecto directamente
+                          openProject(remoteId);
+                        })
+                        .catch((err) => {
+                          console.error("Error connecting to remote database workspace:", err);
+                          showToast(window.t('Fallo de red al conectar al puesto de trabajo.', 'Network failure connecting to workspace.'), 'error');
+                        });
+                    } else {
+                      // Fallback simulado corregido para evitar la pantalla en blanco
+                      const remoteId = 'remote-' + Math.random().toString(36).substr(2, 9);
+                      const newProj = {
+                        id: remoteId,
+                        name: { en: 'Remote Workspace (Simulated)', es: 'Puesto Remoto (Simulado)' },
+                        emoji: '☁️',
+                        cover: 'linear-gradient(135deg, #A8BEE4 0%, #D5E1F6 100%)',
+                        starred: false,
+                        isPublic: true,
+                        isRemote: true,
+                        shareToken: token,
+                        items: 3,
+                        updated: { en: 'Just now', es: 'Ahora mismo' }
+                      };
+                      setProjects(prev => [newProj, ...prev]);
+
+                      setCanvases(prev => ({
+                        ...prev,
+                        [remoteId]: {
+                          title: { es: 'Puesto Remoto (Simulado)', en: 'Remote Workspace (Simulated)' },
+                          items: [
+                            { id: '1', type: 'bigtitle', x: 200, y: 150, width: 400, height: 60, title: { es: '¡Conectado con éxito!', en: 'Connected successfully!' } },
+                            { id: '2', type: 'note', x: 200, y: 250, width: 220, height: 120, content: { es: 'Este lienzo está sincronizado a través de la red (simulado).', en: 'This canvas is synchronized over the network (simulated).' }, color: '#FAF9F6' },
+                            { id: '3', type: 'note', x: 450, y: 250, width: 220, height: 120, content: { es: 'Puedes agregar y editar tarjetas como de costumbre.', en: 'You can add and edit cards as usual.' }, color: '#FAF9F6' }
+                          ],
+                          connectors: []
+                        }
+                      }));
+
+                      setJoiningModalOpen(false);
+                      showToast(window.t('¡Conectado al puesto de trabajo de tu amigo con éxito!', 'Connected to your friend\'s workspace successfully!'));
+                    }
                   }}
                   style={{
                     padding: '8px 16px',
@@ -2304,6 +2481,41 @@ function App() {
               </button>
             </div>
           </div>
+        </div>
+      )}
+      {toast && (
+        <div
+          style={{
+            position: 'fixed',
+            top: '24px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            background: toast.type === 'success' ? '#FFFFFF' : '#FFF3F3',
+            border: toast.type === 'success' ? '2px solid var(--line, #595459)' : '2px solid var(--wine, #E6544F)',
+            color: toast.type === 'success' ? 'var(--ink, #1A1A1A)' : 'var(--wine, #E6544F)',
+            padding: '12px 24px',
+            borderRadius: '12px',
+            boxShadow: '4px 4px 0px var(--line, #595459)',
+            zIndex: 99999,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+            fontWeight: '700',
+            fontSize: '14px',
+            pointerEvents: 'none',
+            animation: 'toastSlideIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) both'
+          }}
+        >
+          <span className="material-symbols-rounded" style={{ fontSize: '20px', color: toast.type === 'success' ? 'var(--olive, #6A8546)' : 'var(--wine, #E6544F)' }}>
+            {toast.type === 'success' ? 'check_circle' : 'warning'}
+          </span>
+          <span>{toast.message}</span>
+          <style>{`
+            @keyframes toastSlideIn {
+              0% { transform: translate(-50%, -40px); opacity: 0; }
+              100% { transform: translate(-50%, 0); opacity: 1; }
+            }
+          `}</style>
         </div>
       )}
     </>

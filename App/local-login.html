@@ -197,14 +197,17 @@
       errorBox.style.display = "none";
       const provider = new firebase.auth.GoogleAuthProvider();
       provider.setCustomParameters({ prompt: 'select_account' });
+      provider.addScope('https://www.googleapis.com/auth/drive.file');
       
       auth.signInWithPopup(provider)
         .then((result) => {
           const user = result.user;
+          const credential = result.credential;
           const profile = {
             name: user.displayName || 'Google User',
             email: user.email,
-            picture: user.photoURL || 'G'
+            picture: user.photoURL || 'G',
+            accessToken: credential ? credential.accessToken : null
           };
 
           fetch('/auth-success', {

@@ -455,17 +455,6 @@ function RecentCard({ project, lang, t, onOpen, onDelete, onRenameClick, onToggl
       <div className="ms-recent-cover" style={{background: project.cover}}>
         <div className="ms-recent-emoji">{project.emoji}</div>
         <div className="ms-card-actions" onClick={(e)=>e.stopPropagation()}>
-          {(project.isPublic || project.isRemote) && (
-            <button className="ms-card-btn" title={window.t('Copiar token de invitación', 'Copy invitation token')}
-              onClick={(e)=>{
-                e.stopPropagation();
-                navigator.clipboard.writeText(project.shareToken || project.id);
-                window.playAudioTone && window.playAudioTone('click');
-                alert(window.t('¡Token de invitación copiado al portapapeles!', 'Invitation token copied to clipboard!'));
-              }}>
-              <span className="material-symbols-rounded" style={{ color: 'var(--olive, #6A8546)' }}>share</span>
-            </button>
-          )}
           <button className="ms-card-btn" title={window.t('Editar proyecto', 'Edit project')}
             onClick={(e)=>{ e.stopPropagation(); onRenameClick && onRenameClick(project); }}>
             <span className="material-symbols-rounded">edit</span>
@@ -492,8 +481,7 @@ function RecentCard({ project, lang, t, onOpen, onDelete, onRenameClick, onToggl
               onClick={(e) => {
                 e.stopPropagation();
                 navigator.clipboard.writeText(project.shareToken || project.id);
-                window.playAudioTone && window.playAudioTone('click');
-                alert(window.t('¡Token de invitación copiado al portapapeles!', 'Invitation token copied to clipboard!'));
+                window.showToast && window.showToast(window.t('¡Token copiado al portapapeles!', 'Token copied to clipboard!'));
               }}
             >
               <span className="material-symbols-rounded" style={{ fontSize: '18px', fontVariationSettings: '"FILL" 1' }}>cloud</span>
@@ -545,17 +533,6 @@ function ProjectCard({ project, lang, t, onOpen, onDelete, onRenameClick, onRest
             </>
           ) : (
             <>
-              {(project.isPublic || project.isRemote) && (
-                <button className="ms-card-btn" title={window.t('Copiar token de invitación', 'Copy invitation token')}
-                  onClick={(e)=>{
-                    e.stopPropagation();
-                    navigator.clipboard.writeText(project.shareToken || project.id);
-                    window.playAudioTone && window.playAudioTone('click');
-                    alert(window.t('¡Token de invitación copiado al portapapeles!', 'Invitation token copied to clipboard!'));
-                  }}>
-                  <span className="material-symbols-rounded" style={{ color: 'var(--olive, #6A8546)' }}>share</span>
-                </button>
-              )}
               <button className="ms-card-btn" title={window.t('Editar proyecto', 'Edit project')}
                 onClick={(e)=>{ e.stopPropagation(); onRenameClick && onRenameClick(project); }}>
                 <span className="material-symbols-rounded">edit</span>
@@ -584,8 +561,7 @@ function ProjectCard({ project, lang, t, onOpen, onDelete, onRenameClick, onRest
               onClick={(e) => {
                 e.stopPropagation();
                 navigator.clipboard.writeText(project.shareToken || project.id);
-                window.playAudioTone && window.playAudioTone('click');
-                alert(window.t('¡Token de invitación copiado al portapapeles!', 'Invitation token copied to clipboard!'));
+                window.showToast && window.showToast(window.t('¡Token copiado al portapapeles!', 'Token copied to clipboard!'));
               }}
             >
               <span className="material-symbols-rounded" style={{ fontSize: '18px', fontVariationSettings: '"FILL" 1' }}>cloud</span>
@@ -704,6 +680,7 @@ function RenameProjectModal({ project, lang, onClose, onSave, onTogglePublic, us
   const [emoji, setEmoji]   = useStateHome(project.emoji || EMOJI_PRESETS[0]);
   const [cover, setCover]   = useStateHome(project.cover || COVER_PRESETS[0]);
   const [isPublic, setIsPublic] = useStateHome(!!project.isPublic);
+  const [copied, setCopied] = useStateHome(false);
 
   const submit = () => {
     const trimmed = name.trim();
@@ -826,14 +803,30 @@ function RenameProjectModal({ project, lang, onClose, onSave, onTogglePublic, us
                   className="btn lift"
                   onClick={() => {
                     navigator.clipboard.writeText(project.shareToken || project.id);
+                    setCopied(true);
                     window.playAudioTone && window.playAudioTone('click');
-                    alert(window.t('¡Token copiado al portapapeles!', 'Token copied to clipboard!'));
+                    setTimeout(() => setCopied(false), 2000);
                   }}
-                  style={{ padding: '6px 12px', fontSize: '11px', fontWeight: '700', border: '1.5px solid var(--line)', borderRadius: '6px', cursor: 'pointer', background: '#FFFFFF' }}
+                  style={{
+                    padding: '6px 12px',
+                    fontSize: '11px',
+                    fontWeight: '700',
+                    border: '1.5px solid var(--line)',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    background: copied ? '#6A8546' : '#FFFFFF',
+                    color: copied ? '#FFFFFF' : 'var(--ink, #1A1A1A)',
+                    transition: 'all 0.2s ease'
+                  }}
                 >
-                  {window.t('Copiar', 'Copy')}
+                  {copied ? window.t('¡Copiado!', 'Copied!') : window.t('Copiar', 'Copy')}
                 </button>
               </div>
+              {copied && (
+                <div style={{ fontSize: '11px', color: '#6A8546', fontWeight: '700', marginTop: '4px', textAlign: 'left', animation: 'fadeIn 0.2s ease' }}>
+                  ✓ {window.t('Copiado al portapapeles', 'Copied to clipboard')}
+                </div>
+              )}
             </div>
           )}
         </div>
