@@ -20,5 +20,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   fetchImageBase64: (url) => ipcRenderer.invoke('fetch-image-base64', url),
   downloadMediaToVault: (folderPath, url, fileName) => ipcRenderer.invoke('download-media-to-vault', { folderPath, url, fileName }),
   getCustomDictionaryWords: () => ipcRenderer.invoke('get-custom-dictionary-words'),
-  removeWordFromDictionary: (word) => ipcRenderer.invoke('remove-word-from-dictionary', word)
+  removeWordFromDictionary: (word) => ipcRenderer.invoke('remove-word-from-dictionary', word),
+  startGoogleLogin: () => ipcRenderer.invoke('start-google-login'),
+  onGoogleSigninCompleted: (callback) => {
+    const listener = (event, profile) => callback(profile);
+    ipcRenderer.on('google-signin-completed', listener);
+    return () => ipcRenderer.removeListener('google-signin-completed', listener);
+  }
 });

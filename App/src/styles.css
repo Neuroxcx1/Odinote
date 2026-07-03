@@ -248,6 +248,16 @@ a, button, select, input[type="submit"], input[type="button"], [role="button"],
 .ms-new-btn:active { transform: translate(1px, 1px); box-shadow: 0 0 0 0 var(--line); }
 .ms-new-btn .material-symbols-rounded { font-size: 18px; }
 
+.ms-join-btn:hover {
+  background: rgba(106, 133, 70, 0.05) !important;
+  transform: translate(-1px, -2px);
+  box-shadow: var(--pop-hover);
+}
+.ms-join-btn:active {
+  transform: translate(1px, 1px);
+  box-shadow: 0 0 0 0 var(--line);
+}
+
 .ms-nav { display: flex; flex-direction: column; gap: 1px; }
 .ms-nav-label {
   font-size: 10.5px;
@@ -483,6 +493,7 @@ a, button, select, input[type="submit"], input[type="button"], [role="button"],
 .ms-card-btn:hover { background: #fff; transform: translate(-1px,-1px); box-shadow: 2px 2px 0 var(--line); }
 .ms-card-btn.danger:hover { color: var(--wine); }
 .ms-card-btn.on { color: #E0A82E; }
+.ms-card-btn.star-btn:hover, .ms-card-btn.star-btn.on { color: #E0A82E !important; }
 .ms-card-btn .material-symbols-rounded { font-size: 16px; }
 .ms-empty-hint { grid-column: 1 / -1; padding: 30px; text-align: center; color: var(--ink-3); font-size: 13px; }
 
@@ -3232,4 +3243,8 @@ body.odi-busy iframe { pointer-events: none !important; }
   .crumb {
     max-width: 70px;
   }
+}
+
+.ms-card-dropdown-item:hover {
+  background: var(--line-soft, #E5E1DD) !important;
 }

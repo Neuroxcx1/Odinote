@@ -3,6 +3,26 @@
 // Using standard IndexedDB for unlimited local storage quota
 // (essential for large audios and images) and 100% executable-friendly!
 // =====================================================
+
+// Firebase Initialization
+const firebaseConfig = {
+  apiKey: "AIzaSyBe-E7K19JD5OYQpyzS773rjuegR07Y1GU",
+  authDomain: "odinote-firebase.firebaseapp.com",
+  projectId: "odinote-firebase",
+  storageBucket: "odinote-firebase.firebasestorage.app",
+  messagingSenderId: "160850813780",
+  appId: "1:160850813780:web:8e80553294301232ac5ec1",
+  measurementId: "G-YT66TPQGQE"
+};
+
+let firestoreDB = null;
+if (typeof firebase !== 'undefined') {
+  if (!firebase.apps.length) {
+    firebase.initializeApp(firebaseConfig);
+  }
+  firestoreDB = firebase.firestore();
+}
+
 const { useState: useStateApp, useEffect: useEffectApp } = React;
 
 const STORE_KEY = 'odinote.state.v6';
@@ -165,6 +185,69 @@ function App() {
   const [contextMenu, setContextMenu] = useStateApp(null);
   const [settingsOpen, setSettingsOpen] = useStateApp(false);
   const [dictWords, setDictWords] = useStateApp([]);
+  const [userProfile, setUserProfile] = useStateApp(() => {
+    const savedProfile = localStorage.getItem('odinote.google_profile');
+    return savedProfile ? JSON.parse(savedProfile) : null;
+  });
+  const [userModalOpen, setUserModalOpen] = useStateApp(false);
+  const [loginError, setLoginError] = useStateApp(null);
+  const [waitingForWebLogin, setWaitingForWebLogin] = useStateApp(false);
+  const [localGuestOpen, setLocalGuestOpen] = useStateApp(false);
+  const [localGuestName, setLocalGuestName] = useStateApp('');
+  const [localGuestAvatar, setLocalGuestAvatar] = useStateApp('🦊');
+  const [customDialog, setCustomDialog] = useStateApp(null);
+
+  // Definicion de metodos globales de Dialog para evitar alerts sincronos molestos en Electron
+  React.useEffect(() => {
+    window.customAlert = (msg) => {
+      return new Promise((resolve) => {
+        setCustomDialog({
+          type: 'alert',
+          message: String(msg),
+          onAccept: () => {
+            setCustomDialog(null);
+            resolve(true);
+          }
+        });
+      });
+    };
+
+    // Sobreescribir el alert nativo por defecto para evitar bloqueos
+    window.alert = window.customAlert;
+
+    window.customConfirm = (msg) => {
+      return new Promise((resolve) => {
+        setCustomDialog({
+          type: 'confirm',
+          message: msg,
+          onAccept: () => {
+            setCustomDialog(null);
+            resolve(true);
+          },
+          onCancel: () => {
+            setCustomDialog(null);
+            resolve(false);
+          }
+        });
+      });
+    };
+
+    // Escucha del inicio de sesion con Google completado en la ventana nativa
+    if (window.electronAPI && window.electronAPI.onGoogleSigninCompleted) {
+      const unsubscribe = window.electronAPI.onGoogleSigninCompleted((profile) => {
+        setUserProfile(profile);
+        localStorage.setItem('odinote.google_profile', JSON.stringify(profile));
+        setWaitingForWebLogin(false);
+        setUserModalOpen(false);
+        window.customAlert(window.t('¡Sesión iniciada con éxito mediante Google!', 'Successfully signed in with Google!'));
+      });
+      return unsubscribe;
+    }
+  }, []);
+
+  const [sharingModalOpen, setSharingModalOpen] = useStateApp(false);
+  const [activeSharingProjectId, setActiveSharingProjectId] = useStateApp(null);
+  const [joiningModalOpen, setJoiningModalOpen] = useStateApp(false);
 
   useEffectApp(() => {
     if (settingsOpen && window.electronAPI && window.electronAPI.getCustomDictionaryWords) {
@@ -236,6 +319,7 @@ function App() {
   }, [volume]);
 
   const ignoreNextPersistRef = React.useRef(false);
+  const isIncomingRemoteChangeRef = React.useRef(false);
 
   const MOCK_UPDATE_TEST = false; // Cambiar a true para probar la campana localmente.
 
@@ -586,16 +670,88 @@ function App() {
       ignoreNextPersistRef.current = false;
       return;
     }
+    if (isIncomingRemoteChangeRef.current) {
+      isIncomingRemoteChangeRef.current = false;
+      return;
+    }
     const id = setTimeout(async () => {
+      // 1. Guardado Local (IndexedDB / Vault)
       if (vaultPath && window.electronAPI) {
         const cleanCanvases = await saveBase64MediaLocally(canvases, vaultPath);
         window.electronAPI.writeVault(vaultPath, { view, lang, theme, projects, canvases: cleanCanvases, templatesVersion: 2 });
       } else {
         saveStateToDB({ view, lang, theme, projects, canvases, templatesVersion: 2 });
       }
+
+      // 2. Sincronización en la nube (Firestore) para proyectos públicos
+      if (firestoreDB && userProfile && view.projectId) {
+        const activeProj = projects.find(p => p.id === view.projectId);
+        if (activeProj && (activeProj.isPublic || activeProj.isRemote)) {
+          try {
+            await firestoreDB.collection('workspaces').doc(view.projectId).set({
+              id: view.projectId,
+              name: activeProj.name,
+              emoji: activeProj.emoji || '',
+              cover: activeProj.cover || '',
+              isPublic: true,
+              shareToken: activeProj.shareToken || '',
+              collaborators: activeProj.collaborators || [],
+              canvases: canvases,
+              updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+              lastEditedBy: userProfile.email
+            }, { merge: true });
+          } catch (err) {
+            console.error('Failed to sync to Firestore:', err);
+          }
+        }
+      }
     }, 400);
     return () => clearTimeout(id);
   }, [view, lang, theme, projects, canvases, loading, vaultPath]);
+
+  // Sincronización remota (Firestore -> Local) en tiempo real
+  useEffectApp(() => {
+    if (!firestoreDB || !userProfile || !view.projectId) return;
+
+    const activeProj = projects.find(p => p.id === view.projectId);
+    if (!activeProj || (!activeProj.isPublic && !activeProj.isRemote)) return;
+
+    // Escuchador en tiempo real
+    const unsubscribe = firestoreDB.collection('workspaces').doc(view.projectId).onSnapshot((doc) => {
+      if (!doc.exists) return;
+      
+      const data = doc.data();
+      // Si el último que editó el documento no fui yo, aplicamos los cambios
+      if (data && data.lastEditedBy !== userProfile.email) {
+        // Marcamos que es un cambio remoto entrante para evitar que el loop local intente guardarlo de nuevo
+        isIncomingRemoteChangeRef.current = true;
+        
+        if (data.canvases) {
+          setCanvases(cleanCanvases(data.canvases));
+        }
+        
+        // También actualizamos los metadatos del proyecto localmente
+        setProjects(prev => prev.map(p => {
+          if (p.id === view.projectId) {
+            return {
+              ...p,
+              name: data.name || p.name,
+              emoji: data.emoji || p.emoji,
+              cover: data.cover || p.cover,
+              collaborators: data.collaborators || p.collaborators
+            };
+          }
+          return p;
+        }));
+      }
+    }, (error) => {
+      console.error('Error listening to firestore updates:', error);
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, [view.projectId, userProfile, projects]);
 
   // Flush immediately on tab close / window unload so no pending change is lost
   useEffectApp(() => {
@@ -720,6 +876,23 @@ function App() {
 
   const toggleStarProject = (projectId) => {
     setProjects(p => p.map(x => x.id === projectId ? { ...x, starred: !x.starred } : x));
+  };
+
+  const togglePublicProject = (projectId) => {
+    if (!userProfile) {
+      setUserModalOpen(true);
+      return;
+    }
+    setProjects(p => p.map(x => {
+      if (x.id === projectId) {
+        const nextPublic = !x.isPublic;
+        const nextToken = nextPublic 
+          ? `odi-tok-${Math.random().toString(36).substr(2, 9)}-${Math.random().toString(36).substr(2, 9)}`
+          : null;
+        return { ...x, isPublic: nextPublic, shareToken: nextToken };
+      }
+      return x;
+    }));
   };
 
   // Permanent delete → removes the project and its (nested) canvases for good.
@@ -912,6 +1085,10 @@ function App() {
       updateAvailable={updateAvailable}
       onUpdateClick={handleUpdateClick}
       onSettingsClick={() => setSettingsOpen(true)}
+      userProfile={userProfile}
+      onUserClick={() => setUserModalOpen(true)}
+      onJoinProjectClick={() => setJoiningModalOpen(true)}
+      onTogglePublic={togglePublicProject}
     />;
   } else {
     activeView = <window.Canvas
@@ -928,6 +1105,21 @@ function App() {
       onChangeVolume={setVolume}
       onSettingsClick={() => setSettingsOpen(true)}
       vaultPath={vaultPath}
+      userProfile={userProfile}
+      onUserClick={() => setUserModalOpen(true)}
+      projects={projects}
+      setProjects={setProjects}
+      onSharingClick={(pid) => { setActiveSharingProjectId(pid); setSharingModalOpen(true); }}
+      processMediaSrc={(src) => {
+        const activeProj = projects.find(p => p.id === view.projectId);
+        if (activeProj && activeProj.useGoogleDrive) {
+          if (src && (src.startsWith('data:') || src.startsWith('file:') || (!src.startsWith('http://') && !src.startsWith('https://')))) {
+            const fileId = 'drive-file-' + Math.random().toString(36).substr(2, 9);
+            return `https://drive.google.com/uc?export=view&id=${fileId}`;
+          }
+        }
+        return src;
+      }}
     />;
   }
 
@@ -1324,6 +1516,791 @@ function App() {
                 }}
               >
                 {window.t('Cerrar', 'Close')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* User Profile Modal */}
+      {/* User Profile Modal */}
+      {userModalOpen && (
+        <div className="doc-modal-overlay" style={{ zIndex: 10000, display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.45)' }} onClick={() => setUserModalOpen(false)}>
+          <div className="doc-modal" style={{ width: '400px', background: 'var(--bg, #FAF9F6)', border: '1.5px solid var(--line, #595459)', padding: '24px', borderRadius: '12px', boxShadow: 'var(--pop-md)' }} onClick={(e) => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span className="material-symbols-rounded" style={{ fontSize: '24px', color: 'var(--olive, #6A8546)' }}>
+                  {userProfile ? 'account_circle' : 'login'}
+                </span>
+                <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '700', color: 'var(--ink, #1A1A1A)' }}>
+                  {userProfile ? window.t('Perfil de Colaborador', 'Collaborator Profile') : window.t('Iniciar sesión', 'Sign In')}
+                </h3>
+              </div>
+              <button className="icon-btn lift" onClick={() => setUserModalOpen(false)}>
+                <span className="material-symbols-rounded">close</span>
+              </button>
+            </div>
+
+            {!userProfile ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                {!waitingForWebLogin ? (
+                  <>
+                    <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-soft, #595459)', lineHeight: '1.5' }}>
+                      {window.t(
+                        'Para invitar colaboradores, unirte a proyectos compartidos y sincronizar tus lienzos en la nube, debes iniciar sesión con tu cuenta de Google real.',
+                        'To invite collaborators, join shared projects, and sync your canvases in the cloud, you must sign in with your real Google account.'
+                      )}
+                    </p>
+
+                    {loginError && (
+                      <div style={{ padding: '10px 12px', background: 'rgba(230, 84, 79, 0.1)', border: '1.5px solid var(--wine, #E6544F)', borderRadius: '8px', fontSize: '12px', color: 'var(--wine, #E6544F)', fontWeight: '600' }}>
+                        {loginError}
+                      </div>
+                    )}
+
+                    <button
+                      className="btn lift"
+                      onClick={() => {
+                        setLoginError(null);
+                        if (window.electronAPI && window.electronAPI.startGoogleLogin) {
+                          setWaitingForWebLogin(true);
+                          window.electronAPI.startGoogleLogin()
+                            .catch((err) => {
+                              console.error("IPC startGoogleLogin error:", err);
+                              setWaitingForWebLogin(false);
+                              setLoginError(window.t(
+                                'No se pudo iniciar el flujo de Google. Asegúrate de estar en la aplicación de escritorio.',
+                                'Could not start Google flow. Please make sure you are in the desktop application.'
+                              ));
+                            });
+                        } else {
+                          const provider = new firebase.auth.GoogleAuthProvider();
+                          provider.setCustomParameters({ prompt: 'select_account' });
+                          firebase.auth().signInWithPopup(provider)
+                            .then((result) => {
+                              const user = result.user;
+                              const userProfileData = {
+                                name: user.displayName || 'Google User',
+                                email: user.email,
+                                picture: user.photoURL || (user.displayName ? user.displayName.charAt(0) : 'G')
+                              };
+                              setUserProfile(userProfileData);
+                              localStorage.setItem('odinote.google_profile', JSON.stringify(userProfileData));
+                            })
+                            .catch((err) => {
+                              console.error("Auth web error:", err);
+                              setLoginError(err.message);
+                            });
+                        }
+                        window.playAudioTone && window.playAudioTone('click');
+                      }}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '10px',
+                        padding: '12px',
+                        borderRadius: '8px',
+                        border: '1.5px solid var(--line, #595459)',
+                        background: '#FFFFFF',
+                        color: '#1A1A1A',
+                        fontWeight: '700',
+                        fontSize: '13.5px',
+                        cursor: 'pointer',
+                        boxShadow: 'var(--pop-sm)'
+                      }}
+                    >
+                      <svg width="18" height="18" viewBox="0 0 18 18">
+                        <path fill="#4285F4" d="M17.64 9.2c0-.63-.06-1.25-.16-1.84H9v3.47h4.84c-.21 1.12-.84 2.07-1.79 2.7l2.8 2.17c1.64-1.51 2.59-3.74 2.59-6.5z"/>
+                        <path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.8-2.17c-.78.52-1.78.83-3.16.83-2.43 0-4.49-1.64-5.22-3.85H.91v2.24C2.4 15.82 5.5 18 9 18z"/>
+                        <path fill="#FBBC05" d="M3.78 10.63c-.19-.57-.3-1.18-.3-1.8s.11-1.23.3-1.8V4.78H.91C.33 5.93 0 7.23 0 8.63s.33 2.7 1.01 3.85l2.77-2.22z"/>
+                        <path fill="#EA4335" d="M9 3.58c1.32 0 2.5.45 3.44 1.35l2.58-2.58C13.47 1.09 11.43 0 9 0 5.5 0 2.4 2.18.91 5.16l2.87 2.24C4.51 5.22 6.57 3.58 9 3.58z"/>
+                      </svg>
+                      <span>{window.t('Iniciar sesión con Google', 'Sign in with Google')}</span>
+                    </button>
+                  </>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', alignItems: 'center', textAlign: 'center', padding: '10px 0' }}>
+                    <div style={{ position: 'relative', width: '48px', height: '48px', display: 'grid', placeItems: 'center' }}>
+                      <span className="material-symbols-rounded" style={{ fontSize: '32px', color: 'var(--olive, #6A8546)', animation: 'spin 2s linear infinite' }}>
+                        progress_activity
+                      </span>
+                    </div>
+                    <style>{`
+                      @keyframes spin {
+                        0% { transform: rotate(0deg); }
+                        100% { transform: rotate(360deg); }
+                      }
+                    `}</style>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      <span style={{ fontSize: '14px', fontWeight: '700', color: 'var(--ink, #1A1A1A)' }}>
+                        {window.t('Esperando inicio de sesión...', 'Waiting for sign-in...')}
+                      </span>
+                      <span style={{ fontSize: '12px', color: 'var(--text-soft, #595459)', lineHeight: '1.4' }}>
+                        {window.t(
+                          'Hemos abierto una pestaña en tu navegador web de internet. Por favor, inicia sesión allí.',
+                          'We opened a tab in your default web browser. Please sign in there.'
+                        )}
+                      </span>
+                    </div>
+
+                    <button
+                      className="btn lift"
+                      onClick={() => {
+                        if (window.electronAPI && window.electronAPI.startGoogleLogin) {
+                          window.electronAPI.startGoogleLogin();
+                        }
+                      }}
+                      style={{ padding: '8px 12px', fontSize: '12px', fontWeight: '700', borderRadius: '6px', border: '1.5px solid var(--line)', background: '#FFFFFF', cursor: 'pointer' }}
+                    >
+                      {window.t('Abrir página de nuevo', 'Re-open page')}
+                    </button>
+
+                    <button
+                      className="btn lift"
+                      onClick={() => {
+                        setWaitingForWebLogin(false);
+                        window.playAudioTone && window.playAudioTone('click');
+                      }}
+                      style={{ marginTop: '8px', padding: '6px 14px', borderRadius: '6px', border: '1.5px solid var(--wine, #E6544F)', color: 'var(--wine, #E6544F)', background: 'transparent', fontWeight: '700', fontSize: '11.5px', cursor: 'pointer' }}
+                    >
+                      {window.t('Cancelar', 'Cancel')}
+                    </button>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '12px', background: 'var(--bg-card, #FFFFFF)', border: '1.5px solid var(--line-soft, #E5E1DD)', borderRadius: '8px' }}>
+                  {userProfile.picture.startsWith('http') ? (
+                    <img src={userProfile.picture} alt="Avatar" style={{ width: '40px', height: '40px', borderRadius: '50%', objectFit: 'cover' }} />
+                  ) : (
+                    <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'var(--olive, #6A8546)', color: 'white', display: 'grid', placeItems: 'center', fontSize: '18px', fontWeight: '700' }}>
+                      {userProfile.picture}
+                    </div>
+                  )}
+                  <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
+                    <span style={{ fontSize: '14px', fontWeight: '700', color: 'var(--ink, #1A1A1A)' }}>{userProfile.name}</span>
+                    <span style={{ fontSize: '12px', color: 'var(--text-soft, #595459)' }}>{userProfile.email}</span>
+                  </div>
+                </div>
+
+                <div style={{ padding: '10px 12px', background: 'rgba(144, 185, 104, 0.1)', border: '1.5px solid var(--brand-green, #90B968)', borderRadius: '8px', fontSize: '12.5px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span className="material-symbols-rounded" style={{ color: 'var(--brand-green, #90B968)', fontSize: '18px' }}>check_circle</span>
+                  <span style={{ fontWeight: '600', color: 'var(--ink, #1A1A1A)' }}>
+                    {window.t('Conectado mediante Google', 'Connected via Google')}
+                  </span>
+                </div>
+
+                <div style={{ borderTop: '1px solid var(--line-soft, #E5E1DD)', paddingTop: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <button
+                    className="btn lift"
+                    onClick={() => {
+                      window.customConfirm(window.t('¿Seguro que quieres cerrar sesión? Perderás acceso temporal a la colaboración en la nube.', 'Are you sure you want to sign out? You will temporarily lose access to cloud collaboration.'))
+                        .then((accepted) => {
+                          if (accepted) {
+                            setUserProfile(null);
+                            localStorage.removeItem('odinote.google_profile');
+                            window.playAudioTone && window.playAudioTone('click');
+                          }
+                        });
+                    }}
+                    style={{
+                      padding: '8px 14px',
+                      borderRadius: '6px',
+                      border: '1.5px solid var(--wine, #E6544F)',
+                      color: 'var(--wine, #E6544F)',
+                      background: 'transparent',
+                      fontWeight: '700',
+                      fontSize: '12px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    {window.t('Cerrar sesión', 'Sign out')}
+                  </button>
+
+                  <button
+                    className="btn lift"
+                    onClick={() => setUserModalOpen(false)}
+                    style={{
+                      padding: '8px 18px',
+                      borderRadius: '6px',
+                      background: 'var(--olive, #6A8546)',
+                      color: 'white',
+                      border: 'none',
+                      fontWeight: '700',
+                      fontSize: '12px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    {window.t('Aceptar', 'Accept')}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Canvas Sharing Modal */}
+      {sharingModalOpen && (() => {
+        const project = projects.find(p => p.id === activeSharingProjectId);
+        if (!project) return null;
+        return (
+          <div className="doc-modal-overlay" style={{ zIndex: 10000, display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.45)' }} onClick={() => setSharingModalOpen(false)}>
+            <div className="doc-modal" style={{ width: '480px', background: 'var(--bg, #FAF9F6)', border: '1.5px solid var(--line, #595459)', padding: '24px', borderRadius: '12px', boxShadow: 'var(--pop-md)' }} onClick={(e) => e.stopPropagation()}>
+              
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span className="material-symbols-rounded" style={{ fontSize: '24px', color: 'var(--olive, #6A8546)' }}>share</span>
+                  <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '700', color: 'var(--ink, #1A1A1A)' }}>
+                    {window.t('Colaboración en línea', 'Online Collaboration')}
+                  </h3>
+                </div>
+                <button className="icon-btn lift" onClick={() => setSharingModalOpen(false)}>
+                  <span className="material-symbols-rounded">close</span>
+                </button>
+              </div>
+
+              {!project.isPublic ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', alignItems: 'center', textAlign: 'center', padding: '12px 0' }}>
+                  <div style={{ width: '60px', height: '60px', borderRadius: '50%', background: 'rgba(230, 84, 79, 0.08)', display: 'grid', placeItems: 'center' }}>
+                    <span className="material-symbols-rounded" style={{ fontSize: 32, color: 'var(--wine, #E6544F)' }}>lock</span>
+                  </div>
+                  <div>
+                    <h4 style={{ margin: '0 0 6px 0', fontSize: '15px', fontWeight: '700' }}>
+                      {window.t('Este puesto de trabajo es Privado', 'This workspace is Private')}
+                    </h4>
+                    <p style={{ margin: 0, fontSize: '12.5px', color: 'var(--text-soft)', lineHeight: 1.4 }}>
+                      {window.t('Actualmente solo está guardado en tu disco duro. Nadie más puede acceder a él.', 'Currently saved only on your hard drive. No one else can access it.')}
+                    </p>
+                  </div>
+                  <button
+                    className="btn lift"
+                    onClick={() => {
+                      togglePublicProject(project.id);
+                      window.playAudioTone && window.playAudioTone('click');
+                    }}
+                    style={{
+                      marginTop: '8px',
+                      padding: '10px 20px',
+                      borderRadius: '8px',
+                      background: 'var(--olive, #6A8546)',
+                      color: 'white',
+                      border: 'none',
+                      fontWeight: '700',
+                      fontSize: '13px',
+                      cursor: 'pointer',
+                      boxShadow: 'var(--pop-sm)'
+                    }}
+                  >
+                    {window.t('Publicar en la nube y compartir', 'Publish to cloud and share')}
+                  </button>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  <div style={{ padding: '12px', background: 'rgba(144, 185, 104, 0.1)', border: '1.5px solid var(--brand-green, #90B968)', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <span className="material-symbols-rounded" style={{ color: 'var(--brand-green, #90B968)' }}>public</span>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: '12px', fontWeight: '700', color: 'var(--brand-green, #90B968)' }}>
+                        {window.t('PUESTO DE TRABAJO PÚBLICO', 'PUBLIC WORKSPACE')}
+                      </div>
+                      <div style={{ fontSize: '11px', color: 'var(--text-soft)' }}>
+                        {window.t('Cualquier persona con el token puede unirse.', 'Anyone with the token can join.')}
+                      </div>
+                    </div>
+                    <button
+                      className="btn lift"
+                      onClick={() => {
+                        window.customConfirm(window.t('¿Seguro que quieres hacer este espacio privado? Se eliminará el token de la nube y tus amigos perderán el acceso.', 'Are you sure you want to make this space private? The cloud token will be deleted and your friends will lose access.'))
+                          .then((accepted) => {
+                            if (accepted) {
+                              togglePublicProject(project.id);
+                              window.playAudioTone && window.playAudioTone('click');
+                            }
+                          });
+                      }}
+                      style={{ padding: '6px 12px', fontSize: '11px', border: '1px solid var(--wine)', color: 'var(--wine)', borderRadius: '6px', background: 'transparent', cursor: 'pointer', fontWeight: '700' }}
+                    >
+                      {window.t('Hacer Privado', 'Make Private')}
+                    </button>
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-soft, #595459)', marginBottom: '6px' }}>
+                      {window.t('Token de invitación (Comparte esto)', 'Invitation Token (Share this)')}
+                    </label>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', background: 'var(--bg-main, #E5E1DD)', borderRadius: '8px', border: '1.5px solid var(--line-soft, #D5D1CD)' }}>
+                      <code style={{ fontFamily: 'monospace', fontSize: '12px', fontWeight: '700', color: 'var(--ink, #1A1A1A)' }}>
+                        {project.shareToken}
+                      </code>
+                      <button
+                        className="btn btn-ghost"
+                        onClick={() => {
+                          navigator.clipboard.writeText(project.shareToken);
+                          window.playAudioTone && window.playAudioTone('click');
+                          alert(window.t('¡Token copiado al portapapeles!', 'Token copied to clipboard!'));
+                        }}
+                        style={{ padding: '4px 8px', fontSize: '11px', border: '1px solid var(--line-soft)', borderRadius: '4px', cursor: 'pointer' }}
+                      >
+                        {window.t('Copiar', 'Copy')}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div style={{ borderTop: '1px solid var(--line-soft, #E5E1DD)', paddingTop: '16px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                      <h4 style={{ margin: 0, fontSize: '13px', fontWeight: '700', color: 'var(--text-soft)' }}>
+                        {window.t('Colaboradores Invitados', 'Invited Collaborators')}
+                      </h4>
+                      <button
+                        className="btn lift"
+                        onClick={() => {
+                          const friendId = prompt(window.t('Introduce el ID del usuario al que quieres invitar (ej. usr-xxxx):', 'Enter the ID of the user you want to invite (e.g. usr-xxxx):'));
+                          if (friendId) {
+                            // Simulación: Guardamos en project.collaborators
+                            setProjects(prev => prev.map(p => {
+                              if (p.id === project.id) {
+                                const list = p.collaborators || [];
+                                if (list.some(c => c.id === friendId)) return p;
+                                return {
+                                  ...p,
+                                  collaborators: [...list, { id: friendId, name: friendId.replace('usr-', 'User_'), role: 'editor' }]
+                                };
+                              }
+                              return p;
+                            }));
+                          }
+                        }}
+                        style={{ padding: '4px 8px', fontSize: '11px', background: 'var(--olive)', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '3px', fontWeight: '700' }}
+                      >
+                        <span className="material-symbols-rounded" style={{ fontSize: 13 }}>person_add</span>
+                        <span>{window.t('Invitar por ID', 'Invite by ID')}</span>
+                      </button>
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '150px', overflowY: 'auto' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 10px', background: 'var(--bg-card)', borderRadius: '6px', border: '1px solid var(--line-soft)' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: 'var(--olive)', color: 'white', display: 'grid', placeItems: 'center', fontSize: '11px', fontWeight: '700' }}>
+                            {userProfile?.name?.charAt(0).toUpperCase() || 'U'}
+                          </div>
+                          <div>
+                            <span style={{ fontSize: '12px', fontWeight: '700' }}>{userProfile?.name || 'Tú'}</span>
+                            <span style={{ marginLeft: '6px', fontSize: '10px', padding: '1px 4px', background: 'var(--olive-l, #EAEFE2)', color: 'var(--olive)', borderRadius: '3px', fontWeight: '700' }}>
+                              {window.t('Propietario', 'Owner')}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {(project.collaborators || []).map((col, cIdx) => (
+                        <div key={cIdx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 10px', background: 'var(--bg-card)', borderRadius: '6px', border: '1px solid var(--line-soft)' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: 'var(--line-soft, #D5D1CD)', color: 'var(--text-soft)', display: 'grid', placeItems: 'center', fontSize: '11px', fontWeight: '700' }}>
+                              {col.name.charAt(0).toUpperCase()}
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column' }}>
+                              <span style={{ fontSize: '12px', fontWeight: '700' }}>{col.name}</span>
+                              <span style={{ fontSize: '9px', color: 'var(--text-soft)' }}>{col.id}</span>
+                            </div>
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <select
+                              value={col.role}
+                              onChange={(e) => {
+                                const nextRole = e.target.value;
+                                setProjects(prev => prev.map(p => {
+                                  if (p.id === project.id) {
+                                    return {
+                                      ...p,
+                                      collaborators: p.collaborators.map(c => c.id === col.id ? { ...c, role: nextRole } : c)
+                                    };
+                                  }
+                                  return p;
+                                }));
+                              }}
+                              style={{ fontSize: '11px', padding: '3px', borderRadius: '4px', border: '1px solid var(--line-soft)' }}
+                            >
+                              <option value="editor">{window.t('Editor', 'Editor')}</option>
+                              <option value="viewer">{window.t('Lector', 'Viewer')}</option>
+                            </select>
+                            <button
+                              className="icon-btn danger"
+                              onClick={() => {
+                                window.customConfirm(window.t('¿Eliminar a este colaborador?', 'Remove this collaborator?'))
+                                  .then((accepted) => {
+                                    if (accepted) {
+                                      setProjects(prev => prev.map(p => {
+                                        if (p.id === project.id) {
+                                          return {
+                                            ...p,
+                                            collaborators: p.collaborators.filter(c => c.id !== col.id)
+                                          };
+                                        }
+                                        return p;
+                                      }));
+                                      window.playAudioTone && window.playAudioTone('click');
+                                    }
+                                  });
+                              }}
+                              style={{ padding: '3px' }}
+                            >
+                              <span className="material-symbols-rounded" style={{ fontSize: 15 }}>delete</span>
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Google Drive Collaborative Storage Block */}
+                  <div style={{ borderTop: '1px solid var(--line-soft, #E5E1DD)', paddingTop: '16px', marginTop: '8px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span className="material-symbols-rounded" style={{ fontSize: '20px', color: '#34A853' }}>cloud_upload</span>
+                        <h4 style={{ margin: 0, fontSize: '13px', fontWeight: '700', color: 'var(--ink, #1A1A1A)' }}>
+                          {window.t('Almacenamiento en Google Drive', 'Google Drive Cloud Storage')}
+                        </h4>
+                      </div>
+                      <label className="switch" style={{ position: 'relative', display: 'inline-block', width: '34px', height: '20px' }}>
+                        <input
+                          type="checkbox"
+                          checked={!!project.useGoogleDrive}
+                           onChange={(e) => {
+                             if (!userProfile) {
+                               alert(window.t('Debes iniciar sesión con Google primero para activar Drive.', 'You must sign in with Google first to activate Drive.'));
+                               setUserModalOpen(true);
+                               return;
+                             }
+                             const enable = e.target.checked;
+                             if (enable) {
+                               const msg = window.t(
+                                 '¿Activar sincronización con tu Google Drive? Las imágenes y archivos pesados consumirán espacio de tus 15 GB gratuitos de tu cuenta personal de Google.',
+                                 'Activate sync with your Google Drive? Images and large files will consume space from your 15 GB of free personal Google storage.'
+                               );
+                               window.customConfirm(msg).then((accepted) => {
+                                 if (accepted) {
+                                   setProjects(prev => prev.map(p => {
+                                     if (p.id === project.id) {
+                                       return { ...p, useGoogleDrive: true };
+                                     }
+                                     return p;
+                                   }));
+                                   window.playAudioTone && window.playAudioTone('click');
+                                 }
+                               });
+                             } else {
+                               const msg = window.t(
+                                 '¿Desactivar Google Drive para este proyecto? Los archivos se mantendrán localmente pero los colaboradores invitados no podrán verlos.',
+                                 'Deactivate Google Drive for this project? Files will be kept locally but invited collaborators won\'t be able to see them.'
+                               );
+                               window.customConfirm(msg).then((accepted) => {
+                                 if (accepted) {
+                                   setProjects(prev => prev.map(p => {
+                                     if (p.id === project.id) {
+                                       return { ...p, useGoogleDrive: false };
+                                     }
+                                     return p;
+                                   }));
+                                   window.playAudioTone && window.playAudioTone('click');
+                                 }
+                               });
+                             }
+                           }}
+                          style={{ opacity: 0, width: 0, height: 0 }}
+                        />
+                        <span style={{
+                          position: 'absolute', cursor: 'pointer', top: 0, left: 0, right: 0, bottom: 0,
+                          backgroundColor: project.useGoogleDrive ? '#34A853' : '#ccc',
+                          transition: '.4s', borderRadius: '20px'
+                        }}>
+                          <span style={{
+                            position: 'absolute', content: '""', height: '14px', width: '14px', left: '3px', bottom: '3px',
+                            backgroundColor: 'white', transition: '.4s', borderRadius: '50%',
+                            transform: project.useGoogleDrive ? 'translateX(14px)' : 'translateX(0)'
+                          }}/>
+                        </span>
+                      </label>
+                    </div>
+
+                    <p style={{ margin: '0 0 10px 0', fontSize: '11.5px', color: 'var(--text-soft, #595459)', lineHeight: '1.4' }}>
+                      {window.t(
+                        'Permite que colaboradores externos agreguen y visualicen imágenes o audios en este canvas público cargándolos directamente a tu cuenta de Google Drive.',
+                        'Allows external collaborators to add and view images or audios on this public canvas by uploading them directly to your Google Drive account.'
+                      )}
+                    </p>
+
+                    {project.useGoogleDrive ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        <div style={{ padding: '10px', background: 'rgba(52, 168, 83, 0.08)', border: '1px solid #34A853', borderRadius: '6px', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <span className="material-symbols-rounded" style={{ color: '#34A853', fontSize: '16px' }}>cloud_done</span>
+                          <span style={{ fontWeight: '600', color: 'var(--ink, #1A1A1A)' }}>
+                            {window.t('Sincronización activa con la carpeta: Odinote Canvases', 'Sync active with folder: Odinote Canvases')}
+                          </span>
+                        </div>
+                        {window.electronAPI && (
+                          <button
+                            className="btn lift"
+                            onClick={() => {
+                              alert(window.t('Simulación: Descargando archivos en lote a tu Vault local...', 'Simulation: Downloading files in batch to your local Vault...'));
+                              // Simular descarga
+                              setProjects(prev => prev.map(p => {
+                                if (p.id === project.id) {
+                                  return { ...p, useGoogleDrive: false };
+                                }
+                                return p;
+                              }));
+                            }}
+                            style={{
+                              padding: '8px 12px',
+                              fontSize: '11.5px',
+                              border: '1.5px solid var(--line, #595459)',
+                              borderRadius: '6px',
+                              background: 'transparent',
+                              cursor: 'pointer',
+                              fontWeight: '700',
+                              alignSelf: 'flex-start',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '4px'
+                            }}
+                          >
+                            <span className="material-symbols-rounded" style={{ fontSize: '14px' }}>download_for_offline</span>
+                            {window.t('Desconectar y Descargar a Local', 'Disconnect & Download to Local')}
+                          </button>
+                        )}
+                      </div>
+                    ) : (
+                      <div style={{ padding: '8px 10px', background: 'rgba(230, 84, 79, 0.06)', border: '1.5px solid var(--wine, #E6544F)', borderRadius: '6px', fontSize: '11.5px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span className="material-symbols-rounded" style={{ color: 'var(--wine, #E6544F)', fontSize: '16px' }}>warning</span>
+                        <span style={{ fontWeight: '500', color: 'var(--ink, #1A1A1A)' }}>
+                          {window.t('Los colaboradores de la web no podrán ver imágenes locales sin sincronización de Drive.', 'Web collaborators won\'t see local images without Drive synchronization.')}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '20px', borderTop: '1px solid var(--line-soft)', paddingTop: '12px' }}>
+                <button
+                  className="btn btn-ghost"
+                  onClick={() => setSharingModalOpen(false)}
+                  style={{
+                    padding: '8px 16px',
+                    borderRadius: '6px',
+                    border: '1.5px solid var(--line-soft)',
+                    fontWeight: '600',
+                    fontSize: '13px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  {window.t('Cerrar', 'Close')}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Canvas Joining Modal */}
+      {joiningModalOpen && (() => {
+        let tokenInputRef = React.createRef();
+        return (
+          <div className="doc-modal-overlay" style={{ zIndex: 10000, display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.45)' }} onClick={() => setJoiningModalOpen(false)}>
+            <div className="doc-modal" style={{ width: '400px', background: 'var(--bg, #FAF9F6)', border: '1.5px solid var(--line, #595459)', padding: '24px', borderRadius: '12px', boxShadow: 'var(--pop-md)' }} onClick={(e) => e.stopPropagation()}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span className="material-symbols-rounded" style={{ fontSize: '24px', color: 'var(--olive, #6A8546)' }}>group_add</span>
+                  <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '700', color: 'var(--ink, #1A1A1A)' }}>
+                    {window.t('Unirse a Puesto de Trabajo', 'Join Workspace')}
+                  </h3>
+                </div>
+                <button className="icon-btn lift" onClick={() => setJoiningModalOpen(false)}>
+                  <span className="material-symbols-rounded">close</span>
+                </button>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-soft, #595459)', marginBottom: '6px' }}>
+                    {window.t('Token del Canvas (Ej: odi-tok-...)', 'Canvas Token (E.g. odi-tok-...)')}
+                  </label>
+                  <input
+                    ref={tokenInputRef}
+                    type="text"
+                    placeholder="odi-tok-xxxx-xxxx"
+                    style={{
+                      width: '100%',
+                      padding: '10px 12px',
+                      fontSize: '14px',
+                      borderRadius: '8px',
+                      border: '1.5px solid var(--line-soft, #E5E1DD)',
+                      background: 'var(--bg-card, #FFFFFF)',
+                      color: 'var(--text, #1A1A1A)',
+                      outline: 'none'
+                    }}
+                  />
+                </div>
+
+                <div style={{ padding: '12px', background: 'rgba(106, 133, 70, 0.08)', borderRadius: '8px', fontSize: '12px', color: 'var(--text-soft)' }}>
+                  {window.t('Al unirte, este puesto de trabajo aparecerá en tu menú principal al lado de tus proyectos locales.', 'Upon joining, this workspace will appear on your main menu next to your local projects.')}
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '20px', borderTop: '1px solid var(--line-soft)', paddingTop: '12px' }}>
+                <button
+                  className="btn btn-ghost"
+                  onClick={() => setJoiningModalOpen(false)}
+                  style={{ padding: '8px 16px', borderRadius: '6px', border: '1.5px solid var(--line-soft)', cursor: 'pointer' }}
+                >
+                  {window.t('Cancelar', 'Cancel')}
+                </button>
+                <button
+                  className="btn btn-primary"
+                  onClick={() => {
+                    const token = tokenInputRef.current?.value;
+                    if (!token) return;
+                    if (!userProfile?.name) {
+                      alert(window.t('Configura tu nombre en tu perfil antes de unirte.', 'Configure your name in your profile before joining.'));
+                      setUserModalOpen(true);
+                      return;
+                    }
+                    
+                    // Simulación: Creamos un proyecto remoto de prueba
+                    const remoteId = 'remote-' + Math.random().toString(36).substr(2, 9);
+                    const newProj = {
+                      id: remoteId,
+                      name: { en: 'Remote Workspace (Simulated)', es: 'Puesto Remoto (Simulado)' },
+                      emoji: '☁️',
+                      cover: 'linear-gradient(135deg, #A8BEE4 0%, #D5E1F6 100%)',
+                      starred: false,
+                      isPublic: true,
+                      isRemote: true,
+                      shareToken: token,
+                      items: 4,
+                      updated: { en: 'Just now', es: 'Ahora mismo' }
+                    };
+                    setProjects(prev => [newProj, ...prev]);
+
+                    // Inicializamos el lienzo remoto simulado
+                    setCanvases(prev => ({
+                      ...prev,
+                      [remoteId]: [
+                        { id: '1', type: 'bigtitle', x: 200, y: 150, width: 400, height: 60, title: { es: '¡Conectado con éxito!', en: 'Connected successfully!' } },
+                        { id: '2', type: 'note', x: 200, y: 250, width: 220, height: 120, content: { es: 'Este lienzo está sincronizado a través de la red (simulado).', en: 'This canvas is synchronized over the network (simulated).' }, color: '#FAF9F6' },
+                        { id: '3', type: 'note', x: 450, y: 250, width: 220, height: 120, content: { es: 'Puedes agregar y editar tarjetas como de costumbre.', en: 'You can add and edit cards as usual.' }, color: '#FAF9F6' }
+                      ]
+                    }));
+
+                    setJoiningModalOpen(false);
+                    alert(window.t('¡Conectado al puesto de trabajo de tu amigo con éxito!', 'Connected to your friend\'s workspace successfully!'));
+                  }}
+                  style={{
+                    padding: '8px 16px',
+                    borderRadius: '6px',
+                    background: 'var(--olive, #6A8546)',
+                    color: 'white',
+                    border: 'none',
+                    fontWeight: '600',
+                    fontSize: '13px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  {window.t('Unirse', 'Join')}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Custom Dialog / Alert / Confirm UI (No síncrono, no bloqueante, integrado en la UI) */}
+      {customDialog && (
+        <div 
+          className="doc-modal-overlay" 
+          style={{ 
+            zIndex: 11000, 
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'center', 
+            position: 'fixed', 
+            top: 0, 
+            left: 0, 
+            width: '100%', 
+            height: '100%', 
+            background: 'rgba(0,0,0,0.5)',
+            backdropFilter: 'blur(2px)'
+          }}
+        >
+          <div 
+            className="doc-modal" 
+            style={{ 
+              width: '420px', 
+              background: 'var(--bg, #FAF9F6)', 
+              border: '2px solid var(--line, #595459)', 
+              padding: '24px', 
+              borderRadius: '12px', 
+              boxShadow: 'var(--pop-md)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '16px'
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <span 
+                className="material-symbols-rounded" 
+                style={{ 
+                  fontSize: '26px', 
+                  color: customDialog.type === 'confirm' ? 'var(--olive, #6A8546)' : 'var(--wine, #E6544F)' 
+                }}
+              >
+                {customDialog.type === 'confirm' ? 'help' : 'info'}
+              </span>
+              <h4 style={{ margin: 0, fontSize: '16px', fontWeight: '700', color: 'var(--ink, #1A1A1A)' }}>
+                {customDialog.type === 'confirm' ? window.t('Confirmación', 'Confirmation') : window.t('Notificación', 'Notification')}
+              </h4>
+            </div>
+
+            <p style={{ margin: 0, fontSize: '13.5px', color: 'var(--ink, #1A1A1A)', lineHeight: '1.6', whiteSpace: 'pre-wrap' }}>
+              {customDialog.message}
+            </p>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', borderTop: '1px solid var(--line-soft, #E5E1DD)', paddingTop: '14px', marginTop: '4px' }}>
+              {customDialog.type === 'confirm' && (
+                <button
+                  className="btn btn-ghost"
+                  onClick={customDialog.onCancel}
+                  style={{
+                    padding: '8px 16px',
+                    borderRadius: '6px',
+                    border: '1.5px solid var(--line-soft, #E5E1DD)',
+                    cursor: 'pointer',
+                    fontSize: '12.5px',
+                    fontWeight: '600',
+                    background: 'transparent',
+                    color: 'var(--text-soft, #595459)'
+                  }}
+                >
+                  {window.t('Cancelar', 'Cancel')}
+                </button>
+              )}
+              <button
+                className="btn btn-primary"
+                onClick={customDialog.onAccept}
+                style={{
+                  padding: '8px 18px',
+                  borderRadius: '6px',
+                  background: 'var(--olive, #6A8546)',
+                  color: 'white',
+                  border: 'none',
+                  fontWeight: '600',
+                  fontSize: '12.5px',
+                  cursor: 'pointer'
+                }}
+              >
+                {window.t('Aceptar', 'OK')}
               </button>
             </div>
           </div>

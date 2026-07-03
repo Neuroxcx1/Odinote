@@ -84,6 +84,7 @@ function createWindow() {
   if (session.defaultSession) {
     try {
       session.defaultSession.clearCache();
+      session.defaultSession.setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
     } catch(e) {}
   }
   if (mainWindow.webContents && mainWindow.webContents.session) {
@@ -548,6 +549,84 @@ ipcMain.handle('download-media-to-vault', async (event, { folderPath, url, fileN
     throw err;
   }
 });
+
+let authServer = null;
+let authPort = 61234;
+
+function startAuthServer() {
+  if (authServer) return;
+  const http = require('http');
+  const fs = require('fs');
+  const path = require('path');
+
+  authServer = http.createServer((req, res) => {
+    if (req.method === 'POST' && req.url === '/auth-success') {
+      let body = '';
+      req.on('data', chunk => {
+        body += chunk.toString();
+      });
+      req.on('end', () => {
+        try {
+          const profile = JSON.parse(body);
+          logToFile(`Received auth-success via POST for ${profile.email}`);
+          if (mainWindow) {
+            mainWindow.webContents.send('google-signin-completed', profile);
+          }
+          res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+          res.end(JSON.stringify({ success: true }));
+
+          setTimeout(() => {
+            if (authServer) {
+              authServer.close();
+              authServer = null;
+            }
+          }, 1000);
+        } catch (err) {
+          logToFile(`Error parsing auth POST body: ${err.message}`);
+          res.writeHead(400);
+          res.end('Bad Request');
+        }
+      });
+    } else if (req.url.startsWith('/local-login.html') || req.url === '/' || req.url.startsWith('/?code=')) {
+      const filePath = path.join(__dirname, 'local-login.html');
+      fs.readFile(filePath, (err, content) => {
+        if (err) {
+          res.writeHead(500);
+          res.end('Error loading local-login.html');
+        } else {
+          res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+          res.end(content);
+        }
+      });
+    } else {
+      res.writeHead(404);
+      res.end('Not Found');
+    }
+  });
+
+  authServer.listen(authPort, '127.0.0.1', () => {
+    logToFile(`Auth local server listening on http://127.0.0.1:${authPort}`);
+  });
+
+  authServer.on('error', (err) => {
+    if (err.code === 'EADDRINUSE') {
+      authPort++;
+      authServer.close();
+      authServer = null;
+      startAuthServer();
+    } else {
+      logToFile(`Auth server error: ${err.message}`);
+    }
+  });
+}
+
+ipcMain.handle('start-google-login', async () => {
+  logToFile('IPC Call: start-google-login');
+  startAuthServer();
+  const authUrl = `http://localhost:${authPort}/`;
+  shell.openExternal(authUrl);
+});
+
 
 app.whenReady().then(() => {
   logToFile('App whenReady triggered.');

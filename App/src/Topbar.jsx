@@ -40,6 +40,8 @@ function Topbar({
   updateAvailable, onUpdateClick,
   volume, onChangeVolume,
   onSettingsClick,
+  userProfile, onUserClick,
+  project, onSharingClick,
 }) {
   const t = window.TRANSLATIONS[lang];
   const [extraOpen, setExtraOpen] = React.useState(false);
@@ -97,6 +99,33 @@ function Topbar({
           });
         })()}
       </div>
+
+      {project && (
+        <button
+          className={`icon-btn lift privacy-status-btn ${project.isPublic ? 'public' : 'private'}`}
+          title={project.isPublic ? window.t('Espacio de trabajo público (Haga clic para ver Token)', 'Public workspace (Click to view Token)') : window.t('Espacio de trabajo privado (Haga clic para hacerlo público)', 'Private workspace (Click to make public)')}
+          onClick={() => { onSharingClick && onSharingClick(); window.playAudioTone && window.playAudioTone('click'); }}
+          style={{
+            marginLeft: '10px',
+            background: project.isPublic ? 'rgba(144, 185, 104, 0.12)' : 'none',
+            border: project.isPublic ? '1px solid var(--brand-green, #90B968)' : 'none',
+            borderRadius: '4px',
+            padding: '2px 6px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '4px',
+            height: '28px',
+            cursor: 'pointer'
+          }}
+        >
+          <span className="material-symbols-rounded" style={{ fontSize: 16, color: project.isPublic ? 'var(--brand-green, #90B968)' : 'var(--text-soft)' }}>
+            {project.isPublic ? 'share' : 'lock'}
+          </span>
+          <span style={{ fontSize: 11, fontWeight: 700, color: project.isPublic ? 'var(--brand-green, #90B968)' : 'var(--text-soft)' }}>
+            {project.isPublic ? window.t('Público', 'Public') : window.t('Privado', 'Private')}
+          </span>
+        </button>
+      )}
 
       <div className="topbar-spacer"/>
 
@@ -274,6 +303,26 @@ function Topbar({
             title={`${Math.round(volume * 100)}%`}
           />
         </div>
+        <button
+          className={`icon-btn lift user-profile-btn ${userProfile ? 'has-name' : 'no-name'}`}
+          title={userProfile ? `${window.t('Perfil de', 'Profile of')} ${userProfile.name}` : window.t('Iniciar sesión con Google (Requerido para colaborar)', 'Sign in with Google (Required to collaborate)')}
+          onClick={() => { onUserClick && onUserClick(); window.playAudioTone && window.playAudioTone('click'); }}
+          style={{ marginRight: '4px', position: 'relative' }}
+        >
+          <span className="material-symbols-rounded" style={{ color: userProfile ? 'var(--brand-green, #90B968)' : 'inherit' }}>person</span>
+          {!userProfile && (
+            <span style={{
+              position: 'absolute',
+              top: '4px',
+              right: '4px',
+              width: '6px',
+              height: '6px',
+              borderRadius: '50%',
+              background: 'var(--wine, #E6544F)',
+              border: '1.5px solid var(--paper)'
+            }}/>
+          )}
+        </button>
         <button
           className="icon-btn lift settings-btn"
           title={window.t('Ajustes', 'Settings')}

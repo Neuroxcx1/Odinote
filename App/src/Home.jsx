@@ -30,7 +30,7 @@ const COVER_PRESETS = [
 ];
 const EMOJI_PRESETS = ['⚔️','🌾','🚀','🧩','🎲','🗺️','🏰','🐉','🎮','🌙','🔥','💎','🎨','📚','💡','🎯'];
 
-function Home({ lang, setLang, theme, setTheme, onOpenProject, projects, onCreate, onDelete, onRename, onRestore, onPurge, onToggleStar, onExport, onImport, vaultPath, onOpenVault, onCloseVault, updateAvailable, onUpdateClick, onSettingsClick }) {
+function Home({ lang, setLang, theme, setTheme, onOpenProject, projects, onCreate, onDelete, onRename, onRestore, onPurge, onToggleStar, onExport, onImport, vaultPath, onOpenVault, onCloseVault, updateAvailable, onUpdateClick, onSettingsClick, userProfile, onUserClick, onJoinProjectClick, onTogglePublic }) {
   const t = window.TRANSLATIONS[lang];
   const [query, setQuery] = useStateHome('');
   const [modal, setModal] = useStateHome(false);
@@ -66,6 +66,27 @@ function Home({ lang, setLang, theme, setTheme, onOpenProject, projects, onCreat
         <button className="ms-new-btn" onClick={()=>setModal(true)}>
           <span className="material-symbols-rounded">add</span>
           <span>{t.new_project}</span>
+        </button>
+
+        <button className="ms-join-btn" onClick={onJoinProjectClick} style={{
+          marginTop: '6px',
+          width: '100%',
+          height: '36px',
+          background: 'none',
+          border: '1.5px dashed var(--olive, #6A8546)',
+          borderRadius: '8px',
+          color: 'var(--olive, #6A8546)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '6px',
+          fontSize: '12px',
+          fontWeight: '700',
+          cursor: 'pointer',
+          transition: 'all 120ms'
+        }}>
+          <span className="material-symbols-rounded" style={{ fontSize: 18 }}>group_add</span>
+          <span>{window.t('Unirse a Puesto', 'Join Workspace')}</span>
         </button>
 
         <nav className="ms-nav">
@@ -211,6 +232,26 @@ function Home({ lang, setLang, theme, setTheme, onOpenProject, projects, onCreat
               </button>
             )}
             <button
+              className={`icon-btn lift user-profile-btn ${userProfile ? 'has-name' : 'no-name'}`}
+              title={userProfile ? `${window.t('Perfil de', 'Profile of')} ${userProfile.name}` : window.t('Iniciar sesión con Google (Requerido para colaborar)', 'Sign in with Google (Required to collaborate)')}
+              onClick={() => { onUserClick && onUserClick(); window.playAudioTone && window.playAudioTone('click'); }}
+              style={{ marginRight: '6px', position: 'relative' }}
+            >
+              <span className="material-symbols-rounded" style={{ color: userProfile ? 'var(--brand-green, #90B968)' : 'inherit' }}>person</span>
+              {!userProfile && (
+                <span style={{
+                  position: 'absolute',
+                  top: '4px',
+                  right: '4px',
+                  width: '6px',
+                  height: '6px',
+                  borderRadius: '50%',
+                  background: 'var(--wine, #E6544F)',
+                  border: '1.5px solid var(--paper)'
+                }}/>
+              )}
+            </button>
+            <button
               className="icon-btn lift settings-btn"
               title={window.t('Ajustes', 'Settings')}
               onClick={onSettingsClick}
@@ -331,6 +372,7 @@ function Home({ lang, setLang, theme, setTheme, onOpenProject, projects, onCreat
                     onDelete={()=>onDelete(p.id)}
                     onRenameClick={setEditProject}
                     onToggleStar={()=>onToggleStar(p.id)}
+                    onTogglePublic={()=>onTogglePublic(p.id)}
                   />
                 ))}
               </div>
@@ -357,7 +399,7 @@ function Home({ lang, setLang, theme, setTheme, onOpenProject, projects, onCreat
           </div>
           <div className={`ms-grid ${viewMode==='list'?'ms-grid-list':''}`}>
             {section === 'all' && <NewProjectCard label={t.new_project} onClick={()=>setModal(true)} lang={lang}/>}
-            {filtered.map(p => (
+             {filtered.map(p => (
               <ProjectCard key={p.id} project={p} lang={lang} t={t}
                 isTrash={section==='trash'}
                 onOpen={()=>onOpenProject(p.id)}
@@ -366,6 +408,7 @@ function Home({ lang, setLang, theme, setTheme, onOpenProject, projects, onCreat
                 onRestore={()=>onRestore(p.id)}
                 onPurge={()=>onPurge(p.id)}
                 onToggleStar={()=>onToggleStar(p.id)}
+                onTogglePublic={()=>onTogglePublic(p.id)}
               />
             ))}
             {section==='trash' && filtered.length === 0 && (
@@ -388,6 +431,8 @@ function Home({ lang, setLang, theme, setTheme, onOpenProject, projects, onCreat
           lang={lang}
           onClose={()=>setEditProject(null)}
           onSave={onRename}
+          onTogglePublic={onTogglePublic}
+          userProfile={userProfile}
         />
       )}
     </div>
@@ -401,11 +446,20 @@ function RecentCard({ project, lang, t, onOpen, onDelete, onRenameClick, onToggl
   };
 
   return (
-    <div className="ms-recent-card" onClick={onOpen} onContextMenu={handleContextMenu}>
+    <div
+      className="ms-recent-card"
+      onClick={onOpen}
+      onContextMenu={handleContextMenu}
+      style={{ position: 'relative' }}
+    >
       <div className="ms-recent-cover" style={{background: project.cover}}>
         <div className="ms-recent-emoji">{project.emoji}</div>
         <div className="ms-card-actions" onClick={(e)=>e.stopPropagation()}>
-          <button className={`ms-card-btn ${project.starred?'on':''}`} title={window.t('Favorito', 'Star')}
+          <button className="ms-card-btn" title={window.t('Editar proyecto', 'Edit project')}
+            onClick={(e)=>{ e.stopPropagation(); onRenameClick && onRenameClick(project); }}>
+            <span className="material-symbols-rounded">edit</span>
+          </button>
+          <button className={`ms-card-btn star-btn ${project.starred?'on':''}`} title={window.t('Favorito', 'Star')}
             onClick={(e)=>{ e.stopPropagation(); onToggleStar && onToggleStar(); }}>
             <span className="material-symbols-rounded">{project.starred?'star':'star_border'}</span>
           </button>
@@ -457,7 +511,11 @@ function ProjectCard({ project, lang, t, onOpen, onDelete, onRenameClick, onRest
             </>
           ) : (
             <>
-              <button className={`ms-card-btn ${project.starred?'on':''}`} title={window.t('Favorito', 'Star')}
+              <button className="ms-card-btn" title={window.t('Editar proyecto', 'Edit project')}
+                onClick={(e)=>{ e.stopPropagation(); onRenameClick && onRenameClick(project); }}>
+                <span className="material-symbols-rounded">edit</span>
+              </button>
+              <button className={`ms-card-btn star-btn ${project.starred?'on':''}`} title={window.t('Favorito', 'Star')}
                 onClick={(e)=>{ e.stopPropagation(); onToggleStar && onToggleStar(); }}>
                 <span className="material-symbols-rounded">{project.starred?'star':'star_border'}</span>
               </button>
@@ -573,10 +631,11 @@ function NewProjectModal({ lang, onClose, onCreate }) {
   );
 }
 
-function RenameProjectModal({ project, lang, onClose, onSave }) {
-  const [name, setName]   = useStateHome(project.name?.[lang] || project.name || '');
-  const [emoji, setEmoji] = useStateHome(project.emoji || EMOJI_PRESETS[0]);
-  const [cover, setCover] = useStateHome(project.cover || COVER_PRESETS[0]);
+function RenameProjectModal({ project, lang, onClose, onSave, onTogglePublic, userProfile }) {
+  const [name, setName]     = useStateHome(project.name?.[lang] || project.name || '');
+  const [emoji, setEmoji]   = useStateHome(project.emoji || EMOJI_PRESETS[0]);
+  const [cover, setCover]   = useStateHome(project.cover || COVER_PRESETS[0]);
+  const [isPublic, setIsPublic] = useStateHome(!!project.isPublic);
 
   const submit = () => {
     const trimmed = name.trim();
@@ -587,9 +646,9 @@ function RenameProjectModal({ project, lang, onClose, onSave }) {
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal" onClick={(e)=>e.stopPropagation()}>
+      <div className="modal" onClick={(e)=>e.stopPropagation()} style={{ maxWidth: '440px' }}>
         <h2>{window.t('Editar proyecto', 'Edit project')}</h2>
-        <p>{window.t('Cambia el nombre, ícono y portada de tu proyecto.', 'Change the name, icon, and cover of your project.')}</p>
+        <p>{window.t('Cambia el nombre, ícono, portada y disponibilidad en la nube de tu proyecto.', 'Change the name, icon, cover, and cloud availability of your project.')}</p>
 
         <div className="field">
           <label>{window.t('Nombre', 'Name')}</label>
@@ -625,7 +684,69 @@ function RenameProjectModal({ project, lang, onClose, onSave }) {
           </div>
         </div>
 
-        <div className="modal-actions">
+        {/* Cloud availability setting */}
+        <div className="field" style={{ marginTop: '20px', borderTop: '1px solid var(--line-soft, #E5E1DD)', paddingTop: '16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', textAlign: 'left', flex: 1, paddingRight: '12px' }}>
+              <span style={{ fontSize: '13px', fontWeight: '700', color: 'var(--ink, #1A1A1A)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span className="material-symbols-rounded" style={{ fontSize: '18px', color: isPublic ? 'var(--brand-green, #90B968)' : 'var(--text-soft, #595459)' }}>
+                  {isPublic ? 'cloud' : 'cloud_off'}
+                </span>
+                {window.t('Disponibilidad del Proyecto', 'Project Availability')}
+              </span>
+              <span style={{ fontSize: '11px', color: 'var(--text-soft, #595459)', lineHeight: '1.4' }}>
+                {isPublic 
+                  ? window.t('Sincronizado en la nube (Online). Tus colaboradores pueden acceder.', 'Synced in the cloud (Online). Your collaborators can access.')
+                  : window.t('Guardado solo localmente (Offline). Privado y seguro.', 'Saved locally only (Offline). Private and secure.')
+                }
+              </span>
+            </div>
+            
+            <button
+              className="btn"
+              onClick={() => {
+                if (isPublic) {
+                  setIsPublic(false);
+                  onTogglePublic && onTogglePublic(project.id);
+                } else {
+                  if (!userProfile) {
+                    window.customAlert(window.t(
+                      'Debes iniciar sesión con Google primero desde tu perfil (esquina superior derecha) antes de poner un proyecto Online.',
+                      'You must sign in with Google first from your profile (top right corner) before putting a project Online.'
+                    ));
+                    return;
+                  }
+                  
+                  const msg = window.t(
+                    '¿Quieres poner este proyecto online? Se subirá a la nube y se vinculará con tu cuenta de Google Drive para imágenes y archivos pesados, consumiendo espacio de tu cuenta de Google.',
+                    'Do you want to put this project online? It will be uploaded to the cloud and linked with your Google Drive account for images and large files, consuming space from your Google account.'
+                  );
+                  window.customConfirm(msg).then((accepted) => {
+                    if (accepted) {
+                      setIsPublic(true);
+                      onTogglePublic && onTogglePublic(project.id);
+                    }
+                  });
+                }
+              }}
+              style={{
+                padding: '6px 12px',
+                fontSize: '11.5px',
+                fontWeight: '700',
+                borderRadius: '6px',
+                border: '1.5px solid var(--line)',
+                background: isPublic ? 'rgba(144, 185, 104, 0.15)' : 'transparent',
+                color: isPublic ? 'var(--brand-green, #6A8546)' : 'var(--ink, #1A1A1A)',
+                cursor: 'pointer',
+                flexShrink: 0
+              }}
+            >
+              {isPublic ? window.t('Poner Offline', 'Put Offline') : window.t('Poner Online', 'Put Online')}
+            </button>
+          </div>
+        </div>
+
+        <div className="modal-actions" style={{ marginTop: '20px' }}>
           <button className="btn btn-ghost" onClick={onClose}>{window.t('Cancelar', 'Cancel')}</button>
           <button
             className="btn btn-primary"
