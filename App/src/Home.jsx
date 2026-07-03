@@ -455,6 +455,17 @@ function RecentCard({ project, lang, t, onOpen, onDelete, onRenameClick, onToggl
       <div className="ms-recent-cover" style={{background: project.cover}}>
         <div className="ms-recent-emoji">{project.emoji}</div>
         <div className="ms-card-actions" onClick={(e)=>e.stopPropagation()}>
+          {(project.isPublic || project.isRemote) && (
+            <button className="ms-card-btn" title={window.t('Copiar token de invitación', 'Copy invitation token')}
+              onClick={(e)=>{
+                e.stopPropagation();
+                navigator.clipboard.writeText(project.shareToken || project.id);
+                window.playAudioTone && window.playAudioTone('click');
+                alert(window.t('¡Token de invitación copiado al portapapeles!', 'Invitation token copied to clipboard!'));
+              }}>
+              <span className="material-symbols-rounded" style={{ color: 'var(--olive, #6A8546)' }}>share</span>
+            </button>
+          )}
           <button className="ms-card-btn" title={window.t('Editar proyecto', 'Edit project')}
             onClick={(e)=>{ e.stopPropagation(); onRenameClick && onRenameClick(project); }}>
             <span className="material-symbols-rounded">edit</span>
@@ -475,7 +486,16 @@ function RecentCard({ project, lang, t, onOpen, onDelete, onRenameClick, onToggl
             {project.name?.[lang] || project.name}
           </div>
           {(project.isPublic || project.isRemote) ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: 'var(--olive, #6A8546)', flexShrink: 0 }} title={window.t('Proyecto Online', 'Online Project')}>
+            <div
+              style={{ display: 'flex', alignItems: 'center', gap: '4px', color: 'var(--olive, #6A8546)', flexShrink: 0, cursor: 'pointer' }}
+              title={window.t('Proyecto Online - Clic para copiar token', 'Online Project - Click to copy token')}
+              onClick={(e) => {
+                e.stopPropagation();
+                navigator.clipboard.writeText(project.shareToken || project.id);
+                window.playAudioTone && window.playAudioTone('click');
+                alert(window.t('¡Token de invitación copiado al portapapeles!', 'Invitation token copied to clipboard!'));
+              }}
+            >
               <span className="material-symbols-rounded" style={{ fontSize: '18px', fontVariationSettings: '"FILL" 1' }}>cloud</span>
               <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--olive, #6A8546)', display: 'inline-block', boxShadow: '0 0 6px var(--olive, #6A8546)' }} />
             </div>
@@ -525,6 +545,17 @@ function ProjectCard({ project, lang, t, onOpen, onDelete, onRenameClick, onRest
             </>
           ) : (
             <>
+              {(project.isPublic || project.isRemote) && (
+                <button className="ms-card-btn" title={window.t('Copiar token de invitación', 'Copy invitation token')}
+                  onClick={(e)=>{
+                    e.stopPropagation();
+                    navigator.clipboard.writeText(project.shareToken || project.id);
+                    window.playAudioTone && window.playAudioTone('click');
+                    alert(window.t('¡Token de invitación copiado al portapapeles!', 'Invitation token copied to clipboard!'));
+                  }}>
+                  <span className="material-symbols-rounded" style={{ color: 'var(--olive, #6A8546)' }}>share</span>
+                </button>
+              )}
               <button className="ms-card-btn" title={window.t('Editar proyecto', 'Edit project')}
                 onClick={(e)=>{ e.stopPropagation(); onRenameClick && onRenameClick(project); }}>
                 <span className="material-symbols-rounded">edit</span>
@@ -547,7 +578,16 @@ function ProjectCard({ project, lang, t, onOpen, onDelete, onRenameClick, onRest
             {project.name?.[lang] || project.name}
           </div>
           {(project.isPublic || project.isRemote) ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: 'var(--olive, #6A8546)', flexShrink: 0 }} title={window.t('Proyecto Online', 'Online Project')}>
+            <div
+              style={{ display: 'flex', alignItems: 'center', gap: '4px', color: 'var(--olive, #6A8546)', flexShrink: 0, cursor: 'pointer' }}
+              title={window.t('Proyecto Online - Clic para copiar token', 'Online Project - Click to copy token')}
+              onClick={(e) => {
+                e.stopPropagation();
+                navigator.clipboard.writeText(project.shareToken || project.id);
+                window.playAudioTone && window.playAudioTone('click');
+                alert(window.t('¡Token de invitación copiado al portapapeles!', 'Invitation token copied to clipboard!'));
+              }}
+            >
               <span className="material-symbols-rounded" style={{ fontSize: '18px', fontVariationSettings: '"FILL" 1' }}>cloud</span>
               <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--olive, #6A8546)', display: 'inline-block', boxShadow: '0 0 6px var(--olive, #6A8546)' }} />
             </div>
