@@ -198,6 +198,7 @@ function App() {
   const [customDialog, setCustomDialog] = useStateApp(null);
   
   const [toast, setToast] = useStateApp(null);
+  const [isSyncingDrive, setIsSyncingDrive] = useStateApp(false);
   const lastGoogleDriveSyncTimeRef = React.useRef(0);
 
   const showToast = (message, type = 'success') => {
@@ -687,6 +688,7 @@ function App() {
 
   const uploadToGoogleDriveReal = async (projectId, projectName, canvasesData, accessToken) => {
     if (!accessToken) return;
+    setIsSyncingDrive(true);
     try {
       const headers = {
         'Authorization': `Bearer ${accessToken}`,
@@ -696,6 +698,10 @@ function App() {
       // 1. Obtener o crear la carpeta "Odinote"
       const searchRootUrl = `https://www.googleapis.com/drive/v3/files?q=name='Odinote' and mimeType='application/vnd.google-apps.folder' and trashed=false&fields=files(id)`;
       const searchRootRes = await fetch(searchRootUrl, { headers });
+      if (searchRootRes.status === 401) {
+        showToast(window.t('Tu sesión de Google Drive ha expirado. Vuelve a iniciar sesión para sincronizar.', 'Your Google Drive session expired. Please sign in again to sync.'), 'error');
+        return;
+      }
       if (!searchRootRes.ok) return;
       const searchRootData = await searchRootRes.json();
       let rootFolderId = '';
@@ -806,10 +812,13 @@ function App() {
       }
     } catch (err) {
       console.error('Error synchronizing project file to Google Drive:', err);
+    } finally {
+      setTimeout(() => setIsSyncingDrive(false), 800);
     }
   };
 
   const uploadMediaToGoogleDriveReal = async (projectId, item, accessToken) => {
+    setIsSyncingDrive(true);
     try {
       const folderId = localStorage.getItem(`odinote.gdrive_folder_${projectId}`);
       if (!folderId) return null;
@@ -876,6 +885,8 @@ function App() {
     } catch (err) {
       console.error('Error uploading media to Google Drive:', err);
       return null;
+    } finally {
+      setTimeout(() => setIsSyncingDrive(false), 800);
     }
   };
 
@@ -1010,9 +1021,18 @@ function App() {
       }
 
       // 3. Sincronización real con Google Drive si está habilitado
-      if (userProfile && userProfile.accessToken && view.projectId) {
+      if (userProfile && view.projectId) {
         const activeProj = projects.find(p => p.id === view.projectId);
-        if (activeProj && activeProj.useGoogleDrive) {
+        if (activeProj && (activeProj.isPublic || activeProj.isRemote || activeProj.useGoogleDrive)) {
+          if (!userProfile.accessToken) {
+            const lastAlert = window.lastDriveScopeAlertTime || 0;
+            const now = Date.now();
+            if (now - lastAlert > 45000) {
+              window.lastDriveScopeAlertTime = now;
+              showToast(window.t('Google Drive no autorizado. Cierra e inicia sesión de nuevo para activarlo.', 'Google Drive unauthorized. Sign out and sign in again to authorize it.'), 'error');
+            }
+            return;
+          }
           const now = Date.now();
           
           // 3.1 Escaneo y subida de imagenes Base64 locales a Google Drive
@@ -1439,6 +1459,7 @@ function App() {
     activeView = <window.Canvas
       key={view.projectId}
       projectId={view.projectId}
+      isSyncingDrive={isSyncingDrive}
       lang={lang} setLang={setLang}
       theme={theme} setTheme={setTheme}
       onHome={goHome}
