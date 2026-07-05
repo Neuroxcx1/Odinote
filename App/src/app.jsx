@@ -38,6 +38,10 @@ try {
   }
 } catch {}
 
+// Marcador de build: si la consola no muestra esta versión, el navegador está
+// sirviendo JS cacheado (subir ?v= en index.html invalida la caché)
+console.log('[ODINOTE] Código cargado: v10');
+
 // Global shortcuts configuration
 window.shortcuts = {
   undo: { key: 'z', ctrl: true, shift: false, alt: false, label: 'Ctrl + Z' },
@@ -1132,11 +1136,18 @@ function App() {
           localStorage.setItem(`odinote.gdrive_folder_${pid}`, folder.id);
 
           // Nada nuevo en Drive desde la última sincronización: no tocar lo local
-          if (remoteTs && remoteTs <= lastSynced) continue;
+          if (remoteTs && remoteTs <= lastSynced) {
+            console.log(`[DRIVE] Import ${pid}: sin cambios remotos (remoto ${remoteTs} <= visto ${lastSynced})`);
+            continue;
+          }
           // Hay ediciones locales posteriores a lo que trae Drive: lo local manda
           // (se subirá en el próximo guardado o con el botón de sincronizar)
-          if (localEdited > lastSynced && localEdited >= remoteTs) continue;
+          if (localEdited > lastSynced && localEdited >= remoteTs) {
+            console.log(`[DRIVE] Import ${pid}: lo local es más nuevo (local ${localEdited} >= remoto ${remoteTs}), no se pisa`);
+            continue;
+          }
 
+          console.log(`[DRIVE] Import ${pid}: aplicando versión remota (remoto ${remoteTs} > visto ${lastSynced})`);
           hasImportedAny = true;
           setDriveSyncedAtLS(pid, remoteTs || Date.now());
 
@@ -1209,12 +1220,17 @@ function App() {
         if (!wasImport && view.projectId) markLocalEditedAt(view.projectId);
       }
 
-      // 1. Guardado Local (IndexedDB / Vault)
-      if (vaultPath && window.electronAPI) {
-        const cleanCanvases = await saveBase64MediaLocally(canvases, vaultPath);
-        window.electronAPI.writeVault(vaultPath, { view, lang, theme, projects, canvases: cleanCanvases, templatesVersion: 2 });
-      } else {
-        saveStateToDB({ view, lang, theme, projects, canvases, templatesVersion: 2 });
+      // 1. Guardado Local (IndexedDB / Vault) — aislado para que un fallo aquí
+      // no impida que la sincronización con Drive (sección 3) se ejecute
+      try {
+        if (vaultPath && window.electronAPI) {
+          const cleanCanvases = await saveBase64MediaLocally(canvases, vaultPath);
+          window.electronAPI.writeVault(vaultPath, { view, lang, theme, projects, canvases: cleanCanvases, templatesVersion: 2 });
+        } else {
+          saveStateToDB({ view, lang, theme, projects, canvases, templatesVersion: 2 });
+        }
+      } catch (err) {
+        console.error('[SAVE] Local save failed:', err);
       }
 
       // 2. Sincronización en la nube (Firestore) para proyectos públicos
@@ -1297,6 +1313,7 @@ function App() {
           window._odiMediaScanBusy = true;
           try {
           const projCanvases = collectProjectCanvases(canvases, view.projectId);
+          console.log(`[DRIVE] Escaneo de medios: ${Object.keys(projCanvases).length} páginas del proyecto ${view.projectId}`);
           const replaced = {}; // { canvasId: { itemId | `${colId}::${childId}`: nuevaUrl } }
           for (const cid of Object.keys(projCanvases)) {
             const canv = projCanvases[cid];
@@ -1306,8 +1323,10 @@ function App() {
                 (replaced[cid] = replaced[cid] || {})[item.id] = legacyUrl;
               } else if (isLocalSrc(item.src)) {
                 const dataUrl = await toDataUrl(item.src);
+                console.log(`[DRIVE] Medio local ${item.type} ${item.id} (${(item.src || '').slice(0, 40)}...) -> dataUrl: ${dataUrl ? 'OK' : 'FALLO al leer'}`);
                 if (dataUrl) {
                   const driveUrl = await uploadMediaToGoogleDriveReal(view.projectId, item, dataUrl, userProfile.accessToken);
+                  console.log(`[DRIVE] Subida de ${item.id}: ${driveUrl ? driveUrl : 'FALLO'}`);
                   if (driveUrl) (replaced[cid] = replaced[cid] || {})[item.id] = driveUrl;
                 }
               }
@@ -1364,7 +1383,9 @@ function App() {
           if (getLocalEditedAt(view.projectId) > getDriveSyncedAt(view.projectId) &&
               now - lastGoogleDriveSyncTimeRef.current > 10000) {
             lastGoogleDriveSyncTimeRef.current = now;
-            uploadToGoogleDriveReal(activeProj, canvases, userProfile.accessToken);
+            console.log(`[DRIVE] Subiendo canvas_state.json de ${view.projectId} (ediciones locales pendientes)`);
+            uploadToGoogleDriveReal(activeProj, canvases, userProfile.accessToken)
+              .then(ok => console.log(`[DRIVE] canvas_state.json de ${view.projectId}: ${ok ? 'subido' : 'FALLO'}`));
           }
         }
       }

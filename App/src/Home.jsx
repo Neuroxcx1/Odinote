@@ -849,7 +849,7 @@ function RenameProjectModal({ project, lang, onClose, onSave, onTogglePublic, us
                     borderRadius: '6px',
                     cursor: 'pointer',
                     background: copied ? '#6A8546' : '#FFFFFF',
-                    color: copied ? '#FFFFFF' : 'var(--ink, #1A1A1A)',
+                    color: copied ? '#FFFFFF' : '#1A1A1A',
                     transition: 'all 0.2s ease'
                   }}
                 >
