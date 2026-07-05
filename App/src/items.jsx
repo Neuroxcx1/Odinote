@@ -27,6 +27,20 @@ function resolveMediaSrc(src) {
 }
 window.resolveMediaSrc = resolveMediaSrc;
 
+// Si una imagen alojada en Drive (lh3.googleusercontent.com) no carga —p. ej. el
+// permiso público tardó en propagarse— se reintenta una única vez con el endpoint
+// oficial de miniaturas de Drive, que sirve el mismo archivo.
+function driveImageFallback(e) {
+  const img = e.currentTarget || e.target;
+  if (!img || img.dataset.odiFallback) return;
+  const m = (img.src || '').match(/^https:\/\/lh3\.googleusercontent\.com\/d\/([\w-]+)/);
+  if (m) {
+    img.dataset.odiFallback = '1';
+    img.src = `https://drive.google.com/thumbnail?id=${m[1]}&sz=w2000`;
+  }
+}
+window.driveImageFallback = driveImageFallback;
+
 // Safety net: if a single node throws during render, show a small fallback for THAT node
 // instead of blanking the whole app.
 class NodeErrorBoundary extends React.Component {
@@ -670,9 +684,10 @@ function ImageItem({ item, lang, onUpdate, callbacks }) {
             style={{ width: frameW, height: frameH, overflow: 'hidden', position: 'absolute', left: frameLeft, top: frameTop }}
             onDoubleClick={(e)=>{ e.stopPropagation(); if (!isCropping) fileRef.current?.click(); }}
           >
-            <img 
-              src={window.resolveMediaSrc(item.src)} 
+            <img
+              src={window.resolveMediaSrc(item.src)}
               draggable={false}
+              onError={driveImageFallback}
               onLoad={(e) => {
                 const img = e.currentTarget;
                 if (img.naturalWidth && img.naturalHeight) {
@@ -1649,11 +1664,14 @@ function BoardItem({ item, lang, onUpdate, onOpenBoard, editing, getNestedItems,
 
   const cardRef = React.useRef(null);
   const lastCalculatedH = React.useRef(item.h);
-  const desiredPreviewH = React.useRef(item.h - 60);
+  // null hasta el primer efecto: se calibra con las medidas REALES del pie.
+  // (Antes se estimaba con un -60 fijo que no coincidía con el pie medido —
+  // sobre todo con títulos de dos líneas — y el nodo crecía ~12px en cada arranque.)
+  const desiredPreviewH = React.useRef(null);
   const [iconPickerOpen, setIconPickerOpen] = React.useState(false);
 
   // If item.h changes from the outside (e.g. user drag resize), update our desired preview height
-  if (item.h !== lastCalculatedH.current) {
+  if (desiredPreviewH.current !== null && item.h !== lastCalculatedH.current) {
     const footEl = cardRef.current?.querySelector('.board-foot');
     const captionEl = cardRef.current?.querySelector('.node-caption-row');
     const footH = footEl ? footEl.offsetHeight : 52;
@@ -1705,6 +1723,14 @@ function BoardItem({ item, lang, onUpdate, onOpenBoard, editing, getNestedItems,
 
     // Restore the original styles
     restores.forEach(restore => restore?.());
+
+    // Primer render: derivar el alto del preview de item.h con las medidas reales.
+    // item.h guardado ya es correcto — no hay nada que actualizar.
+    if (desiredPreviewH.current === null) {
+      desiredPreviewH.current = Math.max(50, item.h - colorBarH - footH - captionH - borderH);
+      lastCalculatedH.current = item.h;
+      return;
+    }
 
     const totalHeight = Math.round(desiredPreviewH.current + colorBarH + footH + captionH + borderH);
 
@@ -3539,7 +3565,7 @@ function FileItem({ item, lang, onUpdate, onOpenFile }) {
               onDoubleClick={(e)=>{ e.stopPropagation(); onOpenFile && onOpenFile(item.id); }}
               title={window.t('Doble clic para ver completo', 'Double-click to view full')}
             >
-              {kind === 'image' && <img src={window.resolveMediaSrc(item.src)} alt={item.name}/>}
+              {kind === 'image' && <img src={window.resolveMediaSrc(item.src)} alt={item.name} onError={driveImageFallback}/>}
               {kind === 'pdf' && <iframe title={item.name} src={window.resolveMediaSrc(item.src)}/>}
               {kind === 'text' && (
                 <div className="file-page-scale" style={{ width: REF, transform: `scale(${scale})`, transformOrigin: 'top left' }}>
@@ -3632,7 +3658,7 @@ function FileViewerModal({ fileItem, lang, onClose }) {
           </button>
         </div>
         <div className={`file-viewer-body kind-${kind}`}>
-          {kind === 'image' && <img src={window.resolveMediaSrc(fileItem.src)} alt={fileItem.name}/>}
+          {kind === 'image' && <img src={window.resolveMediaSrc(fileItem.src)} alt={fileItem.name} onError={driveImageFallback}/>}
           {kind === 'pdf' && <iframe title={fileItem.name} src={window.resolveMediaSrc(fileItem.src)}/>}
           {kind === 'text' && <FilePreviewText src={window.resolveMediaSrc(fileItem.src)}/>}
           {(kind === 'docx' || kind === 'excel') && (

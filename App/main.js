@@ -218,12 +218,24 @@ function createWindow() {
     });
   });
 
-  serverInstance.listen(0, '127.0.0.1', () => {
-    const address = serverInstance.address();
-    const port = address.port;
+  // Puerto FIJO: localStorage/IndexedDB viven por origen (127.0.0.1:puerto).
+  // Con el puerto aleatorio anterior, cada arranque estrenaba un origen vacío:
+  // se perdía la sesión de Google, los ids de Drive y el estado local.
+  const FIXED_PORT = 38471;
+  serverInstance.on('listening', () => {
+    const port = serverInstance.address().port;
     logToFile(`Static server running at: http://127.0.0.1:${port}`);
     mainWindow.loadURL(`http://127.0.0.1:${port}/index.html`);
   });
+  serverInstance.on('error', (err) => {
+    if (err.code === 'EADDRINUSE') {
+      logToFile(`Port ${FIXED_PORT} busy (another Odinote running?), falling back to a random port — session/local data won't persist this run`);
+      serverInstance.listen(0, '127.0.0.1');
+    } else {
+      logToFile(`Static server error: ${err.message}`);
+    }
+  });
+  serverInstance.listen(FIXED_PORT, '127.0.0.1');
 
   mainWindow.on('closed', () => {
     mainWindow = null;
