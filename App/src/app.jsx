@@ -262,16 +262,54 @@ function App() {
     }
   }, []);
 
-  // Comprueba que el token de Drive siga vivo (expira ~1 hora después del login)
+  // Comprueba que el token de Drive siga vivo (expira ~1 hora después del login).
+  // Devuelve { ok, status, reason } para distinguir token caducado (401) de
+  // API de Drive deshabilitada en Google Cloud (403) — causas y remedios distintos.
   const validateDriveToken = async (accessToken) => {
     try {
       const res = await fetch('https://www.googleapis.com/drive/v3/about?fields=user', {
         headers: { 'Authorization': `Bearer ${accessToken}` }
       });
-      return res.ok;
+      if (res.ok) return { ok: true };
+      let reason = '';
+      try {
+        const data = await res.json();
+        reason = (data.error && data.error.message) || '';
+      } catch (e) {}
+      return { ok: false, status: res.status, reason };
     } catch (err) {
-      return false;
+      return { ok: false, status: 0, reason: 'network' };
     }
+  };
+
+  // Aviso (máx. 1 vez por minuto) de que Drive está bloqueado por configuración,
+  // no por el token: reiniciar sesión aquí NO arregla nada, así que no la tocamos
+  const notifyDriveBlocked = (check) => {
+    const now = Date.now();
+    if (now - (window._odiLastDriveBlockToast || 0) < 60000) return;
+    window._odiLastDriveBlockToast = now;
+    const reason = (check && check.reason) || '';
+    const apiDisabled = reason.includes('disabled') || reason.includes('has not been used');
+    if (apiDisabled) {
+      showToast(window.t(
+        'La API de Google Drive está desactivada en tu proyecto de Google Cloud (odinote-firebase). Actívala en la consola de Google Cloud y vuelve a intentarlo.',
+        'The Google Drive API is disabled in your Google Cloud project (odinote-firebase). Enable it in the Google Cloud console and try again.'
+      ), 'error');
+    } else if (check && check.status === 0) {
+      showToast(window.t('Sin conexión con Google Drive. Se trabajará offline.', 'No connection to Google Drive. Working offline.'), 'error');
+    } else {
+      showToast(window.t(
+        `Google Drive rechazó la conexión (error ${check ? check.status : '?'}). Revisa la configuración de tu proyecto de Google Cloud.`,
+        `Google Drive refused the connection (error ${check ? check.status : '?'}). Check your Google Cloud project configuration.`
+      ), 'error');
+    }
+  };
+
+  // Nada puede estar "online" si Drive no funciona o no hay sesión
+  const forceAllProjectsOffline = () => {
+    setProjects(prev => prev.some(p => p.isPublic || p.isRemote)
+      ? prev.map(p => (p.isPublic || p.isRemote) ? { ...p, isPublic: false, isRemote: false } : p)
+      : prev);
   };
 
   // El token murió: lo limpiamos del perfil para que la UI pida volver a iniciar sesión
@@ -285,15 +323,27 @@ function App() {
     showToast(window.t('Tu sesión de Google Drive expiró. Vuelve a iniciar sesión para seguir sincronizando.', 'Your Google Drive session expired. Sign in again to keep syncing.'), 'error');
   };
 
-  // Al arrancar o tras iniciar sesión: validar token e importar los proyectos guardados en Drive
+  // Al arrancar o tras iniciar sesión: validar token e importar los proyectos guardados en Drive.
+  // Si Drive no funciona (token muerto, API deshabilitada o sin red), los puestos de trabajo
+  // pasan a offline: mostrar "online" sin sincronización real sería mentir.
   useEffectApp(() => {
     if (!userProfile || !userProfile.accessToken) return;
     let cancelled = false;
     (async () => {
-      const ok = await validateDriveToken(userProfile.accessToken);
+      const check = await validateDriveToken(userProfile.accessToken);
       if (cancelled) return;
-      if (!ok) { invalidateDriveSession(); return; }
-      syncProjectsFromGoogleDrive(userProfile.accessToken);
+      if (check.ok) {
+        window._odiDriveBlocked = false;
+        syncProjectsFromGoogleDrive(userProfile.accessToken);
+        return;
+      }
+      if (check.status === 401) {
+        invalidateDriveSession();
+      } else {
+        window._odiDriveBlocked = true;
+        notifyDriveBlocked(check);
+      }
+      forceAllProjectsOffline();
     })();
     return () => { cancelled = true; };
   }, [userProfile && userProfile.accessToken]);
@@ -316,9 +366,7 @@ function App() {
   // pasan a offline y se quedan así hasta que el usuario los vuelva a publicar
   useEffectApp(() => {
     if (loading || userProfile) return;
-    setProjects(prev => prev.some(p => p.isPublic || p.isRemote)
-      ? prev.map(p => (p.isPublic || p.isRemote) ? { ...p, isPublic: false, isRemote: false } : p)
-      : prev);
+    forceAllProjectsOffline();
   }, [userProfile, loading]);
 
   const [sharingModalOpen, setSharingModalOpen] = useStateApp(false);
@@ -777,6 +825,15 @@ function App() {
       const driveGet = async (url) => {
         const res = await fetch(url, { headers });
         if (res.status === 401) { invalidateDriveSession(); return null; }
+        if (res.status === 403) {
+          let reason = '';
+          try {
+            const data = await res.clone().json();
+            reason = (data.error && data.error.message) || '';
+          } catch (e) {}
+          notifyDriveBlocked({ status: 403, reason });
+          return null;
+        }
         return res;
       };
 
@@ -1362,32 +1419,31 @@ function App() {
       return;
     }
     const target = projects.find(x => x.id === projectId);
-    const makingPublic = target && !target.isPublic;
-    const nextToken = makingPublic
-      ? `odi-tok-${Math.random().toString(36).substr(2, 9)}-${Math.random().toString(36).substr(2, 9)}`
-      : null;
-    setProjects(p => p.map(x => {
-      if (x.id === projectId) {
-        return { ...x, isPublic: !x.isPublic, shareToken: nextToken };
-      }
-      return x;
-    }));
-    // Al publicar, subimos el proyecto a Drive de inmediato (sin esperar al autosave)
-    // para que aparezca en la carpeta Odinote y en los otros dispositivos de la cuenta
-    if (makingPublic && target) {
-      if (!userProfile.accessToken) {
-        showToast(window.t('Publicado localmente, pero Google Drive no está autorizado. Cierra e inicia sesión de nuevo.', 'Published locally, but Google Drive is not authorized. Sign out and sign in again.'), 'error');
-        return;
-      }
-      uploadToGoogleDriveReal({ ...target, isPublic: true, shareToken: nextToken }, canvases, userProfile.accessToken)
-        .then(folderId => {
-          if (folderId) {
-            showToast(window.t(`"${projectNameString(target.name)}" subido a tu Google Drive (carpeta Odinote).`, `"${projectNameString(target.name)}" uploaded to your Google Drive (Odinote folder).`));
-          } else {
-            showToast(window.t('No se pudo subir el proyecto a Google Drive. Revisa tu sesión.', 'Could not upload the project to Google Drive. Check your session.'), 'error');
-          }
-        });
+    if (!target) return;
+
+    // Poner offline siempre está permitido
+    if (target.isPublic) {
+      setProjects(p => p.map(x => x.id === projectId ? { ...x, isPublic: false, shareToken: null } : x));
+      return;
     }
+
+    // Poner online: primero se sube a Drive y SOLO si la subida fue real se marca
+    // como online. Un puesto "online" sin datos en la nube sería falso.
+    if (!userProfile.accessToken) {
+      showToast(window.t('Google Drive no está autorizado, el proyecto se queda offline. Cierra e inicia sesión de nuevo.', 'Google Drive is not authorized, the project stays offline. Sign out and sign in again.'), 'error');
+      return;
+    }
+    const nextToken = `odi-tok-${Math.random().toString(36).substr(2, 9)}-${Math.random().toString(36).substr(2, 9)}`;
+    showToast(window.t('Subiendo el proyecto a Google Drive...', 'Uploading the project to Google Drive...'));
+    uploadToGoogleDriveReal({ ...target, isPublic: true, shareToken: nextToken }, canvases, userProfile.accessToken)
+      .then(folderId => {
+        if (folderId) {
+          setProjects(p => p.map(x => x.id === projectId ? { ...x, isPublic: true, shareToken: nextToken } : x));
+          showToast(window.t(`"${projectNameString(target.name)}" ya está online, guardado en tu Google Drive (carpeta Odinote).`, `"${projectNameString(target.name)}" is now online, saved to your Google Drive (Odinote folder).`));
+        } else {
+          showToast(window.t('No se pudo subir a Google Drive: el proyecto se queda offline.', 'Could not upload to Google Drive: the project stays offline.'), 'error');
+        }
+      });
   };
 
   // Invita a un colaborador compartiendo la carpeta del proyecto en Drive con su cuenta de Google.
@@ -2219,7 +2275,7 @@ function App() {
                           window.electronAPI.startGoogleLogin();
                         }
                       }}
-                      style={{ padding: '8px 12px', fontSize: '12px', fontWeight: '700', borderRadius: '6px', border: '1.5px solid var(--line)', background: '#FFFFFF', cursor: 'pointer' }}
+                      style={{ padding: '8px 12px', fontSize: '12px', fontWeight: '700', borderRadius: '6px', border: '1.5px solid var(--line)', background: '#FFFFFF', color: '#1A1A1A', cursor: 'pointer' }}
                     >
                       {window.t('Abrir página de nuevo', 'Re-open page')}
                     </button>
@@ -2337,7 +2393,7 @@ function App() {
                   </div>
                   <div>
                     <h4 style={{ margin: '0 0 6px 0', fontSize: '15px', fontWeight: '700' }}>
-                      {window.t('Este puesto de trabajo es Privado', 'This workspace is Private')}
+                      {window.t('Este puesto de trabajo está Offline', 'This workspace is Offline')}
                     </h4>
                     <p style={{ margin: 0, fontSize: '12.5px', color: 'var(--text-soft)', lineHeight: 1.4 }}>
                       {window.t('Actualmente solo está guardado en tu disco duro. Nadie más puede acceder a él.', 'Currently saved only on your hard drive. No one else can access it.')}
@@ -2362,7 +2418,7 @@ function App() {
                       boxShadow: 'var(--pop-sm)'
                     }}
                   >
-                    {window.t('Publicar en la nube y compartir', 'Publish to cloud and share')}
+                    {window.t('Poner Online y compartir', 'Put Online and share')}
                   </button>
                 </div>
               ) : (
@@ -2371,7 +2427,7 @@ function App() {
                     <span className="material-symbols-rounded" style={{ color: 'var(--brand-green, #90B968)' }}>public</span>
                     <div style={{ flex: 1 }}>
                       <div style={{ fontSize: '12px', fontWeight: '700', color: 'var(--brand-green, #90B968)' }}>
-                        {window.t('PUESTO DE TRABAJO PÚBLICO', 'PUBLIC WORKSPACE')}
+                        {window.t('PUESTO DE TRABAJO ONLINE', 'WORKSPACE ONLINE')}
                       </div>
                       <div style={{ fontSize: '11px', color: 'var(--text-soft)' }}>
                         {window.t('Cualquier persona con el token puede unirse.', 'Anyone with the token can join.')}
@@ -2380,7 +2436,7 @@ function App() {
                     <button
                       className="btn lift"
                       onClick={() => {
-                        window.customConfirm(window.t('¿Seguro que quieres hacer este espacio privado? Se eliminará el token de la nube y tus amigos perderán el acceso.', 'Are you sure you want to make this space private? The cloud token will be deleted and your friends will lose access.'))
+                        window.customConfirm(window.t('¿Seguro que quieres poner este espacio offline? Se eliminará el token de la nube y tus amigos perderán el acceso.', 'Are you sure you want to take this space offline? The cloud token will be deleted and your friends will lose access.'))
                           .then((accepted) => {
                             if (accepted) {
                               togglePublicProject(project.id);
@@ -2390,7 +2446,7 @@ function App() {
                       }}
                       style={{ padding: '6px 12px', fontSize: '11px', border: '1px solid var(--wine)', color: 'var(--wine)', borderRadius: '6px', background: 'transparent', cursor: 'pointer', fontWeight: '700' }}
                     >
-                      {window.t('Hacer Privado', 'Make Private')}
+                      {window.t('Poner Offline', 'Take Offline')}
                     </button>
                   </div>
 

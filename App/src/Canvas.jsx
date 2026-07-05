@@ -4171,7 +4171,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
           {currentProject && (
             <button
               className={`status-pill privacy-status-pill ${currentProject.isPublic ? 'public' : 'private'}`}
-              title={currentProject.isPublic ? window.t('Espacio de trabajo público (Haga clic para ver Token)', 'Public workspace (Click to view Token)') : window.t('Espacio de trabajo privado (Haga clic para hacerlo público)', 'Private workspace (Click to make public)')}
+              title={currentProject.isPublic ? window.t('Puesto de trabajo online, sincronizado con tu Google Drive (Haga clic para gestionar)', 'Workspace online, synced with your Google Drive (Click to manage)') : window.t('Puesto de trabajo offline, solo en este equipo (Haga clic para ponerlo online)', 'Workspace offline, only on this device (Click to put it online)')}
               onClick={() => { onSharingClick && onSharingClick(projectId); window.playAudioTone && window.playAudioTone('click'); }}
               style={{
                 cursor: 'pointer',
@@ -4181,9 +4181,9 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
               }}
             >
               <span className="material-symbols-rounded" style={{ fontSize: 14 }}>
-                {currentProject.isPublic ? 'share' : 'lock'}
+                {currentProject.isPublic ? 'cloud_done' : 'cloud_off'}
               </span>
-              {currentProject.isPublic ? window.t('Público', 'Public') : window.t('Privado', 'Private')}
+              {currentProject.isPublic ? window.t('Online', 'Online') : window.t('Offline', 'Offline')}
             </button>
           )}
           <div className="status-pill"><div className="dot-live"/> {window.t('Guardado', 'Saved')}</div>
