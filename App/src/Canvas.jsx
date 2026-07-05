@@ -759,6 +759,47 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
       }
       if (matchShortcut(window.shortcuts.undo)) { e.preventDefault(); undo(); }
       if (matchShortcut(window.shortcuts.redo)) { e.preventDefault(); redo(); }
+      // Cortar/Copiar nodos desde el teclado. Los eventos nativos 'cut'/'copy' solo se
+      // disparan cuando el foco está en un elemento editable (el interceptor oculto);
+      // si un nodo roba el foco (botones, celdas, etc.) nunca llegan, por lo que Ctrl+X
+      // solo funcionaba con algunos nodos. preventDefault() cancela el evento nativo de
+      // portapapeles, así que esta ruta nunca se ejecuta dos veces.
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey &&
+          (e.key === 'x' || e.key === 'X' || e.key === 'c' || e.key === 'C') && !docOpen) {
+        const isCutKey = e.key === 'x' || e.key === 'X';
+        const selectedItems = current.items.filter(it => selectedIds.includes(it.id) || (selectedIds.length === 0 && it.id === selected));
+        if (selectedItems.length > 0) {
+          e.preventDefault();
+          const selectedItemIds = selectedItems.map(it => it.id);
+          const selectedConnectors = (current.connectors || []).filter(co =>
+            selectedIds.includes(co.id) ||
+            (selectedItemIds.includes(co.fromEnd?.itemId) && selectedItemIds.includes(co.toEnd?.itemId))
+          );
+          const copiedData = {
+            odinote: true,
+            items: JSON.parse(JSON.stringify(selectedItems)),
+            connectors: JSON.parse(JSON.stringify(selectedConnectors)),
+          };
+          window._odiCopiedData = copiedData;
+          window._odiCopiedItem = copiedData.items[0];
+          const jsonStr = JSON.stringify(copiedData);
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(jsonStr).catch(() => {});
+          }
+          if (isCutKey) {
+            setCanvases(prev => {
+              const c = prev[currentId];
+              return { ...prev, [currentId]: {
+                ...c,
+                items: c.items.filter(it => !selectedItemIds.includes(it.id)),
+                connectors: (c.connectors || []).filter(co => !selectedItemIds.includes(co.id) && !selectedItemIds.includes(co.fromEnd?.itemId) && !selectedItemIds.includes(co.toEnd?.itemId)),
+              }};
+            });
+            setSelectedIds([]); setSelected(null);
+          }
+          return;
+        }
+      }
       if (matchShortcut(window.shortcuts.search) && !contextMenu) {
         e.preventDefault();
         document.querySelector('.mini-search input')?.focus();
@@ -3624,8 +3665,6 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
         onChangeVolume={onChangeVolume}
         userProfile={userProfile}
         onUserClick={onUserClick}
-        project={currentProject}
-        onSharingClick={onSharingClick}
       />
 
       {toolGhost && <ToolGhost {...toolGhost} lang={lang}/>}
@@ -4129,6 +4168,24 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
 
         {/* Status pills */}
         <div className="status-bar">
+          {currentProject && (
+            <button
+              className={`status-pill privacy-status-pill ${currentProject.isPublic ? 'public' : 'private'}`}
+              title={currentProject.isPublic ? window.t('Espacio de trabajo público (Haga clic para ver Token)', 'Public workspace (Click to view Token)') : window.t('Espacio de trabajo privado (Haga clic para hacerlo público)', 'Private workspace (Click to make public)')}
+              onClick={() => { onSharingClick && onSharingClick(projectId); window.playAudioTone && window.playAudioTone('click'); }}
+              style={{
+                cursor: 'pointer',
+                background: currentProject.isPublic ? 'rgba(144, 185, 104, 0.12)' : 'var(--paper)',
+                borderColor: currentProject.isPublic ? 'var(--brand-green, #90B968)' : 'var(--line)',
+                color: currentProject.isPublic ? 'var(--brand-green, #90B968)' : 'var(--text-soft, #595459)',
+              }}
+            >
+              <span className="material-symbols-rounded" style={{ fontSize: 14 }}>
+                {currentProject.isPublic ? 'share' : 'lock'}
+              </span>
+              {currentProject.isPublic ? window.t('Público', 'Public') : window.t('Privado', 'Private')}
+            </button>
+          )}
           <div className="status-pill"><div className="dot-live"/> {window.t('Guardado', 'Saved')}</div>
           <div className="status-pill">
             <span className="material-symbols-rounded" style={{fontSize:14}}>category</span>

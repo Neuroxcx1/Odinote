@@ -3154,8 +3154,9 @@ body.odi-busy iframe { pointer-events: none !important; }
    RESPONSIVE DESIGN SYSTEM — TOPBAR & TOOLS (1080p and smaller screens)
    ========================================================================== */
 
-/* En resoluciones de 1600px o menos, reducimos ligeramente los paddings y márgenes */
-@media (max-width: 1600px) {
+/* En resoluciones de 1920px o menos (pantallas 1080p), reducimos paddings, márgenes y el
+   tamaño de los botones para que la barra superior no se desborde ni se solapen elementos */
+@media (max-width: 1920px) {
   .topbar {
     gap: 8px;
     padding: 6px 10px;
@@ -3173,6 +3174,13 @@ body.odi-busy iframe { pointer-events: none !important; }
   .tool .material-symbols-rounded {
     font-size: 19px;
   }
+  .icon-btn {
+    width: 38px;
+    height: 38px;
+  }
+  .icon-btn .material-symbols-rounded {
+    font-size: 20px;
+  }
   .kofi-topbar-btn, .feedback-topbar-btn {
     margin-right: 6px;
     padding: 6px 12px;
@@ -3180,8 +3188,8 @@ body.odi-busy iframe { pointer-events: none !important; }
   }
 }
 
-/* En resoluciones de 1400px o menos, ocultamos el texto de Feedback y Apoyar para ahorrar espacio, convirtiéndolos en botones de iconos circulares */
-@media (max-width: 1400px) {
+/* En resoluciones de 1680px o menos, ocultamos el texto de Feedback y Apoyar para ahorrar espacio, convirtiéndolos en botones de iconos circulares */
+@media (max-width: 1680px) {
   .feedback-topbar-btn span:not(.material-symbols-rounded),
   .kofi-topbar-btn span:not(.material-symbols-rounded) {
     display: none;
@@ -3203,8 +3211,8 @@ body.odi-busy iframe { pointer-events: none !important; }
   }
 }
 
-/* En resoluciones de 1280px o menos (como laptops u pantallas escaladas), ocultamos el texto de las herramientas centrales para que solo queden los iconos, similar a Figma o Miro */
-@media (max-width: 1280px) {
+/* En resoluciones de 1440px o menos (como laptops u pantallas escaladas), ocultamos el texto de las herramientas centrales para que solo queden los iconos, similar a Figma o Miro */
+@media (max-width: 1440px) {
   .tool .tool-label {
     display: none;
   }
@@ -3229,8 +3237,8 @@ body.odi-busy iframe { pointer-events: none !important; }
   }
 }
 
-/* En pantallas aún más pequeñas (1024px o menos), ocultamos el slider de volumen del todo */
-@media (max-width: 1024px) {
+/* En pantallas aún más pequeñas (1200px o menos), ocultamos el slider de volumen del todo */
+@media (max-width: 1200px) {
   .volume-slider {
     display: none;
   }

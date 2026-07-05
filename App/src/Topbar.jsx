@@ -17,13 +17,13 @@ const TOOLS = [
   { id: 'board',    icon: 'dashboard',     label: 'tool_board',    bg: '#E6544F', fg: 'white' },
   { id: 'column',   icon: 'view_column',   label: 'tool_column',   bg: '#E6544F', fg: 'white' },
   { id: 'table',    icon: 'table_chart',   label: 'tool_table',    bg: '#E6544F', fg: 'white' },
-  { id: 'calendar', icon: 'calendar_month',label: 'tool_calendar', bg: '#E6544F', fg: 'white' },
+  { id: 'frame',    icon: 'crop_free',     label: 'tool_frame',    bg: '#E6544F', fg: 'white' },
   // Conector → blanco
   { id: 'line',     icon: 'arrow_outward', label: 'tool_line',     bg: '#FFFFFF', fg: '#1A1A1A' },
 ];
 
 const EXTRA_TOOLS = [
-  { id: 'frame',    icon: 'crop_free',     label: 'tool_frame',    bg: '#E6544F', fg: 'white' },
+  { id: 'calendar', icon: 'calendar_month',label: 'tool_calendar', bg: '#E6544F', fg: 'white' },
   { id: 'comment',  icon: 'forum',         label: 'tool_comment',  bg: '#90B968', fg: 'white' },
   { id: 'file',     icon: 'draft',         label: 'tool_file',     bg: '#E1DFE3', fg: '#1A1A1A' },
   { id: 'map',      icon: 'map',           label: 'tool_map',      bg: '#E1DFE3', fg: '#1A1A1A' },
@@ -41,7 +41,6 @@ function Topbar({
   volume, onChangeVolume,
   onSettingsClick,
   userProfile, onUserClick,
-  project, onSharingClick,
   isSyncingDrive,
 }) {
   const t = window.TRANSLATIONS[lang];
@@ -100,33 +99,6 @@ function Topbar({
           });
         })()}
       </div>
-
-      {project && (
-        <button
-          className={`icon-btn lift privacy-status-btn ${project.isPublic ? 'public' : 'private'}`}
-          title={project.isPublic ? window.t('Espacio de trabajo público (Haga clic para ver Token)', 'Public workspace (Click to view Token)') : window.t('Espacio de trabajo privado (Haga clic para hacerlo público)', 'Private workspace (Click to make public)')}
-          onClick={() => { onSharingClick && onSharingClick(); window.playAudioTone && window.playAudioTone('click'); }}
-          style={{
-            marginLeft: '10px',
-            background: project.isPublic ? 'rgba(144, 185, 104, 0.12)' : 'none',
-            border: project.isPublic ? '1px solid var(--brand-green, #90B968)' : 'none',
-            borderRadius: '4px',
-            padding: '2px 6px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '4px',
-            height: '28px',
-            cursor: 'pointer'
-          }}
-        >
-          <span className="material-symbols-rounded" style={{ fontSize: 16, color: project.isPublic ? 'var(--brand-green, #90B968)' : 'var(--text-soft)' }}>
-            {project.isPublic ? 'share' : 'lock'}
-          </span>
-          <span style={{ fontSize: 11, fontWeight: 700, color: project.isPublic ? 'var(--brand-green, #90B968)' : 'var(--text-soft)' }}>
-            {project.isPublic ? window.t('Público', 'Public') : window.t('Privado', 'Private')}
-          </span>
-        </button>
-      )}
 
       <div className="topbar-spacer"/>
 
