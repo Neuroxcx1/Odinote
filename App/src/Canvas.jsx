@@ -735,6 +735,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
         e.preventDefault();
         if (selectedIds.length > 1) {
           // Delete all multi-selected items in a single state update
+          window.playAudioTone && window.playAudioTone('delete');
           setCanvases(prev => {
             const c = prev[currentId];
             return { ...prev, [currentId]: {
@@ -787,6 +788,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
             navigator.clipboard.writeText(jsonStr).catch(() => {});
           }
           if (isCutKey) {
+            window.playAudioTone && window.playAudioTone('delete');
             setCanvases(prev => {
               const c = prev[currentId];
               return { ...prev, [currentId]: {

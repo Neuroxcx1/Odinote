@@ -648,6 +648,10 @@ function ImageItem({ item, lang, onUpdate, callbacks }) {
       } else if (handle === 'br') {
         newW = Math.max(10, Math.min(100 - initialCrop.x, initialCrop.w + dpX));
         newH = Math.max(10, Math.min(100 - initialCrop.y, initialCrop.h + dpY));
+      } else if (handle === 'move') {
+        // Arrastrar el área completa de recorte sin cambiar su tamaño
+        newX = Math.max(0, Math.min(100 - initialCrop.w, initialCrop.x + dpX));
+        newY = Math.max(0, Math.min(100 - initialCrop.h, initialCrop.y + dpY));
       }
 
       onUpdate({
@@ -721,19 +725,23 @@ function ImageItem({ item, lang, onUpdate, callbacks }) {
                 left: isCropping ? 0 : `${(-crop.x / crop.w) * 100}%`,
                 top: isCropping ? 0 : `${(-crop.y / crop.h) * 100}%`,
                 objectFit: 'fill',
-                pointerEvents: 'none'
+                pointerEvents: 'none',
+                transform: `${item.flipH ? 'scaleX(-1) ' : ''}${item.flipV ? 'scaleY(-1)' : ''}`.trim() || undefined
               }}
             />
             {isCropping && (
               <>
                 {/* Capas de mascara blanca semitransparente */}
-                <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: `${crop.y}%`, background: 'rgba(255,255,255,0.5)', pointerEvents: 'none' }} />
-                <div style={{ position: 'absolute', top: `${crop.y + crop.h}%`, left: 0, right: 0, bottom: 0, background: 'rgba(255,255,255,0.5)', pointerEvents: 'none' }} />
-                <div style={{ position: 'absolute', top: `${crop.y}%`, left: 0, width: `${crop.x}%`, height: `${crop.h}%`, background: 'rgba(255,255,255,0.5)', pointerEvents: 'none' }} />
-                <div style={{ position: 'absolute', top: `${crop.y}%`, left: `${crop.x + crop.w}%`, right: 0, height: `${crop.h}%`, background: 'rgba(255,255,255,0.5)', pointerEvents: 'none' }} />
+                <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: `${crop.y}%`, background: 'rgba(0,0,0,0.45)', pointerEvents: 'none' }} />
+                <div style={{ position: 'absolute', top: `${crop.y + crop.h}%`, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.45)', pointerEvents: 'none' }} />
+                <div style={{ position: 'absolute', top: `${crop.y}%`, left: 0, width: `${crop.x}%`, height: `${crop.h}%`, background: 'rgba(0,0,0,0.45)', pointerEvents: 'none' }} />
+                <div style={{ position: 'absolute', top: `${crop.y}%`, left: `${crop.x + crop.w}%`, right: 0, height: `${crop.h}%`, background: 'rgba(0,0,0,0.45)', pointerEvents: 'none' }} />
 
-                {/* Rectangulo punteado del area visible */}
-                <div 
+                {/* Rectángulo punteado del área visible — arrastrable para mover
+                    el recorte completo sin cambiar su tamaño */}
+                <div
+                  onMouseDown={(e) => startCropDrag(e, 'move')}
+                  title={window.t('Arrastra para mover el recorte', 'Drag to move the crop area')}
                   style={{
                     position: 'absolute',
                     left: `${crop.x}%`,
@@ -742,7 +750,9 @@ function ImageItem({ item, lang, onUpdate, callbacks }) {
                     height: `${crop.h}%`,
                     border: '1.5px dashed var(--olive, #6A8546)',
                     boxSizing: 'border-box',
-                    pointerEvents: 'none'
+                    cursor: 'move',
+                    pointerEvents: 'auto',
+                    zIndex: 14
                   }}
                 />
 

@@ -592,6 +592,28 @@ function ContextSidebar({
               <span className="material-symbols-rounded">aspect_ratio</span>
               <span>{window.t('Restaurar', 'Restore')}</span>
             </button>
+            <button
+              className={`ctx-btn ${item.flipH ? 'active' : ''}`}
+              onClick={() => {
+                onUpdate({ flipH: !item.flipH });
+                window.playAudioTone && window.playAudioTone('click');
+              }}
+              title={window.t('Voltear horizontalmente (efecto espejo)', 'Flip horizontally (mirror)')}
+            >
+              <span className="material-symbols-rounded">flip</span>
+              <span>{window.t('Espejo H', 'Flip H')}</span>
+            </button>
+            <button
+              className={`ctx-btn ${item.flipV ? 'active' : ''}`}
+              onClick={() => {
+                onUpdate({ flipV: !item.flipV });
+                window.playAudioTone && window.playAudioTone('click');
+              }}
+              title={window.t('Voltear verticalmente (espejo arriba/abajo)', 'Flip vertically (top/bottom mirror)')}
+            >
+              <span className="material-symbols-rounded" style={{ transform: 'rotate(90deg)' }}>flip</span>
+              <span>{window.t('Espejo V', 'Flip V')}</span>
+            </button>
           </>
         )}
 

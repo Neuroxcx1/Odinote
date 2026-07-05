@@ -15,12 +15,19 @@ const firebaseConfig = {
   measurementId: "G-YT66TPQGQE"
 };
 
+// Colaboración en tiempo real por Firestore DESACTIVADA: la sincronización y las
+// invitaciones funcionan 100% por Google Drive, así que no hay base de datos de
+// Firebase que configurar ni que pueda generar cobros. Cambiar a true si algún
+// día se reactiva (requiere crear la base de datos con reglas de seguridad).
+const ENABLE_FIRESTORE_SYNC = false;
 let firestoreDB = null;
 if (typeof firebase !== 'undefined') {
   if (!firebase.apps.length) {
     firebase.initializeApp(firebaseConfig);
   }
-  firestoreDB = firebase.firestore();
+  if (ENABLE_FIRESTORE_SYNC) {
+    firestoreDB = firebase.firestore();
+  }
 }
 
 const { useState: useStateApp, useEffect: useEffectApp } = React;
@@ -40,7 +47,7 @@ try {
 
 // Marcador de build: si la consola no muestra esta versión, el navegador está
 // sirviendo JS cacheado (subir ?v= en index.html invalida la caché)
-console.log('[ODINOTE] Código cargado: v17');
+console.log('[ODINOTE] Código cargado: v18');
 
 // Global shortcuts configuration
 window.shortcuts = {
@@ -1069,49 +1076,43 @@ function App() {
     if (!accessToken) return;
     try {
       const headers = { 'Authorization': `Bearer ${accessToken}` };
-      
-      // 1. Buscar la carpeta "Odinote"
-      const searchRootUrl = `https://www.googleapis.com/drive/v3/files?q=name='Odinote' and mimeType='application/vnd.google-apps.folder' and trashed=false&fields=files(id)`;
-      const searchRootRes = await fetch(searchRootUrl, { headers });
-      if (searchRootRes.status === 401) { invalidateDriveSession(); return; }
-      if (!searchRootRes.ok) return;
-      const searchRootData = await searchRootRes.json();
-      if (!searchRootData.files || searchRootData.files.length === 0) return;
-      const rootFolderId = searchRootData.files[0].id;
 
-      // 2. Listar las subcarpetas dentro de "Odinote"
-      const listSubfoldersUrl = `https://www.googleapis.com/drive/v3/files?q='${rootFolderId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false&fields=files(id, name)`;
-      const subfoldersRes = await fetch(listSubfoldersUrl, { headers });
-      if (!subfoldersRes.ok) return;
-      const subfoldersData = await subfoldersRes.json();
-      if (!subfoldersData.files || subfoldersData.files.length === 0) return;
+      // 1. Buscar TODOS los canvas_state.json accesibles con UNA sola búsqueda.
+      // Esto cubre tanto los proyectos de la carpeta Odinote propia como los
+      // proyectos que otros usuarios COMPARTIERON contigo: las carpetas
+      // compartidas no viven dentro de tu carpeta Odinote, así que la búsqueda
+      // anterior (raíz → subcarpetas) jamás las encontraba y las invitaciones
+      // no servían de nada.
+      const searchUrl = `https://www.googleapis.com/drive/v3/files?q=name='canvas_state.json' and trashed=false&fields=files(id,parents)&pageSize=100`;
+      const searchRes = await fetch(searchUrl, { headers });
+      if (searchRes.status === 401) { invalidateDriveSession(); return; }
+      if (!searchRes.ok) return;
+      const searchData = await searchRes.json();
+      if (!searchData.files || searchData.files.length === 0) return;
 
       let hasImportedAny = false;
       const importedProjects = [];
       const importedCanvases = {};
+      const seenProjects = new Set();
 
-      for (const folder of subfoldersData.files) {
-        // 3. Buscar "canvas_state.json" dentro de la subcarpeta
-        const searchFileUrl = `https://www.googleapis.com/drive/v3/files?q=name='canvas_state.json' and '${folder.id}' in parents and trashed=false&fields=files(id)`;
-        const fileRes = await fetch(searchFileUrl, { headers });
-        if (!fileRes.ok) continue;
-        const fileData = await fileRes.json();
-        if (!fileData.files || fileData.files.length === 0) continue;
-        const fileId = fileData.files[0].id;
+      for (const file of searchData.files) {
+        const folderId = (file.parents && file.parents[0]) || null;
 
-        // 4. Descargar "canvas_state.json"
-        const downloadUrl = `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`;
+        // 2. Descargar "canvas_state.json"
+        const downloadUrl = `https://www.googleapis.com/drive/v3/files/${file.id}?alt=media`;
         const downloadRes = await fetch(downloadUrl, { headers });
         if (!downloadRes.ok) continue;
         const projJSON = await downloadRes.json();
 
         if (projJSON && projJSON.projectId) {
           const pid = projJSON.projectId;
+          if (seenProjects.has(pid)) continue;
+          seenProjects.add(pid);
           const remoteTs = Date.parse(projJSON.syncedAt || '') || 0;
           const lastSynced = getDriveSyncedAt(pid);
           const localEdited = getLocalEditedAt(pid);
 
-          localStorage.setItem(`odinote.gdrive_folder_${pid}`, folder.id);
+          if (folderId) localStorage.setItem(`odinote.gdrive_folder_${pid}`, folderId);
 
           // Nada nuevo en Drive desde la última sincronización: no tocar lo local
           if (remoteTs && remoteTs <= lastSynced) {
