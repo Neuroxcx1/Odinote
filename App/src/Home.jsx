@@ -28,18 +28,22 @@ const COVER_PRESETS = [
   'linear-gradient(135deg, #FFFFFF 0%, #E6544F 100%)',
   'linear-gradient(135deg, #FFFFFF 0%, #F7DA84 100%)',
 ];
-// Iconos de proyecto: nombres de Material Symbols Rounded (fuente ya incluida en
-// la app, licencia Apache 2.0 — libre y sin atribución). Los proyectos antiguos
-// con emojis se siguen mostrando tal cual.
+// Iconos de proyecto: Fluent Emoji 3D de Microsoft (licencia MIT, incluidos en
+// lib/project-icons — ver LICENSE.txt). Los proyectos antiguos con emojis o
+// nombres de Material Symbols se siguen mostrando tal cual.
 const EMOJI_PRESETS = [
-  'sports_esports', 'rocket_launch', 'palette', 'brush',
-  'extension', 'casino', 'map', 'menu_book',
-  'music_note', 'movie', 'science', 'lightbulb',
-  'star', 'favorite', 'terminal', 'photo_camera'
+  'icon:video_game', 'icon:crossed_swords', 'icon:rocket', 'icon:artist_palette',
+  'icon:paintbrush', 'icon:puzzle_piece', 'icon:game_die', 'icon:world_map',
+  'icon:open_book', 'icon:musical_notes', 'icon:movie_camera', 'icon:test_tube',
+  'icon:light_bulb', 'icon:fire', 'icon:gem_stone', 'icon:trophy'
 ];
 
-// Renderiza el icono del proyecto: nombre snake_case → Material Symbol; otro texto → emoji
+// Renderiza el icono del proyecto según su formato:
+//  'icon:nombre' → PNG de Fluent Emoji · snake_case → Material Symbol · otro → emoji de texto
 function renderProjectIcon(icon) {
+  if (icon && icon.startsWith('icon:')) {
+    return <img className="project-icon-img" src={`lib/project-icons/${icon.slice(5)}_3d.png`} alt="" draggable={false}/>;
+  }
   if (icon && /^[a-z0-9_]+$/.test(icon)) {
     return <span className="material-symbols-rounded">{icon}</span>;
   }

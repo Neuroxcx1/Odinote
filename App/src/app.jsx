@@ -200,6 +200,17 @@ function App() {
   const [toast, setToast] = useStateApp(null);
   const [isSyncingDrive, setIsSyncingDrive] = useStateApp(false);
   const lastGoogleDriveSyncTimeRef = React.useRef(0);
+  // true mientras el último cambio de canvases vino de una importación de Drive
+  // (para no marcarlo como edición local y evitar guerras de re-subida)
+  const driveImportRef = React.useRef(false);
+  const lastSeenCanvasesRef = React.useRef(null);
+
+  // Marcas de tiempo por proyecto para decidir la dirección de la sincronización:
+  // drive_synced_at = versión de Drive que ya tenemos · local_edited_at = última edición local
+  const getDriveSyncedAt = (pid) => parseInt(localStorage.getItem(`odinote.drive_synced_at_${pid}`) || '0', 10);
+  const setDriveSyncedAtLS = (pid, ts) => localStorage.setItem(`odinote.drive_synced_at_${pid}`, String(ts));
+  const getLocalEditedAt = (pid) => parseInt(localStorage.getItem(`odinote.local_edited_at_${pid}`) || '0', 10);
+  const markLocalEditedAt = (pid) => localStorage.setItem(`odinote.local_edited_at_${pid}`, String(Date.now()));
 
   const showToast = (message, type = 'success') => {
     setToast({ message, type });
@@ -910,6 +921,7 @@ function App() {
       const fileSearchData = await fileSearchRes.json();
       let fileId = '';
 
+      const syncedAtISO = new Date().toISOString();
       const projectDataContent = JSON.stringify({
         projectId,
         name: project.name,
@@ -919,7 +931,7 @@ function App() {
         shareToken: project.shareToken || null,
         collaborators: project.collaborators || [],
         canvases: collectProjectCanvases(canvasesData, projectId),
-        syncedAt: new Date().toISOString()
+        syncedAt: syncedAtISO
       });
 
       if (fileSearchData.files && fileSearchData.files.length > 0) {
@@ -967,6 +979,9 @@ function App() {
         });
         if (!createRes.ok) return null;
       }
+      // Registrar qué versión quedó en Drive: es la referencia para saber si hay
+      // cambios locales pendientes o si lo remoto trae algo más nuevo
+      setDriveSyncedAtLS(projectId, Date.parse(syncedAtISO));
       return projFolderId;
     } catch (err) {
       console.error('Error synchronizing project file to Google Drive:', err);
@@ -1109,9 +1124,21 @@ function App() {
         const projJSON = await downloadRes.json();
 
         if (projJSON && projJSON.projectId) {
+          const pid = projJSON.projectId;
+          const remoteTs = Date.parse(projJSON.syncedAt || '') || 0;
+          const lastSynced = getDriveSyncedAt(pid);
+          const localEdited = getLocalEditedAt(pid);
+
+          localStorage.setItem(`odinote.gdrive_folder_${pid}`, folder.id);
+
+          // Nada nuevo en Drive desde la última sincronización: no tocar lo local
+          if (remoteTs && remoteTs <= lastSynced) continue;
+          // Hay ediciones locales posteriores a lo que trae Drive: lo local manda
+          // (se subirá en el próximo guardado o con el botón de sincronizar)
+          if (localEdited > lastSynced && localEdited >= remoteTs) continue;
+
           hasImportedAny = true;
-          
-          localStorage.setItem(`odinote.gdrive_folder_${projJSON.projectId}`, folder.id);
+          setDriveSyncedAtLS(pid, remoteTs || Date.now());
 
           const projectMetaData = {
             id: projJSON.projectId,
@@ -1146,6 +1173,7 @@ function App() {
           return next;
         });
 
+        driveImportRef.current = true;
         setCanvases(prev => ({
           ...prev,
           ...importedCanvases
@@ -1170,6 +1198,17 @@ function App() {
       return;
     }
     const id = setTimeout(async () => {
+      // 0. Marca de edición local: solo cuando los canvases realmente cambiaron
+      // y el cambio no vino de una importación de Drive
+      if (lastSeenCanvasesRef.current === null) {
+        lastSeenCanvasesRef.current = canvases;
+      } else if (canvases !== lastSeenCanvasesRef.current) {
+        const wasImport = driveImportRef.current;
+        driveImportRef.current = false;
+        lastSeenCanvasesRef.current = canvases;
+        if (!wasImport && view.projectId) markLocalEditedAt(view.projectId);
+      }
+
       // 1. Guardado Local (IndexedDB / Vault)
       if (vaultPath && window.electronAPI) {
         const cleanCanvases = await saveBase64MediaLocally(canvases, vaultPath);
@@ -1227,7 +1266,10 @@ function App() {
           // Recorre TODAS las páginas del proyecto (raíz + boards anidados) y también
           // los hijos de las columnas — antes solo se miraba el canvas raíz y por eso
           // las imágenes de los boards internos nunca llegaban a Drive.
-          const isLocalSrc = (src) => !!src && (src.startsWith('data:') || src.startsWith('media/') || src.startsWith('/vault-media/'));
+          // Cualquier src que no sea http(s) es un medio local pendiente de subir:
+          // data:, media/..., /vault-media/... y también las rutas absolutas
+          // antiguas (file:///C:/.../media/x.png) que resolveMediaSrc sabe mapear
+          const isLocalSrc = (src) => !!src && !src.startsWith('http://') && !src.startsWith('https://');
           // Migración: URLs 'uc?export=view' de subidas anteriores ya no renderizan
           // como <img>; se convierten al endpoint lh3 sin volver a subir nada
           const legacyDriveImageUrl = (it) => {
@@ -1250,6 +1292,10 @@ function App() {
             } catch (err) { return null; }
           };
 
+          // Guardia contra escaneos simultáneos (subirían los mismos archivos dos veces)
+          if (window._odiMediaScanBusy) return;
+          window._odiMediaScanBusy = true;
+          try {
           const projCanvases = collectProjectCanvases(canvases, view.projectId);
           const replaced = {}; // { canvasId: { itemId | `${colId}::${childId}`: nuevaUrl } }
           for (const cid of Object.keys(projCanvases)) {
@@ -1304,12 +1350,19 @@ function App() {
               return next;
             });
             showToast(window.t('Imágenes y archivos del proyecto subidos a Google Drive.', 'Project images and files uploaded to Google Drive.'));
-            // Forzar un save del JSON con las nuevas URLs en el proximo render
+            // Forzar la resubida inmediata del JSON con las nuevas URLs en el
+            // próximo ciclo (sin esto el throttle de 10s dejaba el JSON viejo en Drive)
+            lastGoogleDriveSyncTimeRef.current = 0;
             return;
           }
+          } finally {
+            window._odiMediaScanBusy = false;
+          }
 
-          // 3.2 Sincronización del archivo JSON del proyecto a Google Drive
-          if (now - lastGoogleDriveSyncTimeRef.current > 10000) {
+          // 3.2 Sincronización del archivo JSON del proyecto a Google Drive,
+          // solo si hay ediciones locales que Drive aún no tiene
+          if (getLocalEditedAt(view.projectId) > getDriveSyncedAt(view.projectId) &&
+              now - lastGoogleDriveSyncTimeRef.current > 10000) {
             lastGoogleDriveSyncTimeRef.current = now;
             uploadToGoogleDriveReal(activeProj, canvases, userProfile.accessToken);
           }
@@ -1534,13 +1587,17 @@ function App() {
     }
     showToast(window.t('Sincronizando con Google Drive...', 'Syncing with Google Drive...'));
     try {
-      if (view.projectId) {
-        const activeProj = projects.find(p => p.id === view.projectId);
-        if (activeProj && (activeProj.isPublic || activeProj.useGoogleDrive)) {
-          await uploadToGoogleDriveReal(activeProj, canvases, userProfile.accessToken);
+      // 1. Bajar primero lo que haya nuevo en Drive (la importación ya compara
+      // marcas de tiempo, así que nunca pisa ediciones locales más recientes)
+      await syncProjectsFromGoogleDrive(userProfile.accessToken);
+
+      // 2. Subir TODOS los proyectos online que tengan cambios locales pendientes
+      const onlineProjects = projects.filter(p => (p.isPublic || p.useGoogleDrive) && !p.deleted);
+      for (const p of onlineProjects) {
+        if (getLocalEditedAt(p.id) > getDriveSyncedAt(p.id)) {
+          await uploadToGoogleDriveReal(p, canvases, userProfile.accessToken);
         }
       }
-      await syncProjectsFromGoogleDrive(userProfile.accessToken);
       showToast(window.t('Sincronización con Google Drive completada.', 'Google Drive sync finished.'));
     } catch (err) {
       console.error('Manual Drive refresh failed:', err);

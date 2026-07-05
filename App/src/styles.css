@@ -3280,3 +3280,14 @@ body.odi-busy iframe { pointer-events: none !important; }
   line-height: 1;
   vertical-align: middle;
 }
+
+/* Iconos de proyecto Fluent Emoji 3D (PNG) — escalan con el tamaño del texto */
+.project-icon-img {
+  width: 1.15em;
+  height: 1.15em;
+  object-fit: contain;
+  vertical-align: middle;
+  filter: drop-shadow(0 1px 2px rgba(0,0,0,0.25));
+  pointer-events: none;
+}
+.emoji-pick .project-icon-img { width: 20px; height: 20px; }
