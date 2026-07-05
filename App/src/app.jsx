@@ -40,7 +40,7 @@ try {
 
 // Marcador de build: si la consola no muestra esta versión, el navegador está
 // sirviendo JS cacheado (subir ?v= en index.html invalida la caché)
-console.log('[ODINOTE] Código cargado: v10');
+console.log('[ODINOTE] Código cargado: v11');
 
 // Global shortcuts configuration
 window.shortcuts = {
@@ -813,17 +813,7 @@ function App() {
 
   // Recolecta solo los canvases del proyecto (raíz + boards anidados),
   // para no subir a Drive los datos de TODOS los demás proyectos
-  const collectProjectCanvases = (allCanvases, rootId) => {
-    const out = {};
-    const visit = (id) => {
-      const c = allCanvases[id];
-      if (!c || out[id]) return;
-      out[id] = c;
-      (c.items || []).forEach(it => { if (it.canvasId) visit(it.canvasId); });
-    };
-    visit(rootId);
-    return out;
-  };
+  const collectProjectCanvases = window.OdiDrive.collectProjectCanvases;
 
   // Sube el estado del proyecto a Drive. Devuelve el id de la carpeta del proyecto o null si falló.
   const uploadToGoogleDriveReal = async (project, canvasesData, accessToken) => {
@@ -995,97 +985,8 @@ function App() {
     }
   };
 
-  // Sube un medio (imagen/audio/archivo) a la carpeta del proyecto en Drive.
-  // Recibe el contenido siempre como data-URL (el llamador resuelve archivos del Vault).
-  const uploadMediaToGoogleDriveReal = async (projectId, item, dataUrl, accessToken) => {
-    setIsSyncingDrive(true);
-    try {
-      const folderId = localStorage.getItem(`odinote.gdrive_folder_${projectId}`);
-      if (!folderId) return null;
-
-      // Extraer base64 data
-      const parts = (dataUrl || '').split(',');
-      if (parts.length < 2) return null;
-      const mimeMatch = parts[0].match(/:(.*?);/);
-      if (!mimeMatch) return null;
-      const mime = mimeMatch[1];
-
-      const ext = mime.split('/')[1] || 'png';
-      const fileName = `media_${item.id}.${ext}`;
-
-      // Crear el archivo (POST multipart upload)
-      const boundary = '-------314159265358979323846';
-      const delimiter = `\r\n--${boundary}\r\n`;
-      const closeDelim = `\r\n--${boundary}--`;
-      
-      const metadata = {
-        name: fileName,
-        mimeType: mime,
-        parents: [folderId]
-      };
-
-      const multipartBody = 
-        delimiter +
-        'Content-Type: application/json; charset=UTF-8\r\n\r\n' +
-        JSON.stringify(metadata) +
-        delimiter +
-        `Content-Type: ${mime}\r\n` +
-        'Content-Transfer-Encoding: base64\r\n\r\n' +
-        parts[1] +
-        closeDelim;
-
-      const uploadUrl = 'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart';
-      const uploadRes = await fetch(uploadUrl, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Content-Type': `multipart/related; boundary=${boundary}`
-        },
-        body: multipartBody
-      });
-
-      if (uploadRes.status === 401) { invalidateDriveSession(); return null; }
-      if (uploadRes.status === 403) {
-        let reason = '';
-        try {
-          const data = await uploadRes.clone().json();
-          reason = (data.error && data.error.message) || '';
-        } catch (e) {}
-        notifyDriveBlocked({ status: 403, reason });
-        return null;
-      }
-      if (!uploadRes.ok) return null;
-      const fileData = await uploadRes.json();
-      const fileId = fileData.id;
-
-      // Dar permiso público de lectura para que cualquiera pueda cargarlo en el canvas web/local
-      const permUrl = `https://www.googleapis.com/drive/v3/files/${fileId}/permissions`;
-      await fetch(permUrl, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          role: 'reader',
-          type: 'anyone'
-        })
-      });
-
-      // Devolver una URL pública que funcione como src directo.
-      // Para imágenes, el endpoint lh3 renderiza el archivo tal cual (uc?export=view
-      // ya no sirve como <img src> porque Google devuelve HTML/redirecciones).
-      if (mime.startsWith('image/')) {
-        return `https://lh3.googleusercontent.com/d/${fileId}`;
-      }
-      return `https://drive.google.com/uc?export=download&id=${fileId}`;
-    } catch (err) {
-      console.error('Error uploading media to Google Drive:', err);
-      return null;
-    } finally {
-      setTimeout(() => setIsSyncingDrive(false), 800);
-    }
-  };
+  // (La subida de medios vive ahora en window.OdiDrive.syncProjectMedia — src/drive.js —
+  // con subida reanudable sin límite de tamaño y cubierta por tests.)
 
   const syncProjectsFromGoogleDrive = async (accessToken) => {
     if (!accessToken) return;
@@ -1279,71 +1180,28 @@ function App() {
           }
 
           // 3.1 Escaneo y subida de medios locales (base64 o archivos del Vault) a Drive.
-          // Recorre TODAS las páginas del proyecto (raíz + boards anidados) y también
-          // los hijos de las columnas — antes solo se miraba el canvas raíz y por eso
-          // las imágenes de los boards internos nunca llegaban a Drive.
-          // Cualquier src que no sea http(s) es un medio local pendiente de subir:
-          // data:, media/..., /vault-media/... y también las rutas absolutas
-          // antiguas (file:///C:/.../media/x.png) que resolveMediaSrc sabe mapear
-          const isLocalSrc = (src) => !!src && !src.startsWith('http://') && !src.startsWith('https://');
-          // Migración: URLs 'uc?export=view' de subidas anteriores ya no renderizan
-          // como <img>; se convierten al endpoint lh3 sin volver a subir nada
-          const legacyDriveImageUrl = (it) => {
-            if (it.type !== 'image') return null;
-            const m = (it.src || '').match(/^https:\/\/drive\.google\.com\/uc\?export=view&id=([\w-]{20,})$/);
-            return m ? `https://lh3.googleusercontent.com/d/${m[1]}` : null;
-          };
-          const toDataUrl = async (src) => {
-            if (src.startsWith('data:')) return src;
-            try {
-              const resp = await fetch(window.resolveMediaSrc ? window.resolveMediaSrc(src) : src);
-              if (!resp.ok) return null;
-              const blob = await resp.blob();
-              return await new Promise((resolve) => {
-                const fr = new FileReader();
-                fr.onload = () => resolve(fr.result);
-                fr.onerror = () => resolve(null);
-                fr.readAsDataURL(blob);
-              });
-            } catch (err) { return null; }
-          };
-
+          // Toda la lógica vive en window.OdiDrive (src/drive.js), cubierta por tests
+          // con la API simulada. Usa subida reanudable: el multipart anterior tenía
+          // un límite de 5 MB y fallaba en silencio con imágenes grandes.
           // Guardia contra escaneos simultáneos (subirían los mismos archivos dos veces)
           if (window._odiMediaScanBusy) return;
           window._odiMediaScanBusy = true;
           try {
-          const projCanvases = collectProjectCanvases(canvases, view.projectId);
-          console.log(`[DRIVE] Escaneo de medios: ${Object.keys(projCanvases).length} páginas del proyecto ${view.projectId}`);
-          const replaced = {}; // { canvasId: { itemId | `${colId}::${childId}`: nuevaUrl } }
-          for (const cid of Object.keys(projCanvases)) {
-            const canv = projCanvases[cid];
-            for (const item of (canv.items || [])) {
-              const legacyUrl = legacyDriveImageUrl(item);
-              if (legacyUrl) {
-                (replaced[cid] = replaced[cid] || {})[item.id] = legacyUrl;
-              } else if (isLocalSrc(item.src)) {
-                const dataUrl = await toDataUrl(item.src);
-                console.log(`[DRIVE] Medio local ${item.type} ${item.id} (${(item.src || '').slice(0, 40)}...) -> dataUrl: ${dataUrl ? 'OK' : 'FALLO al leer'}`);
-                if (dataUrl) {
-                  const driveUrl = await uploadMediaToGoogleDriveReal(view.projectId, item, dataUrl, userProfile.accessToken);
-                  console.log(`[DRIVE] Subida de ${item.id}: ${driveUrl ? driveUrl : 'FALLO'}`);
-                  if (driveUrl) (replaced[cid] = replaced[cid] || {})[item.id] = driveUrl;
-                }
-              }
-              for (const child of (item.children || [])) {
-                const childLegacyUrl = legacyDriveImageUrl(child);
-                if (childLegacyUrl) {
-                  (replaced[cid] = replaced[cid] || {})[`${item.id}::${child.id}`] = childLegacyUrl;
-                } else if (isLocalSrc(child.src)) {
-                  const dataUrl = await toDataUrl(child.src);
-                  if (dataUrl) {
-                    const driveUrl = await uploadMediaToGoogleDriveReal(view.projectId, child, dataUrl, userProfile.accessToken);
-                    if (driveUrl) (replaced[cid] = replaced[cid] || {})[`${item.id}::${child.id}`] = driveUrl;
-                  }
-                }
-              }
-            }
+          setIsSyncingDrive(true);
+          const mediaResult = await window.OdiDrive.syncProjectMedia({
+            canvases,
+            projectId: view.projectId,
+            folderId: localStorage.getItem(`odinote.gdrive_folder_${view.projectId}`),
+            accessToken: userProfile.accessToken,
+            resolveSrc: window.resolveMediaSrc,
+            log: (m) => console.log('[DRIVE] ' + m)
+          });
+          if (mediaResult.authError === 401) { invalidateDriveSession(); return; }
+          if (mediaResult.authError === 403) { notifyDriveBlocked({ status: 403, reason: '' }); return; }
+          if (mediaResult.attempted > mediaResult.uploaded) {
+            console.warn(`[DRIVE] ${mediaResult.attempted - mediaResult.uploaded} medios no se pudieron subir (ver líneas anteriores)`);
           }
+          const replaced = mediaResult.replaced;
 
           if (Object.keys(replaced).length > 0) {
             setCanvases(prev => {
@@ -1376,6 +1234,7 @@ function App() {
           }
           } finally {
             window._odiMediaScanBusy = false;
+            setTimeout(() => setIsSyncingDrive(false), 800);
           }
 
           // 3.2 Sincronización del archivo JSON del proyecto a Google Drive,
