@@ -63,6 +63,29 @@
     return `https://drive.google.com/uc?export=download&id=${fileId}`;
   }
 
+  // Busca o crea una subcarpeta dentro de la carpeta indicada. Devuelve
+  // { id } · { authError } · { id: null } si no se pudo crear.
+  async function ensureSubfolder({ parentId, name, accessToken, fetchFn }) {
+    const f = fetchFn || fetch.bind(typeof window !== 'undefined' ? window : globalThis);
+    const authHeaders = { 'Authorization': `Bearer ${accessToken}` };
+    const q = encodeURIComponent(`name='${name}' and '${parentId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`);
+    const res = await f(`${DRIVE_API}/files?q=${q}&fields=files(id)`, { headers: authHeaders });
+    if (res.status === 401 || res.status === 403) return { authError: res.status };
+    if (res.ok) {
+      const data = await res.json();
+      if (data.files && data.files.length > 0) return { id: data.files[0].id };
+    }
+    const createRes = await f(`${DRIVE_API}/files`, {
+      method: 'POST',
+      headers: { ...authHeaders, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, mimeType: 'application/vnd.google-apps.folder', parents: [parentId] })
+    });
+    if (createRes.status === 401 || createRes.status === 403) return { authError: createRes.status };
+    if (!createRes.ok) return { id: null };
+    const created = await createRes.json();
+    return { id: created.id || null };
+  }
+
   // Sube (o actualiza, si ya existe uno con el mismo nombre) un archivo binario
   // en la carpeta indicada usando subida REANUDABLE: el método multipart anterior
   // tenía un límite de 5 MB y fallaba en silencio con imágenes grandes.
@@ -133,6 +156,12 @@
 
     if (!folderId) { L('Sin carpeta de proyecto en Drive: se pospone la subida de medios'); return { replaced, attempted, uploaded, authError }; }
 
+    // Los medios van en la subcarpeta "media" del proyecto, no sueltos en la raíz
+    const sub = await ensureSubfolder({ parentId: folderId, name: 'media', accessToken, fetchFn: f });
+    if (sub.authError) return { replaced, attempted, uploaded, authError: sub.authError };
+    const mediaFolderId = sub.id || folderId;
+    L(sub.id ? 'Carpeta de medios: media/' : 'No se pudo crear la carpeta media/: se usará la raíz del proyecto');
+
     // Lee un medio local como bytes: data-URL directo, o rutas del Vault via HTTP local
     const readLocalMedia = async (src) => {
       if (src.startsWith('data:')) return dataUrlToBytes(src);
@@ -156,7 +185,7 @@
       const media = await readLocalMedia(node.src);
       L(`${key} (${node.type || '?'}): lectura ${media ? `OK ${media.mime}, ${media.bytes.length} bytes` : 'FALLÓ'} · src: ${(node.src || '').slice(0, 60)}`);
       if (!media) return;
-      const res = await uploadMediaFile({ folderId, baseName: `media_${node.id}`, media, accessToken, fetchFn: f, log: L });
+      const res = await uploadMediaFile({ folderId: mediaFolderId, baseName: `media_${node.id}`, media, accessToken, fetchFn: f, log: L });
       if (res && res.authError) { authError = res.authError; return; }
       if (res && res.url) {
         uploaded++;
@@ -183,7 +212,7 @@
     return { replaced, attempted, uploaded, authError };
   }
 
-  const OdiDrive = { isLocalSrc, legacyDriveImageUrl, collectProjectCanvases, dataUrlToBytes, extForMime, publicUrlForFile, uploadMediaFile, syncProjectMedia };
+  const OdiDrive = { isLocalSrc, legacyDriveImageUrl, collectProjectCanvases, dataUrlToBytes, extForMime, publicUrlForFile, ensureSubfolder, uploadMediaFile, syncProjectMedia };
   if (typeof window !== 'undefined') window.OdiDrive = OdiDrive;
   if (typeof module !== 'undefined' && module.exports) module.exports = OdiDrive;
 })();
