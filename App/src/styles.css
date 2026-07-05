@@ -3264,3 +3264,19 @@ body.odi-busy iframe { pointer-events: none !important; }
 .ms-card-dropdown-item:hover {
   background: var(--line-soft, #E5E1DD) !important;
 }
+
+/* Animación global de giro (botón/indicador de sincronización con Drive) */
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Iconos de proyecto con Material Symbols (los nombres tipo snake_case se
+   renderizan como icono; los emojis antiguos se siguen mostrando como texto) */
+.ms-recent-emoji .material-symbols-rounded,
+.ms-project-emoji .material-symbols-rounded,
+.emoji-pick .material-symbols-rounded {
+  font-size: inherit;
+  line-height: 1;
+  vertical-align: middle;
+}

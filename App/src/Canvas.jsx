@@ -367,7 +367,7 @@ function duplicateCanvasState(state, origId, newId) {
   });
 }
 
-function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn, setCanvases: setExtCanvases, updateAvailable, onUpdateClick, volume, onChangeVolume, onSettingsClick, vaultPath, userProfile, onUserClick, projects, setProjects, onSharingClick, isSyncingDrive }) {
+function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn, setCanvases: setExtCanvases, updateAvailable, onUpdateClick, volume, onChangeVolume, onSettingsClick, vaultPath, userProfile, onUserClick, projects, setProjects, onSharingClick, onManualSync, isSyncingDrive }) {
   const currentProject = projects ? projects.find(p => p.id === projectId) : null;
   const [canvases, _setCanvases] = useStateCanvas(() => canvasesIn || JSON.parse(JSON.stringify(window.INITIAL_CANVASES)));
   // Stable ref to App's setter — avoids the infinite loop caused by it being a dep on every render
@@ -3653,6 +3653,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
         theme={theme} setTheme={setTheme}
         crumbs={crumbs} onCrumb={onCrumb} onCrumbRename={onCrumbRename}
         onSettingsClick={onSettingsClick}
+        onManualSync={onManualSync}
         isSyncingDrive={isSyncingDrive}
         activeTool={activeTool} setActiveTool={setActiveTool}
         onHome={onHome}

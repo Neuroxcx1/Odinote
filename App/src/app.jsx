@@ -976,16 +976,20 @@ function App() {
     }
   };
 
-  const uploadMediaToGoogleDriveReal = async (projectId, item, accessToken) => {
+  // Sube un medio (imagen/audio/archivo) a la carpeta del proyecto en Drive.
+  // Recibe el contenido siempre como data-URL (el llamador resuelve archivos del Vault).
+  const uploadMediaToGoogleDriveReal = async (projectId, item, dataUrl, accessToken) => {
     setIsSyncingDrive(true);
     try {
       const folderId = localStorage.getItem(`odinote.gdrive_folder_${projectId}`);
       if (!folderId) return null;
 
       // Extraer base64 data
-      const parts = item.src.split(',');
+      const parts = (dataUrl || '').split(',');
       if (parts.length < 2) return null;
-      const mime = parts[0].match(/:(.*?);/)[1];
+      const mimeMatch = parts[0].match(/:(.*?);/);
+      if (!mimeMatch) return null;
+      const mime = mimeMatch[1];
 
       const ext = mime.split('/')[1] || 'png';
       const fileName = `media_${item.id}.${ext}`;
@@ -1022,6 +1026,15 @@ function App() {
       });
 
       if (uploadRes.status === 401) { invalidateDriveSession(); return null; }
+      if (uploadRes.status === 403) {
+        let reason = '';
+        try {
+          const data = await uploadRes.clone().json();
+          reason = (data.error && data.error.message) || '';
+        } catch (e) {}
+        notifyDriveBlocked({ status: 403, reason });
+        return null;
+      }
       if (!uploadRes.ok) return null;
       const fileData = await uploadRes.json();
       const fileId = fileData.id;
@@ -1040,8 +1053,13 @@ function App() {
         })
       });
 
-      // Devolver la URL de descarga directa
-      return `https://drive.google.com/uc?export=view&id=${fileId}`;
+      // Devolver una URL pública que funcione como src directo.
+      // Para imágenes, el endpoint lh3 renderiza el archivo tal cual (uc?export=view
+      // ya no sirve como <img src> porque Google devuelve HTML/redirecciones).
+      if (mime.startsWith('image/')) {
+        return `https://lh3.googleusercontent.com/d/${fileId}`;
+      }
+      return `https://drive.google.com/uc?export=download&id=${fileId}`;
     } catch (err) {
       console.error('Error uploading media to Google Drive:', err);
       return null;
@@ -1205,32 +1223,89 @@ function App() {
             if (!createdFolder) return;
           }
 
-          // 3.1 Escaneo y subida de imagenes Base64 locales a Google Drive
-          const currentCanvas = canvases[view.projectId];
-          if (currentCanvas && currentCanvas.items) {
-            let changedMedia = false;
-            const updatedItems = await Promise.all(currentCanvas.items.map(async (item) => {
-              if (item.src && item.src.startsWith('data:')) {
-                const driveUrl = await uploadMediaToGoogleDriveReal(view.projectId, item, userProfile.accessToken);
-                if (driveUrl) {
-                  changedMedia = true;
-                  return { ...item, src: driveUrl };
+          // 3.1 Escaneo y subida de medios locales (base64 o archivos del Vault) a Drive.
+          // Recorre TODAS las páginas del proyecto (raíz + boards anidados) y también
+          // los hijos de las columnas — antes solo se miraba el canvas raíz y por eso
+          // las imágenes de los boards internos nunca llegaban a Drive.
+          const isLocalSrc = (src) => !!src && (src.startsWith('data:') || src.startsWith('media/') || src.startsWith('/vault-media/'));
+          // Migración: URLs 'uc?export=view' de subidas anteriores ya no renderizan
+          // como <img>; se convierten al endpoint lh3 sin volver a subir nada
+          const legacyDriveImageUrl = (it) => {
+            if (it.type !== 'image') return null;
+            const m = (it.src || '').match(/^https:\/\/drive\.google\.com\/uc\?export=view&id=([\w-]{20,})$/);
+            return m ? `https://lh3.googleusercontent.com/d/${m[1]}` : null;
+          };
+          const toDataUrl = async (src) => {
+            if (src.startsWith('data:')) return src;
+            try {
+              const resp = await fetch(window.resolveMediaSrc ? window.resolveMediaSrc(src) : src);
+              if (!resp.ok) return null;
+              const blob = await resp.blob();
+              return await new Promise((resolve) => {
+                const fr = new FileReader();
+                fr.onload = () => resolve(fr.result);
+                fr.onerror = () => resolve(null);
+                fr.readAsDataURL(blob);
+              });
+            } catch (err) { return null; }
+          };
+
+          const projCanvases = collectProjectCanvases(canvases, view.projectId);
+          const replaced = {}; // { canvasId: { itemId | `${colId}::${childId}`: nuevaUrl } }
+          for (const cid of Object.keys(projCanvases)) {
+            const canv = projCanvases[cid];
+            for (const item of (canv.items || [])) {
+              const legacyUrl = legacyDriveImageUrl(item);
+              if (legacyUrl) {
+                (replaced[cid] = replaced[cid] || {})[item.id] = legacyUrl;
+              } else if (isLocalSrc(item.src)) {
+                const dataUrl = await toDataUrl(item.src);
+                if (dataUrl) {
+                  const driveUrl = await uploadMediaToGoogleDriveReal(view.projectId, item, dataUrl, userProfile.accessToken);
+                  if (driveUrl) (replaced[cid] = replaced[cid] || {})[item.id] = driveUrl;
                 }
               }
-              return item;
-            }));
-
-            if (changedMedia) {
-              setCanvases(prev => ({
-                ...prev,
-                [view.projectId]: {
-                  ...currentCanvas,
-                  items: updatedItems
+              for (const child of (item.children || [])) {
+                const childLegacyUrl = legacyDriveImageUrl(child);
+                if (childLegacyUrl) {
+                  (replaced[cid] = replaced[cid] || {})[`${item.id}::${child.id}`] = childLegacyUrl;
+                } else if (isLocalSrc(child.src)) {
+                  const dataUrl = await toDataUrl(child.src);
+                  if (dataUrl) {
+                    const driveUrl = await uploadMediaToGoogleDriveReal(view.projectId, child, dataUrl, userProfile.accessToken);
+                    if (driveUrl) (replaced[cid] = replaced[cid] || {})[`${item.id}::${child.id}`] = driveUrl;
+                  }
                 }
-              }));
-              // Forzar un save de la nueva URL en el proximo render
-              return;
+              }
             }
+          }
+
+          if (Object.keys(replaced).length > 0) {
+            setCanvases(prev => {
+              const next = { ...prev };
+              Object.keys(replaced).forEach(cid => {
+                const canv = next[cid];
+                if (!canv) return;
+                next[cid] = {
+                  ...canv,
+                  items: (canv.items || []).map(it => {
+                    let updated = it;
+                    if (replaced[cid][it.id]) updated = { ...updated, src: replaced[cid][it.id] };
+                    if (updated.children && updated.children.some(ch => replaced[cid][`${it.id}::${ch.id}`])) {
+                      updated = {
+                        ...updated,
+                        children: updated.children.map(ch => replaced[cid][`${it.id}::${ch.id}`] ? { ...ch, src: replaced[cid][`${it.id}::${ch.id}`] } : ch)
+                      };
+                    }
+                    return updated;
+                  })
+                };
+              });
+              return next;
+            });
+            showToast(window.t('Imágenes y archivos del proyecto subidos a Google Drive.', 'Project images and files uploaded to Google Drive.'));
+            // Forzar un save del JSON con las nuevas URLs en el proximo render
+            return;
           }
 
           // 3.2 Sincronización del archivo JSON del proyecto a Google Drive
@@ -1444,6 +1519,33 @@ function App() {
           showToast(window.t('No se pudo subir a Google Drive: el proyecto se queda offline.', 'Could not upload to Google Drive: the project stays offline.'), 'error');
         }
       });
+  };
+
+  // Sincronización manual con Drive: sube el proyecto activo (si está online)
+  // y luego baja lo que haya nuevo en la nube. Es el botón de "refrescar".
+  const manualDriveRefresh = async () => {
+    if (!userProfile) {
+      setUserModalOpen(true);
+      return;
+    }
+    if (!userProfile.accessToken) {
+      showToast(window.t('Google Drive no está autorizado. Cierra e inicia sesión de nuevo.', 'Google Drive is not authorized. Sign out and sign in again.'), 'error');
+      return;
+    }
+    showToast(window.t('Sincronizando con Google Drive...', 'Syncing with Google Drive...'));
+    try {
+      if (view.projectId) {
+        const activeProj = projects.find(p => p.id === view.projectId);
+        if (activeProj && (activeProj.isPublic || activeProj.useGoogleDrive)) {
+          await uploadToGoogleDriveReal(activeProj, canvases, userProfile.accessToken);
+        }
+      }
+      await syncProjectsFromGoogleDrive(userProfile.accessToken);
+      showToast(window.t('Sincronización con Google Drive completada.', 'Google Drive sync finished.'));
+    } catch (err) {
+      console.error('Manual Drive refresh failed:', err);
+      showToast(window.t('La sincronización manual falló. Revisa tu conexión.', 'Manual sync failed. Check your connection.'), 'error');
+    }
   };
 
   // Invita a un colaborador compartiendo la carpeta del proyecto en Drive con su cuenta de Google.
@@ -1718,6 +1820,8 @@ function App() {
       onUserClick={() => setUserModalOpen(true)}
       onJoinProjectClick={() => setJoiningModalOpen(true)}
       onTogglePublic={togglePublicProject}
+      onManualSync={manualDriveRefresh}
+      isSyncingDrive={isSyncingDrive}
     />;
   } else {
     activeView = <window.Canvas
@@ -1740,6 +1844,7 @@ function App() {
       projects={projects}
       setProjects={setProjects}
       onSharingClick={(pid) => { setActiveSharingProjectId(pid); setInviteEmail(''); setSharingModalOpen(true); }}
+      onManualSync={manualDriveRefresh}
     />;
   }
 
@@ -3003,7 +3108,7 @@ function App() {
             top: '24px',
             left: '50%',
             transform: 'translateX(-50%)',
-            background: toast.type === 'success' ? '#FFFFFF' : '#FFF3F3',
+            background: 'var(--paper, #FFFFFF)',
             border: toast.type === 'success' ? '2px solid var(--line, #595459)' : '2px solid var(--wine, #E6544F)',
             color: toast.type === 'success' ? 'var(--ink, #1A1A1A)' : 'var(--wine, #E6544F)',
             padding: '12px 24px',

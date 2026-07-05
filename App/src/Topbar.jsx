@@ -41,6 +41,7 @@ function Topbar({
   volume, onChangeVolume,
   onSettingsClick,
   userProfile, onUserClick,
+  onManualSync,
   isSyncingDrive,
 }) {
   const t = window.TRANSLATIONS[lang];
@@ -208,6 +209,19 @@ function Topbar({
       </div>
 
       <div className="topbar-actions">
+        <button
+          className="icon-btn lift"
+          title={window.t('Sincronizar con Google Drive ahora', 'Sync with Google Drive now')}
+          onClick={() => { onManualSync && onManualSync(); window.playAudioTone && window.playAudioTone('click'); }}
+          style={{ marginRight: 6 }}
+        >
+          <span
+            className="material-symbols-rounded"
+            style={isSyncingDrive ? { animation: 'spin 1.5s linear infinite' } : undefined}
+          >
+            sync
+          </span>
+        </button>
         {window.electronAPI && (
           <button
             className={`icon-btn lift update-bell-btn ${updateAvailable ? 'has-update' : ''}`}

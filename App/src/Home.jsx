@@ -28,9 +28,26 @@ const COVER_PRESETS = [
   'linear-gradient(135deg, #FFFFFF 0%, #E6544F 100%)',
   'linear-gradient(135deg, #FFFFFF 0%, #F7DA84 100%)',
 ];
-const EMOJI_PRESETS = ['⚔️','🌾','🚀','🧩','🎲','🗺️','🏰','🐉','🎮','🌙','🔥','💎','🎨','📚','💡','🎯'];
+// Iconos de proyecto: nombres de Material Symbols Rounded (fuente ya incluida en
+// la app, licencia Apache 2.0 — libre y sin atribución). Los proyectos antiguos
+// con emojis se siguen mostrando tal cual.
+const EMOJI_PRESETS = [
+  'sports_esports', 'rocket_launch', 'palette', 'brush',
+  'extension', 'casino', 'map', 'menu_book',
+  'music_note', 'movie', 'science', 'lightbulb',
+  'star', 'favorite', 'terminal', 'photo_camera'
+];
 
-function Home({ lang, setLang, theme, setTheme, onOpenProject, projects, onCreate, onDelete, onRename, onRestore, onPurge, onToggleStar, onExport, onImport, vaultPath, onOpenVault, onCloseVault, updateAvailable, onUpdateClick, onSettingsClick, userProfile, onUserClick, onJoinProjectClick, onTogglePublic }) {
+// Renderiza el icono del proyecto: nombre snake_case → Material Symbol; otro texto → emoji
+function renderProjectIcon(icon) {
+  if (icon && /^[a-z0-9_]+$/.test(icon)) {
+    return <span className="material-symbols-rounded">{icon}</span>;
+  }
+  return icon;
+}
+window.renderProjectIcon = renderProjectIcon;
+
+function Home({ lang, setLang, theme, setTheme, onOpenProject, projects, onCreate, onDelete, onRename, onRestore, onPurge, onToggleStar, onExport, onImport, vaultPath, onOpenVault, onCloseVault, updateAvailable, onUpdateClick, onSettingsClick, userProfile, onUserClick, onJoinProjectClick, onTogglePublic, onManualSync, isSyncingDrive }) {
   const t = window.TRANSLATIONS[lang];
   const [query, setQuery] = useStateHome('');
   const [modal, setModal] = useStateHome(false);
@@ -211,6 +228,19 @@ function Home({ lang, setLang, theme, setTheme, onOpenProject, projects, onCreat
             />
           </div>
           <div className="ms-top-actions">
+            <button
+              className="icon-btn lift"
+              title={window.t('Sincronizar con Google Drive ahora', 'Sync with Google Drive now')}
+              onClick={() => { onManualSync && onManualSync(); window.playAudioTone && window.playAudioTone('click'); }}
+              style={{ marginRight: 10 }}
+            >
+              <span
+                className="material-symbols-rounded"
+                style={isSyncingDrive ? { animation: 'spin 1.5s linear infinite', color: 'var(--brand-green, #90B968)' } : undefined}
+              >
+                sync
+              </span>
+            </button>
             {window.electronAPI && (
               <button
                 className={`icon-btn lift update-bell-btn ${updateAvailable ? 'has-update' : ''}`}
@@ -453,7 +483,7 @@ function RecentCard({ project, lang, t, onOpen, onDelete, onRenameClick, onToggl
       style={{ position: 'relative' }}
     >
       <div className="ms-recent-cover" style={{background: project.cover}}>
-        <div className="ms-recent-emoji">{project.emoji}</div>
+        <div className="ms-recent-emoji">{renderProjectIcon(project.emoji)}</div>
         <div className="ms-card-actions" onClick={(e)=>e.stopPropagation()}>
           <button className="ms-card-btn" title={window.t('Editar proyecto', 'Edit project')}
             onClick={(e)=>{ e.stopPropagation(); onRenameClick && onRenameClick(project); }}>
@@ -518,7 +548,7 @@ function ProjectCard({ project, lang, t, onOpen, onDelete, onRenameClick, onRest
       style={{position:'relative'}}
     >
       <div className="ms-project-cover" style={{ background: project.cover }}>
-        <div className="ms-project-emoji">{project.emoji}</div>
+        <div className="ms-project-emoji">{renderProjectIcon(project.emoji)}</div>
         <div className="ms-card-actions" onClick={(e)=>e.stopPropagation()}>
           {isTrash ? (
             <>
@@ -640,7 +670,7 @@ function NewProjectModal({ lang, onClose, onCreate }) {
           <label>{window.t('Ícono', 'Icon')}</label>
           <div className="emoji-row">
             {EMOJI_PRESETS.map(e => (
-              <button key={e} className={`emoji-pick ${emoji===e?'active':''}`} onClick={()=>setEmoji(e)}>{e}</button>
+              <button key={e} className={`emoji-pick ${emoji===e?'active':''}`} onClick={()=>setEmoji(e)}>{renderProjectIcon(e)}</button>
             ))}
           </div>
         </div>
@@ -710,7 +740,7 @@ function RenameProjectModal({ project, lang, onClose, onSave, onTogglePublic, us
           <label>{window.t('Ícono', 'Icon')}</label>
           <div className="emoji-row">
             {EMOJI_PRESETS.map(e => (
-              <button key={e} className={`emoji-pick ${emoji===e?'active':''}`} onClick={()=>setEmoji(e)}>{e}</button>
+              <button key={e} className={`emoji-pick ${emoji===e?'active':''}`} onClick={()=>setEmoji(e)}>{renderProjectIcon(e)}</button>
             ))}
           </div>
         </div>
