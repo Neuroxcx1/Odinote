@@ -172,6 +172,41 @@ function cleanOrthoWithEndpoints(ortho, p1, p2, exA_dir, exB_dir) {
 
 function getCenter(item) { return { x: item.x + item.w / 2, y: item.y + item.h / 2 }; }
 
+// Punto del borde del rectángulo más cercano a (tx,ty) — estilo Milanote: las
+// flechas llegan a la altura del origen en vez de converger todas hacia el centro.
+function nearestPointOnRect(item, tx, ty) {
+  const l = item.x, r = item.x + item.w, t = item.y, b = item.y + item.h;
+  if (tx < l || tx > r || ty < t || ty > b) {
+    return { x: Math.max(l, Math.min(r, tx)), y: Math.max(t, Math.min(b, ty)) };
+  }
+  // El punto cae dentro del nodo: proyectar al borde más cercano
+  const dl = tx - l, dr = r - tx, dt = ty - t, db = b - ty;
+  const m = Math.min(dl, dr, dt, db);
+  if (m === dl) return { x: l, y: ty };
+  if (m === dr) return { x: r, y: ty };
+  if (m === dt) return { x: tx, y: t };
+  return { x: tx, y: b };
+}
+
+// Polilínea ortogonal con esquinas redondeadas (aspecto Miro)
+function roundedOrthoPath(pts, radius) {
+  if (!pts || pts.length < 2) return '';
+  if (pts.length === 2) return `M ${pts[0].x} ${pts[0].y} L ${pts[1].x} ${pts[1].y}`;
+  let d = `M ${pts[0].x} ${pts[0].y}`;
+  for (let i = 1; i < pts.length - 1; i++) {
+    const p0 = pts[i - 1], p1 = pts[i], p2 = pts[i + 1];
+    const l1 = Math.hypot(p1.x - p0.x, p1.y - p0.y);
+    const l2 = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+    if (l1 < 0.5 || l2 < 0.5) { d += ` L ${p1.x} ${p1.y}`; continue; }
+    const rr = Math.min(radius, l1 / 2, l2 / 2);
+    const a = { x: p1.x - ((p1.x - p0.x) / l1) * rr, y: p1.y - ((p1.y - p0.y) / l1) * rr };
+    const b = { x: p1.x + ((p2.x - p1.x) / l2) * rr, y: p1.y + ((p2.y - p1.y) / l2) * rr };
+    d += ` L ${a.x} ${a.y} Q ${p1.x} ${p1.y} ${b.x} ${b.y}`;
+  }
+  d += ` L ${pts[pts.length - 1].x} ${pts[pts.length - 1].y}`;
+  return d;
+}
+
 // Where the ray from the item's center toward (tx,ty) exits the item's rectangle
 function edgeIntersect(item, tx, ty) {
   const cx = item.x + item.w / 2, cy = item.y + item.h / 2;
@@ -427,7 +462,8 @@ function Connector({ conn, items, selected, selectedIds, onSelect, onUpdate, onD
       cleanV.push(verts[i]);
     }
     orthoVerts = cleanV;
-    path = 'M ' + cleanV.map(pt => `${pt.x} ${pt.y}`).join(' L ');
+    // Esquinas redondeadas (aspecto Miro) — los handles siguen usando los vértices exactos
+    path = roundedOrthoPath(cleanV, 8);
     const mid = ortho[Math.floor((ortho.length - 1) / 2)];
     hx = mid.x; hy = mid.y;
     const cn = cleanV.length;
@@ -435,12 +471,13 @@ function Connector({ conn, items, selected, selectedIds, onSelect, onUpdate, onD
     angleEnd = cn >= 2 ? Math.atan2(cleanV[cn-1].y - cleanV[cn-2].y, cleanV[cn-1].x - cleanV[cn-2].x) : 0;
     angleStart = cn >= 2 ? Math.atan2(cleanV[0].y - cleanV[1].y, cleanV[0].x - cleanV[1].x) : 0;
   } else {
-    // Control point from the CENTERS (stable). Edges point TOWARD the control point so the
-    // dotted "covered" segment and the curve line up at the node edge.
+    // Control point from the CENTERS (stable). Edges attach at the NEAREST border
+    // point toward the control point (Milanote-style): arrows from several rows
+    // arrive at distinct heights instead of converging on one spot.
     qx = (cA.x + cB.x) / 2 + bend.x;
     qy = (cA.y + cB.y) / 2 + bend.y;
-    eA = A.item ? edgeIntersect(A.item, qx, qy) : cA;
-    eB = B.item ? edgeIntersect(B.item, qx, qy) : cB;
+    eA = A.item ? nearestPointOnRect(A.item, qx, qy) : cA;
+    eB = B.item ? nearestPointOnRect(B.item, qx, qy) : cB;
     p1 = moveToward(eA, { x: qx, y: qy }, GAP);
     p2 = moveToward(eB, { x: qx, y: qy }, GAP);
     path = `M ${p1.x} ${p1.y} Q ${qx} ${qy} ${p2.x} ${p2.y}`;

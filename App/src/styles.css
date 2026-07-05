@@ -925,6 +925,11 @@ body.dragging-task .item-card { pointer-events: auto !important; }
   transform-origin: center;
 }
 .item:hover .connect-handle, .col-child-wrap:hover .connect-handle { opacity: 1; transform: scale(calc(1 * var(--handle-scale, 1))); }
+/* Dentro de una columna: al pasar sobre una tarjeta hija se esconden los demás
+   conectores del item (columna incluida) y solo queda el de la tarjeta hija —
+   antes se superponían dos anillos y era incómodo apuntar */
+.item:has(.col-child-wrap:hover) .anchors .connect-handle { opacity: 0 !important; pointer-events: none !important; }
+.item:has(.col-child-wrap:hover) .col-child-wrap:hover .anchors .connect-handle { opacity: 1 !important; pointer-events: auto !important; }
 .connect-handle:hover { background: var(--olive); transform: scale(calc(1.15 * var(--handle-scale, 1))); }
 .connect-handle .material-symbols-rounded { font-size: 16px; color: var(--olive); }
 .connect-handle:hover .material-symbols-rounded { color: #fff; }

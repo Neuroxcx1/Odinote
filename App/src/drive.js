@@ -133,14 +133,20 @@
     const fileData = await putRes.json();
     if (!fileData || !fileData.id) { L(`${fileName}: respuesta sin id de archivo`); return null; }
 
-    // 4. Permiso público de lectura para que el resto de dispositivos lo vean
+    // 4. Permiso público de lectura para que el resto de dispositivos lo vean.
+    // Si falla, la imagen dará 404 en los demás dispositivos: hay que saberlo.
     try {
-      await f(`${DRIVE_API}/files/${fileData.id}/permissions`, {
+      const permRes = await f(`${DRIVE_API}/files/${fileData.id}/permissions`, {
         method: 'POST',
         headers: { ...authHeaders, 'Content-Type': 'application/json' },
         body: JSON.stringify({ role: 'reader', type: 'anyone' })
       });
-    } catch (e) { /* no bloquear la subida por el permiso */ }
+      if (!permRes.ok) {
+        L(`${fileName}: AVISO — el permiso público falló (HTTP ${permRes.status}); la imagen puede no verse en otros dispositivos`);
+      }
+    } catch (e) {
+      L(`${fileName}: AVISO — error de red al establecer el permiso público`);
+    }
 
     return { fileId: fileData.id, url: publicUrlForFile(fileData.id, mime) };
   }
