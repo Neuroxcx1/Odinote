@@ -461,7 +461,7 @@ function Home({ lang, setLang, theme, setTheme, onOpenProject, projects, onCreat
       )}
       {editProject && (
         <RenameProjectModal
-          project={editProject}
+          project={projects.find(p => p.id === editProject.id) || editProject}
           lang={lang}
           onClose={()=>setEditProject(null)}
           onSave={onRename}
@@ -713,7 +713,9 @@ function RenameProjectModal({ project, lang, onClose, onSave, onTogglePublic, us
   const [name, setName]     = useStateHome(project.name?.[lang] || project.name || '');
   const [emoji, setEmoji]   = useStateHome(project.emoji || EMOJI_PRESETS[0]);
   const [cover, setCover]   = useStateHome(project.cover || COVER_PRESETS[0]);
-  const [isPublic, setIsPublic] = useStateHome(!!project.isPublic);
+  // Derivado del proyecto real: poner Online es asíncrono (sube a Drive primero),
+  // así que un estado local aquí se quedaba desfasado y mostraba "Offline" a proyectos online
+  const isPublic = !!project.isPublic;
   const [copied, setCopied] = useStateHome(false);
 
   const submit = () => {
@@ -785,7 +787,6 @@ function RenameProjectModal({ project, lang, onClose, onSave, onTogglePublic, us
               className="btn"
               onClick={() => {
                 if (isPublic) {
-                  setIsPublic(false);
                   onTogglePublic && onTogglePublic(project.id);
                 } else {
                   if (!userProfile) {
@@ -802,7 +803,6 @@ function RenameProjectModal({ project, lang, onClose, onSave, onTogglePublic, us
                   );
                   window.customConfirm(msg).then((accepted) => {
                     if (accepted) {
-                      setIsPublic(true);
                       onTogglePublic && onTogglePublic(project.id);
                     }
                   });

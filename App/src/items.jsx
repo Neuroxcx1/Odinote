@@ -27,12 +27,27 @@ function resolveMediaSrc(src) {
 }
 window.resolveMediaSrc = resolveMediaSrc;
 
-// Si una imagen alojada en Drive (lh3.googleusercontent.com) no carga —p. ej. el
-// permiso público tardó en propagarse— se reintenta una única vez con el endpoint
-// oficial de miniaturas de Drive, que sirve el mismo archivo.
+// Src a mostrar para un medio: en el .exe se prioriza la copia local de la bóveda
+// (srcLocal) para que todo cargue sin internet; en la web se usa el src remoto.
+function displayMediaSrc(item) {
+  if (window.electronAPI && item.srcLocal) return resolveMediaSrc(item.srcLocal);
+  return resolveMediaSrc(item.src);
+}
+window.displayMediaSrc = displayMediaSrc;
+
+// Cadena de respaldo si una imagen no carga:
+// 1) la copia local de la bóveda falló → probar la URL remota original
+// 2) la URL lh3 de Drive falló (permiso propagándose) → probar el endpoint de miniaturas
 function driveImageFallback(e) {
   const img = e.currentTarget || e.target;
-  if (!img || img.dataset.odiFallback) return;
+  if (!img) return;
+  const remote = img.dataset.remoteSrc;
+  if (remote && !img.dataset.odiTriedRemote && img.src !== remote && !img.src.startsWith('https://lh3.') && !img.src.startsWith('https://drive.google.com/thumbnail')) {
+    img.dataset.odiTriedRemote = '1';
+    img.src = remote;
+    return;
+  }
+  if (img.dataset.odiFallback) return;
   const m = (img.src || '').match(/^https:\/\/lh3\.googleusercontent\.com\/d\/([\w-]+)/);
   if (m) {
     img.dataset.odiFallback = '1';
@@ -685,7 +700,8 @@ function ImageItem({ item, lang, onUpdate, callbacks }) {
             onDoubleClick={(e)=>{ e.stopPropagation(); if (!isCropping) fileRef.current?.click(); }}
           >
             <img
-              src={window.resolveMediaSrc(item.src)}
+              src={displayMediaSrc(item)}
+              data-remote-src={/^https?:\/\//.test(item.src || '') ? item.src : undefined}
               draggable={false}
               onError={driveImageFallback}
               onLoad={(e) => {
@@ -3243,7 +3259,7 @@ function AudioItem({ item, lang, onUpdate }) {
         {/* Custom audio element */}
         <audio
           ref={audioRef}
-          src={window.resolveMediaSrc(item.src)}
+          src={displayMediaSrc(item)}
           onTimeUpdate={handleTimeUpdate}
           onLoadedMetadata={handleLoadedMetadata}
           onEnded={handleEnded}

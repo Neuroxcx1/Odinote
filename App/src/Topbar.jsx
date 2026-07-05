@@ -217,7 +217,7 @@ function Topbar({
         >
           <span
             className="material-symbols-rounded"
-            style={isSyncingDrive ? { animation: 'spin 1.5s linear infinite' } : undefined}
+            style={isSyncingDrive ? { animation: 'spin 1.5s linear infinite', color: 'var(--brand-green, #90B968)' } : undefined}
           >
             sync
           </span>
@@ -290,44 +290,8 @@ function Topbar({
             title={`${Math.round(volume * 100)}%`}
           />
         </div>
-        {isSyncingDrive && (
-          <div
-            className="drive-sync-indicator"
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              color: 'var(--brand-green, #90B968)',
-              fontSize: '11px',
-              fontWeight: '700',
-              marginRight: '8px',
-              userSelect: 'none'
-            }}
-            title={window.t('Sincronizando con Google Drive...', 'Syncing with Google Drive...')}
-          >
-            <span
-              className="material-symbols-rounded"
-              style={{
-                fontSize: '18px',
-                animation: 'spin 1.5s linear infinite'
-              }}
-            >
-              sync
-            </span>
-            <span className="sync-text-label" style={{ display: 'inline-block' }}>
-              {window.t('Sincronizando...', 'Syncing...')}
-            </span>
-            <style>{`
-              @keyframes spin {
-                0% { transform: rotate(0deg); }
-                100% { transform: rotate(360deg); }
-              }
-              @media (max-width: 600px) {
-                .sync-text-label { display: none !important; }
-              }
-            `}</style>
-          </div>
-        )}
+        {/* El estado "sincronizando" se muestra girando el botón ↻ (arriba), sin
+            insertar texto que desplace toda la barra hacia la izquierda */}
         <button
           className={`icon-btn lift user-profile-btn ${userProfile ? 'has-name' : 'no-name'}`}
           title={userProfile ? `${window.t('Perfil de', 'Profile of')} ${userProfile.name}` : window.t('Iniciar sesión con Google (Requerido para colaborar)', 'Sign in with Google (Required to collaborate)')}

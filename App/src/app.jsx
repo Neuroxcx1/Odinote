@@ -40,7 +40,7 @@ try {
 
 // Marcador de build: si la consola no muestra esta versión, el navegador está
 // sirviendo JS cacheado (subir ?v= en index.html invalida la caché)
-console.log('[ODINOTE] Código cargado: v15');
+console.log('[ODINOTE] Código cargado: v16');
 
 // Global shortcuts configuration
 window.shortcuts = {
@@ -327,7 +327,52 @@ function App() {
       : prev);
   };
 
-  // El token murió: lo limpiamos del perfil para que la UI pida volver a iniciar sesión
+  // Flujo de autenticación con Google, compartido entre el primer login y la
+  // renovación del token de Drive (que caduca ~1 hora). En la renovación no se
+  // fuerza el selector de cuenta, así el popup se resuelve casi solo.
+  const startGoogleAuthFlow = (isRenewal) => {
+    setLoginError(null);
+    if (window.electronAPI && window.electronAPI.startGoogleLogin) {
+      setWaitingForWebLogin(true);
+      window.electronAPI.startGoogleLogin()
+        .catch((err) => {
+          console.error('IPC startGoogleLogin error:', err);
+          setWaitingForWebLogin(false);
+          setLoginError(window.t(
+            'No se pudo iniciar el flujo de Google. Asegúrate de estar en la aplicación de escritorio.',
+            'Could not start Google flow. Please make sure you are in the desktop application.'
+          ));
+        });
+    } else {
+      const provider = new firebase.auth.GoogleAuthProvider();
+      if (!isRenewal) provider.setCustomParameters({ prompt: 'select_account' });
+      provider.addScope('https://www.googleapis.com/auth/drive.file');
+      firebase.auth().signInWithPopup(provider)
+        .then((result) => {
+          const user = result.user;
+          const credential = result.credential;
+          const userProfileData = {
+            name: user.displayName || 'Google User',
+            email: user.email,
+            picture: user.photoURL || (user.displayName ? user.displayName.charAt(0) : 'G'),
+            accessToken: credential ? credential.accessToken : null
+          };
+          setUserProfile(userProfileData);
+          localStorage.setItem('odinote.google_profile', JSON.stringify(userProfileData));
+          setUserModalOpen(false);
+          showToast(isRenewal
+            ? window.t('Acceso a Google Drive renovado.', 'Google Drive access renewed.')
+            : window.t('¡Sesión iniciada con éxito mediante Google!', 'Successfully signed in with Google!'));
+        })
+        .catch((err) => {
+          console.error('Auth web error:', err);
+          setLoginError(err.message);
+        });
+    }
+  };
+
+  // El token murió: lo limpiamos del perfil y abrimos el modal de usuario,
+  // donde un solo clic en "Renovar" recupera el acceso a Drive
   const invalidateDriveSession = () => {
     setUserProfile(prev => {
       if (!prev || !prev.accessToken) return prev;
@@ -335,7 +380,8 @@ function App() {
       localStorage.setItem('odinote.google_profile', JSON.stringify(next));
       return next;
     });
-    showToast(window.t('Tu sesión de Google Drive expiró. Vuelve a iniciar sesión para seguir sincronizando.', 'Your Google Drive session expired. Sign in again to keep syncing.'), 'error');
+    showToast(window.t('Tu sesión de Google Drive expiró. Renuévala con un clic.', 'Your Google Drive session expired. Renew it with one click.'), 'error');
+    setUserModalOpen(true);
   };
 
   // Al arrancar o tras iniciar sesión: validar token e importar los proyectos guardados en Drive.
@@ -1539,6 +1585,66 @@ function App() {
     }
   };
 
+  // Caché local de medios en el .exe: descarga a la bóveda (carpeta media/) los
+  // medios alojados en la nube, para que el proyecto abra completo sin internet.
+  // El src remoto se conserva (los demás dispositivos lo siguen usando); srcLocal
+  // es el espejo local que la app de escritorio muestra con prioridad.
+  useEffectApp(() => {
+    if (!window.electronAPI || !window.electronAPI.downloadMediaToVault) return;
+    if (!vaultPath || !view.projectId || loading) return;
+    const t = setTimeout(async () => {
+      if (window._odiLocalCacheBusy) return;
+      window._odiLocalCacheBusy = true;
+      try {
+        const pages = collectProjectCanvases(canvases, view.projectId);
+        const cached = {}; // { canvasId: { itemId | `${colId}::${childId}`: rutaLocal } }
+        for (const cid of Object.keys(pages)) {
+          for (const item of (pages[cid].items || [])) {
+            const jobs = [[item.id, item]];
+            (item.children || []).forEach(ch => jobs.push([`${item.id}::${ch.id}`, ch]));
+            for (const [key, node] of jobs) {
+              if (!node.src || !/^https?:\/\//.test(node.src) || node.srcLocal) continue;
+              try {
+                const localPath = await window.electronAPI.downloadMediaToVault(vaultPath, node.src, `cloud_${node.id}`);
+                if (localPath) (cached[cid] = cached[cid] || {})[key] = localPath;
+              } catch (err) {
+                // Sin internet o URL rota: se reintentará en el próximo ciclo
+              }
+            }
+          }
+        }
+        if (Object.keys(cached).length > 0) {
+          console.log(`[CACHE] ${Object.values(cached).reduce((n, m) => n + Object.keys(m).length, 0)} medios de la nube copiados a la bóveda local`);
+          setCanvases(prev => {
+            const next = { ...prev };
+            Object.keys(cached).forEach(cid => {
+              const canv = next[cid];
+              if (!canv) return;
+              next[cid] = {
+                ...canv,
+                items: (canv.items || []).map(it => {
+                  let updated = it;
+                  if (cached[cid][it.id]) updated = { ...updated, srcLocal: cached[cid][it.id] };
+                  if (updated.children && updated.children.some(ch => cached[cid][`${it.id}::${ch.id}`])) {
+                    updated = {
+                      ...updated,
+                      children: updated.children.map(ch => cached[cid][`${it.id}::${ch.id}`] ? { ...ch, srcLocal: cached[cid][`${it.id}::${ch.id}`] } : ch)
+                    };
+                  }
+                  return updated;
+                })
+              };
+            });
+            return next;
+          });
+        }
+      } finally {
+        window._odiLocalCacheBusy = false;
+      }
+    }, 3000);
+    return () => clearTimeout(t);
+  }, [view.projectId, canvases, vaultPath, loading]);
+
   // Invita a un colaborador compartiendo la carpeta del proyecto en Drive con su cuenta de Google.
   // Google le envía el correo de invitación; no hay IDs inventados de por medio.
   const inviteCollaboratorByGoogle = async (project, email) => {
@@ -2277,41 +2383,7 @@ function App() {
                     <button
                       className="btn lift"
                       onClick={() => {
-                        setLoginError(null);
-                        if (window.electronAPI && window.electronAPI.startGoogleLogin) {
-                          setWaitingForWebLogin(true);
-                          window.electronAPI.startGoogleLogin()
-                            .catch((err) => {
-                              console.error("IPC startGoogleLogin error:", err);
-                              setWaitingForWebLogin(false);
-                              setLoginError(window.t(
-                                'No se pudo iniciar el flujo de Google. Asegúrate de estar en la aplicación de escritorio.',
-                                'Could not start Google flow. Please make sure you are in the desktop application.'
-                              ));
-                            });
-                        } else {
-                          const provider = new firebase.auth.GoogleAuthProvider();
-                          provider.setCustomParameters({ prompt: 'select_account' });
-                          provider.addScope('https://www.googleapis.com/auth/drive.file');
-                          firebase.auth().signInWithPopup(provider)
-                            .then((result) => {
-                              const user = result.user;
-                              const credential = result.credential;
-                              const userProfileData = {
-                                name: user.displayName || 'Google User',
-                                email: user.email,
-                                picture: user.photoURL || (user.displayName ? user.displayName.charAt(0) : 'G'),
-                                accessToken: credential ? credential.accessToken : null
-                              };
-                              setUserProfile(userProfileData);
-                              localStorage.setItem('odinote.google_profile', JSON.stringify(userProfileData));
-                              showToast(window.t('¡Sesión iniciada con éxito mediante Google!', 'Successfully signed in with Google!'));
-                            })
-                            .catch((err) => {
-                              console.error("Auth web error:", err);
-                              setLoginError(err.message);
-                            });
-                        }
+                        startGoogleAuthFlow(false);
                         window.playAudioTone && window.playAudioTone('click');
                       }}
                       style={{
@@ -2405,12 +2477,28 @@ function App() {
                   </div>
                 </div>
 
-                <div style={{ padding: '10px 12px', background: 'rgba(144, 185, 104, 0.1)', border: '1.5px solid var(--brand-green, #90B968)', borderRadius: '8px', fontSize: '12.5px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span className="material-symbols-rounded" style={{ color: 'var(--brand-green, #90B968)', fontSize: '18px' }}>check_circle</span>
-                  <span style={{ fontWeight: '600', color: 'var(--ink, #1A1A1A)' }}>
-                    {window.t('Conectado mediante Google', 'Connected via Google')}
-                  </span>
-                </div>
+                {userProfile.accessToken ? (
+                  <div style={{ padding: '10px 12px', background: 'rgba(144, 185, 104, 0.1)', border: '1.5px solid var(--brand-green, #90B968)', borderRadius: '8px', fontSize: '12.5px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span className="material-symbols-rounded" style={{ color: 'var(--brand-green, #90B968)', fontSize: '18px' }}>check_circle</span>
+                    <span style={{ fontWeight: '600', color: 'var(--ink, #1A1A1A)' }}>
+                      {window.t('Conectado mediante Google', 'Connected via Google')}
+                    </span>
+                  </div>
+                ) : (
+                  <div style={{ padding: '10px 12px', background: 'rgba(230, 84, 79, 0.08)', border: '1.5px solid var(--wine, #E6544F)', borderRadius: '8px', fontSize: '12.5px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <span className="material-symbols-rounded" style={{ color: 'var(--wine, #E6544F)', fontSize: '18px' }}>sync_problem</span>
+                    <span style={{ fontWeight: '600', color: 'var(--ink, #1A1A1A)', flex: 1 }}>
+                      {window.t('El acceso a Google Drive caducó (dura ~1 hora).', 'Google Drive access expired (lasts ~1 hour).')}
+                    </span>
+                    <button
+                      className="btn lift"
+                      onClick={() => { startGoogleAuthFlow(true); window.playAudioTone && window.playAudioTone('click'); }}
+                      style={{ padding: '6px 12px', borderRadius: '6px', background: 'var(--olive, #6A8546)', color: 'white', border: 'none', fontWeight: '700', fontSize: '12px', cursor: 'pointer', flexShrink: 0 }}
+                    >
+                      {window.t('Renovar', 'Renew')}
+                    </button>
+                  </div>
+                )}
 
                 <div style={{ borderTop: '1px solid var(--line-soft, #E5E1DD)', paddingTop: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <button
