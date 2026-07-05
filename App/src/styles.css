@@ -488,7 +488,10 @@ a, button, select, input[type="submit"], input[type="button"], [role="button"],
 .ms-card-btn {
   width: 26px; height: 26px; display: grid; place-items: center;
   background: rgba(255,255,255,0.94); border: 1.5px solid var(--line);
-  border-radius: 4px; box-shadow: 1px 1px 0 var(--line); cursor: pointer; color: var(--ink);
+  border-radius: 4px; box-shadow: 1px 1px 0 var(--line); cursor: pointer;
+  /* El botón es blanco en ambos temas, así que el icono siempre debe ser oscuro
+     (var(--ink) se vuelve blanco en modo oscuro y el icono desaparecía) */
+  color: #1A1A1A;
 }
 .ms-card-btn:hover { background: #fff; transform: translate(-1px,-1px); box-shadow: 2px 2px 0 var(--line); }
 .ms-card-btn.danger:hover { color: var(--wine); }
@@ -2943,6 +2946,11 @@ body.odi-busy iframe { pointer-events: none !important; }
 
 .frame-header {
   background: color-mix(in srgb, var(--line-soft, #E5E1DD) 25%, transparent);
+}
+/* En modo oscuro --line-soft es casi negro; usamos un gris claro translúcido
+   para que la franja del título contraste con el lienzo sin deslumbrar */
+[data-theme="dark"] .frame-header {
+  background: rgba(240, 238, 240, 0.13);
 }
 
 /* Colores específicos de fondo y borde para los Frames */

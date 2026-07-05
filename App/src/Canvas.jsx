@@ -367,7 +367,7 @@ function duplicateCanvasState(state, origId, newId) {
   });
 }
 
-function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn, setCanvases: setExtCanvases, updateAvailable, onUpdateClick, volume, onChangeVolume, onSettingsClick, vaultPath, userProfile, onUserClick, projects, setProjects, onSharingClick, processMediaSrc, isSyncingDrive }) {
+function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn, setCanvases: setExtCanvases, updateAvailable, onUpdateClick, volume, onChangeVolume, onSettingsClick, vaultPath, userProfile, onUserClick, projects, setProjects, onSharingClick, isSyncingDrive }) {
   const currentProject = projects ? projects.find(p => p.id === projectId) : null;
   const [canvases, _setCanvases] = useStateCanvas(() => canvasesIn || JSON.parse(JSON.stringify(window.INITIAL_CANVASES)));
   // Stable ref to App's setter — avoids the infinite loop caused by it being a dep on every render
@@ -925,7 +925,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
           const targetItem = targetId ? current.items.find(i => i.id === targetId) : null;
           const pt = screenToCanvas(e.clientX, e.clientY);
           const applyDroppedImageSrc = (rawSrc) => {
-            const src = processMediaSrc ? processMediaSrc(rawSrc) : rawSrc;
+            const src = rawSrc;
             const defW = 300;
             const defH = 220;
 
@@ -1218,7 +1218,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
 
       // Resolve to a usable image source (data URL from blob, or http URL string)
       const applyImageSrc = (rawSrc) => {
-        const src = processMediaSrc ? processMediaSrc(rawSrc) : rawSrc;
+        const src = rawSrc;
         e.preventDefault();
         const selItem = selected ? current.items.find(i => i.id === selected) : null;
         

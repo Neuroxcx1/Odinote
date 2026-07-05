@@ -262,15 +262,70 @@ function App() {
     }
   }, []);
 
-  useEffectApp(() => {
-    if (userProfile && userProfile.accessToken) {
-      syncProjectsFromGoogleDrive(userProfile.accessToken);
+  // Comprueba que el token de Drive siga vivo (expira ~1 hora después del login)
+  const validateDriveToken = async (accessToken) => {
+    try {
+      const res = await fetch('https://www.googleapis.com/drive/v3/about?fields=user', {
+        headers: { 'Authorization': `Bearer ${accessToken}` }
+      });
+      return res.ok;
+    } catch (err) {
+      return false;
     }
+  };
+
+  // El token murió: lo limpiamos del perfil para que la UI pida volver a iniciar sesión
+  const invalidateDriveSession = () => {
+    setUserProfile(prev => {
+      if (!prev || !prev.accessToken) return prev;
+      const next = { ...prev, accessToken: null };
+      localStorage.setItem('odinote.google_profile', JSON.stringify(next));
+      return next;
+    });
+    showToast(window.t('Tu sesión de Google Drive expiró. Vuelve a iniciar sesión para seguir sincronizando.', 'Your Google Drive session expired. Sign in again to keep syncing.'), 'error');
+  };
+
+  // Al arrancar o tras iniciar sesión: validar token e importar los proyectos guardados en Drive
+  useEffectApp(() => {
+    if (!userProfile || !userProfile.accessToken) return;
+    let cancelled = false;
+    (async () => {
+      const ok = await validateDriveToken(userProfile.accessToken);
+      if (cancelled) return;
+      if (!ok) { invalidateDriveSession(); return; }
+      syncProjectsFromGoogleDrive(userProfile.accessToken);
+    })();
+    return () => { cancelled = true; };
+  }, [userProfile && userProfile.accessToken]);
+
+  // Re-importar desde Drive cuando la ventana recupera el foco (máx. 1 vez por minuto),
+  // para que lo publicado desde el otro dispositivo (web <-> .exe) aparezca solo
+  useEffectApp(() => {
+    const onFocus = () => {
+      if (!userProfile || !userProfile.accessToken) return;
+      const now = Date.now();
+      if (now - (window._odiLastDriveImport || 0) < 60000) return;
+      window._odiLastDriveImport = now;
+      syncProjectsFromGoogleDrive(userProfile.accessToken);
+    };
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
   }, [userProfile]);
+
+  // Sin sesión iniciada no puede haber nada online: todos los puestos de trabajo
+  // pasan a offline y se quedan así hasta que el usuario los vuelva a publicar
+  useEffectApp(() => {
+    if (loading || userProfile) return;
+    setProjects(prev => prev.some(p => p.isPublic || p.isRemote)
+      ? prev.map(p => (p.isPublic || p.isRemote) ? { ...p, isPublic: false, isRemote: false } : p)
+      : prev);
+  }, [userProfile, loading]);
 
   const [sharingModalOpen, setSharingModalOpen] = useStateApp(false);
   const [activeSharingProjectId, setActiveSharingProjectId] = useStateApp(null);
   const [joiningModalOpen, setJoiningModalOpen] = useStateApp(false);
+  const [inviteEmail, setInviteEmail] = useStateApp('');
+  const [inviteBusy, setInviteBusy] = useStateApp(false);
 
   useEffectApp(() => {
     if (settingsOpen && window.electronAPI && window.electronAPI.getCustomDictionaryWords) {
@@ -686,26 +741,52 @@ function App() {
     return nextCanvases;
   };
 
-  const uploadToGoogleDriveReal = async (projectId, projectName, canvasesData, accessToken) => {
-    if (!accessToken) return;
+  // Nombre legible del proyecto: en el estado es un objeto { es, en }
+  const projectNameString = (name) => {
+    if (!name) return 'Proyecto';
+    if (typeof name === 'string') return name;
+    return name.es || name.en || Object.values(name)[0] || 'Proyecto';
+  };
+
+  // Recolecta solo los canvases del proyecto (raíz + boards anidados),
+  // para no subir a Drive los datos de TODOS los demás proyectos
+  const collectProjectCanvases = (allCanvases, rootId) => {
+    const out = {};
+    const visit = (id) => {
+      const c = allCanvases[id];
+      if (!c || out[id]) return;
+      out[id] = c;
+      (c.items || []).forEach(it => { if (it.canvasId) visit(it.canvasId); });
+    };
+    visit(rootId);
+    return out;
+  };
+
+  // Sube el estado del proyecto a Drive. Devuelve el id de la carpeta del proyecto o null si falló.
+  const uploadToGoogleDriveReal = async (project, canvasesData, accessToken) => {
+    if (!accessToken || !project) return null;
+    const projectId = project.id;
+    const projectName = projectNameString(project.name);
+    const safeName = projectName.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
     setIsSyncingDrive(true);
     try {
       const headers = {
         'Authorization': `Bearer ${accessToken}`,
         'Content-Type': 'application/json'
       };
+      const driveGet = async (url) => {
+        const res = await fetch(url, { headers });
+        if (res.status === 401) { invalidateDriveSession(); return null; }
+        return res;
+      };
 
       // 1. Obtener o crear la carpeta "Odinote"
       const searchRootUrl = `https://www.googleapis.com/drive/v3/files?q=name='Odinote' and mimeType='application/vnd.google-apps.folder' and trashed=false&fields=files(id)`;
-      const searchRootRes = await fetch(searchRootUrl, { headers });
-      if (searchRootRes.status === 401) {
-        showToast(window.t('Tu sesión de Google Drive ha expirado. Vuelve a iniciar sesión para sincronizar.', 'Your Google Drive session expired. Please sign in again to sync.'), 'error');
-        return;
-      }
-      if (!searchRootRes.ok) return;
+      const searchRootRes = await driveGet(searchRootUrl);
+      if (!searchRootRes || !searchRootRes.ok) return null;
       const searchRootData = await searchRootRes.json();
       let rootFolderId = '';
-      
+
       if (searchRootData.files && searchRootData.files.length > 0) {
         rootFolderId = searchRootData.files[0].id;
       } else {
@@ -717,53 +798,70 @@ function App() {
             mimeType: 'application/vnd.google-apps.folder'
           })
         });
-        if (!createRootRes.ok) return;
+        if (!createRootRes.ok) return null;
         const createRootData = await createRootRes.json();
         rootFolderId = createRootData.id;
       }
 
-      if (!rootFolderId) return;
+      if (!rootFolderId) return null;
 
-      // 2. Obtener o crear la carpeta con el nombre del proyecto dentro de "Odinote"
-      const searchProjFolderUrl = `https://www.googleapis.com/drive/v3/files?q=name='${projectName}' and '${rootFolderId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false&fields=files(id)`;
-      const searchProjFolderRes = await fetch(searchProjFolderUrl, { headers });
-      if (!searchProjFolderRes.ok) return;
-      const searchProjFolderData = await searchProjFolderRes.json();
+      // 2. Obtener o crear la carpeta del proyecto dentro de "Odinote".
+      // Primero probamos el id guardado (sobrevive a renombres del proyecto).
       let projFolderId = '';
-
-      if (searchProjFolderData.files && searchProjFolderData.files.length > 0) {
-        projFolderId = searchProjFolderData.files[0].id;
-      } else {
-        const createProjFolderRes = await fetch('https://www.googleapis.com/drive/v3/files', {
-          method: 'POST',
-          headers,
-          body: JSON.stringify({
-            name: projectName,
-            mimeType: 'application/vnd.google-apps.folder',
-            parents: [rootFolderId]
-          })
-        });
-        if (!createProjFolderRes.ok) return;
-        const createProjFolderData = await createProjFolderRes.json();
-        projFolderId = createProjFolderData.id;
+      const storedFolderId = localStorage.getItem(`odinote.gdrive_folder_${projectId}`);
+      if (storedFolderId) {
+        const checkRes = await driveGet(`https://www.googleapis.com/drive/v3/files/${storedFolderId}?fields=id,trashed`);
+        if (checkRes && checkRes.ok) {
+          const checkData = await checkRes.json();
+          if (!checkData.trashed) projFolderId = checkData.id;
+        }
       }
 
-      if (!projFolderId) return;
+      if (!projFolderId) {
+        const searchProjFolderUrl = `https://www.googleapis.com/drive/v3/files?q=name='${encodeURIComponent(safeName)}' and '${rootFolderId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false&fields=files(id)`;
+        const searchProjFolderRes = await driveGet(searchProjFolderUrl);
+        if (!searchProjFolderRes || !searchProjFolderRes.ok) return null;
+        const searchProjFolderData = await searchProjFolderRes.json();
+
+        if (searchProjFolderData.files && searchProjFolderData.files.length > 0) {
+          projFolderId = searchProjFolderData.files[0].id;
+        } else {
+          const createProjFolderRes = await fetch('https://www.googleapis.com/drive/v3/files', {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({
+              name: projectName,
+              mimeType: 'application/vnd.google-apps.folder',
+              parents: [rootFolderId]
+            })
+          });
+          if (!createProjFolderRes.ok) return null;
+          const createProjFolderData = await createProjFolderRes.json();
+          projFolderId = createProjFolderData.id;
+        }
+      }
+
+      if (!projFolderId) return null;
 
       // Guardar el ID de la carpeta del proyecto en localStorage para las subidas de imagenes
       localStorage.setItem(`odinote.gdrive_folder_${projectId}`, projFolderId);
 
       // 3. Buscar si ya existe "canvas_state.json" en esa carpeta
       const searchFileUrl = `https://www.googleapis.com/drive/v3/files?q=name='canvas_state.json' and '${projFolderId}' in parents and trashed=false&fields=files(id)`;
-      const fileSearchRes = await fetch(searchFileUrl, { headers });
-      if (!fileSearchRes.ok) return;
+      const fileSearchRes = await driveGet(searchFileUrl);
+      if (!fileSearchRes || !fileSearchRes.ok) return null;
       const fileSearchData = await fileSearchRes.json();
       let fileId = '';
 
       const projectDataContent = JSON.stringify({
         projectId,
-        name: projectName,
-        canvases: canvasesData,
+        name: project.name,
+        emoji: project.emoji || '🗒️',
+        cover: project.cover || '',
+        isPublic: !!project.isPublic,
+        shareToken: project.shareToken || null,
+        collaborators: project.collaborators || [],
+        canvases: collectProjectCanvases(canvasesData, projectId),
         syncedAt: new Date().toISOString()
       });
 
@@ -771,7 +869,7 @@ function App() {
         fileId = fileSearchData.files[0].id;
         // Actualizar canvas_state.json
         const updateUrl = `https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`;
-        await fetch(updateUrl, {
+        const updateRes = await fetch(updateUrl, {
           method: 'PATCH',
           headers: {
             'Authorization': `Bearer ${accessToken}`,
@@ -779,6 +877,7 @@ function App() {
           },
           body: projectDataContent
         });
+        if (!updateRes.ok) return null;
       } else {
         // Crear canvas_state.json
         const boundary = '-------314159265358979323846';
@@ -801,7 +900,7 @@ function App() {
           closeDelim;
 
         const createUrl = 'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart';
-        await fetch(createUrl, {
+        const createRes = await fetch(createUrl, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${accessToken}`,
@@ -809,9 +908,12 @@ function App() {
           },
           body: multipartBody
         });
+        if (!createRes.ok) return null;
       }
+      return projFolderId;
     } catch (err) {
       console.error('Error synchronizing project file to Google Drive:', err);
+      return null;
     } finally {
       setTimeout(() => setIsSyncingDrive(false), 800);
     }
@@ -862,6 +964,7 @@ function App() {
         body: multipartBody
       });
 
+      if (uploadRes.status === 401) { invalidateDriveSession(); return null; }
       if (!uploadRes.ok) return null;
       const fileData = await uploadRes.json();
       const fileId = fileData.id;
@@ -898,6 +1001,7 @@ function App() {
       // 1. Buscar la carpeta "Odinote"
       const searchRootUrl = `https://www.googleapis.com/drive/v3/files?q=name='Odinote' and mimeType='application/vnd.google-apps.folder' and trashed=false&fields=files(id)`;
       const searchRootRes = await fetch(searchRootUrl, { headers });
+      if (searchRootRes.status === 401) { invalidateDriveSession(); return; }
       if (!searchRootRes.ok) return;
       const searchRootData = await searchRootRes.json();
       if (!searchRootData.files || searchRootData.files.length === 0) return;
@@ -939,14 +1043,15 @@ function App() {
             name: projJSON.name,
             emoji: projJSON.emoji || '🗒️',
             cover: projJSON.cover || 'var(--bg-card, #FFFFFF)',
-            starred: false,
-            isPublic: true,
+            isPublic: projJSON.isPublic !== false,
+            shareToken: projJSON.shareToken || null,
+            collaborators: projJSON.collaborators || [],
             useGoogleDrive: true,
             items: Object.keys(projJSON.canvases || {}).length,
             updated: { en: 'Synced', es: 'Sincronizado' }
           };
           importedProjects.push(projectMetaData);
-          
+
           Object.assign(importedCanvases, projJSON.canvases);
         }
       }
@@ -957,9 +1062,10 @@ function App() {
           importedProjects.forEach(ip => {
             const idx = next.findIndex(p => p.id === ip.id);
             if (idx !== -1) {
-              next[idx] = { ...next[idx], ...ip };
+              // Conservamos lo local que Drive no conoce (favorito, papelera)
+              next[idx] = { ...next[idx], ...ip, starred: next[idx].starred, deleted: next[idx].deleted };
             } else {
-              next.push(ip);
+              next.push({ ...ip, starred: false });
             }
           });
           return next;
@@ -1034,7 +1140,14 @@ function App() {
             return;
           }
           const now = Date.now();
-          
+
+          // 3.0 Primera sincronización: crear las carpetas en Drive antes de subir medios
+          if (!localStorage.getItem(`odinote.gdrive_folder_${view.projectId}`)) {
+            lastGoogleDriveSyncTimeRef.current = now;
+            const createdFolder = await uploadToGoogleDriveReal(activeProj, canvases, userProfile.accessToken);
+            if (!createdFolder) return;
+          }
+
           // 3.1 Escaneo y subida de imagenes Base64 locales a Google Drive
           const currentCanvas = canvases[view.projectId];
           if (currentCanvas && currentCanvas.items) {
@@ -1066,7 +1179,7 @@ function App() {
           // 3.2 Sincronización del archivo JSON del proyecto a Google Drive
           if (now - lastGoogleDriveSyncTimeRef.current > 10000) {
             lastGoogleDriveSyncTimeRef.current = now;
-            uploadToGoogleDriveReal(view.projectId, activeProj.name, canvases, userProfile.accessToken);
+            uploadToGoogleDriveReal(activeProj, canvases, userProfile.accessToken);
           }
         }
       }
@@ -1248,16 +1361,111 @@ function App() {
       setUserModalOpen(true);
       return;
     }
+    const target = projects.find(x => x.id === projectId);
+    const makingPublic = target && !target.isPublic;
+    const nextToken = makingPublic
+      ? `odi-tok-${Math.random().toString(36).substr(2, 9)}-${Math.random().toString(36).substr(2, 9)}`
+      : null;
     setProjects(p => p.map(x => {
       if (x.id === projectId) {
-        const nextPublic = !x.isPublic;
-        const nextToken = nextPublic 
-          ? `odi-tok-${Math.random().toString(36).substr(2, 9)}-${Math.random().toString(36).substr(2, 9)}`
-          : null;
-        return { ...x, isPublic: nextPublic, shareToken: nextToken };
+        return { ...x, isPublic: !x.isPublic, shareToken: nextToken };
       }
       return x;
     }));
+    // Al publicar, subimos el proyecto a Drive de inmediato (sin esperar al autosave)
+    // para que aparezca en la carpeta Odinote y en los otros dispositivos de la cuenta
+    if (makingPublic && target) {
+      if (!userProfile.accessToken) {
+        showToast(window.t('Publicado localmente, pero Google Drive no está autorizado. Cierra e inicia sesión de nuevo.', 'Published locally, but Google Drive is not authorized. Sign out and sign in again.'), 'error');
+        return;
+      }
+      uploadToGoogleDriveReal({ ...target, isPublic: true, shareToken: nextToken }, canvases, userProfile.accessToken)
+        .then(folderId => {
+          if (folderId) {
+            showToast(window.t(`"${projectNameString(target.name)}" subido a tu Google Drive (carpeta Odinote).`, `"${projectNameString(target.name)}" uploaded to your Google Drive (Odinote folder).`));
+          } else {
+            showToast(window.t('No se pudo subir el proyecto a Google Drive. Revisa tu sesión.', 'Could not upload the project to Google Drive. Check your session.'), 'error');
+          }
+        });
+    }
+  };
+
+  // Invita a un colaborador compartiendo la carpeta del proyecto en Drive con su cuenta de Google.
+  // Google le envía el correo de invitación; no hay IDs inventados de por medio.
+  const inviteCollaboratorByGoogle = async (project, email) => {
+    const clean = (email || '').trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(clean)) {
+      showToast(window.t('Introduce un correo de Google válido.', 'Enter a valid Google email.'), 'error');
+      return false;
+    }
+    if (!userProfile || !userProfile.accessToken) {
+      showToast(window.t('Inicia sesión con Google para poder invitar.', 'Sign in with Google to invite.'), 'error');
+      return false;
+    }
+    if (userProfile.email && clean === userProfile.email.toLowerCase()) {
+      showToast(window.t('Ese correo es el tuyo: ya eres el propietario.', 'That email is yours: you are already the owner.'), 'error');
+      return false;
+    }
+    try {
+      // Asegurar que el proyecto ya existe en Drive antes de compartir la carpeta
+      let folderId = localStorage.getItem(`odinote.gdrive_folder_${project.id}`);
+      if (!folderId) {
+        folderId = await uploadToGoogleDriveReal(project, canvases, userProfile.accessToken);
+      }
+      if (!folderId) {
+        showToast(window.t('No se pudo preparar la carpeta del proyecto en Drive.', 'Could not prepare the project folder on Drive.'), 'error');
+        return false;
+      }
+      const res = await fetch(`https://www.googleapis.com/drive/v3/files/${folderId}/permissions?sendNotificationEmail=true`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${userProfile.accessToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ role: 'writer', type: 'user', emailAddress: clean })
+      });
+      if (res.status === 401) { invalidateDriveSession(); return false; }
+      if (!res.ok) {
+        showToast(window.t('Google rechazó la invitación. Verifica que el correo sea una cuenta de Google real.', 'Google rejected the invitation. Make sure the email is a real Google account.'), 'error');
+        return false;
+      }
+      setProjects(prev => prev.map(p => {
+        if (p.id !== project.id) return p;
+        const list = p.collaborators || [];
+        if (list.some(c => (c.email || c.id || '').toLowerCase() === clean)) return p;
+        return { ...p, collaborators: [...list, { id: clean, email: clean, name: clean.split('@')[0], role: 'editor' }] };
+      }));
+      showToast(window.t(`Invitación enviada por Google Drive a ${clean}.`, `Invitation sent via Google Drive to ${clean}.`));
+      return true;
+    } catch (err) {
+      console.error('Error inviting collaborator via Google Drive:', err);
+      showToast(window.t('Error de red al enviar la invitación.', 'Network error while sending the invitation.'), 'error');
+      return false;
+    }
+  };
+
+  // Quita al colaborador de la lista y revoca su permiso en la carpeta de Drive
+  const removeCollaboratorByGoogle = async (project, col) => {
+    setProjects(prev => prev.map(p => {
+      if (p.id !== project.id) return p;
+      return { ...p, collaborators: (p.collaborators || []).filter(c => c.id !== col.id) };
+    }));
+    const email = (col.email || col.id || '').toLowerCase();
+    const folderId = localStorage.getItem(`odinote.gdrive_folder_${project.id}`);
+    if (!folderId || !userProfile || !userProfile.accessToken || !email.includes('@')) return;
+    try {
+      const headers = { 'Authorization': `Bearer ${userProfile.accessToken}` };
+      const listRes = await fetch(`https://www.googleapis.com/drive/v3/files/${folderId}/permissions?fields=permissions(id,emailAddress)`, { headers });
+      if (listRes.status === 401) { invalidateDriveSession(); return; }
+      if (!listRes.ok) return;
+      const listData = await listRes.json();
+      const perm = (listData.permissions || []).find(pm => (pm.emailAddress || '').toLowerCase() === email);
+      if (perm) {
+        await fetch(`https://www.googleapis.com/drive/v3/files/${folderId}/permissions/${perm.id}`, { method: 'DELETE', headers });
+      }
+    } catch (err) {
+      console.error('Error revoking Drive permission:', err);
+    }
   };
 
   // Permanent delete → removes the project and its (nested) canvases for good.
@@ -1475,17 +1683,7 @@ function App() {
       onUserClick={() => setUserModalOpen(true)}
       projects={projects}
       setProjects={setProjects}
-      onSharingClick={(pid) => { setActiveSharingProjectId(pid); setSharingModalOpen(true); }}
-      processMediaSrc={(src) => {
-        const activeProj = projects.find(p => p.id === view.projectId);
-        if (activeProj && activeProj.useGoogleDrive) {
-          if (src && (src.startsWith('data:') || src.startsWith('file:') || (!src.startsWith('http://') && !src.startsWith('https://')))) {
-            const fileId = 'drive-file-' + Math.random().toString(36).substr(2, 9);
-            return `https://drive.google.com/uc?export=view&id=${fileId}`;
-          }
-        }
-        return src;
-      }}
+      onSharingClick={(pid) => { setActiveSharingProjectId(pid); setInviteEmail(''); setSharingModalOpen(true); }}
     />;
   }
 
@@ -2219,35 +2417,47 @@ function App() {
                   </div>
 
                   <div style={{ borderTop: '1px solid var(--line-soft, #E5E1DD)', paddingTop: '16px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                      <h4 style={{ margin: 0, fontSize: '13px', fontWeight: '700', color: 'var(--text-soft)' }}>
-                        {window.t('Colaboradores Invitados', 'Invited Collaborators')}
-                      </h4>
-                      <button
-                        className="btn lift"
-                        onClick={() => {
-                          const friendId = prompt(window.t('Introduce el ID del usuario al que quieres invitar (ej. usr-xxxx):', 'Enter the ID of the user you want to invite (e.g. usr-xxxx):'));
-                          if (friendId) {
-                            // Simulación: Guardamos en project.collaborators
-                            setProjects(prev => prev.map(p => {
-                              if (p.id === project.id) {
-                                const list = p.collaborators || [];
-                                if (list.some(c => c.id === friendId)) return p;
-                                return {
-                                  ...p,
-                                  collaborators: [...list, { id: friendId, name: friendId.replace('usr-', 'User_'), role: 'editor' }]
-                                };
-                              }
-                              return p;
-                            }));
+                    <h4 style={{ margin: '0 0 8px 0', fontSize: '13px', fontWeight: '700', color: 'var(--text-soft)' }}>
+                      {window.t('Colaboradores Invitados', 'Invited Collaborators')}
+                    </h4>
+                    <div style={{ display: 'flex', gap: '6px', marginBottom: '12px' }}>
+                      <input
+                        type="email"
+                        value={inviteEmail}
+                        onChange={(e) => setInviteEmail(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && !inviteBusy) {
+                            setInviteBusy(true);
+                            inviteCollaboratorByGoogle(project, inviteEmail).then(ok => {
+                              setInviteBusy(false);
+                              if (ok) setInviteEmail('');
+                            });
                           }
                         }}
-                        style={{ padding: '4px 8px', fontSize: '11px', background: 'var(--olive)', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '3px', fontWeight: '700' }}
+                        placeholder={window.t('correo@gmail.com del invitado', 'guest email@gmail.com')}
+                        style={{ flex: 1, padding: '7px 10px', fontSize: '12px', border: '1.5px solid var(--line-soft, #D5D1CD)', borderRadius: '6px', background: 'var(--bg-card, #FFFFFF)', color: 'var(--ink, #1A1A1A)' }}
+                      />
+                      <button
+                        className="btn lift"
+                        disabled={inviteBusy}
+                        onClick={() => {
+                          if (inviteBusy) return;
+                          setInviteBusy(true);
+                          inviteCollaboratorByGoogle(project, inviteEmail).then(ok => {
+                            setInviteBusy(false);
+                            if (ok) setInviteEmail('');
+                          });
+                          window.playAudioTone && window.playAudioTone('click');
+                        }}
+                        style={{ padding: '4px 10px', fontSize: '11px', background: 'var(--olive)', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontWeight: '700', opacity: inviteBusy ? 0.6 : 1 }}
                       >
-                        <span className="material-symbols-rounded" style={{ fontSize: 13 }}>person_add</span>
-                        <span>{window.t('Invitar por ID', 'Invite by ID')}</span>
+                        <span className="material-symbols-rounded" style={{ fontSize: 13 }}>{inviteBusy ? 'hourglass_top' : 'person_add'}</span>
+                        <span>{inviteBusy ? window.t('Invitando...', 'Inviting...') : window.t('Invitar por Google', 'Invite via Google')}</span>
                       </button>
                     </div>
+                    <p style={{ margin: '0 0 10px 0', fontSize: '10.5px', color: 'var(--text-soft, #595459)', lineHeight: 1.4 }}>
+                      {window.t('La invitación se envía compartiendo la carpeta del proyecto en tu Google Drive con esa cuenta. El invitado recibirá un correo de Google.', 'The invitation is sent by sharing the project folder on your Google Drive with that account. The guest will receive an email from Google.')}
+                    </p>
 
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '150px', overflowY: 'auto' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 10px', background: 'var(--bg-card)', borderRadius: '6px', border: '1px solid var(--line-soft)' }}>
@@ -2298,18 +2508,10 @@ function App() {
                             <button
                               className="icon-btn danger"
                               onClick={() => {
-                                window.customConfirm(window.t('¿Eliminar a este colaborador?', 'Remove this collaborator?'))
+                                window.customConfirm(window.t('¿Eliminar a este colaborador? También se revocará su acceso a la carpeta de Drive.', 'Remove this collaborator? Their access to the Drive folder will also be revoked.'))
                                   .then((accepted) => {
                                     if (accepted) {
-                                      setProjects(prev => prev.map(p => {
-                                        if (p.id === project.id) {
-                                          return {
-                                            ...p,
-                                            collaborators: p.collaborators.filter(c => c.id !== col.id)
-                                          };
-                                        }
-                                        return p;
-                                      }));
+                                      removeCollaboratorByGoogle(project, col);
                                       window.playAudioTone && window.playAudioTone('click');
                                     }
                                   });
@@ -2358,6 +2560,17 @@ function App() {
                                      return p;
                                    }));
                                    window.playAudioTone && window.playAudioTone('click');
+                                   // Subida inmediata para que las carpetas aparezcan en Drive al instante
+                                   if (userProfile.accessToken) {
+                                     uploadToGoogleDriveReal({ ...project, useGoogleDrive: true }, canvases, userProfile.accessToken)
+                                       .then(folderId => {
+                                         if (folderId) {
+                                           showToast(window.t('Proyecto sincronizado con tu Google Drive (carpeta Odinote).', 'Project synced with your Google Drive (Odinote folder).'));
+                                         }
+                                       });
+                                   } else {
+                                     showToast(window.t('Google Drive no autorizado. Cierra e inicia sesión de nuevo para activarlo.', 'Google Drive unauthorized. Sign out and sign in again to authorize it.'), 'error');
+                                   }
                                  }
                                });
                              } else {
@@ -2406,7 +2619,7 @@ function App() {
                         <div style={{ padding: '10px', background: 'rgba(52, 168, 83, 0.08)', border: '1px solid #34A853', borderRadius: '6px', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
                           <span className="material-symbols-rounded" style={{ color: '#34A853', fontSize: '16px' }}>cloud_done</span>
                           <span style={{ fontWeight: '600', color: 'var(--ink, #1A1A1A)' }}>
-                            {window.t('Sincronización activa con la carpeta: Odinote Canvases', 'Sync active with folder: Odinote Canvases')}
+                            {window.t('Sincronización activa con la carpeta: Odinote', 'Sync active with folder: Odinote')}
                           </span>
                         </div>
                         {window.electronAPI && (
