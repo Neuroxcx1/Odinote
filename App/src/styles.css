@@ -924,12 +924,20 @@ body.dragging-task .item-card { pointer-events: auto !important; }
   z-index: 6;
   transform-origin: center;
 }
-.item:hover .connect-handle, .col-child-wrap:hover .connect-handle { opacity: 1; transform: scale(calc(1 * var(--handle-scale, 1))); }
-/* Dentro de una columna: al pasar sobre una tarjeta hija se esconden los demás
-   conectores del item (columna incluida) y solo queda el de la tarjeta hija —
-   antes se superponían dos anillos y era incómodo apuntar */
-.item:has(.col-child-wrap:hover) .anchors .connect-handle { opacity: 0 !important; pointer-events: none !important; }
-.item:has(.col-child-wrap:hover) .col-child-wrap:hover .anchors .connect-handle { opacity: 1 !important; pointer-events: auto !important; }
+/* Solo el handle PROPIO del elemento sobre el que está el cursor: con el selector
+   descendiente anterior, pasar sobre una columna encendía a la vez su handle y el
+   de TODAS sus tarjetas hijas (anillos superpuestos) */
+.item:hover > .anchors > .connect-handle,
+.col-child-wrap:hover > .anchors > .connect-handle { opacity: 1; transform: scale(calc(1 * var(--handle-scale, 1))); }
+/* Dentro de una columna: al pasar sobre una tarjeta hija se esconde el conector
+   de la columna y solo queda el de la tarjeta hija */
+.item:has(.col-child-wrap:hover) > .anchors > .connect-handle { opacity: 0 !important; pointer-events: none !important; }
+
+/* Cuatro puntos de conexión estilo Miro: arriba, derecha, abajo e izquierda
+   (la base .connect-handle ya posiciona el derecho) */
+.connect-handle.pos-top    { right: auto; left: 50%; top: -11px; margin-top: 0; margin-left: -11px; }
+.connect-handle.pos-bottom { right: auto; left: 50%; top: auto; bottom: -11px; margin-top: 0; margin-left: -11px; }
+.connect-handle.pos-left   { right: auto; left: -11px; }
 .connect-handle:hover { background: var(--olive); transform: scale(calc(1.15 * var(--handle-scale, 1))); }
 .connect-handle .material-symbols-rounded { font-size: 16px; color: var(--olive); }
 .connect-handle:hover .material-symbols-rounded { color: #fff; }

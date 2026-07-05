@@ -4046,17 +4046,20 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
                       {item.comments.length}
                     </div>
                   )}
-                  {/* Single Milanote-style connection handle (connects to the node's center).
-                      Appears on hover; drag it onto another node to create an arrow. */}
+                  {/* Puntos de conexión estilo Miro en los cuatro lados del nodo.
+                      Aparecen al pasar el cursor; arrastra cualquiera hasta otro nodo. */}
                   {!isEditing && !activeTool && item.type !== 'line' && (
                     <div className="anchors">
-                      <div
-                        className="connect-handle"
-                        title={lang==='es'?'Arrastra para conectar':'Drag to connect'}
-                        onMouseDown={(e)=>startAnchorDrag(e, item.id, 'center')}
-                      >
-                        <span className="material-symbols-rounded">trip_origin</span>
-                      </div>
+                      {['top', 'right', 'bottom', 'left'].map(pos => (
+                        <div
+                          key={pos}
+                          className={`connect-handle ${pos === 'right' ? '' : `pos-${pos}`}`}
+                          title={lang==='es'?'Arrastra para conectar':'Drag to connect'}
+                          onMouseDown={(e)=>startAnchorDrag(e, item.id, 'center')}
+                        >
+                          <span className="material-symbols-rounded">trip_origin</span>
+                        </div>
+                      ))}
                     </div>
                   )}
                   {/* Resize handles */}

@@ -22,8 +22,13 @@ const cors = require('cors');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Configuración de Ko-fi (SEGURO: lee el token desde variables de entorno de producción. Si no está definido, usa el valor de respaldo local)
-const KOFI_VERIFICATION_TOKEN = process.env.KOFI_VERIFICATION_TOKEN || 'fd67ed4c-f7d7-47fc-a652-124d36eccf30';
+// Configuración de Ko-fi. El token de verificación se lee SOLO de la variable de
+// entorno: nunca lo escribas en este archivo (el repo es público y quedaría expuesto).
+const KOFI_VERIFICATION_TOKEN = process.env.KOFI_VERIFICATION_TOKEN;
+if (!KOFI_VERIFICATION_TOKEN) {
+  console.error('[Ko-fi Webhook] Falta la variable de entorno KOFI_VERIFICATION_TOKEN. Configúrala antes de iniciar el servidor.');
+  process.exit(1);
+}
 const DONATIONS_FILE_PATH = path.join(__dirname, 'donations.json'); // Archivo que servirá la app de Odinote
 const MAX_DONATIONS_LIST = 10; // Número máximo de donantes recientes a conservar
 
