@@ -40,7 +40,7 @@ try {
 
 // Marcador de build: si la consola no muestra esta versión, el navegador está
 // sirviendo JS cacheado (subir ?v= en index.html invalida la caché)
-console.log('[ODINOTE] Código cargado: v11');
+console.log('[ODINOTE] Código cargado: v12');
 
 // Global shortcuts configuration
 window.shortcuts = {
@@ -988,6 +988,37 @@ function App() {
   // (La subida de medios vive ahora en window.OdiDrive.syncProjectMedia — src/drive.js —
   // con subida reanudable sin límite de tamaño y cubierta por tests.)
 
+  // Aplica al estado las URLs de Drive que reemplazan a los medios locales.
+  // Devuelve true si hubo algo que aplicar. Usado por el autosave y el botón ↻.
+  const applyMediaReplacements = (replaced) => {
+    if (!replaced || Object.keys(replaced).length === 0) return false;
+    setCanvases(prev => {
+      const next = { ...prev };
+      Object.keys(replaced).forEach(cid => {
+        const canv = next[cid];
+        if (!canv) return;
+        next[cid] = {
+          ...canv,
+          items: (canv.items || []).map(it => {
+            let updated = it;
+            if (replaced[cid][it.id]) updated = { ...updated, src: replaced[cid][it.id] };
+            if (updated.children && updated.children.some(ch => replaced[cid][`${it.id}::${ch.id}`])) {
+              updated = {
+                ...updated,
+                children: updated.children.map(ch => replaced[cid][`${it.id}::${ch.id}`] ? { ...ch, src: replaced[cid][`${it.id}::${ch.id}`] } : ch)
+              };
+            }
+            return updated;
+          })
+        };
+      });
+      return next;
+    });
+    // El próximo autosave debe subir el JSON con las URLs nuevas sin esperar el throttle
+    lastGoogleDriveSyncTimeRef.current = 0;
+    return true;
+  };
+
   const syncProjectsFromGoogleDrive = async (accessToken) => {
     if (!accessToken) return;
     try {
@@ -1160,8 +1191,12 @@ function App() {
       // 3. Sincronización real con Google Drive si está habilitado
       if (userProfile && view.projectId) {
         const activeProj = projects.find(p => p.id === view.projectId);
+        if (activeProj && !(activeProj.isPublic || activeProj.isRemote || activeProj.useGoogleDrive)) {
+          console.log(`[DRIVE] ${view.projectId} está Offline: no se sincroniza (ponlo Online para subirlo)`);
+        }
         if (activeProj && (activeProj.isPublic || activeProj.isRemote || activeProj.useGoogleDrive)) {
           if (!userProfile.accessToken) {
+            console.log('[DRIVE] Sin token de Drive: hay que volver a iniciar sesión con Google');
             const lastAlert = window.lastDriveScopeAlertTime || 0;
             const now = Date.now();
             if (now - lastAlert > 45000) {
@@ -1201,35 +1236,8 @@ function App() {
           if (mediaResult.attempted > mediaResult.uploaded) {
             console.warn(`[DRIVE] ${mediaResult.attempted - mediaResult.uploaded} medios no se pudieron subir (ver líneas anteriores)`);
           }
-          const replaced = mediaResult.replaced;
-
-          if (Object.keys(replaced).length > 0) {
-            setCanvases(prev => {
-              const next = { ...prev };
-              Object.keys(replaced).forEach(cid => {
-                const canv = next[cid];
-                if (!canv) return;
-                next[cid] = {
-                  ...canv,
-                  items: (canv.items || []).map(it => {
-                    let updated = it;
-                    if (replaced[cid][it.id]) updated = { ...updated, src: replaced[cid][it.id] };
-                    if (updated.children && updated.children.some(ch => replaced[cid][`${it.id}::${ch.id}`])) {
-                      updated = {
-                        ...updated,
-                        children: updated.children.map(ch => replaced[cid][`${it.id}::${ch.id}`] ? { ...ch, src: replaced[cid][`${it.id}::${ch.id}`] } : ch)
-                      };
-                    }
-                    return updated;
-                  })
-                };
-              });
-              return next;
-            });
+          if (applyMediaReplacements(mediaResult.replaced)) {
             showToast(window.t('Imágenes y archivos del proyecto subidos a Google Drive.', 'Project images and files uploaded to Google Drive.'));
-            // Forzar la resubida inmediata del JSON con las nuevas URLs en el
-            // próximo ciclo (sin esto el throttle de 10s dejaba el JSON viejo en Drive)
-            lastGoogleDriveSyncTimeRef.current = 0;
             return;
           }
           } finally {
@@ -1466,22 +1474,68 @@ function App() {
       return;
     }
     showToast(window.t('Sincronizando con Google Drive...', 'Syncing with Google Drive...'));
+    setIsSyncingDrive(true);
     try {
       // 1. Bajar primero lo que haya nuevo en Drive (la importación ya compara
       // marcas de tiempo, así que nunca pisa ediciones locales más recientes)
       await syncProjectsFromGoogleDrive(userProfile.accessToken);
 
-      // 2. Subir TODOS los proyectos online que tengan cambios locales pendientes
+      // 2. Si estamos dentro de un proyecto online, subir también sus medios
+      // locales (imágenes/audio) — es la sincronización completa garantizada
+      let uploadedMedia = 0;
+      let mediaReplaced = false;
+      if (view.projectId) {
+        const activeProj = projects.find(p => p.id === view.projectId);
+        if (activeProj && (activeProj.isPublic || activeProj.useGoogleDrive)) {
+          let folderId = localStorage.getItem(`odinote.gdrive_folder_${view.projectId}`);
+          if (!folderId) {
+            folderId = await uploadToGoogleDriveReal(activeProj, canvases, userProfile.accessToken);
+          }
+          if (folderId && !window._odiMediaScanBusy) {
+            window._odiMediaScanBusy = true;
+            try {
+              const mediaResult = await window.OdiDrive.syncProjectMedia({
+                canvases,
+                projectId: view.projectId,
+                folderId,
+                accessToken: userProfile.accessToken,
+                resolveSrc: window.resolveMediaSrc,
+                log: (m) => console.log('[DRIVE] ' + m)
+              });
+              if (mediaResult.authError === 401) { invalidateDriveSession(); return; }
+              if (mediaResult.authError === 403) { notifyDriveBlocked({ status: 403, reason: '' }); return; }
+              uploadedMedia = mediaResult.uploaded;
+              mediaReplaced = applyMediaReplacements(mediaResult.replaced);
+              if (mediaResult.attempted > mediaResult.uploaded) {
+                showToast(window.t(`${mediaResult.attempted - mediaResult.uploaded} archivos no se pudieron subir (detalles en la consola).`, `${mediaResult.attempted - mediaResult.uploaded} files could not be uploaded (details in console).`), 'error');
+              }
+            } finally {
+              window._odiMediaScanBusy = false;
+            }
+          }
+        } else if (activeProj) {
+          console.log(`[DRIVE] ${view.projectId} está Offline: el botón de sincronizar no lo sube (ponlo Online primero)`);
+        }
+      }
+
+      // 3. Subir TODOS los proyectos online que tengan cambios locales pendientes.
+      // Si acabamos de reemplazar medios del proyecto actual, su JSON lo subirá el
+      // autosave con el estado ya actualizado (el `canvases` de aquí sería el viejo).
       const onlineProjects = projects.filter(p => (p.isPublic || p.useGoogleDrive) && !p.deleted);
       for (const p of onlineProjects) {
+        if (p.id === view.projectId && mediaReplaced) continue;
         if (getLocalEditedAt(p.id) > getDriveSyncedAt(p.id)) {
           await uploadToGoogleDriveReal(p, canvases, userProfile.accessToken);
         }
       }
-      showToast(window.t('Sincronización con Google Drive completada.', 'Google Drive sync finished.'));
+      showToast(uploadedMedia > 0
+        ? window.t(`Sincronización completada: ${uploadedMedia} archivos subidos a Drive.`, `Sync finished: ${uploadedMedia} files uploaded to Drive.`)
+        : window.t('Sincronización con Google Drive completada.', 'Google Drive sync finished.'));
     } catch (err) {
       console.error('Manual Drive refresh failed:', err);
       showToast(window.t('La sincronización manual falló. Revisa tu conexión.', 'Manual sync failed. Check your connection.'), 'error');
+    } finally {
+      setTimeout(() => setIsSyncingDrive(false), 800);
     }
   };
 
