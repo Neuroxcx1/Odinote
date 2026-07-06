@@ -543,7 +543,7 @@ function NodeCaption({ item, lang, onUpdate, className, placeholder, style, auto
     <div
       ref={ref}
       className={`node-caption rich-caption${className ? ' ' + className : ''}`}
-      style={style}
+      style={{ ...(style || {}), ...(item.captionSize ? { fontSize: `${item.captionSize}px` } : {}) }}
       contentEditable
       suppressContentEditableWarning
       spellCheck={true}

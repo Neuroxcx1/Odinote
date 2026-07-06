@@ -367,7 +367,7 @@ function duplicateCanvasState(state, origId, newId) {
   });
 }
 
-function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn, setCanvases: setExtCanvases, updateAvailable, onUpdateClick, volume, onChangeVolume, onSettingsClick, vaultPath, userProfile, onUserClick, projects, setProjects, onSharingClick, onManualSync, isSyncingDrive }) {
+function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn, setCanvases: setExtCanvases, updateAvailable, onUpdateClick, volume, onChangeVolume, onSettingsClick, vaultPath, userProfile, onUserClick, projects, setProjects, onSharingClick, onManualSync, isSyncingDrive, needsDriveAuth }) {
   const currentProject = projects ? projects.find(p => p.id === projectId) : null;
   const [canvases, _setCanvases] = useStateCanvas(() => canvasesIn || JSON.parse(JSON.stringify(window.INITIAL_CANVASES)));
   // Stable ref to App's setter — avoids the infinite loop caused by it being a dep on every render
@@ -2976,12 +2976,30 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
     window.playAudioTone && window.playAudioTone('delete');
     setCanvases(prev => {
       const c = prev[currentId];
-      const item = c.items.find(i => i.id === itemId);
+      let item = c.items.find(i => i.id === itemId);
+      let nextItems;
+      if (item) {
+        nextItems = c.items.filter(i => i.id !== itemId);
+      } else {
+        // La tarjeta puede vivir DENTRO de una columna: antes estos nodos no se
+        // podían eliminar porque solo se buscaba en el primer nivel del lienzo
+        nextItems = c.items.map(it => {
+          if (it.type === 'column' && it.children) {
+            const found = it.children.find(ch => ch.id === itemId);
+            if (found) {
+              item = found;
+              return { ...it, children: it.children.filter(ch => ch.id !== itemId) };
+            }
+          }
+          return it;
+        });
+        if (!item) return prev;
+      }
       const nextCanvases = {
         ...prev,
         [currentId]: {
           ...c,
-          items: c.items.filter(i => i.id !== itemId),
+          items: nextItems,
           connectors: (c.connectors || []).filter(co => {
             const fromId = co.fromEnd?.itemId || co.from;
             const toId   = co.toEnd?.itemId   || co.to;
@@ -3356,6 +3374,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
     setStack(s => [...s, canvasId]);
     setTransition('entering');
     setTimeout(() => setTransition(null), 350);
+    window.playAudioTone && window.playAudioTone('board_open');
   };
 
   const goBackTo = (idx) => {
@@ -3593,6 +3612,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
           return next;
         });
         setSelected(item.id);
+        window.playAudioTone && window.playAudioTone('drop');
         if (['note','comment','bigtitle'].includes(item.type)) setTimeout(() => setEditing(item.id), 40);
         if (item.type === 'doc') setTimeout(() => setDocOpen({ id: item.id }), 40);
         if (['link','todo','board','column','map','frame'].includes(item.type)) setTimeout(() => setEditing(item.id), 40);
@@ -3657,6 +3677,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
         onSettingsClick={onSettingsClick}
         onManualSync={onManualSync}
         isSyncingDrive={isSyncingDrive}
+        needsDriveAuth={needsDriveAuth}
         activeTool={activeTool} setActiveTool={setActiveTool}
         onHome={onHome}
         onUndo={undo} onRedo={redo}

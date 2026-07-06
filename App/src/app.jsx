@@ -47,7 +47,7 @@ try {
 
 // Marcador de build: si la consola no muestra esta versión, el navegador está
 // sirviendo JS cacheado (subir ?v= en index.html invalida la caché)
-console.log('[ODINOTE] Código cargado: v18');
+console.log('[ODINOTE] Código cargado: v19');
 
 // Global shortcuts configuration
 window.shortcuts = {
@@ -378,8 +378,8 @@ function App() {
     }
   };
 
-  // El token murió: lo limpiamos del perfil y abrimos el modal de usuario,
-  // donde un solo clic en "Renovar" recupera el acceso a Drive
+  // El token murió: lo limpiamos del perfil sin interrumpir al usuario con modales.
+  // El botón ↻ muestra un punto rojo y un solo clic en él renueva el acceso.
   const invalidateDriveSession = () => {
     setUserProfile(prev => {
       if (!prev || !prev.accessToken) return prev;
@@ -387,8 +387,7 @@ function App() {
       localStorage.setItem('odinote.google_profile', JSON.stringify(next));
       return next;
     });
-    showToast(window.t('Tu sesión de Google Drive expiró. Renuévala con un clic.', 'Your Google Drive session expired. Renew it with one click.'), 'error');
-    setUserModalOpen(true);
+    showToast(window.t('El acceso a Drive caducó: pulsa el botón ↻ para renovarlo con un clic.', 'Drive access expired: press the ↻ button to renew it with one click.'), 'error');
   };
 
   // Al arrancar o tras iniciar sesión: validar token e importar los proyectos guardados en Drive.
@@ -1243,12 +1242,14 @@ function App() {
         }
         if (activeProj && (activeProj.isPublic || activeProj.isRemote || activeProj.useGoogleDrive)) {
           if (!userProfile.accessToken) {
-            console.log('[DRIVE] Sin token de Drive: hay que volver a iniciar sesión con Google');
+            console.log('[DRIVE] Sin token de Drive: pulsa ↻ para renovarlo');
             const lastAlert = window.lastDriveScopeAlertTime || 0;
             const now = Date.now();
-            if (now - lastAlert > 45000) {
+            // Aviso espaciado (5 min) para no ser molesto: el punto rojo del botón ↻
+            // ya indica el estado de forma permanente y silenciosa
+            if (now - lastAlert > 300000) {
               window.lastDriveScopeAlertTime = now;
-              showToast(window.t('Google Drive no autorizado. Cierra e inicia sesión de nuevo para activarlo.', 'Google Drive unauthorized. Sign out and sign in again to authorize it.'), 'error');
+              showToast(window.t('El acceso a Drive caducó: pulsa ↻ para renovarlo con un clic.', 'Drive access expired: press ↻ to renew it with one click.'), 'error');
             }
             return;
           }
@@ -1517,7 +1518,10 @@ function App() {
       return;
     }
     if (!userProfile.accessToken) {
-      showToast(window.t('Google Drive no está autorizado. Cierra e inicia sesión de nuevo.', 'Google Drive is not authorized. Sign out and sign in again.'), 'error');
+      // Renovación directa: pulsar ↻ sin token válido lanza el flujo de Google
+      // al instante (sin selector de cuenta), en vez de solo mostrar un aviso
+      showToast(window.t('Renovando el acceso a Google Drive...', 'Renewing Google Drive access...'));
+      startGoogleAuthFlow(true);
       return;
     }
     showToast(window.t('Sincronizando con Google Drive...', 'Syncing with Google Drive...'));
@@ -1920,6 +1924,7 @@ function App() {
       onTogglePublic={togglePublicProject}
       onManualSync={manualDriveRefresh}
       isSyncingDrive={isSyncingDrive}
+      needsDriveAuth={!!(userProfile && !userProfile.accessToken)}
     />;
   } else {
     activeView = <window.Canvas
@@ -1943,6 +1948,7 @@ function App() {
       setProjects={setProjects}
       onSharingClick={(pid) => { setActiveSharingProjectId(pid); setInviteEmail(''); setSharingModalOpen(true); }}
       onManualSync={manualDriveRefresh}
+      needsDriveAuth={!!(userProfile && !userProfile.accessToken)}
     />;
   }
 

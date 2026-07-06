@@ -739,6 +739,26 @@ function ContextSidebar({
           </>
         )}
 
+        {/* Tamaño de letra de la leyenda — disponible en cualquier nodo con
+            leyenda activa (mismo mecanismo de ciclo que el título de los frames) */}
+        {item.showCaption === true && (
+          <button
+            className="ctx-btn"
+            onClick={() => {
+              const sizes = [11, 13, 15, 18, 22, 28];
+              const cur = item.captionSize || 11;
+              const idx = sizes.indexOf(cur);
+              const next = sizes[(idx + 1) % sizes.length];
+              onUpdate({ captionSize: next });
+              window.playAudioTone && window.playAudioTone('click');
+            }}
+            title={window.t(`Tamaño de la leyenda: ${item.captionSize || 11}px (clic para cambiar)`, `Caption size: ${item.captionSize || 11}px (click to change)`)}
+          >
+            <span className="material-symbols-rounded">format_size</span>
+            <span>{window.t('Leyenda A±', 'Caption A±')}</span>
+          </button>
+        )}
+
         <div className="ctx-sep-h"/>
 
         <button className="ctx-btn" onClick={onDuplicate} title={window.t('Duplicar', 'Duplicate')}>

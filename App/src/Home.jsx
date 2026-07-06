@@ -51,7 +51,7 @@ function renderProjectIcon(icon) {
 }
 window.renderProjectIcon = renderProjectIcon;
 
-function Home({ lang, setLang, theme, setTheme, onOpenProject, projects, onCreate, onDelete, onRename, onRestore, onPurge, onToggleStar, onExport, onImport, vaultPath, onOpenVault, onCloseVault, updateAvailable, onUpdateClick, onSettingsClick, userProfile, onUserClick, onJoinProjectClick, onTogglePublic, onManualSync, isSyncingDrive }) {
+function Home({ lang, setLang, theme, setTheme, onOpenProject, projects, onCreate, onDelete, onRename, onRestore, onPurge, onToggleStar, onExport, onImport, vaultPath, onOpenVault, onCloseVault, updateAvailable, onUpdateClick, onSettingsClick, userProfile, onUserClick, onJoinProjectClick, onTogglePublic, onManualSync, isSyncingDrive, needsDriveAuth }) {
   const t = window.TRANSLATIONS[lang];
   const [query, setQuery] = useStateHome('');
   const [modal, setModal] = useStateHome(false);
@@ -234,16 +234,21 @@ function Home({ lang, setLang, theme, setTheme, onOpenProject, projects, onCreat
           <div className="ms-top-actions">
             <button
               className="icon-btn lift"
-              title={window.t('Sincronizar con Google Drive ahora', 'Sync with Google Drive now')}
+              title={needsDriveAuth
+                ? window.t('El acceso a Drive caducó: haz clic para renovarlo', 'Drive access expired: click to renew it')
+                : window.t('Sincronizar con Google Drive ahora', 'Sync with Google Drive now')}
               onClick={() => { onManualSync && onManualSync(); window.playAudioTone && window.playAudioTone('click'); }}
-              style={{ marginRight: 10 }}
+              style={{ marginRight: 10, position: 'relative' }}
             >
               <span
                 className="material-symbols-rounded"
-                style={isSyncingDrive ? { animation: 'spin 1.5s linear infinite', color: 'var(--brand-green, #90B968)' } : undefined}
+                style={isSyncingDrive ? { animation: 'spin 1.5s linear infinite', color: 'var(--brand-green, #90B968)' } : (needsDriveAuth ? { color: 'var(--wine, #E6544F)' } : undefined)}
               >
-                sync
+                {needsDriveAuth ? 'sync_problem' : 'sync'}
               </span>
+              {needsDriveAuth && (
+                <span style={{ position: 'absolute', top: '4px', right: '4px', width: '7px', height: '7px', borderRadius: '50%', background: 'var(--wine, #E6544F)', border: '1.5px solid var(--paper)' }}/>
+              )}
             </button>
             {window.electronAPI && (
               <button

@@ -1957,77 +1957,59 @@ window.playAudioTone = function(type) {
   if (window.isAudioMuted) return;
   try {
     const ctx = new (window.AudioContext || window.webkitAudioContext)();
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    
     const now = ctx.currentTime;
-    
+    // Los tonos escalan con el deslizador de volumen (antes solo se respetaba el
+    // silencio y todo sonaba igual de bajo). Con el volumen por defecto (0.5) los
+    // sonidos son ~1.6x más fuertes que antes; al máximo, ~3x.
+    const k = (typeof window.audioVolume === 'number' ? window.audioVolume : 0.5) * 3.2;
+
+    // Un tono simple: onda, frecuencia inicial/final, retardo, duración y ganancia base
+    const tone = ({ wave = 'sine', from, to, at = 0, dur, gain: g }) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.type = wave;
+      osc.frequency.setValueAtTime(from, now + at);
+      if (to) osc.frequency.exponentialRampToValueAtTime(to, now + at + dur);
+      gain.gain.setValueAtTime(Math.min(0.5, g * k), now + at);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + at + dur);
+      osc.start(now + at);
+      osc.stop(now + at + dur);
+    };
+
     if (type === 'click') {
       // Premium mechanical high-frequency tick
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(880, now);
-      osc.frequency.exponentialRampToValueAtTime(1500, now + 0.015);
-      gain.gain.setValueAtTime(0.02, now);
-      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.015);
-      osc.start(now);
-      osc.stop(now + 0.015);
+      tone({ from: 880, to: 1500, dur: 0.015, gain: 0.02 });
     } else if (type === 'create') {
       // Satisfying organic bubble plop
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(180, now);
-      osc.frequency.exponentialRampToValueAtTime(780, now + 0.08);
-      gain.gain.setValueAtTime(0.05, now);
-      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.08);
-      osc.start(now);
-      osc.stop(now + 0.08);
+      tone({ from: 180, to: 780, dur: 0.08, gain: 0.05 });
+    } else if (type === 'drop') {
+      // Soltar un nodo nuevo en el lienzo: plop + blip de confirmación
+      tone({ from: 160, to: 620, dur: 0.09, gain: 0.055 });
+      tone({ from: 880, to: 1180, at: 0.09, dur: 0.07, gain: 0.035 });
     } else if (type === 'delete') {
       // Soft tactile slip / paper slide
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(260, now);
-      osc.frequency.exponentialRampToValueAtTime(60, now + 0.12);
-      gain.gain.setValueAtTime(0.04, now);
-      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.12);
-      osc.start(now);
-      osc.stop(now + 0.12);
+      tone({ from: 260, to: 60, dur: 0.12, gain: 0.04 });
     } else if (type === 'connect') {
       // Soft acoustic dual chime (music box)
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(523.25, now); // C5
-      osc.frequency.setValueAtTime(783.99, now + 0.04); // G5
-      gain.gain.setValueAtTime(0.03, now);
-      gain.gain.setValueAtTime(0.03, now + 0.04);
-      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.16);
-      osc.start(now);
-      osc.stop(now + 0.16);
+      tone({ from: 523.25, dur: 0.16, gain: 0.03 });
+      tone({ from: 783.99, at: 0.04, dur: 0.12, gain: 0.03 });
     } else if (type === 'drag_start') {
       // Soft card lift/grab thump
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(140, now);
-      osc.frequency.exponentialRampToValueAtTime(90, now + 0.03);
-      gain.gain.setValueAtTime(0.03, now);
-      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.03);
-      osc.start(now);
-      osc.stop(now + 0.03);
+      tone({ from: 140, to: 90, dur: 0.03, gain: 0.03 });
     } else if (type === 'drag_end') {
       // Soft card landing drop
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(100, now);
-      osc.frequency.exponentialRampToValueAtTime(50, now + 0.05);
-      gain.gain.setValueAtTime(0.04, now);
-      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.05);
-      osc.start(now);
-      osc.stop(now + 0.05);
+      tone({ from: 100, to: 50, dur: 0.05, gain: 0.04 });
     } else if (type === 'snap') {
       // Tiny haptic ticking sound
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(1200, now);
-      gain.gain.setValueAtTime(0.008, now);
-      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.008);
-      osc.start(now);
-      osc.stop(now + 0.008);
+      tone({ from: 1200, dur: 0.008, gain: 0.008 });
+    } else if (type === 'board_open') {
+      // Entrar a un tablero: arpegio ascendente suave, al estilo de los canales de Wii
+      tone({ wave: 'triangle', from: 523.25, dur: 0.35, gain: 0.030 }); // C5
+      tone({ wave: 'triangle', from: 659.25, at: 0.07, dur: 0.32, gain: 0.032 }); // E5
+      tone({ wave: 'triangle', from: 783.99, at: 0.14, dur: 0.30, gain: 0.034 }); // G5
+      tone({ wave: 'sine',     from: 1046.5, at: 0.21, dur: 0.42, gain: 0.030 }); // C6
     }
   } catch (e) {
     // Fail silently if browser audio context blocked
