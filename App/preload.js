@@ -22,6 +22,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getCustomDictionaryWords: () => ipcRenderer.invoke('get-custom-dictionary-words'),
   removeWordFromDictionary: (word) => ipcRenderer.invoke('remove-word-from-dictionary', word),
   startGoogleLogin: () => ipcRenderer.invoke('start-google-login'),
+  // Descarga el instalador del release y lo ejecuta (auto-actualización).
+  // onProgress recibe el porcentaje descargado (0-100).
+  downloadAndRunUpdate: (url, fileName, onProgress) => {
+    if (onProgress) {
+      const listener = (event, pct) => onProgress(pct);
+      ipcRenderer.on('update-download-progress', listener);
+    }
+    return ipcRenderer.invoke('download-and-run-update', { url, fileName });
+  },
   onGoogleSigninCompleted: (callback) => {
     const listener = (event, profile) => callback(profile);
     ipcRenderer.on('google-signin-completed', listener);

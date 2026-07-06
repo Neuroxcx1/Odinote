@@ -639,6 +639,50 @@ ipcMain.handle('start-google-login', async () => {
   shell.openExternal(authUrl);
 });
 
+// Descarga el instalador (.exe) del último release y lo lanza, para actualizar
+// sin que el usuario tenga que ir a GitHub. Devuelve { ok } o { ok:false, error }.
+ipcMain.handle('download-and-run-update', async (event, { url, fileName }) => {
+  logToFile(`IPC Call: download-and-run-update ${url}`);
+  try {
+    const path = require('path');
+    const fs = require('fs');
+    const os = require('os');
+    const { net } = require('electron');
+
+    const safeName = (fileName || 'Odinote-Setup.exe').replace(/[^a-zA-Z0-9._-]/g, '_');
+    const destPath = path.join(os.tmpdir(), safeName);
+
+    const response = await net.fetch(url, { redirect: 'follow' });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+    // Descarga en streaming para poder informar el progreso
+    const total = Number(response.headers.get('content-length')) || 0;
+    const reader = response.body.getReader();
+    const chunks = [];
+    let received = 0;
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      chunks.push(value);
+      received += value.length;
+      if (total && mainWindow) {
+        mainWindow.webContents.send('update-download-progress', Math.round((received / total) * 100));
+      }
+    }
+    fs.writeFileSync(destPath, Buffer.concat(chunks.map(c => Buffer.from(c))));
+    logToFile(`Update installer saved to ${destPath}, launching...`);
+
+    // Lanzar el instalador y cerrar la app para que pueda reemplazar los archivos
+    const opened = await shell.openPath(destPath);
+    if (opened) throw new Error(opened); // openPath devuelve string de error si falla
+    setTimeout(() => app.quit(), 1200);
+    return { ok: true };
+  } catch (err) {
+    logToFile(`download-and-run-update ERROR: ${err.message}`);
+    return { ok: false, error: err.message };
+  }
+});
+
 
 app.whenReady().then(() => {
   logToFile('App whenReady triggered.');

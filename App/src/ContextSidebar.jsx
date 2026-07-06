@@ -739,24 +739,41 @@ function ContextSidebar({
           </>
         )}
 
-        {/* Tamaño de letra de la leyenda — disponible en cualquier nodo con
-            leyenda activa (mismo mecanismo de ciclo que el título de los frames) */}
+        {/* Tamaño de letra de la leyenda — dos botones (aumentar/disminuir),
+            disponibles en cualquier nodo con leyenda activa */}
         {item.showCaption === true && (
-          <button
-            className="ctx-btn"
-            onClick={() => {
-              const sizes = [11, 13, 15, 18, 22, 28];
-              const cur = item.captionSize || 11;
-              const idx = sizes.indexOf(cur);
-              const next = sizes[(idx + 1) % sizes.length];
-              onUpdate({ captionSize: next });
-              window.playAudioTone && window.playAudioTone('click');
-            }}
-            title={window.t(`Tamaño de la leyenda: ${item.captionSize || 11}px (clic para cambiar)`, `Caption size: ${item.captionSize || 11}px (click to change)`)}
-          >
-            <span className="material-symbols-rounded">format_size</span>
-            <span>{window.t('Leyenda A±', 'Caption A±')}</span>
-          </button>
+          <>
+            <button
+              className="ctx-btn"
+              onClick={() => {
+                const sizes = [11, 13, 15, 18, 22, 28, 34];
+                const cur = item.captionSize || 11;
+                const idx = sizes.indexOf(cur);
+                const next = idx < sizes.length - 1 ? sizes[idx + 1] : sizes[sizes.length - 1];
+                onUpdate({ captionSize: next });
+                window.playAudioTone && window.playAudioTone('click');
+              }}
+              title={window.t('Aumentar tamaño de la leyenda', 'Increase caption size')}
+            >
+              <span className="material-symbols-rounded">text_increase</span>
+              <span>{window.t('Aumentar Leyenda', 'Increase Caption')}</span>
+            </button>
+            <button
+              className="ctx-btn"
+              onClick={() => {
+                const sizes = [11, 13, 15, 18, 22, 28, 34];
+                const cur = item.captionSize || 11;
+                const idx = sizes.indexOf(cur);
+                const next = idx > 0 ? sizes[idx - 1] : sizes[0];
+                onUpdate({ captionSize: next });
+                window.playAudioTone && window.playAudioTone('click');
+              }}
+              title={window.t('Disminuir tamaño de la leyenda', 'Decrease caption size')}
+            >
+              <span className="material-symbols-rounded">text_decrease</span>
+              <span>{window.t('Disminuir Leyenda', 'Decrease Caption')}</span>
+            </button>
+          </>
         )}
 
         <div className="ctx-sep-h"/>

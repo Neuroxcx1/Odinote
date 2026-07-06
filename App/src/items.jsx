@@ -35,6 +35,23 @@ function displayMediaSrc(item) {
 }
 window.displayMediaSrc = displayMediaSrc;
 
+// Fondo de un nodo respetando el tema: si el usuario NO eligió color, el nodo
+// sigue el tema (papel oscuro en modo oscuro) en vez de quedar blanco fijo.
+// Un color elegido explícitamente (incluido el blanco) se respeta tal cual.
+function nodeBg(item) {
+  if (!item.color) return 'var(--paper)';
+  return window.resolveStickyColor ? window.resolveStickyColor(item.color) : '#FFFFFF';
+}
+// Color de texto acorde al fondo: sin color → tinta del tema; fondo oscuro →
+// blanco; fondo claro elegido → tinta oscura fija.
+function nodeInk(item) {
+  if (!item.color) return 'var(--ink)';
+  const dark = ['olive','wine','dark','green','red','purple','navy','indigo','plum','forest','black'].includes(item.color);
+  return dark ? '#FFFFFF' : '#1A1A1A';
+}
+window.nodeBg = nodeBg;
+window.nodeInk = nodeInk;
+
 // Cadena de respaldo si una imagen no carga:
 // 1) la copia local de la bóveda falló → probar la URL remota original
 // 2) la URL lh3 de Drive falló (permiso propagándose) → probar el endpoint de miniaturas
@@ -111,9 +128,8 @@ function pickLang(v, lang) {
 function NoteItem({ item, lang, editing, onUpdate }) {
   const cls = colorClass(item.color || 'white');
   const text = pickLang(item.content, lang);
-  const bg = window.resolveStickyColor ? window.resolveStickyColor(item.color || 'white') : null;
-  const isDarkBg = ['olive','wine','dark','green','red','purple'].includes(item.color);
-  const textColor = isDarkBg ? 'white' : '#1A1A1A';
+  const bg = window.nodeBg(item);
+  const textColor = window.nodeInk(item);
   const ref = React.useRef(null);
 
   // Ensure every <pre> has an editable <p> sibling after it (so user can click below)
@@ -564,7 +580,7 @@ function ImageItem({ item, lang, onUpdate, callbacks }) {
   const cb = callbacks || {};
   const fileRef = React.useRef(null);
   const hasImage = !!item.src;
-  const bg = window.resolveStickyColor ? window.resolveStickyColor(item.color || 'white') : null;
+  const bg = window.nodeBg(item);
   const [naturalRatio, setNaturalRatio] = React.useState(null);
   const onUpdateRef = React.useRef(onUpdate);
   React.useEffect(() => { onUpdateRef.current = onUpdate; }, [onUpdate]);
@@ -932,7 +948,7 @@ function LinkItem({ item, lang, onUpdate, editing, onEndEdit }) {
   const meta = hasUrl ? parseLink(item.url) : null;
   const [fetched, setFetched] = React.useState(null);
   const [playing, setPlaying] = React.useState(false);
-  const bg = window.resolveStickyColor ? window.resolveStickyColor(item.color || 'white') : null;
+  const bg = window.nodeBg(item);
   const isDarkBg = ['olive','wine','dark','green','red','purple'].includes(item.color);
   const showPreview = item.showPreview !== false;
   const showInfo = item.showInfo !== false;
@@ -958,7 +974,7 @@ function LinkItem({ item, lang, onUpdate, editing, onEndEdit }) {
   if (!hasUrl || editing) {
     return (
       <div className="link-card empty" style={{width:'100%', height:'100%'}}>
-        <div className="item-card" style={{ background: bg, color: isDarkBg ? 'white' : 'inherit' }}>
+        <div className="item-card" style={{ background: bg, color: window.nodeInk(item) }}>
           <div className="link-edit-row">
             <span className="material-symbols-rounded link-prefix" style={{fontSize: 18, color:'var(--ink-3)'}}>link</span>
             <input
@@ -999,7 +1015,7 @@ function LinkItem({ item, lang, onUpdate, editing, onEndEdit }) {
 
   return (
     <div className="link-card" style={{width:'100%', height:'100%'}}>
-      <div className="item-card" style={{ background: bg, color: isDarkBg ? 'white' : 'inherit' }}>
+      <div className="item-card" style={{ background: bg, color: window.nodeInk(item) }}>
         {showPreview && (
         <div
           className="link-thumb"
@@ -1109,7 +1125,7 @@ function LinkItem({ item, lang, onUpdate, editing, onEndEdit }) {
 // ──────────────── TODO ────────────────
 function TodoItem({ item, lang, onUpdate, editing, callbacks }) {
   const subs = item.items || [];
-  const bg = window.resolveStickyColor ? window.resolveStickyColor(item.color || 'white') : null;
+  const bg = window.nodeBg(item);
   const isDarkBg = ['olive','wine','dark','green','red','purple'].includes(item.color);
 
   const [focusedRowId, setFocusedRowId] = React.useState(() => {
@@ -1285,7 +1301,7 @@ function TodoItem({ item, lang, onUpdate, editing, callbacks }) {
 
   return (
     <div ref={cardRef} className="todo-card" style={{width:'100%', height:'100%'}}>
-      <div className="item-card" style={{ background: bg, color: isDarkBg ? 'white' : 'inherit' }}>
+      <div className="item-card" style={{ background: bg, color: window.nodeInk(item) }}>
         {item.showTitle !== false && (
           <div className="todo-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
             {editing ? (
@@ -1944,7 +1960,7 @@ function BoardItem({ item, lang, onUpdate, onOpenBoard, editing, getNestedItems,
 // ──────────────── DOC ────────────────
 function DocItem({ item, lang, onOpenDoc }) {
   const body = pickLang(item.body, lang);
-  const bg = window.resolveStickyColor ? window.resolveStickyColor(item.color || 'white') : null;
+  const bg = window.nodeBg(item);
   const isDarkBg = ['olive','wine','dark','green','red','purple'].includes(item.color);
   const compact = item.showPreview === false; // preview off → just the doc logo
   const title = pickLang(item.title, lang) || (window.t('Documento', 'Document'));
@@ -1952,7 +1968,7 @@ function DocItem({ item, lang, onOpenDoc }) {
     <div className="doc-card" style={{width:'100%', height:'100%'}}>
       <div
         className="item-card"
-        style={{ background: bg, color: isDarkBg ? 'white' : '#1A1A1A' }}
+        style={{ background: bg, color: window.nodeInk(item) }}
         onDoubleClick={(e)=>{ e.stopPropagation(); onOpenDoc && onOpenDoc(item.id); }}
       >
         {compact ? (
@@ -1994,7 +2010,7 @@ function CalendarItem({ item, lang, onUpdate, editing }) {
   const [eventDraft, setEventDraft] = React.useState('');
   const fileRef = React.useRef(null);
   const pendingImgKey = React.useRef(null);
-  const bg = window.resolveStickyColor ? window.resolveStickyColor(item.color || 'white') : null;
+  const bg = window.nodeBg(item);
   const isDarkBg = ['olive','wine','dark','green','red','purple'].includes(item.color);
 
   const firstDay = new Date(view.year, view.month, 1).getDay();
@@ -2086,7 +2102,7 @@ function CalendarItem({ item, lang, onUpdate, editing }) {
 
   return (
     <div className="cal-mb" style={{width:'100%', height:'100%'}}>
-      <div className="item-card" style={{padding: 10, display:'flex', flexDirection:'column', background: bg, color: isDarkBg ? 'white' : 'inherit'}}>
+      <div className="item-card" style={{padding: 10, display:'flex', flexDirection:'column', background: bg, color: window.nodeInk(item)}}>
         <div className="cal-mb-head">
           <span className="material-symbols-rounded" style={{color:'var(--wine)'}}>calendar_month</span>
 
@@ -2470,7 +2486,7 @@ function TableItem({ item, lang, onUpdate, editing, selected, onSelectItem, onRe
   const cells = item.cells || {};
   const title = pickLang(item.title, lang) || '';
   const caption = pickLang(item.caption, lang) || '';
-  const bg = window.resolveStickyColor ? window.resolveStickyColor(item.color || 'white') : null;
+  const bg = window.nodeBg(item);
   const isWhite = !item.color || item.color === 'white';
 
   const MIN_COL_W = 80;
@@ -3064,7 +3080,7 @@ function CommentItem({ item, lang, onUpdate, editing }) {
 
   return (
     <div className="comment-card" style={{width:'100%', height:'100%'}}>
-      <div className="item-card" style={{ background: bg, color: isDarkBg ? 'white' : 'inherit' }}>
+      <div className="item-card" style={{ background: bg, color: window.nodeInk(item) }}>
         <div className="comment-head">
           <div className="comment-avatar" style={{background: COLOR_HEX_RESOLVED[colorClass(item.avatarColor || 'sage')]}}>
             {item.avatar || 'A'}
@@ -3083,10 +3099,10 @@ function CommentItem({ item, lang, onUpdate, editing }) {
             onClick={(e)=>e.stopPropagation()}
             onMouseDown={(e)=>e.stopPropagation()}
             onKeyDown={(e)=>{ if (e.key==='Escape') e.target.blur(); }}
-            style={{ color: isDarkBg ? 'white' : 'inherit' }}
+            style={{ color: window.nodeInk(item) }}
           />
         ) : (
-          <div ref={ref} className="note-inner rich comment-rich" style={{ color: isDarkBg ? 'white' : 'inherit' }}/>
+          <div ref={ref} className="note-inner rich comment-rich" style={{ color: window.nodeInk(item) }}/>
         )}
         {item.showCaption && (
           <div className="node-caption-row">

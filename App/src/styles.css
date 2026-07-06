@@ -1052,7 +1052,10 @@ body.odi-busy iframe { pointer-events: none !important; }
 .item:not(.selected) .node-caption { pointer-events: none; }
 .node-caption-row { padding: 6px 12px; border-top: 1px solid var(--line-soft); }
 .link-caption-input.node-caption { margin-top: 4px; }
-.image-caption.node-caption { min-height: 0; }
+/* La leyenda de imagen se posiciona con left/right, así que su ancho debe ser
+   automático — el width:100% heredado de .node-caption la desbordaba por la
+   derecha (hueco solo a la izquierda). */
+.image-caption.node-caption { min-height: 0; width: auto; box-sizing: border-box; }
 
 /* Todo */
 .todo-card .item-card {
@@ -2674,7 +2677,11 @@ body.odi-busy iframe { pointer-events: none !important; }
   z-index: 10;
   cursor: pointer;
   text-decoration: none;
+  /* Sombra en el texto para que resalte sobre el gradiente y el glow */
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
 }
+.kofi-topbar-btn .kofi-icon,
+.kofi-topbar-btn span { position: relative; z-index: 2; }
 .kofi-topbar-btn::before {
   content: '';
   position: absolute;
@@ -2820,15 +2827,24 @@ body.odi-busy iframe { pointer-events: none !important; }
   font-size: 14px;
 }
 
+/* En modo oscuro el botón es más sólido y vibrante, pero el halo blanco se
+   modera para que el texto "Support" siga siendo legible (antes lo lavaba). */
+[data-theme="dark"] .kofi-topbar-btn {
+  background: linear-gradient(135deg, #E6544F, #FF6B67, #C7423D, #E6544F);
+  background-size: 300% 100%;
+  animation: kofi-gradient-shift 6s ease infinite;
+  border-color: rgba(255, 255, 255, 0.45);
+  box-shadow: 0 4px 18px rgba(230, 84, 79, 0.55), 0 0 12px rgba(255, 107, 103, 0.35);
+}
 [data-theme="dark"] .kofi-topbar-btn::before, [data-theme="dark"] .kofi-card-btn::before {
-  background: conic-gradient(from 0deg, #FFFFFF, #90B968, #595459, #E6544F, #FFFFFF);
-  filter: blur(10px);
-  opacity: 0.55;
+  background: conic-gradient(from 0deg, #FF6B67, #E6544F, #B83A36, #FF6B67);
+  filter: blur(9px);
+  opacity: 0.5;
 }
 [data-theme="dark"] .kofi-topbar-btn::after, [data-theme="dark"] .kofi-card-btn::after {
-  background: radial-gradient(circle at 15% 40%, #FFFFFF 0%, rgba(255, 255, 255, 0.8) 25%, rgba(230, 84, 79, 0.2) 50%, transparent 75%);
-  filter: blur(3px);
-  opacity: 0.85;
+  background: radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.35) 0%, rgba(255, 107, 103, 0.25) 55%, transparent 100%);
+  filter: blur(2px);
+  opacity: 0.4;
 }
 
 @keyframes pulse-bell {

@@ -47,7 +47,7 @@ try {
 
 // Marcador de build: si la consola no muestra esta versión, el navegador está
 // sirviendo JS cacheado (subir ?v= en index.html invalida la caché)
-console.log('[ODINOTE] Código cargado: v19');
+console.log('[ODINOTE] Código cargado: v20');
 
 // Global shortcuts configuration
 window.shortcuts = {
@@ -193,6 +193,9 @@ function App() {
   const [vaultPath, setVaultPath] = useStateApp(null);
   const [updateAvailable, setUpdateAvailable] = useStateApp(false);
   const [checkingUpdates, setCheckingUpdates] = useStateApp(false);
+  // Modal de actualización: { state:'available'|'uptodate'|'downloading'|'error', version, notes, assetUrl, assetName, progress }
+  const [updateModal, setUpdateModal] = useStateApp(null);
+  const [updateProgress, setUpdateProgress] = useStateApp(0);
   const [contextMenu, setContextMenu] = useStateApp(null);
   const [settingsOpen, setSettingsOpen] = useStateApp(false);
   const [dictWords, setDictWords] = useStateApp([]);
@@ -514,92 +517,92 @@ function App() {
   const ignoreNextPersistRef = React.useRef(false);
   const isIncomingRemoteChangeRef = React.useRef(false);
 
-  const MOCK_UPDATE_TEST = false; // Cambiar a true para probar la campana localmente.
+  const CURRENT_VERSION = '1.0.5'; // debe coincidir con package.json
+
+  // Compara versiones semánticas "a.b.c": devuelve true si `latest` > `current`
+  const isNewerVersion = (latest, current) => {
+    const lp = latest.split('.').map(Number);
+    const cp = current.split('.').map(Number);
+    for (let i = 0; i < Math.max(lp.length, cp.length); i++) {
+      const l = lp[i] || 0, c = cp[i] || 0;
+      if (l > c) return true;
+      if (l < c) return false;
+    }
+    return false;
+  };
 
   const checkUpdates = async (manual = false) => {
     if (checkingUpdates) return;
     if (manual) setCheckingUpdates(true);
-    const cleanCurrent = '1.0.4'; // matches package.json
     try {
-      if (MOCK_UPDATE_TEST) {
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        setUpdateAvailable(true);
-        if (manual) {
-          alert(window.t('¡Nueva versión disponible: v1.0.5! Haz clic en la campana para descargarla.', 'New version available: v1.0.5! Click the bell to download it.'));
-        }
-        return;
-      }
       const res = await fetch('https://api.github.com/repos/Neuroxcx1/Odinote/releases');
       if (!res.ok) {
-        if (manual) {
-          alert(window.t('No se pudieron comprobar las actualizaciones. Comprueba tu conexión.', 'Could not check for updates. Please check your connection.'));
-        }
+        if (manual) setUpdateModal({ state: 'error' });
         return;
       }
       const data = await res.json();
-      if (!Array.isArray(data) || data.length === 0) {
-        if (manual) {
-          alert(window.t('¡Estás al día! Odinote está en su versión más reciente (%v).', 'You are up to date! Odinote is on the latest version (%v).').replace('%v', 'v' + cleanCurrent));
-        }
-        return;
-      }
-      const latestRelease = data[0];
-      const latestVersion = latestRelease.tag_name;
+      const latestRelease = Array.isArray(data) ? data.find(r => !r.draft && !r.prerelease) || data[0] : null;
+      const latestVersion = latestRelease && latestRelease.tag_name;
       if (!latestVersion) {
-        if (manual) {
-          alert(window.t('¡Estás al día! Odinote está en su versión más reciente (%v).', 'You are up to date! Odinote is on the latest version (%v).').replace('%v', 'v' + cleanCurrent));
-        }
+        if (manual) setUpdateModal({ state: 'uptodate', version: CURRENT_VERSION });
         return;
       }
-
       const cleanLatest = latestVersion.replace(/^v/, '');
 
-      const latestParts = cleanLatest.split('.').map(Number);
-      const currentParts = cleanCurrent.split('.').map(Number);
-
-      let hasNew = false;
-      for (let i = 0; i < Math.max(latestParts.length, currentParts.length); i++) {
-        const l = latestParts[i] || 0;
-        const c = currentParts[i] || 0;
-        if (l > c) {
-          hasNew = true;
-          break;
-        } else if (l < c) {
-          break;
-        }
-      }
-
-      if (hasNew) {
+      if (isNewerVersion(cleanLatest, CURRENT_VERSION)) {
+        // Buscar el instalador .exe entre los archivos del release para poder
+        // auto-descargarlo; si no hay, se ofrecerá abrir la página del release.
+        const asset = (latestRelease.assets || []).find(a => /\.exe$/i.test(a.name));
         setUpdateAvailable(true);
-        if (manual) {
-          alert(window.t(`¡Nueva versión disponible: v${cleanLatest}! Haz clic en la campana para descargarla.`, `New version available: v${cleanLatest}! Click the bell to download it.`));
-        }
+        setUpdateModal({
+          state: 'available',
+          version: cleanLatest,
+          notes: (latestRelease.body || '').slice(0, 600),
+          assetUrl: asset ? asset.browser_download_url : null,
+          assetName: asset ? asset.name : null,
+        });
       } else {
         setUpdateAvailable(false);
-        if (manual) {
-          alert(window.t('¡Estás al día! Odinote está en su versión más reciente (%v).', 'You are up to date! Odinote is on the latest version (%v).').replace('%v', 'v' + cleanCurrent));
-        }
+        if (manual) setUpdateModal({ state: 'uptodate', version: CURRENT_VERSION });
       }
     } catch (err) {
       console.error('Failed to check for updates:', err);
-      if (manual) {
-        alert(window.t('Error al comprobar actualizaciones. Comprueba tu conexión a internet.', 'Error checking for updates. Please check your internet connection.'));
-      }
+      if (manual) setUpdateModal({ state: 'error' });
     } finally {
       if (manual) setCheckingUpdates(false);
     }
   };
 
-  // Check for updates instantly on mount
+  // Comprobar al arrancar (auto: si hay versión nueva, abre el modal directamente)
   useEffectApp(() => {
     if (window.electronAPI) {
       checkUpdates(false);
     }
   }, []);
 
-  const handleUpdateClick = () => {
-    if (updateAvailable) {
+  // Descarga el instalador y lo ejecuta (auto-actualización). Si no hay instalador
+  // en el release, abre la página de descargas como respaldo.
+  const runAutoUpdate = () => {
+    if (!updateModal) return;
+    if (!updateModal.assetUrl || !window.electronAPI || !window.electronAPI.downloadAndRunUpdate) {
       window.open('https://github.com/Neuroxcx1/Odinote/releases/latest', '_blank');
+      return;
+    }
+    setUpdateProgress(0);
+    setUpdateModal(m => ({ ...m, state: 'downloading' }));
+    window.electronAPI.downloadAndRunUpdate(updateModal.assetUrl, updateModal.assetName, (pct) => setUpdateProgress(pct))
+      .then(result => {
+        if (!result || !result.ok) {
+          setUpdateModal(m => ({ ...m, state: 'error' }));
+        }
+        // Si ok, main.js relanza el instalador y cierra la app
+      });
+  };
+
+  const handleUpdateClick = () => {
+    if (updateModal) return; // ya abierto
+    if (updateAvailable) {
+      checkUpdates(true); // reabre el modal con los datos frescos del release
     } else {
       checkUpdates(true);
     }
@@ -3187,6 +3190,87 @@ function App() {
           </div>
         </div>
       )}
+      {updateModal && (
+        <div className="doc-modal-overlay" style={{ zIndex: 10001, display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(3px)' }} onClick={() => { if (updateModal.state !== 'downloading') setUpdateModal(null); }}>
+          <div style={{ width: '420px', maxWidth: '92vw', background: 'var(--paper, #FAF9F6)', border: '1.5px solid var(--line, #595459)', borderRadius: '14px', boxShadow: 'var(--pop-md)', overflow: 'hidden' }} onClick={(e) => e.stopPropagation()}>
+            {/* Cabecera con gradiente de marca */}
+            <div style={{ padding: '22px 24px', background: 'linear-gradient(135deg, var(--olive, #6A8546), var(--brand-green, #90B968))', color: 'white', display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <span className="material-symbols-rounded" style={{ fontSize: '30px' }}>
+                {updateModal.state === 'uptodate' ? 'verified' : updateModal.state === 'error' ? 'error' : 'rocket_launch'}
+              </span>
+              <div>
+                <div style={{ fontSize: '17px', fontWeight: '800', fontFamily: 'var(--font-display)' }}>
+                  {updateModal.state === 'available' && window.t(`Odinote v${updateModal.version} disponible`, `Odinote v${updateModal.version} available`)}
+                  {updateModal.state === 'downloading' && window.t('Descargando actualización…', 'Downloading update…')}
+                  {updateModal.state === 'uptodate' && window.t('Todo al día', 'You are up to date')}
+                  {updateModal.state === 'error' && window.t('No se pudo actualizar', 'Update failed')}
+                </div>
+                <div style={{ fontSize: '12px', opacity: 0.9 }}>
+                  {window.t(`Versión actual: v${CURRENT_VERSION}`, `Current version: v${CURRENT_VERSION}`)}
+                </div>
+              </div>
+            </div>
+
+            <div style={{ padding: '20px 24px' }}>
+              {updateModal.state === 'available' && (
+                <>
+                  <p style={{ margin: '0 0 12px 0', fontSize: '13.5px', color: 'var(--ink, #1A1A1A)' }}>
+                    {updateModal.assetUrl
+                      ? window.t('Se descargará e instalará automáticamente. La app se reiniciará al terminar.', 'It will download and install automatically. The app will restart when finished.')
+                      : window.t('Abre la página de descargas para obtener la nueva versión.', 'Open the downloads page to get the new version.')}
+                  </p>
+                  {updateModal.notes && (
+                    <div style={{ maxHeight: '140px', overflowY: 'auto', fontSize: '12px', color: 'var(--text-soft, #595459)', background: 'var(--bg-main, #ECEAE6)', border: '1px solid var(--line-soft, #E5E1DD)', borderRadius: '8px', padding: '10px 12px', whiteSpace: 'pre-wrap', marginBottom: '16px' }}>
+                      {updateModal.notes}
+                    </div>
+                  )}
+                  <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+                    <button onClick={() => setUpdateModal(null)} style={{ padding: '9px 16px', borderRadius: '8px', border: '1.5px solid var(--line-soft, #D5D1CD)', background: 'transparent', color: 'var(--ink)', fontWeight: '700', fontSize: '13px', cursor: 'pointer' }}>
+                      {window.t('Más tarde', 'Later')}
+                    </button>
+                    <button onClick={runAutoUpdate} style={{ padding: '9px 18px', borderRadius: '8px', border: 'none', background: 'var(--olive, #6A8546)', color: 'white', fontWeight: '700', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span className="material-symbols-rounded" style={{ fontSize: '18px' }}>{updateModal.assetUrl ? 'download' : 'open_in_new'}</span>
+                      {updateModal.assetUrl ? window.t('Actualizar ahora', 'Update now') : window.t('Abrir descargas', 'Open downloads')}
+                    </button>
+                  </div>
+                </>
+              )}
+
+              {updateModal.state === 'downloading' && (
+                <div>
+                  <div style={{ height: '10px', borderRadius: '999px', background: 'var(--bg-main, #ECEAE6)', overflow: 'hidden', marginBottom: '10px' }}>
+                    <div style={{ height: '100%', width: `${updateProgress}%`, background: 'var(--brand-green, #90B968)', transition: 'width 200ms' }}/>
+                  </div>
+                  <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-soft)', textAlign: 'center' }}>
+                    {updateProgress}% · {window.t('No cierres la aplicación…', 'Do not close the app…')}
+                  </p>
+                </div>
+              )}
+
+              {(updateModal.state === 'uptodate' || updateModal.state === 'error') && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                  <p style={{ margin: 0, fontSize: '13.5px', color: 'var(--ink, #1A1A1A)' }}>
+                    {updateModal.state === 'uptodate'
+                      ? window.t('Ya tienes la versión más reciente de Odinote.', 'You already have the latest version of Odinote.')
+                      : window.t('Revisa tu conexión a internet e inténtalo de nuevo, o descarga manualmente desde GitHub.', 'Check your internet connection and try again, or download manually from GitHub.')}
+                  </p>
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+                    {updateModal.state === 'error' && (
+                      <button onClick={() => window.open('https://github.com/Neuroxcx1/Odinote/releases/latest', '_blank')} style={{ padding: '9px 16px', borderRadius: '8px', border: '1.5px solid var(--line-soft)', background: 'transparent', color: 'var(--ink)', fontWeight: '700', fontSize: '13px', cursor: 'pointer' }}>
+                        {window.t('Abrir GitHub', 'Open GitHub')}
+                      </button>
+                    )}
+                    <button onClick={() => setUpdateModal(null)} style={{ padding: '9px 18px', borderRadius: '8px', border: 'none', background: 'var(--olive, #6A8546)', color: 'white', fontWeight: '700', fontSize: '13px', cursor: 'pointer' }}>
+                      {window.t('Entendido', 'Got it')}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {toast && (
         <div
           style={{
