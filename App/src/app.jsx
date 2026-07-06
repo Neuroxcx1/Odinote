@@ -47,7 +47,7 @@ try {
 
 // Marcador de build: si la consola no muestra esta versión, el navegador está
 // sirviendo JS cacheado (subir ?v= en index.html invalida la caché)
-console.log('[ODINOTE] Código cargado: v20');
+console.log('[ODINOTE] Código cargado: v21');
 
 // Global shortcuts configuration
 window.shortcuts = {
@@ -799,7 +799,14 @@ function App() {
     document.body.setAttribute('data-theme', theme);
     document.body.setAttribute('data-lang', lang);
     window.currentLang = lang;
+    // Persistir el tema para que el splash del próximo arranque combine sin destello
+    try { localStorage.setItem('odinote.theme', theme); } catch (e) {}
   }, [theme, lang]);
+
+  // Quitar la pantalla de carga una vez que la app montó y renderizó
+  useEffectApp(() => {
+    window.__hideSplash && window.__hideSplash();
+  }, []);
 
   const savingMediaRef = React.useRef(new Set());
 
