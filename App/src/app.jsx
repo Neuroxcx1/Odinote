@@ -47,7 +47,7 @@ try {
 
 // Marcador de build: si la consola no muestra esta versión, el navegador está
 // sirviendo JS cacheado (subir ?v= en index.html invalida la caché)
-console.log('[ODINOTE] Código cargado: v21');
+console.log('[ODINOTE] Código cargado: v22');
 
 // Global shortcuts configuration
 window.shortcuts = {
@@ -801,6 +801,10 @@ function App() {
     window.currentLang = lang;
     // Persistir el tema para que el splash del próximo arranque combine sin destello
     try { localStorage.setItem('odinote.theme', theme); } catch (e) {}
+    // Y para que el fondo de la ventana nativa de Electron también combine
+    if (window.electronAPI && window.electronAPI.setWindowTheme) {
+      window.electronAPI.setWindowTheme(theme);
+    }
   }, [theme, lang]);
 
   // Quitar la pantalla de carga una vez que la app montó y renderizó

@@ -21,6 +21,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   downloadMediaToVault: (folderPath, url, fileName) => ipcRenderer.invoke('download-media-to-vault', { folderPath, url, fileName }),
   getCustomDictionaryWords: () => ipcRenderer.invoke('get-custom-dictionary-words'),
   removeWordFromDictionary: (word) => ipcRenderer.invoke('remove-word-from-dictionary', word),
+  setWindowTheme: (theme) => ipcRenderer.invoke('set-window-theme', theme),
   startGoogleLogin: () => ipcRenderer.invoke('start-google-login'),
   // Descarga el instalador del release y lo ejecuta (auto-actualización).
   // onProgress recibe el porcentaje descargado (0-100).

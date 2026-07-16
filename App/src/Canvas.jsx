@@ -675,7 +675,26 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
       }
     };
     el.addEventListener('wheel', onWheel, { passive: false });
-    return () => el.removeEventListener('wheel', onWheel);
+
+    // Red de seguridad: si algo (foco por teclado, scrollIntoView, etc.) desplaza
+    // el canvas o sus ancestros, lo devolvemos a 0 para que nada "suba" la interfaz
+    // ni descuadre las coordenadas del zoom/paneo.
+    const resetScroll = () => {
+      let node = el;
+      while (node) {
+        if (node.scrollTop || node.scrollLeft) { node.scrollTop = 0; node.scrollLeft = 0; }
+        node = node.parentElement;
+      }
+    };
+    const scrollTargets = [];
+    let n = el;
+    while (n) { scrollTargets.push(n); n = n.parentElement; }
+    scrollTargets.forEach(t => t.addEventListener('scroll', resetScroll, { passive: true }));
+
+    return () => {
+      el.removeEventListener('wheel', onWheel);
+      scrollTargets.forEach(t => t.removeEventListener('scroll', resetScroll));
+    };
   }, []);
 
   // ───── Keyboard ─────
@@ -700,6 +719,10 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
         if (e.key === 'Escape') e.target.blur();
         return;
       }
+      // Tab fuera de un campo movía el foco a un nodo editable lejano y el navegador
+      // desplazaba el canvas para revelarlo (aunque overflow sea hidden, el foco sí
+      // desplaza). Eso subía la interfaz y descuadraba el zoom al cursor. Lo anulamos.
+      if (e.key === 'Tab') { e.preventDefault(); return; }
       if (e.key === 'Escape') {
         setActiveTool(null); setSelected(null); setSelectedIds([]); setSelectedConn(null);
         setEditing(null); setPendingConn(null); setContextMenu(null); setDropTargetCol(null);

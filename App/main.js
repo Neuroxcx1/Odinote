@@ -65,6 +65,17 @@ function createWindow() {
   const menu = Menu.buildFromTemplate(template);
   Menu.setApplicationMenu(menu);
   
+  // backgroundColor evita el destello blanco de Electron antes de que cargue el
+  // HTML (coincide con el fondo del splash). show:false + ready-to-show hace que
+  // la ventana solo aparezca cuando ya hay algo pintado, no en blanco.
+  const savedTheme = (() => {
+    try {
+      const configPath = path.join(app.getPath('userData'), 'window-theme.txt');
+      if (fs.existsSync(configPath)) return fs.readFileSync(configPath, 'utf-8').trim();
+    } catch (e) {}
+    return 'light';
+  })();
+
   mainWindow = new BrowserWindow({
     width: 1280,
     height: 800,
@@ -72,12 +83,18 @@ function createWindow() {
     minHeight: 700,
     icon: path.join(__dirname, 'Icon/Icon.ico'),
     title: 'Odinote',
+    show: false,
+    backgroundColor: savedTheme === 'dark' ? '#232123' : '#F4F3EF',
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
       webSecurity: false,
       preload: path.join(__dirname, 'preload.js')
     }
+  });
+
+  mainWindow.once('ready-to-show', () => {
+    mainWindow.show();
   });
 
   const { session } = require('electron');
@@ -631,6 +648,16 @@ function startAuthServer() {
     }
   });
 }
+
+// Guarda el tema para que el próximo arranque pinte el fondo de la ventana acorde
+// (evita destello claro↔oscuro antes de que cargue el HTML).
+ipcMain.handle('set-window-theme', async (event, theme) => {
+  try {
+    const configPath = path.join(app.getPath('userData'), 'window-theme.txt');
+    fs.writeFileSync(configPath, theme === 'dark' ? 'dark' : 'light', 'utf-8');
+  } catch (e) {}
+  return { ok: true };
+});
 
 ipcMain.handle('start-google-login', async () => {
   logToFile('IPC Call: start-google-login');
