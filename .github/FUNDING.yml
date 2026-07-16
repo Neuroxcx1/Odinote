@@ -1,0 +1,8 @@
+# Muestra un botón "Sponsor" en la página del repositorio de GitHub.
+# Ko-fi ya está activo. Para activar GitHub Sponsors (recomendado, sin comisión
+# para ti), primero inscríbete en https://github.com/sponsors y luego quita el
+# comentario de la línea `github:`.
+
+ko_fi: neuroxcx
+# github: [Neuroxcx1]
+# liberapay: neuroxcx        # opcional: donaciones recurrentes, https://liberapay.com
