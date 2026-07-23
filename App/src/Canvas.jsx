@@ -576,37 +576,71 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
   }, []);
 
   // ───── History ─────
+  // Última instantánea registrada: evita guardar estados idénticos (los
+  // micro-ajustes automáticos, como recalcular la altura de una nota, producían
+  // entradas invisibles y hacían que Ctrl+Z "no hiciera nada" visible).
+  const lastSnapRef = useRefCanvas(null);
+  const historyTimerRef = useRefCanvas(null);
+
+  // Espejos en refs para poder leer/actualizar el historial de forma síncrona
+  const historyRef = useRefCanvas([]);
+  const historyIdxRef = useRefCanvas(-1);
+  historyRef.current = history;
+  historyIdxRef.current = historyIdx;
+  // Estado vivo del lienzo (evita leer datos obsoletos desde un closure viejo)
+  const canvasesLiveRef = useRefCanvas(canvases);
+  canvasesLiveRef.current = canvases;
+
   const pushHistory = useCallbackCanvas((snap) => {
-    setHistoryIdx(idx => {
-      setHistory(h => {
-        const cut = h.slice(0, idx + 1);
-        cut.push(snap);
-        if (cut.length > 50) cut.shift();
-        return cut;
-      });
-      return Math.min(49, idx + 1);
-    });
+    if (lastSnapRef.current === snap) return; // sin cambios reales
+    lastSnapRef.current = snap;
+    const cut = historyRef.current.slice(0, historyIdxRef.current + 1);
+    cut.push(snap);
+    if (cut.length > 50) cut.shift();
+    historyRef.current = cut;
+    historyIdxRef.current = cut.length - 1;
+    setHistory(cut);
+    setHistoryIdx(cut.length - 1);
   }, []);
 
+  // Se agrupan los cambios rápidos (escribir letra por letra, arrastrar) en una
+  // sola entrada tras una pausa, para que cada Ctrl+Z deshaga algo perceptible.
   useEffectCanvas(() => {
     if (skipHistory.current) { skipHistory.current = false; return; }
-    pushHistory(JSON.stringify(canvases));
+    const snap = JSON.stringify(canvases);
+    // La primera instantánea se guarda de inmediato (estado base del lienzo)
+    if (lastSnapRef.current === null) { pushHistory(snap); return; }
+    if (historyTimerRef.current) clearTimeout(historyTimerRef.current);
+    historyTimerRef.current = setTimeout(() => {
+      historyTimerRef.current = null;
+      pushHistory(snap);
+    }, 450);
   // eslint-disable-next-line
   }, [canvases]);
 
-  const undo = () => {
-    if (historyIdx <= 0) return;
+  const applySnapshot = (idx) => {
+    const snapStr = historyRef.current[idx];
+    if (snapStr == null) return;
     skipHistory.current = true;
-    const snap = JSON.parse(history[historyIdx - 1]);
-    _setCanvases(snap);
-    setHistoryIdx(i => i - 1);
+    lastSnapRef.current = snapStr;
+    historyIdxRef.current = idx;
+    setHistoryIdx(idx);
+    _setCanvases(JSON.parse(snapStr));
+  };
+
+  const undo = () => {
+    if (historyTimerRef.current) { clearTimeout(historyTimerRef.current); historyTimerRef.current = null; }
+    // Volcar los cambios aún no registrados (p. ej. lo que se acaba de escribir)
+    // para que este Ctrl+Z los pueda deshacer en lugar de perderse.
+    const live = JSON.stringify(canvasesLiveRef.current);
+    if (live !== lastSnapRef.current) pushHistory(live);
+    if (historyIdxRef.current <= 0) return;
+    applySnapshot(historyIdxRef.current - 1);
   };
   const redo = () => {
-    if (historyIdx >= history.length - 1) return;
-    skipHistory.current = true;
-    const snap = JSON.parse(history[historyIdx + 1]);
-    _setCanvases(snap);
-    setHistoryIdx(i => i + 1);
+    if (historyTimerRef.current) { clearTimeout(historyTimerRef.current); historyTimerRef.current = null; }
+    if (historyIdxRef.current >= historyRef.current.length - 1) return;
+    applySnapshot(historyIdxRef.current + 1);
   };
 
   // ───── Reset state on canvas change ─────
@@ -3140,6 +3174,12 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
       });
     }
     
+    // Desde el primer momento marcamos la altura como manual en los nodos que se
+    // auto-ajustan al texto, para que dejen de imponer su propia altura.
+    if (['note', 'comment'].includes(item.type) && !item.manualH) {
+      updateItemSilent(itemId, { manualH: true });
+    }
+
     let resizeMaster = null; // Locked to 'x' or 'y' on first move to prevent jumps
     let wasSnappedX = false;
     let wasSnappedY = false;

@@ -255,6 +255,10 @@ function NoteItem({ item, lang, editing, onUpdate }) {
 
   React.useEffect(() => {
     if (!ref.current) return;
+    // Mientras se arrastra/redimensiona no recalculamos: antes este efecto
+    // revertía la altura en cada frame y por eso la nota "solo se estiraba
+    // horizontalmente".
+    if (document.body.classList.contains('odi-busy')) return;
     const contentEl = ref.current;
     const origHeight = contentEl.style.height;
     contentEl.style.height = 'auto';
