@@ -3089,6 +3089,9 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
     const sx = item.x, sy = item.y, sw = item.w, sh = item.h;
     const minW = 100, minH = 50;
     const aspectRatio = sw / sh;
+    // Nodos en modo compacto (sin vista previa): el redimensionado mantiene la
+    // proporción (no se puede poner "más gordo o más flaco"), igual que con Shift.
+    const aspectLocked = item.showPreview === false && ['board','doc','link'].includes(item.type);
     
     // Multi-resize logic setup
     const isMulti = selectedIds.length > 1 && selectedIds.includes(itemId);
@@ -3147,7 +3150,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
       const MAX_ALIGN_DIST = 99999;
       const currentItems = current.items || [];
 
-      if (ev.shiftKey || item.type === 'file') {
+      if (ev.shiftKey || item.type === 'file' || aspectLocked) {
         const master = resizeMaster || 'x'; // default to x
         if (master === 'x') {
           if (corner.includes('r')) nw = Math.max(minW, sw + dx);

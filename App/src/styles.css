@@ -693,19 +693,22 @@ a, button, select, input[type="submit"], input[type="button"], [role="button"],
 
 .topbar-spacer { flex: 1; }
 
-.tools { display: flex; align-items: center; gap: 4px; background: var(--bg); border: 1.5px solid var(--line); border-radius: 8px; padding: 5px; box-shadow: var(--pop-sm); }
-.tool { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 5px 9px; border-radius: 6px; transition: transform 120ms var(--e-out), background 100ms; }
+/* Tamaños base COMPACTOS: se aplican en todas las resoluciones (incluidas >2K),
+   para que la barra no se agrande ni se solape en pantallas grandes. Los
+   breakpoints de abajo solo reducen aún más en pantallas pequeñas. */
+.tools { display: flex; align-items: center; gap: 3px; background: var(--bg); border: 1.5px solid var(--line); border-radius: 8px; padding: 4px; box-shadow: var(--pop-sm); }
+.tool { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 4px 7px; border-radius: 6px; transition: transform 120ms var(--e-out), background 100ms; }
 .tool:hover { transform: translateY(-1px); background: var(--line-softer); }
-.tool .tool-icon { width: 35px; height: 35px; border-radius: 8px; display: grid; place-items: center; border: 1.5px solid var(--line); box-shadow: var(--pop-sm); color: var(--ink); background: var(--tool-bg); transition: transform 100ms var(--e-out); }
-.tool .tool-label { font-size: 12px; font-weight: 600; letter-spacing: -0.01em; color: var(--ink-2); }
+.tool .tool-icon { width: 31px; height: 31px; border-radius: 8px; display: grid; place-items: center; border: 1.5px solid var(--line); box-shadow: var(--pop-sm); color: var(--ink); background: var(--tool-bg); transition: transform 100ms var(--e-out); }
+.tool .tool-label { font-size: 11px; font-weight: 600; letter-spacing: -0.01em; color: var(--ink-2); }
 .tool.active .tool-icon { background: var(--olive); color: white; transform: scale(1.05); border-color: var(--line); }
 .tool.active { background: color-mix(in srgb, var(--olive) 14%, transparent); }
 .tool.active .tool-label { color: var(--ink); }
-.tool .material-symbols-rounded { font-size: 22px; }
-.tool-divider { width: 1.5px; height: 34px; background: var(--line-soft); margin: 0 3px; }
+.tool .material-symbols-rounded { font-size: 19px; }
+.tool-divider { width: 1.5px; height: 32px; background: var(--line-soft); margin: 0 3px; }
 
-.topbar-actions { display: flex; align-items: center; gap: 6px; }
-.icon-btn { width: 42px; height: 42px; border-radius: 8px; display: grid; place-items: center; border: 1.5px solid var(--line); background: var(--paper); box-shadow: var(--pop-sm); transition: transform 140ms var(--e-out), box-shadow 140ms var(--e-out); }
+.topbar-actions { display: flex; align-items: center; gap: 5px; }
+.icon-btn { width: 38px; height: 38px; border-radius: 8px; display: grid; place-items: center; border: 1.5px solid var(--line); background: var(--paper); box-shadow: var(--pop-sm); transition: transform 140ms var(--e-out), box-shadow 140ms var(--e-out); }
 .icon-btn:hover { transform: translate(-1px, -1px); box-shadow: var(--pop-hover); }
 .icon-btn .material-symbols-rounded { font-size: 22px; }
 .avatar { width: 32px; height: 32px; border-radius: 50%; border: 1.5px solid var(--line); background: var(--olive); color: white; display: grid; place-items: center; font-weight: 700; font-family: var(--font-display); font-size: 12px; box-shadow: var(--pop-sm); }
@@ -1192,10 +1195,12 @@ body.odi-busy iframe { pointer-events: none !important; }
 .todo-meta-chip.due { color: var(--wine); background: var(--wine-l); border: 1px solid var(--wine-2); }
 
 /* Column strip + body */
-.column-card .item-card { background: var(--bg-2); display: flex; flex-direction: column; }
+.column-card .item-card { background: var(--bg-2); display: flex; flex-direction: column; border-radius: 8px; overflow: hidden; }
 .column-card .column-strip {
   padding: 11px 14px 9px;
   border-bottom: 1.5px solid var(--line);
+  /* Franja del título con un leve degradado para dar profundidad (menos plano) */
+  background: linear-gradient(180deg, var(--paper) 0%, color-mix(in srgb, var(--paper) 92%, var(--line-soft)) 100%);
   font-family: var(--font-display);
   font-weight: 700;
   font-size: 15px;
@@ -1224,17 +1229,29 @@ body.odi-busy iframe { pointer-events: none !important; }
   flex: 1;
   min-height: 80px;
   background: var(--bg-2);
+  /* Sombra interior sutil: da sensación de "contenedor" en vez de área plana */
+  box-shadow: inset 0 2px 6px -4px rgba(0,0,0,0.25);
   overflow-y: auto;
   overflow-x: hidden;
 }
 .column-card.drop-target .item-card { outline: 3px dashed var(--olive); outline-offset: 2px; }
 .column-card.drop-target .column-body { background: var(--olive-l); }
 
-/* Empty column body — just the plain gray area (no text/icon), like Milanote */
+/* Estado vacío: zona punteada acogedora con icono y texto (menos plano) */
 .column-empty {
   flex: 1;
   min-height: 90px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 6px;
+  margin: 2px;
+  border: 1.5px dashed var(--line-soft, #D5D1CD);
+  border-radius: 8px;
+  color: var(--ink-3);
+  font-size: 12px; font-weight: 600;
+  text-align: center;
 }
+.column-empty .material-symbols-rounded { font-size: 26px; opacity: 0.6; }
+.column-card.drop-target .column-empty { border-color: var(--olive); color: var(--olive); }
 
 /* Items rendered INSIDE a column */
 .col-child-wrap {
@@ -1412,9 +1429,27 @@ body.odi-busy iframe { pointer-events: none !important; }
 .doc-head .material-symbols-rounded { font-size: calc(16px * var(--node-scale, 1)); color: var(--wine); }
 .doc-body-preview { font-size: calc(12px * var(--node-scale, 1)); color: var(--ink-2); line-height: 1.5; flex: 1; overflow: hidden; }
 /* Compact doc (preview off) — just the logo + title, like the file node */
-.doc-compact { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; text-align: center; }
-.doc-compact-icon { font-size: calc(46px * var(--node-scale, 1)); color: var(--wine); }
-.doc-compact-title { font-family: var(--font-display); font-weight: 700; font-size: calc(13px * var(--node-scale, 1)); color: inherit; line-height: 1.3; word-break: break-word; max-width: 100%; }
+.doc-compact { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: calc(10px * var(--node-scale, 1)); text-align: center; min-height: 0; }
+/* Hoja de papel: representa el documento con un icono y líneas de texto simuladas,
+   en vez de un icono suelto en un espacio vacío */
+.doc-compact-paper {
+  position: relative;
+  width: min(58%, 96px);
+  aspect-ratio: 3 / 3.6;
+  background: #FFFFFF;
+  border: 1.5px solid var(--line-soft, #E5E1DD);
+  border-radius: 6px;
+  box-shadow: var(--pop-sm);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 7px; padding: 10px;
+  overflow: hidden;
+}
+[data-theme="dark"] .doc-compact-paper { background: #2E2C2E; border-color: #1A1A1A; }
+.doc-compact-icon { font-size: calc(30px * var(--node-scale, 1)); color: var(--wine); }
+.doc-compact-lines { width: 78%; display: flex; flex-direction: column; gap: 4px; }
+.doc-compact-lines i { display: block; height: 3px; border-radius: 2px; background: color-mix(in srgb, var(--wine) 22%, var(--line-soft, #E5E1DD)); }
+.doc-compact-lines i:last-child { width: 60%; }
+.doc-compact-title { font-family: var(--font-display); font-weight: 700; font-size: calc(13px * var(--node-scale, 1)); color: var(--ink); line-height: 1.3; word-break: break-word; max-width: 92%; }
 .doc-body-preview:empty::before { content: 'Doble clic para escribir…'; color: var(--ink-3); font-style: italic; }
 [data-lang="en"] .doc-body-preview:empty::before { content: 'Double-click to write…'; }
 
@@ -3220,28 +3255,25 @@ body.odi-busy iframe { pointer-events: none !important; }
    tamaño de los botones para que la barra superior no se desborde ni se solapen elementos */
 @media (max-width: 1920px) {
   .topbar {
-    gap: 8px;
+    gap: 7px;
     padding: 6px 10px;
   }
-  .tools {
-    padding: 4px;
-  }
   .tool {
-    padding: 4px 6px;
+    padding: 4px 5px;
   }
   .tool .tool-icon {
-    width: 32px;
-    height: 32px;
+    width: 29px;
+    height: 29px;
   }
   .tool .material-symbols-rounded {
-    font-size: 19px;
+    font-size: 18px;
   }
   .icon-btn {
-    width: 38px;
-    height: 38px;
+    width: 36px;
+    height: 36px;
   }
   .icon-btn .material-symbols-rounded {
-    font-size: 20px;
+    font-size: 19px;
   }
   .kofi-topbar-btn, .feedback-topbar-btn {
     margin-right: 6px;

@@ -662,17 +662,8 @@ function ContextSidebar({
 
         {isFrame && (
           <>
-            <button
-              className="ctx-btn"
-              onClick={() => {
-                onStartEdit && onStartEdit();
-                window.playAudioTone && window.playAudioTone('click');
-              }}
-              title={window.t('Cambiar título', 'Change title')}
-            >
-              <span className="material-symbols-rounded">title</span>
-              <span>{window.t('Título', 'Title')}</span>
-            </button>
+            {/* (El botón "Editar" universal ya entra a editar el título del marco,
+                así que aquí solo quedan los controles de tamaño del título.) */}
             <button
               className="ctx-btn"
               onClick={() => {

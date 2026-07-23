@@ -1612,7 +1612,10 @@ function ColumnItem({ item, lang, onUpdate, editing, callbacks }) {
         </div>
         <div className="column-body">
           {children.length === 0 && (
-            <div className="column-empty"/>
+            <div className="column-empty">
+              <span className="material-symbols-rounded">stacks</span>
+              <span>{window.t('Arrastra tarjetas aquí', 'Drag cards here')}</span>
+            </div>
           )}
           {children.map(child => {
             const isBoardCompact = child.type === 'board' && child.showPreview === false;
@@ -1973,7 +1976,10 @@ function DocItem({ item, lang, onOpenDoc }) {
       >
         {compact ? (
           <div className="doc-compact">
-            <span className="material-symbols-rounded doc-compact-icon">description</span>
+            <div className="doc-compact-paper">
+              <span className="material-symbols-rounded doc-compact-icon">description</span>
+              <div className="doc-compact-lines"><i/><i/><i/><i/></div>
+            </div>
             <div className="doc-compact-title">{title}</div>
           </div>
         ) : (
