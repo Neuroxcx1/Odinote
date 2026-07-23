@@ -273,7 +273,7 @@ function NoteItem({ item, lang, editing, onUpdate }) {
       onUpdate({ h: totalHeight });
     }
   // eslint-disable-next-line
-  }, [item.content, editing, item.h, lang, item.manualH]);
+  }, [item.content, editing, item.h, lang, item.manualH, item.textScale]);
 
   if (editing) {
     return (

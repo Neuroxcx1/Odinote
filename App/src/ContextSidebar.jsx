@@ -811,6 +811,43 @@ function ContextSidebar({
           </>
         )}
 
+        {/* Tamaño del texto del nodo (A+ / A−). Multiplica todo el texto, así que
+            convive con Título/Subtítulo, negritas y demás formato. */}
+        {['note','comment','todo'].includes(item.type) && (
+          <>
+            <button
+              className="ctx-btn"
+              onClick={() => {
+                const steps = [0.8, 0.9, 1, 1.15, 1.35, 1.6, 1.9, 2.3, 2.8];
+                const cur = item.textScale || 1;
+                const idx = steps.findIndex(s => Math.abs(s - cur) < 0.001);
+                const next = idx === -1 ? 1.15 : steps[Math.min(steps.length - 1, idx + 1)];
+                onUpdate({ textScale: next });
+                window.playAudioTone && window.playAudioTone('click');
+              }}
+              title={window.t('Aumentar tamaño del texto', 'Increase text size')}
+            >
+              <span className="material-symbols-rounded">text_increase</span>
+              <span>{window.t('Aumentar Texto', 'Increase Text')}</span>
+            </button>
+            <button
+              className="ctx-btn"
+              onClick={() => {
+                const steps = [0.8, 0.9, 1, 1.15, 1.35, 1.6, 1.9, 2.3, 2.8];
+                const cur = item.textScale || 1;
+                const idx = steps.findIndex(s => Math.abs(s - cur) < 0.001);
+                const next = idx === -1 ? 0.9 : steps[Math.max(0, idx - 1)];
+                onUpdate({ textScale: next });
+                window.playAudioTone && window.playAudioTone('click');
+              }}
+              title={window.t('Disminuir tamaño del texto', 'Decrease text size')}
+            >
+              <span className="material-symbols-rounded">text_decrease</span>
+              <span>{window.t('Disminuir Texto', 'Decrease Text')}</span>
+            </button>
+          </>
+        )}
+
         {/* Estirar: ajustar altura al contenido (útil en comentarios/notas largos) */}
         {['note','comment','todo','link'].includes(item.type) && (
           <button className="ctx-btn" onClick={fitHeightToContent} title={window.t('Ajustar la altura al contenido', 'Fit height to content')}>
