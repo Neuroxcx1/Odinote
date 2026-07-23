@@ -343,10 +343,9 @@ function Connector({ conn, items, selected, selectedIds, onSelect, onUpdate, onD
     const gg = Math.min(g, l * 0.6);
     return { x: from.x + (dx / l) * gg, y: from.y + (dy / l) * gg };
   };
-  const GAP = 6;
+  const GAP = 16;
 
   let eA, eB, p1, p2, qx, qy, path, hx, hy, angleEnd, angleStart, exADir, exBDir;
-  let headScale = 1; // se reduce en conectores muy cortos para que la punta quepa
   let orthoWaypoints = null;   // user-draggable interior waypoints (Miro-style)
   let orthoVerts = null;       // full vertex list of the right-angle polyline (for segment handles)
   let orthoSegments = null;    // segment midpoints (drag to add a new control point)
@@ -472,31 +471,19 @@ function Connector({ conn, items, selected, selectedIds, onSelect, onUpdate, onD
     angleEnd = cn >= 2 ? Math.atan2(cleanV[cn-1].y - cleanV[cn-2].y, cleanV[cn-1].x - cleanV[cn-2].x) : 0;
     angleStart = cn >= 2 ? Math.atan2(cleanV[0].y - cleanV[1].y, cleanV[0].x - cleanV[1].x) : 0;
   } else {
-    // Cada borde se proyecta hacia el CENTRO del otro nodo (no hacia el punto
-    // medio). Esto es estable aunque un nodo sea gigante: antes, con un marco
-    // grande, el punto medio caía DENTRO del marco e invertía la punta (apuntaba
-    // hacia afuera). Proyectar hacia el centro del origen siempre da un borde y
-    // una dirección correctos.
+    // Control point from the CENTERS (stable). Edges point TOWARD the control point so the
+    // dotted "covered" segment and the curve line up at the node edge. (Lógica original.)
     qx = (cA.x + cB.x) / 2 + bend.x;
     qy = (cA.y + cB.y) / 2 + bend.y;
-    eA = A.item ? nearestPointOnRect(A.item, cB.x, cB.y) : cA;
-    eB = B.item ? nearestPointOnRect(B.item, cA.x, cA.y) : cB;
-    // Gap adaptativo: en conexiones cortas se reduce para que la línea y la punta
-    // quepan sin encimarse (antes el gap fijo las degeneraba).
-    const edgeDist = Math.hypot(eB.x - eA.x, eB.y - eA.y);
-    const gap = Math.max(2, Math.min(GAP, edgeDist * 0.30));
-    // p1/p2 se separan del borde hacia el otro nodo (quedan en el hueco)
-    p1 = moveToward(eA, cB, gap);
-    p2 = moveToward(eB, cA, gap);
+    eA = A.item ? edgeIntersect(A.item, qx, qy) : cA;
+    eB = B.item ? edgeIntersect(B.item, qx, qy) : cB;
+    p1 = moveToward(eA, { x: qx, y: qy }, GAP);
+    p2 = moveToward(eB, { x: qx, y: qy }, GAP);
     path = `M ${p1.x} ${p1.y} Q ${qx} ${qy} ${p2.x} ${p2.y}`;
     hx = 0.25 * p1.x + 0.5 * qx + 0.25 * p2.x;
     hy = 0.25 * p1.y + 0.5 * qy + 0.25 * p2.y;
-    // La punta apunta HACIA el nodo: de p2 (en el hueco) hacia su borde eB.
-    angleEnd = Math.atan2(eB.y - p2.y, eB.x - p2.x);
-    angleStart = Math.atan2(eA.y - p1.y, eA.x - p1.x);
-    // Escala de la punta: tamaño sólido normal; solo se reduce en tramos muy cortos
-    const segLen = Math.hypot(p2.x - p1.x, p2.y - p1.y);
-    headScale = Math.max(0.7, Math.min(1, segLen / 20));
+    angleEnd = Math.atan2(p2.y - qy, p2.x - qx);   // arrival direction at the head
+    angleStart = Math.atan2(p1.y - qy, p1.x - qx); // arrival direction at the tail (bidir)
   }
 
   const themeInk = theme === 'dark' ? '#F0EEF0' : '#1A1A1A';
@@ -518,7 +505,7 @@ function Connector({ conn, items, selected, selectedIds, onSelect, onUpdate, onD
   }
 
   const arrowPts = (px, py, ang) => {
-    const ah = 11 * headScale, aw = 7 * headScale;
+    const ah = 11, aw = 7;
     const a1x = px - ah * Math.cos(ang) + aw * Math.cos(ang + Math.PI / 2);
     const a1y = py - ah * Math.sin(ang) + aw * Math.sin(ang + Math.PI / 2);
     const a2x = px - ah * Math.cos(ang) - aw * Math.cos(ang + Math.PI / 2);
