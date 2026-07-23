@@ -261,11 +261,19 @@ function NoteItem({ item, lang, editing, onUpdate }) {
     const naturalHeight = contentEl.scrollHeight;
     contentEl.style.height = origHeight;
     const totalHeight = Math.max(80, Math.round(naturalHeight + 3));
+    // Si el usuario redimensionó la nota a mano, respetamos SU altura: solo
+    // crecemos si el texto ya no cabe (nunca encogemos). Antes este efecto
+    // devolvía la altura al tamaño del texto y por eso la nota "solo se
+    // expandía hacia los lados".
+    if (item.manualH) {
+      if (totalHeight > (item.h || 0)) onUpdate({ h: totalHeight });
+      return;
+    }
     if (Math.abs((item.h || 0) - totalHeight) > 3) {
       onUpdate({ h: totalHeight });
     }
   // eslint-disable-next-line
-  }, [item.content, editing, item.h, lang]);
+  }, [item.content, editing, item.h, lang, item.manualH]);
 
   if (editing) {
     return (

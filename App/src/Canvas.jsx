@@ -717,6 +717,17 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
       const inField = !isPasteInt && (tag === 'input' || tag === 'textarea' || e.target.isContentEditable);
       if (inField) {
         if (e.key === 'Escape') e.target.blur();
+        // Deshacer/Rehacer TAMBIÉN mientras se escribe dentro de un nodo: antes se
+        // salía aquí y Ctrl+Z solo llegaba al undo nativo del navegador, así que
+        // parecía que no funcionaba en las notas. Se desenfoca primero para que el
+        // contenido del editor se sincronice con el estado restaurado.
+        if (matchShortcut(window.shortcuts.undo) || matchShortcut(window.shortcuts.redo)) {
+          e.preventDefault();
+          const isUndo = matchShortcut(window.shortcuts.undo);
+          try { e.target.blur(); } catch (err) {}
+          setEditing(null);
+          setTimeout(() => { isUndo ? undo() : redo(); }, 0);
+        }
         return;
       }
       // Tab fuera de un campo movía el foco a un nodo editable lejano y el navegador
@@ -3367,7 +3378,10 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
     const onUp = () => {
       document.body.classList.remove('odi-busy');
       setGuides(null);
-      updateItem(itemId, {});
+      // Marcar que la altura la fijó el usuario, para que el auto-ajuste al
+      // contenido (notas/comentarios) deje de pisar el tamaño elegido.
+      const manualPatch = ['note', 'comment'].includes(item.type) ? { manualH: true } : {};
+      updateItem(itemId, manualPatch);
       window.removeEventListener('mousemove', onMove);
       window.removeEventListener('mouseup', onUp);
     };
