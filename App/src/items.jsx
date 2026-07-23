@@ -3837,6 +3837,10 @@ function BigTitleItem({ item, lang, editing, onUpdate }) {
   const ref = React.useRef(null);
   const align = item.align || 'center';
   const color = item.textColor || 'inherit';
+  // Estilos de nodo completo (B/I/S/U) del título
+  const weight = item.bold === false ? 500 : 800;
+  const fontStyle = item.italic ? 'italic' : 'normal';
+  const textDecoration = [item.underline && 'underline', item.strike && 'line-through'].filter(Boolean).join(' ') || 'none';
 
   React.useEffect(() => {
     if (!ref.current) return;
@@ -3881,7 +3885,9 @@ function BigTitleItem({ item, lang, editing, onUpdate }) {
         style={{
           fontFamily: 'var(--font-display)',
           fontSize: '32px',
-          fontWeight: 800,
+          fontWeight: weight,
+          fontStyle: fontStyle,
+          textDecoration: textDecoration,
           textAlign: align,
           color: color === 'inherit' ? 'var(--ink)' : color,
           background: 'none',

@@ -25,6 +25,11 @@ function TextFormatSidebar({ item, lang, onUpdate, onClose, variant, noCodeQuote
     try {
       if (item.type === 'bigtitle') {
         setActive({
+          // El título aplica B/I/S/U a todo el nodo (texto uniforme)
+          bold: item.bold !== false,
+          italic: !!item.italic,
+          strike: !!item.strike,
+          underline: !!item.underline,
           alignLeft: (item.align || 'center') === 'left',
           alignCenter: (item.align || 'center') === 'center',
           alignRight: (item.align || 'center') === 'right',
@@ -131,24 +136,26 @@ function TextFormatSidebar({ item, lang, onUpdate, onClose, variant, noCodeQuote
         </>
       )}
 
-      {!isCustomPropType && (
+      {(!isCustomPropType || isBigTitle) && (
         <>
-          <button className={`ctx-btn ${active.bold ? 'active' : ''}`} onClick={()=>exec('bold')}>
+          {/* En el título, B/I/S/U son toggles de nodo completo (texto uniforme);
+              en las notas usan execCommand por selección. */}
+          <button className={`ctx-btn ${active.bold ? 'active' : ''}`} onClick={()=> isBigTitle ? onUpdate({ bold: item.bold === false }) : exec('bold')}>
             <div className="ctx-letter" style={{fontWeight: 800}}>B</div>
             <span>{lang==='es'?'Negrita':'Bold'}</span>
           </button>
 
-          <button className={`ctx-btn ${active.italic ? 'active' : ''}`} onClick={()=>exec('italic')}>
+          <button className={`ctx-btn ${active.italic ? 'active' : ''}`} onClick={()=> isBigTitle ? onUpdate({ italic: !item.italic }) : exec('italic')}>
             <div className="ctx-letter" style={{fontStyle: 'italic', fontWeight: 700}}>I</div>
             <span>{lang==='es'?'Cursiva':'Italic'}</span>
           </button>
 
-          <button className={`ctx-btn ${active.strike ? 'active' : ''}`} onClick={()=>exec('strikeThrough')}>
+          <button className={`ctx-btn ${active.strike ? 'active' : ''}`} onClick={()=> isBigTitle ? onUpdate({ strike: !item.strike }) : exec('strikeThrough')}>
             <div className="ctx-letter" style={{textDecoration: 'line-through', fontWeight: 700}}>S</div>
             <span>{lang==='es'?'Tachado':'Strike'}</span>
           </button>
 
-          <button className={`ctx-btn ${active.underline ? 'active' : ''}`} onClick={()=>exec('underline')}>
+          <button className={`ctx-btn ${active.underline ? 'active' : ''}`} onClick={()=> isBigTitle ? onUpdate({ underline: !item.underline }) : exec('underline')}>
             <div className="ctx-letter" style={{textDecoration: 'underline', fontWeight: 700}}>U</div>
             <span>{lang==='es'?'Subrayado':'Underline'}</span>
           </button>

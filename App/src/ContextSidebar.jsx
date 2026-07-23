@@ -114,6 +114,22 @@ function ContextSidebar({
   const tableCell = isTable && window._focusedTableCell && window._focusedTableCell.itemId === item.id
     ? window._focusedTableCell : null;
 
+  // "Estirar": ajusta la altura del nodo a la de su contenido real (para
+  // comentarios/notas largos que se cortan). Mide con la altura en auto.
+  const fitHeightToContent = () => {
+    const wrap = document.querySelector(`.item[data-item-id="${item.id}"]`) ||
+                 document.querySelector(`[data-item-id="${item.id}"]`);
+    if (!wrap) return;
+    const card = wrap.querySelector('.item-card') || wrap.firstElementChild;
+    if (!card) return;
+    const prev = wrap.style.height;
+    wrap.style.height = 'auto';
+    const target = Math.max(60, Math.round(card.scrollHeight + 6));
+    wrap.style.height = prev;
+    onUpdate({ h: target });
+    window.playAudioTone && window.playAudioTone('click');
+  };
+
   const reactions = item.reactions || {};
   const comments = item.comments || [];
 
@@ -291,7 +307,20 @@ function ContextSidebar({
           <>
             <button
               className={`ctx-btn ${item.showPreview !== false ? 'active' : ''}`}
-              onClick={()=>onUpdate({ showPreview: item.showPreview === false })}
+              onClick={()=>{
+                // Igual que el documento: al quitar la vista previa el nodo se
+                // vuelve compacto (fila tipo marcador), y al activarla recupera
+                // altura para que la miniatura no quede aplastada.
+                const turningOff = item.showPreview !== false;
+                if (isColChild) {
+                  onUpdate({ showPreview: !turningOff });
+                } else {
+                  onUpdate(turningOff
+                    ? { showPreview: false, h: 76 }
+                    : { showPreview: true, h: Math.max(item.h || 0, 260) });
+                }
+                window.playAudioTone && window.playAudioTone('click');
+              }}
               title={window.t('Alternar vista previa', 'Toggle preview')}
             >
               <span className="material-symbols-rounded">image</span>
@@ -788,6 +817,14 @@ function ContextSidebar({
               <span>{window.t('Disminuir Leyenda', 'Decrease Caption')}</span>
             </button>
           </>
+        )}
+
+        {/* Estirar: ajustar altura al contenido (útil en comentarios/notas largos) */}
+        {['note','comment','todo','link'].includes(item.type) && (
+          <button className="ctx-btn" onClick={fitHeightToContent} title={window.t('Ajustar la altura al contenido', 'Fit height to content')}>
+            <span className="material-symbols-rounded">height</span>
+            <span>{window.t('Estirar', 'Fit height')}</span>
+          </button>
         )}
 
         <div className="ctx-sep-h"/>
