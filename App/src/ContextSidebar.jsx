@@ -126,7 +126,8 @@ function ContextSidebar({
     wrap.style.height = 'auto';
     const target = Math.max(60, Math.round(card.scrollHeight + 6));
     wrap.style.height = prev;
-    onUpdate({ h: target });
+    // Además devuelve la nota al ajuste automático (deshace el tamaño manual)
+    onUpdate({ h: target, manualH: false });
     window.playAudioTone && window.playAudioTone('click');
   };
 

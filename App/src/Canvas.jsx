@@ -4076,9 +4076,15 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
               const isDropTarget = dropTargetCol === item.id || dropTargetTodo === item.id;
               const def = defaultDims(item.type);
               const rawScale = Math.min((item.w || def.w) / def.w, (item.h || def.h) / def.h);
+              // Notas y comentarios escalan el texto de forma PROPORCIONAL al nodo:
+              // al agrandarlos se ven igual pero más grandes, sin dejar espacio en
+              // blanco. (El resto de nodos mantiene el escalado suave, porque tienen
+              // controles/estructura que no deben crecer tanto.)
               const nodeScale = item.type === 'column'
                 ? 1
-                : 1 + (Math.min(2.25, Math.max(1, rawScale)) - 1) * 0.5;
+                : (item.type === 'note' || item.type === 'comment')
+                  ? Math.min(4, Math.max(1, rawScale))
+                  : 1 + (Math.min(2.25, Math.max(1, rawScale)) - 1) * 0.5;
               return (
                 <div
                   key={item.id}
