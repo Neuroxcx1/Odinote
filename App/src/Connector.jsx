@@ -472,28 +472,28 @@ function Connector({ conn, items, selected, selectedIds, onSelect, onUpdate, onD
     angleEnd = cn >= 2 ? Math.atan2(cleanV[cn-1].y - cleanV[cn-2].y, cleanV[cn-1].x - cleanV[cn-2].x) : 0;
     angleStart = cn >= 2 ? Math.atan2(cleanV[0].y - cleanV[1].y, cleanV[0].x - cleanV[1].x) : 0;
   } else {
-    // Control point from the CENTERS (stable). Edges attach at the NEAREST border
-    // point toward the control point (Milanote-style): arrows from several rows
-    // arrive at distinct heights instead of converging on one spot.
+    // Cada borde se proyecta hacia el CENTRO del otro nodo (no hacia el punto
+    // medio). Esto es estable aunque un nodo sea gigante: antes, con un marco
+    // grande, el punto medio caía DENTRO del marco e invertía la punta (apuntaba
+    // hacia afuera). Proyectar hacia el centro del origen siempre da un borde y
+    // una dirección correctos.
     qx = (cA.x + cB.x) / 2 + bend.x;
     qy = (cA.y + cB.y) / 2 + bend.y;
-    eA = A.item ? nearestPointOnRect(A.item, qx, qy) : cA;
-    eB = B.item ? nearestPointOnRect(B.item, qx, qy) : cB;
+    eA = A.item ? nearestPointOnRect(A.item, cB.x, cB.y) : cA;
+    eB = B.item ? nearestPointOnRect(B.item, cA.x, cA.y) : cB;
     // Gap adaptativo: en conexiones cortas se reduce para que la línea y la punta
-    // quepan sin encimarse (antes el gap fijo de 16px las degeneraba).
+    // quepan sin encimarse (antes el gap fijo las degeneraba).
     const edgeDist = Math.hypot(eB.x - eA.x, eB.y - eA.y);
-    const gap = Math.max(2, Math.min(GAP, edgeDist * 0.28));
-    p1 = moveToward(eA, { x: qx, y: qy }, gap);
-    p2 = moveToward(eB, { x: qx, y: qy }, gap);
+    const gap = Math.max(2, Math.min(GAP, edgeDist * 0.30));
+    // p1/p2 se separan del borde hacia el otro nodo (quedan en el hueco)
+    p1 = moveToward(eA, cB, gap);
+    p2 = moveToward(eB, cA, gap);
     path = `M ${p1.x} ${p1.y} Q ${qx} ${qy} ${p2.x} ${p2.y}`;
     hx = 0.25 * p1.x + 0.5 * qx + 0.25 * p2.x;
     hy = 0.25 * p1.y + 0.5 * qy + 0.25 * p2.y;
-    // Ángulo de la punta: tangente en el extremo. Si el vector al punto de control
-    // es diminuto (conexión corta), usar la dirección A→B, que es estable.
-    const tgtEnd = Math.hypot(p2.x - qx, p2.y - qy);
-    const tgtStart = Math.hypot(p1.x - qx, p1.y - qy);
-    angleEnd = tgtEnd > 1 ? Math.atan2(p2.y - qy, p2.x - qx) : Math.atan2(eB.y - eA.y, eB.x - eA.x);
-    angleStart = tgtStart > 1 ? Math.atan2(p1.y - qy, p1.x - qx) : Math.atan2(eA.y - eB.y, eA.x - eB.x);
+    // La punta apunta HACIA el nodo: de p2 (en el hueco) hacia su borde eB.
+    angleEnd = Math.atan2(eB.y - p2.y, eB.x - p2.x);
+    angleStart = Math.atan2(eA.y - p1.y, eA.x - p1.x);
     // Escala de la punta según la longitud real del tramo visible
     const segLen = Math.hypot(p2.x - p1.x, p2.y - p1.y);
     headScale = Math.max(0.5, Math.min(1, segLen / 24));

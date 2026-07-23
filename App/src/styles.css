@@ -1430,22 +1430,16 @@ body.odi-busy iframe { pointer-events: none !important; }
 .doc-body-preview { font-size: calc(12px * var(--node-scale, 1)); color: var(--ink-2); line-height: 1.5; flex: 1; overflow: hidden; }
 /* Compact doc (preview off) — just the logo + title, like the file node */
 .doc-compact { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: calc(10px * var(--node-scale, 1)); text-align: center; min-height: 0; }
-/* Hoja de papel: representa el documento con un icono y líneas de texto simuladas,
-   en vez de un icono suelto en un espacio vacío */
+/* Logo del documento: icono + líneas de texto simuladas, sin marco/caja
+   (solo el "logo" flotando sobre el fondo del nodo) */
 .doc-compact-paper {
   position: relative;
-  width: min(58%, 96px);
-  aspect-ratio: 3 / 3.6;
-  background: #FFFFFF;
-  border: 1.5px solid var(--line-soft, #E5E1DD);
-  border-radius: 6px;
-  box-shadow: var(--pop-sm);
+  width: min(52%, 92px);
   display: flex; flex-direction: column; align-items: center; justify-content: center;
-  gap: 7px; padding: 10px;
+  gap: 8px;
   overflow: hidden;
 }
-[data-theme="dark"] .doc-compact-paper { background: #2E2C2E; border-color: #1A1A1A; }
-.doc-compact-icon { font-size: calc(30px * var(--node-scale, 1)); color: var(--wine); }
+.doc-compact-icon { font-size: calc(40px * var(--node-scale, 1)); color: var(--wine); }
 .doc-compact-lines { width: 78%; display: flex; flex-direction: column; gap: 4px; }
 .doc-compact-lines i { display: block; height: 3px; border-radius: 2px; background: color-mix(in srgb, var(--wine) 22%, var(--line-soft, #E5E1DD)); }
 .doc-compact-lines i:last-child { width: 60%; }
