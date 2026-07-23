@@ -1968,10 +1968,10 @@ function DocItem({ item, lang, onOpenDoc }) {
   const compact = item.showPreview === false; // preview off → just the doc logo
   const title = pickLang(item.title, lang) || (window.t('Documento', 'Document'));
   return (
-    <div className="doc-card" style={{width:'100%', height:'100%'}}>
+    <div className={`doc-card ${compact ? 'doc-compact-mode' : ''}`} style={{width:'100%', height:'100%'}}>
       <div
         className="item-card"
-        style={{ background: bg, color: window.nodeInk(item) }}
+        style={{ background: compact ? 'transparent' : bg, color: window.nodeInk(item) }}
         onDoubleClick={(e)=>{ e.stopPropagation(); onOpenDoc && onOpenDoc(item.id); }}
       >
         {compact ? (

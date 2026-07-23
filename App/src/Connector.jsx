@@ -343,7 +343,7 @@ function Connector({ conn, items, selected, selectedIds, onSelect, onUpdate, onD
     const gg = Math.min(g, l * 0.6);
     return { x: from.x + (dx / l) * gg, y: from.y + (dy / l) * gg };
   };
-  const GAP = 11;
+  const GAP = 6;
 
   let eA, eB, p1, p2, qx, qy, path, hx, hy, angleEnd, angleStart, exADir, exBDir;
   let headScale = 1; // se reduce en conectores muy cortos para que la punta quepa
@@ -494,9 +494,9 @@ function Connector({ conn, items, selected, selectedIds, onSelect, onUpdate, onD
     // La punta apunta HACIA el nodo: de p2 (en el hueco) hacia su borde eB.
     angleEnd = Math.atan2(eB.y - p2.y, eB.x - p2.x);
     angleStart = Math.atan2(eA.y - p1.y, eA.x - p1.x);
-    // Escala de la punta según la longitud real del tramo visible
+    // Escala de la punta: tamaño sólido normal; solo se reduce en tramos muy cortos
     const segLen = Math.hypot(p2.x - p1.x, p2.y - p1.y);
-    headScale = Math.max(0.5, Math.min(1, segLen / 24));
+    headScale = Math.max(0.7, Math.min(1, segLen / 20));
   }
 
   const themeInk = theme === 'dark' ? '#F0EEF0' : '#1A1A1A';
@@ -518,7 +518,7 @@ function Connector({ conn, items, selected, selectedIds, onSelect, onUpdate, onD
   }
 
   const arrowPts = (px, py, ang) => {
-    const ah = 10 * headScale, aw = 6.5 * headScale;
+    const ah = 11 * headScale, aw = 7 * headScale;
     const a1x = px - ah * Math.cos(ang) + aw * Math.cos(ang + Math.PI / 2);
     const a1y = py - ah * Math.sin(ang) + aw * Math.sin(ang + Math.PI / 2);
     const a2x = px - ah * Math.cos(ang) - aw * Math.cos(ang + Math.PI / 2);

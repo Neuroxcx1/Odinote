@@ -1425,6 +1425,8 @@ body.odi-busy iframe { pointer-events: none !important; }
 
 /* Doc — small card on canvas, opens fullscreen modal */
 .doc-card .item-card { padding: calc(11px * var(--node-scale, 1)) calc(13px * var(--node-scale, 1)); cursor: pointer; display: flex; flex-direction: column; }
+/* Documento sin vista previa: sin caja/rectángulo, solo el logo sobre el lienzo */
+.doc-card.doc-compact-mode .item-card { background: transparent !important; border: none !important; box-shadow: none !important; padding: 4px; }
 .doc-head { flex-shrink: 0; display: flex; align-items: center; gap: 8px; font-family: var(--font-display); font-weight: 700; font-size: calc(14px * var(--node-scale, 1)); margin-bottom: 7px; }
 .doc-head .material-symbols-rounded { font-size: calc(16px * var(--node-scale, 1)); color: var(--wine); }
 .doc-body-preview { font-size: calc(12px * var(--node-scale, 1)); color: var(--ink-2); line-height: 1.5; flex: 1; overflow: hidden; }

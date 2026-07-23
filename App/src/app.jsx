@@ -47,7 +47,7 @@ try {
 
 // Marcador de build: si la consola no muestra esta versión, el navegador está
 // sirviendo JS cacheado (subir ?v= en index.html invalida la caché)
-console.log('[ODINOTE] Código cargado: v26');
+console.log('[ODINOTE] Código cargado: v27');
 
 // Global shortcuts configuration
 window.shortcuts = {
