@@ -265,10 +265,13 @@ function NoteItem({ item, lang, editing, onUpdate }) {
     const naturalHeight = contentEl.scrollHeight;
     contentEl.style.height = origHeight;
     const totalHeight = Math.max(80, Math.round(naturalHeight + 3));
-    // Si el usuario redimensionó la nota a mano, respetamos SU altura tal cual.
-    // (No la ajustamos al texto: como el texto escala con el nodo, crecer aquí
-    // realimentaría el escalado en bucle. El botón "Estirar" ajusta a demanda.)
-    if (item.manualH) return;
+    // Con altura fijada a mano respetamos ese tamaño, pero SÍ crecemos si el
+    // texto ya no cabe (p. ej. al subir el tamaño con los botones A+). Nunca
+    // encogemos, para no deshacer la altura elegida.
+    if (item.manualH) {
+      if (totalHeight > (item.h || 0)) onUpdate({ h: totalHeight });
+      return;
+    }
     if (Math.abs((item.h || 0) - totalHeight) > 3) {
       onUpdate({ h: totalHeight });
     }
@@ -282,6 +285,7 @@ function NoteItem({ item, lang, editing, onUpdate }) {
           <div
             ref={ref}
             className="note-edit rich"
+            style={{ fontSize: `calc(13.5px * var(--node-scale, 1) * ${item.textScale || 1})` }}
             contentEditable
             suppressContentEditableWarning
             spellCheck={true}
@@ -513,7 +517,7 @@ function NoteItem({ item, lang, editing, onUpdate }) {
         <div
           ref={ref}
           className="note-inner rich"
-          style={{ color: textColor }}
+          style={{ color: textColor, fontSize: `calc(13.5px * var(--node-scale, 1) * ${item.textScale || 1})` }}
         />
       </div>
     </div>
@@ -3118,10 +3122,10 @@ function CommentItem({ item, lang, onUpdate, editing }) {
             onClick={(e)=>e.stopPropagation()}
             onMouseDown={(e)=>e.stopPropagation()}
             onKeyDown={(e)=>{ if (e.key==='Escape') e.target.blur(); }}
-            style={{ color: window.nodeInk(item) }}
+            style={{ color: window.nodeInk(item), fontSize: `calc(13.5px * var(--node-scale, 1) * ${item.textScale || 1})` }}
           />
         ) : (
-          <div ref={ref} className="note-inner rich comment-rich" style={{ color: window.nodeInk(item) }}/>
+          <div ref={ref} className="note-inner rich comment-rich" style={{ color: window.nodeInk(item), fontSize: `calc(13.5px * var(--node-scale, 1) * ${item.textScale || 1})` }}/>
         )}
         {item.showCaption && (
           <div className="node-caption-row">
