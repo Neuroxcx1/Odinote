@@ -168,6 +168,20 @@ function ContextSidebar({
           </button>
         ) : (
           <>
+            {/* Botón de editar universal: entra al modo edición del nodo (para las
+                notas, títulos, comentarios, etc. muestra las opciones de texto).
+                Se omite en imagen (se edita con doble clic / recorte) y en nodos
+                sin edición de contenido (color, audio, archivo). */}
+            {!tableCell && onStartEdit && ['note','comment','bigtitle','todo','link','board','column','frame'].includes(item.type) && (
+              <button
+                className="ctx-btn"
+                onClick={()=>{ onStartEdit(); window.playAudioTone && window.playAudioTone('click'); }}
+                title={window.t('Editar', 'Edit')}
+              >
+                <span className="material-symbols-rounded">edit</span>
+                <span>{window.t('Editar', 'Edit')}</span>
+              </button>
+            )}
             {!tableCell && !isImage && (
               <button
             className={`ctx-btn ${(pane === 'color' || pane === 'colorHex') ? 'active' : ''}`}

@@ -2211,6 +2211,10 @@ function CalendarItem({ item, lang, onUpdate, editing }) {
                   e.stopPropagation();
                   if (c.muted) return;
                   if (adding === c.key) return; // already adding
+                  // Feedback inmediato: marca el día como seleccionado (se resalta) y suena
+                  const [cy, cm, cd] = c.key.split('-').map(Number);
+                  onUpdate({ selectedDay: cd, selectedYear: cy, selectedMonth: cm });
+                  window.playAudioTone && window.playAudioTone('click');
                   // open day menu instead of jumping straight to event input
                   openDayMenu({ key: c.key, x: e.clientX, y: e.clientY });
                 }}
@@ -2308,7 +2312,8 @@ function CalendarItem({ item, lang, onUpdate, editing }) {
           })}
         </div>
         <div className="cal-mb-hint">
-          {window.t('Clic en un día para evento · ícono de imagen para foto', 'Click a day for event · image icon for photo')}
+          <span className="material-symbols-rounded" style={{ fontSize: '13px', verticalAlign: 'middle', marginRight: '4px' }}>touch_app</span>
+          {window.t('Clic en un día para agregar evento · ícono de imagen para foto', 'Click a day to add an event · image icon for a photo')}
         </div>
         <input ref={fileRef} type="file" accept="image/*" style={{display:'none'}} onChange={handlePickImage}/>
         {dayMenu && (() => {

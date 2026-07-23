@@ -346,6 +346,7 @@ function Connector({ conn, items, selected, selectedIds, onSelect, onUpdate, onD
   const GAP = 16;
 
   let eA, eB, p1, p2, qx, qy, path, hx, hy, angleEnd, angleStart, exADir, exBDir;
+  let headScale = 1; // se reduce en conectores muy cortos para que la punta quepa
   let orthoWaypoints = null;   // user-draggable interior waypoints (Miro-style)
   let orthoVerts = null;       // full vertex list of the right-angle polyline (for segment handles)
   let orthoSegments = null;    // segment midpoints (drag to add a new control point)
@@ -478,13 +479,24 @@ function Connector({ conn, items, selected, selectedIds, onSelect, onUpdate, onD
     qy = (cA.y + cB.y) / 2 + bend.y;
     eA = A.item ? nearestPointOnRect(A.item, qx, qy) : cA;
     eB = B.item ? nearestPointOnRect(B.item, qx, qy) : cB;
-    p1 = moveToward(eA, { x: qx, y: qy }, GAP);
-    p2 = moveToward(eB, { x: qx, y: qy }, GAP);
+    // Gap adaptativo: en conexiones cortas se reduce para que la línea y la punta
+    // quepan sin encimarse (antes el gap fijo de 16px las degeneraba).
+    const edgeDist = Math.hypot(eB.x - eA.x, eB.y - eA.y);
+    const gap = Math.max(2, Math.min(GAP, edgeDist * 0.28));
+    p1 = moveToward(eA, { x: qx, y: qy }, gap);
+    p2 = moveToward(eB, { x: qx, y: qy }, gap);
     path = `M ${p1.x} ${p1.y} Q ${qx} ${qy} ${p2.x} ${p2.y}`;
     hx = 0.25 * p1.x + 0.5 * qx + 0.25 * p2.x;
     hy = 0.25 * p1.y + 0.5 * qy + 0.25 * p2.y;
-    angleEnd = Math.atan2(p2.y - qy, p2.x - qx);   // arrival direction at the head
-    angleStart = Math.atan2(p1.y - qy, p1.x - qx); // arrival direction at the tail (bidir)
+    // Ángulo de la punta: tangente en el extremo. Si el vector al punto de control
+    // es diminuto (conexión corta), usar la dirección A→B, que es estable.
+    const tgtEnd = Math.hypot(p2.x - qx, p2.y - qy);
+    const tgtStart = Math.hypot(p1.x - qx, p1.y - qy);
+    angleEnd = tgtEnd > 1 ? Math.atan2(p2.y - qy, p2.x - qx) : Math.atan2(eB.y - eA.y, eB.x - eA.x);
+    angleStart = tgtStart > 1 ? Math.atan2(p1.y - qy, p1.x - qx) : Math.atan2(eA.y - eB.y, eA.x - eB.x);
+    // Escala de la punta según la longitud real del tramo visible
+    const segLen = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+    headScale = Math.max(0.5, Math.min(1, segLen / 24));
   }
 
   const themeInk = theme === 'dark' ? '#F0EEF0' : '#1A1A1A';
@@ -506,7 +518,7 @@ function Connector({ conn, items, selected, selectedIds, onSelect, onUpdate, onD
   }
 
   const arrowPts = (px, py, ang) => {
-    const ah = 11, aw = 7;
+    const ah = 11 * headScale, aw = 7 * headScale;
     const a1x = px - ah * Math.cos(ang) + aw * Math.cos(ang + Math.PI / 2);
     const a1y = py - ah * Math.sin(ang) + aw * Math.sin(ang + Math.PI / 2);
     const a2x = px - ah * Math.cos(ang) - aw * Math.cos(ang + Math.PI / 2);

@@ -1435,8 +1435,27 @@ body.odi-busy iframe { pointer-events: none !important; }
 .cal-mb-cell.muted:hover { background: transparent; }
 .cal-mb-cell.today { background: var(--olive-l); border-color: var(--olive); }
 .cal-mb-cell.today .cal-mb-day { color: var(--olive); font-weight: 800; }
-.cal-mb-cell.selected-day { background: var(--wine-l); border-color: var(--wine); }
+.cal-mb-cell.selected-day { background: var(--wine-l); border-color: var(--wine); box-shadow: 0 0 0 1.5px var(--wine); animation: cal-day-pop 260ms var(--e-out); }
 .cal-mb-cell.selected-day .cal-mb-day { color: var(--wine); font-weight: 800; }
+@keyframes cal-day-pop {
+  0% { transform: scale(0.86); }
+  55% { transform: scale(1.06); }
+  100% { transform: scale(1); }
+}
+/* Píldora del texto de ayuda del calendario (antes texto plano sin estilo) */
+.cal-mb-hint {
+  margin-top: calc(8px * var(--node-scale, 1));
+  align-self: center;
+  display: inline-flex; align-items: center;
+  padding: calc(4px * var(--node-scale, 1)) calc(11px * var(--node-scale, 1));
+  background: var(--bg-main, var(--bg));
+  border: 1px solid var(--line-soft);
+  border-radius: 999px;
+  font-size: calc(10.5px * var(--node-scale, 1));
+  font-weight: 600;
+  color: var(--text-soft, #595459);
+  letter-spacing: -0.01em;
+}
 .cal-mb-day { font-family: var(--font-mono); font-size: calc(11px * var(--node-scale, 1)); font-weight: 700; color: var(--ink-2); }
 .cal-mb-event { font-size: calc(9.5px * var(--node-scale, 1)); padding: 2px 5px; color: white; border-radius: 2px; font-weight: 600; line-height: 1.15; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; border: 1px solid rgba(0,0,0,0.15); transition: filter 100ms; }
 .cal-mb-event:hover { filter: brightness(1.08); box-shadow: 0 0 0 2px rgba(255,255,255,0.6) inset; }
@@ -2961,44 +2980,50 @@ body.odi-busy iframe { pointer-events: none !important; }
    FRAME ITEM (MARCO DE AGRUPACIÓN)
    ========================================================================== */
 .frame-card {
-  border: 2px dashed var(--line);
+  border: 2px dashed var(--frame-border, var(--line));
   border-radius: 6px;
-  background: transparent;
-  transition: border-color 140ms ease, background 140ms ease;
+  background: var(--frame-bg, transparent);
+  transition: border-color 140ms ease, background 140ms ease, box-shadow 140ms ease;
   overflow: hidden;
   pointer-events: none;
 }
 
+/* Selección: anillo por box-shadow en vez de reemplazar el border-color, para que
+   el color elegido del marco siga viéndose cuando está seleccionado */
 .frame-card:hover, .item.selected .frame-card {
-  border-color: var(--wine, #7B2D26);
+  box-shadow: 0 0 0 2px var(--wine, #7B2D26);
 }
 
 .frame-header {
-  background: color-mix(in srgb, var(--line-soft, #E5E1DD) 25%, transparent);
+  background: var(--frame-header-bg, color-mix(in srgb, var(--line-soft, #E5E1DD) 25%, transparent));
 }
 /* En modo oscuro --line-soft es casi negro; usamos un gris claro translúcido
-   para que la franja del título contraste con el lienzo sin deslumbrar */
-[data-theme="dark"] .frame-header {
+   para que la franja del título contraste con el lienzo sin deslumbrar
+   (solo cuando el marco no tiene color propio) */
+[data-theme="dark"] .frame-card.c-transparent .frame-header,
+[data-theme="dark"] .frame-card:not([class*="c-"]) .frame-header {
   background: rgba(240, 238, 240, 0.13);
 }
 
-/* Colores específicos de fondo y borde para los Frames */
-.frame-card.c-white  { border-color: color-mix(in srgb, var(--c-white, #FFFFFF) 40%, var(--line)); background: color-mix(in srgb, var(--c-white, #FFFFFF) 6%, transparent); }
-.frame-card.c-cream  { border-color: color-mix(in srgb, var(--c-cream, #FEF7E0) 50%, var(--line)); background: color-mix(in srgb, var(--c-cream, #FEF7E0) 8%, transparent); }
-.frame-card.c-sage   { border-color: color-mix(in srgb, var(--c-sage, #E8F0DA) 60%, var(--line)); background: color-mix(in srgb, var(--c-sage, #E8F0DA) 8%, transparent); }
-.frame-card.c-rose   { border-color: color-mix(in srgb, var(--c-rose, #FBDFDD) 60%, var(--line)); background: color-mix(in srgb, var(--c-rose, #FBDFDD) 8%, transparent); }
-.frame-card.c-stone  { border-color: color-mix(in srgb, var(--c-stone, #DCDCE1) 60%, var(--line)); background: color-mix(in srgb, var(--c-stone, #DCDCE1) 8%, transparent); }
-.frame-card.c-mist   { border-color: color-mix(in srgb, var(--c-mist, #ECEBEB) 60%, var(--line)); background: color-mix(in srgb, var(--c-mist, #ECEBEB) 8%, transparent); }
-.frame-card.c-olive  { border-color: var(--c-olive, #6A8546); background: color-mix(in srgb, var(--c-olive, #6A8546) 12%, transparent); }
-.frame-card.c-wine   { border-color: var(--c-wine, #993844); background: color-mix(in srgb, var(--c-wine, #993844) 12%, transparent); }
-.frame-card.c-red    { border-color: var(--c-red, #E6544F); background: color-mix(in srgb, var(--c-red, #E6544F) 10%, transparent); }
-.frame-card.c-sky    { border-color: var(--c-sky, #8AC1E8); background: color-mix(in srgb, var(--c-sky, #8AC1E8) 10%, transparent); }
-.frame-card.c-yellow { border-color: var(--c-yellow, #F7DA84); background: color-mix(in srgb, var(--c-yellow, #F7DA84) 10%, transparent); }
-.frame-card.c-orange { border-color: var(--c-orange, #F5A66B); background: color-mix(in srgb, var(--c-orange, #F5A66B) 10%, transparent); }
-.frame-card.c-pink   { border-color: var(--c-pink, #E58AB8); background: color-mix(in srgb, var(--c-pink, #E58AB8) 10%, transparent); }
-.frame-card.c-purple { border-color: var(--c-purple, #B084D0); background: color-mix(in srgb, var(--c-purple, #B084D0) 10%, transparent); }
-.frame-card.c-dark   { border-color: var(--c-dark, #595459); background: color-mix(in srgb, var(--c-dark, #595459) 10%, transparent); }
-.frame-card.c-transparent { border-color: var(--line); background: transparent; }
+/* Colores de los Frames: borde a color pleno + fondo con tinte perceptible +
+   franja del título tintada. Valores rgba fijos para que se vean igual sobre
+   cualquier fondo de lienzo (los porcentajes bajos anteriores eran invisibles). */
+.frame-card.c-white  { --frame-border: #B5B2B5; --frame-bg: rgba(255,255,255,0.55); --frame-header-bg: rgba(255,255,255,0.85); }
+.frame-card.c-mist   { --frame-border: #9E9C9E; --frame-bg: rgba(190,188,190,0.32); --frame-header-bg: rgba(190,188,190,0.55); }
+.frame-card.c-cream  { --frame-border: #E5D48F; --frame-bg: rgba(254,247,224,0.55); --frame-header-bg: rgba(247,225,150,0.6); }
+.frame-card.c-sage   { --frame-border: #B9CE96; --frame-bg: rgba(232,240,218,0.55); --frame-header-bg: rgba(200,222,160,0.6); }
+.frame-card.c-rose   { --frame-border: #E9A8A3; --frame-bg: rgba(251,223,221,0.55); --frame-header-bg: rgba(245,190,186,0.6); }
+.frame-card.c-stone  { --frame-border: #B0AEB6; --frame-bg: rgba(220,220,225,0.4); --frame-header-bg: rgba(200,200,210,0.55); }
+.frame-card.c-yellow { --frame-border: #E7C25A; --frame-bg: rgba(247,218,132,0.32); --frame-header-bg: rgba(247,218,132,0.55); }
+.frame-card.c-orange { --frame-border: #E88B45; --frame-bg: rgba(245,166,107,0.28); --frame-header-bg: rgba(245,166,107,0.5); }
+.frame-card.c-red    { --frame-border: #E6544F; --frame-bg: rgba(230,84,79,0.16); --frame-header-bg: rgba(230,84,79,0.3); }
+.frame-card.c-pink   { --frame-border: #DB6FA6; --frame-bg: rgba(229,138,184,0.24); --frame-header-bg: rgba(229,138,184,0.42); }
+.frame-card.c-purple { --frame-border: #9E6FC2; --frame-bg: rgba(176,132,208,0.22); --frame-header-bg: rgba(176,132,208,0.4); }
+.frame-card.c-sky    { --frame-border: #6FAEDC; --frame-bg: rgba(138,193,232,0.26); --frame-header-bg: rgba(138,193,232,0.45); }
+.frame-card.c-olive  { --frame-border: #6A8546; --frame-bg: rgba(106,133,70,0.18); --frame-header-bg: rgba(106,133,70,0.32); }
+.frame-card.c-wine   { --frame-border: #993844; --frame-bg: rgba(153,56,68,0.18); --frame-header-bg: rgba(153,56,68,0.32); }
+.frame-card.c-dark   { --frame-border: #595459; --frame-bg: rgba(89,84,89,0.2); --frame-header-bg: rgba(89,84,89,0.35); }
+.frame-card.c-transparent { --frame-border: var(--line); --frame-bg: transparent; }
 
 /* ==========================================================================
    BIG TITLE ITEM (TÍTULO GIGANTE TRANSPARENTE)
