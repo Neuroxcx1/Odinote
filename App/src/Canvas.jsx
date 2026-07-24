@@ -1402,11 +1402,10 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
         }
       } catch (err) {}
 
-      // Fallback local por si acaso
-      if (!parsedOdiData && window._odiCopiedData) {
-        parsedOdiData = window._odiCopiedData;
-      }
-
+      // OJO: aquí NO se usa window._odiCopiedData como respaldo. Antes se hacía y,
+      // al copiar algo de fuera (texto o imagen), se pegaba el último nodo copiado
+      // dentro de la app en lugar del contenido externo. El respaldo interno solo
+      // se usa al final, si el portapapeles no trae nada aprovechable.
       if (parsedOdiData) {
         e.preventDefault();
         pasteData(parsedOdiData);
@@ -1437,6 +1436,42 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
       const urlText = (cdata.getData('text/uri-list') || cdata.getData('text/plain') || '').split('\n')[0].trim();
       if (urlText && /^https?:\/\//i.test(urlText) && /\.(png|jpe?g|gif|webp|svg|bmp)(\?|$)/i.test(urlText)) {
         fetchAndApplyImage(urlText);
+        return;
+      }
+
+      // 5) Texto plano externo → crear una nota (o un enlace si es una URL)
+      const plainText = (cdata.getData('text/plain') || '').trim();
+      if (plainText) {
+        e.preventDefault();
+        const m = lastMouseRef.current || { x: 0, y: 0 };
+        const pt = screenToCanvas(m.x, m.y);
+        const isUrl = /^https?:\/\/\S+$/i.test(plainText);
+        const type = isUrl ? 'link' : 'note';
+        const def = defaultDims(type);
+        const newItem = makeNewItem(type, pt.x - def.w / 2, pt.y - def.h / 2, def.w, def.h, lang);
+        if (isUrl) {
+          newItem.url = plainText;
+        } else {
+          // Respetar los saltos de línea del texto copiado
+          const html = plainText
+            .split(/\r?\n/)
+            .map(line => `<p>${line.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') || '<br>'}</p>`)
+            .join('');
+          newItem.content = { es: html, en: html };
+        }
+        setCanvases(prev => {
+          const c = prev[currentId];
+          return { ...prev, [currentId]: { ...c, items: [...c.items, newItem] } };
+        });
+        setSelected(newItem.id);
+        window.playAudioTone && window.playAudioTone('drop');
+        return;
+      }
+
+      // 6) El portapapeles no trae nada aprovechable → repetir la última copia interna
+      if (window._odiCopiedData) {
+        e.preventDefault();
+        pasteData(window._odiCopiedData);
       }
     };
     const onDocCopy = (e) => {

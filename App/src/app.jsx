@@ -47,7 +47,7 @@ try {
 
 // Marcador de build: si la consola no muestra esta versión, el navegador está
 // sirviendo JS cacheado (subir ?v= en index.html invalida la caché)
-console.log('[ODINOTE] Código cargado: v33');
+console.log('[ODINOTE] Código cargado: v34');
 
 // Global shortcuts configuration
 window.shortcuts = {
@@ -3285,10 +3285,11 @@ function App() {
       {toast && (
         <div
           style={{
+            // Abajo a la derecha para no tapar la barra superior ni el lienzo
             position: 'fixed',
-            top: '24px',
-            left: '50%',
-            transform: 'translateX(-50%)',
+            bottom: '20px',
+            right: '20px',
+            maxWidth: 'min(380px, calc(100vw - 40px))',
             background: 'var(--paper, #FFFFFF)',
             border: toast.type === 'success' ? '2px solid var(--line, #595459)' : '2px solid var(--wine, #E6544F)',
             color: toast.type === 'success' ? 'var(--ink, #1A1A1A)' : 'var(--wine, #E6544F)',
@@ -3311,8 +3312,8 @@ function App() {
           <span>{toast.message}</span>
           <style>{`
             @keyframes toastSlideIn {
-              0% { transform: translate(-50%, -40px); opacity: 0; }
-              100% { transform: translate(-50%, 0); opacity: 1; }
+              0% { transform: translateY(28px); opacity: 0; }
+              100% { transform: translateY(0); opacity: 1; }
             }
           `}</style>
         </div>
