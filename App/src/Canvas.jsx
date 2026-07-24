@@ -2094,20 +2094,50 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
       ? current.items.filter(it => selectedIds.includes(it.id)).map(it => ({ id: it.id, x: it.x, y: it.y }))
       : null;
     
-    // Frame drag: snapshot geometrically-contained items
+    // Frame drag: snapshot geometrically-contained items, incluyendo MARCOS ANIDADOS
+    // y su contenido (de forma recursiva).
     let frameChildrenStart = null;
     if (item.type === 'frame' && !isMultiDrag) {
-      const frameRect = { x: item.x, y: item.y, w: item.w || 400, h: item.h || 400 };
-      const inside = current.items.filter(it => {
-        if (it.id === itemId || it.type === 'line' || it.type === 'frame') return false;
-        const itW = it.w !== undefined ? it.w : (defaultDims ? defaultDims(it.type).w : 200);
-        const itH = it.h !== undefined ? it.h : (defaultDims ? defaultDims(it.type).h : 120);
-        const cx = it.x + itW / 2;
-        const cy = it.y + itH / 2;
-        return cx >= frameRect.x && cx <= frameRect.x + frameRect.w &&
-               cy >= frameRect.y && cy <= frameRect.y + frameRect.h;
+      const sizeOf = (it) => ({
+        w: it.w !== undefined ? it.w : (defaultDims ? defaultDims(it.type).w : 200),
+        h: it.h !== undefined ? it.h : (defaultDims ? defaultDims(it.type).h : 120),
       });
-      frameChildrenStart = inside.map(it => ({ id: it.id, x: it.x, y: it.y }));
+
+      // Hijos directos de un marco.
+      //  · Nodos normales: basta con que su CENTRO caiga dentro (regla tolerante).
+      //  · Marcos: deben estar CONTENIDOS POR COMPLETO y ser de menor área. Esto
+      //    hace la relación de un solo sentido por geometría — un marco grande
+      //    nunca cabe entero dentro de uno pequeño, así que el hijo jamás
+      //    arrastra al padre.
+      const directChildren = (frame) => {
+        const fw = frame.w || 400, fh = frame.h || 400;
+        return current.items.filter(it => {
+          if (it.id === frame.id || it.type === 'line') return false;
+          const { w, h } = sizeOf(it);
+          if (it.type === 'frame') {
+            return it.x >= frame.x && it.y >= frame.y &&
+                   it.x + w <= frame.x + fw && it.y + h <= frame.y + fh &&
+                   (w * h) < (fw * fh);
+          }
+          const cx = it.x + w / 2, cy = it.y + h / 2;
+          return cx >= frame.x && cx <= frame.x + fw &&
+                 cy >= frame.y && cy <= frame.y + fh;
+        });
+      };
+
+      // Recorrido en profundidad: al mover un marco se lleva sus marcos hijos y
+      // todo lo que haya dentro de ellos. El Set evita duplicados y bucles.
+      const collected = new Map();
+      const walk = (frame) => {
+        directChildren(frame).forEach(child => {
+          if (collected.has(child.id) || child.id === itemId) return;
+          collected.set(child.id, child);
+          if (child.type === 'frame') walk(child);
+        });
+      };
+      walk(item);
+
+      frameChildrenStart = Array.from(collected.values()).map(it => ({ id: it.id, x: it.x, y: it.y }));
     }
 
     const startConnectors = (current.connectors || []).map(co => ({
