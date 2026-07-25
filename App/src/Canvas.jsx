@@ -3241,7 +3241,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
     
     // Desde el primer momento marcamos la altura como manual en los nodos que se
     // auto-ajustan al texto, para que dejen de imponer su propia altura.
-    if (['note', 'comment'].includes(item.type) && !item.manualH) {
+    if (['note', 'comment', 'todo'].includes(item.type) && !item.manualH) {
       updateItemSilent(itemId, { manualH: true });
     }
 
@@ -3485,7 +3485,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
       setGuides(null);
       // Marcar que la altura la fijó el usuario, para que el auto-ajuste al
       // contenido (notas/comentarios) deje de pisar el tamaño elegido.
-      const manualPatch = ['note', 'comment'].includes(item.type) ? { manualH: true } : {};
+      const manualPatch = ['note', 'comment', 'todo'].includes(item.type) ? { manualH: true } : {};
       updateItem(itemId, manualPatch);
       window.removeEventListener('mousemove', onMove);
       window.removeEventListener('mouseup', onUp);
@@ -4041,7 +4041,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
         const it = selectedItem;
         if (!it) return null;
         const isEditingMapTitle = it.type === 'map' && it._editingTitle;
-        const isEditingTextNode = editing && editing === selected && ['note','comment','bigtitle','frame'].includes(it.type);
+        const isEditingTextNode = editing && editing === selected && ['note','comment','bigtitle','frame','todo'].includes(it.type);
         if (!isEditingTextNode && !isEditingMapTitle) return null;
         return (
           <window.TextFormatSidebar

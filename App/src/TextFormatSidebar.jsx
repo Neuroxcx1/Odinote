@@ -10,7 +10,26 @@ function TextFormatSidebar({ item, lang, onUpdate, onClose, variant, noCodeQuote
   const isBigTitle = item.type === 'bigtitle';
   const isFrame = item.type === 'frame';
   const isMap = item.type === 'map';
-  const isCustomPropType = isBigTitle || isFrame || isMap;
+  const isTodo = item.type === 'todo';
+  // Estos tipos guardan el formato como propiedades del nodo/fila en vez de HTML,
+  // así que NUNCA deben llegar a execCommand (findEditor haría fallback al primer
+  // editor de nota del documento y formatearía un nodo ajeno).
+  const isCustomPropType = isBigTitle || isFrame || isMap || isTodo;
+
+  // ── To-do: el formato se aplica a la TAREA enfocada; si no hay ninguna
+  // enfocada, se aplica a todas las tareas del nodo. ──
+  const todoRows = isTodo ? (item.items || []) : [];
+  const focusedTodoRowId = isTodo && window._focusedTodoRow && window._focusedTodoRow.todoId === item.id
+    ? window._focusedTodoRow.rowId : null;
+  const activeTodoRow = focusedTodoRowId
+    ? todoRows.find(r => r.id === focusedTodoRowId)
+    : todoRows[0];
+  const applyTodoStyle = (patch) => {
+    onUpdate({
+      items: todoRows.map(r => (focusedTodoRowId ? r.id === focusedTodoRowId : true) ? { ...r, ...patch } : r)
+    });
+  };
+  const toggleTodoStyle = (key) => applyTodoStyle({ [key]: !(activeTodoRow && activeTodoRow[key]) });
   const [active, setActive] = React.useState({});
   const [colorOpen, setColorOpen] = React.useState(false);
 
@@ -35,6 +54,9 @@ function TextFormatSidebar({ item, lang, onUpdate, onClose, variant, noCodeQuote
           alignRight: (item.align || 'center') === 'right',
           alignJustify: (item.align || 'center') === 'justify',
         });
+      } else if (item.type === 'todo') {
+        const r = activeTodoRow || {};
+        setActive({ bold: !!r.bold, italic: !!r.italic, strike: !!r.strike, underline: !!r.underline });
       } else if (item.type === 'frame' || item.type === 'map') {
         setActive({
           alignLeft: (item.titleAlign || 'left') === 'left',
@@ -62,7 +84,9 @@ function TextFormatSidebar({ item, lang, onUpdate, onClose, variant, noCodeQuote
   React.useEffect(() => {
     const iv = setInterval(refresh, 250);
     return () => clearInterval(iv);
-  }, [item.id, item.align, item.titleAlign]);
+    // item.items y la fila enfocada entran aquí para que los toggles B/I/S/U
+    // reflejen la tarea activa en vez de quedarse con un closure viejo
+  }, [item.id, item.align, item.titleAlign, item.items, focusedTodoRowId]);
 
   // Helper: find the active contenteditable; if not focused, focus the note's editor
   const findEditor = () => {
@@ -136,33 +160,34 @@ function TextFormatSidebar({ item, lang, onUpdate, onClose, variant, noCodeQuote
         </>
       )}
 
-      {(!isCustomPropType || isBigTitle) && (
+      {(!isCustomPropType || isBigTitle || isTodo) && (
         <>
-          {/* En el título, B/I/S/U son toggles de nodo completo (texto uniforme);
-              en las notas usan execCommand por selección. */}
-          <button className={`ctx-btn ${active.bold ? 'active' : ''}`} onClick={()=> isBigTitle ? onUpdate({ bold: item.bold === false }) : exec('bold')}>
+          {/* En el título y en las tareas, B/I/S/U son toggles de propiedad
+              (texto plano); en las notas usan execCommand por selección. */}
+          <button className={`ctx-btn ${active.bold ? 'active' : ''}`} onClick={()=> isTodo ? toggleTodoStyle('bold') : isBigTitle ? onUpdate({ bold: item.bold === false }) : exec('bold')}>
             <div className="ctx-letter" style={{fontWeight: 800}}>B</div>
             <span>{lang==='es'?'Negrita':'Bold'}</span>
           </button>
 
-          <button className={`ctx-btn ${active.italic ? 'active' : ''}`} onClick={()=> isBigTitle ? onUpdate({ italic: !item.italic }) : exec('italic')}>
+          <button className={`ctx-btn ${active.italic ? 'active' : ''}`} onClick={()=> isTodo ? toggleTodoStyle('italic') : isBigTitle ? onUpdate({ italic: !item.italic }) : exec('italic')}>
             <div className="ctx-letter" style={{fontStyle: 'italic', fontWeight: 700}}>I</div>
             <span>{lang==='es'?'Cursiva':'Italic'}</span>
           </button>
 
-          <button className={`ctx-btn ${active.strike ? 'active' : ''}`} onClick={()=> isBigTitle ? onUpdate({ strike: !item.strike }) : exec('strikeThrough')}>
+          <button className={`ctx-btn ${active.strike ? 'active' : ''}`} onClick={()=> isTodo ? toggleTodoStyle('strike') : isBigTitle ? onUpdate({ strike: !item.strike }) : exec('strikeThrough')}>
             <div className="ctx-letter" style={{textDecoration: 'line-through', fontWeight: 700}}>S</div>
             <span>{lang==='es'?'Tachado':'Strike'}</span>
           </button>
 
-          <button className={`ctx-btn ${active.underline ? 'active' : ''}`} onClick={()=> isBigTitle ? onUpdate({ underline: !item.underline }) : exec('underline')}>
+          <button className={`ctx-btn ${active.underline ? 'active' : ''}`} onClick={()=> isTodo ? toggleTodoStyle('underline') : isBigTitle ? onUpdate({ underline: !item.underline }) : exec('underline')}>
             <div className="ctx-letter" style={{textDecoration: 'underline', fontWeight: 700}}>U</div>
             <span>{lang==='es'?'Subrayado':'Underline'}</span>
           </button>
         </>
       )}
 
-      {(isCustomPropType || !isCaption) && (
+      {/* Alineación: no aplica a las tareas (y evitaría caer en execCommand) */}
+      {!isTodo && (isCustomPropType || !isCaption) && (
         <>
           <div className="ctx-sep-h"/>
 
@@ -320,7 +345,9 @@ function TextFormatSidebar({ item, lang, onUpdate, onClose, variant, noCodeQuote
                 className="text-color-swatch"
                 style={{background: c, border: c === '#FFFFFF' ? '1.5px solid var(--line-soft)' : '1.5px solid var(--line)'}}
                 onClick={()=>{
-                  if (isBigTitle) {
+                  if (isTodo) {
+                    applyTodoStyle({ color: c });
+                  } else if (isBigTitle) {
                     onUpdate({ textColor: c });
                   } else if (isFrame || isMap) {
                     onUpdate({ titleColor: c });
@@ -337,7 +364,9 @@ function TextFormatSidebar({ item, lang, onUpdate, onClose, variant, noCodeQuote
             className="btn"
             style={{marginTop: 8, width: '100%', justifyContent: 'center', fontSize: 11.5}}
             onClick={()=>{
-              if (isBigTitle) {
+              if (isTodo) {
+                applyTodoStyle({ color: null, bold: false, italic: false, underline: false, strike: false });
+              } else if (isBigTitle) {
                 onUpdate({ textColor: 'inherit' });
               } else if (isFrame || isMap) {
                 onUpdate({ titleColor: 'inherit' });

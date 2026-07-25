@@ -1306,10 +1306,20 @@ function TodoItem({ item, lang, onUpdate, editing, callbacks }) {
     // Restore the original styles so DOM matches state until update completes
     restores.forEach(restore => restore?.());
 
+    // Con altura fijada a mano respetamos ese tamaño, pero crecemos si el
+    // contenido ya no cabe (si no, "Nueva tarea" quedaría cortado abajo).
+    if (item.manualH) {
+      if (calculatedHeight > (item.h || 0)) onUpdate({ h: calculatedHeight });
+      return;
+    }
     if (Math.abs((item.h || 0) - calculatedHeight) > 3) {
       onUpdate({ h: calculatedHeight });
     }
-  }, [subs, item.title, editing, item.h, lang]);
+  // focusedRowId y la selección entran en las dependencias: al enfocar una tarea
+  // aparece su barra de controles (~20px) y sin recalcular aquí el contenido
+  // desbordaba y escondía el botón "Nueva tarea".
+  }, [subs, item.title, editing, item.h, lang, item.manualH, item.textScale, focusedRowId,
+      callbacks?.isSelectedItem ? callbacks.isSelectedItem(item.id) : false]);
 
   return (
     <div ref={cardRef} className="todo-card" style={{width:'100%', height:'100%'}}>
@@ -1471,6 +1481,15 @@ function TodoItem({ item, lang, onUpdate, editing, callbacks }) {
                           setTimeout(()=>{ prevInput?.focus(); }, 10);
                         }
                       }
+                    }}
+                    style={{
+                      // Tamaño desde los botones A+/A− (inline: la variable CSS
+                      // heredada no llegaba hasta aquí) y formato por tarea
+                      fontSize: `calc(13px * var(--node-scale, 1) * ${item.textScale || 1})`,
+                      fontWeight: ti.bold ? 700 : undefined,
+                      fontStyle: ti.italic ? 'italic' : undefined,
+                      textDecoration: [ti.underline && 'underline', ti.strike && 'line-through'].filter(Boolean).join(' ') || undefined,
+                      color: ti.color || undefined,
                     }}
                   />
                   {hasMeta && (
