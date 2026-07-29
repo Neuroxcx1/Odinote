@@ -47,7 +47,7 @@ try {
 
 // Marcador de build: si la consola no muestra esta versión, el navegador está
 // sirviendo JS cacheado (subir ?v= en index.html invalida la caché)
-console.log('[ODINOTE] Código cargado: v36');
+console.log('[ODINOTE] Código cargado: v37');
 
 // Global shortcuts configuration
 window.shortcuts = {
@@ -1800,11 +1800,20 @@ function App() {
             alert(window.t('Este archivo no parece ser un respaldo valido de Odinote.', 'This file does not look like a valid Odinote backup.'));
             return;
           }
-          setView(state.view || { kind: 'home' });
-          setLang(state.lang || 'es');
-          setTheme(state.theme || 'light');
-          setProjects(state.projects);
-          setCanvases(state.canvases);
+          // FUSIONAR, no reemplazar: un respaldo importado solía borrar TODOS los
+          // proyectos existentes. Ahora se añaden/actualizan por id, conservando
+          // todo lo que ya tenías. Los ids nuevos (p. ej. de una plantilla de
+          // ejemplo) simplemente se agregan a la lista.
+          setProjects(prev => {
+            const byId = new Map(prev.map(p => [p.id, p]));
+            state.projects.forEach(p => byId.set(p.id, p));
+            return Array.from(byId.values());
+          });
+          setCanvases(prev => ({ ...prev, ...state.canvases }));
+          showToast(window.t(
+            `Se importaron ${state.projects.length} proyecto(s). Tus proyectos existentes se conservaron.`,
+            `Imported ${state.projects.length} project(s). Your existing projects were kept.`
+          ));
         } catch {
           alert(window.t('No se pudo importar el respaldo.', 'The backup could not be imported.'));
         }
