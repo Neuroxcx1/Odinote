@@ -58,6 +58,9 @@ function Home({ lang, setLang, theme, setTheme, onOpenProject, projects, onCreat
   const [section, setSection] = useStateHome('all');
   const [viewMode, setViewMode] = useStateHome('grid'); // 'grid' | 'list'
   const [editProject, setEditProject] = useStateHome(null);
+  // En móvil la barra lateral (con "Nuevo espacio", papelera, bóveda…) no cabe:
+  // se abre como cajón desde el botón ☰. En escritorio esto no se usa.
+  const [sideOpen, setSideOpen] = useStateHome(false);
 
 
 
@@ -76,9 +79,10 @@ function Home({ lang, setLang, theme, setTheme, onOpenProject, projects, onCreat
   const recents = projects.filter(p => !p.deleted).slice(0, 4);
 
   return (
-    <div className="miro-home" data-screen-label="Home">
+    <div className={`miro-home ${sideOpen ? 'side-open' : ''}`} data-screen-label="Home">
+      {sideOpen && <div className="ms-side-scrim" onClick={()=>setSideOpen(false)}/>}
       {/* Sidebar */}
-      <aside className="ms-side">
+      <aside className="ms-side" onClick={(e)=>{ if (e.target.closest('button, a')) setSideOpen(false); }}>
         <div className="ms-brand">
           <div className="brand-mark"><BrandMark/></div>
           <span>Odinote</span>
@@ -223,6 +227,15 @@ function Home({ lang, setLang, theme, setTheme, onOpenProject, projects, onCreat
       {/* Main */}
       <main className="ms-main">
         <header className="ms-top">
+          {/* Abre la barra lateral como cajón. Solo se ve en móvil. */}
+          <button
+            className="ms-side-toggle"
+            onClick={()=>setSideOpen(true)}
+            title={window.t('Menú', 'Menu')}
+            aria-label={window.t('Menú', 'Menu')}
+          >
+            <span className="material-symbols-rounded">menu</span>
+          </button>
           <div className="ms-search">
             <span className="material-symbols-rounded">search</span>
             <input

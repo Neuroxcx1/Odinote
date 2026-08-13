@@ -2,7 +2,14 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- El lienzo tiene su propio zoom de pellizco (Canvas.jsx): si además
+         dejamos el zoom del navegador, cada gesto hace las dos cosas a la vez.
+         viewport-fit=cover habilita env(safe-area-inset-*) en móviles con
+         muesca, que usamos para no meter botones bajo la barra del sistema. -->
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
+    />
     <meta
       name="description"
       content="Odinote is a free and open source application to organize projects, notes, references, and visual boards in an infinite canvas."
@@ -11,15 +18,22 @@
     <link rel="icon" type="image/png" href="./Icon/Icon.png" />
     <link rel="stylesheet" href="./lib/fonts.css" />
     <link rel="stylesheet" href="./lib/github.min.css" />
-    <link rel="stylesheet" href="./src/styles.css?v=37" />
+    <link rel="stylesheet" href="./src/styles.css?v=38" />
     
-    <!-- Google Analytics (GA4) -->
+    <!-- Google Analytics (GA4).
+         Se envía a DOS propiedades a propósito:
+          · G-2HTKF0DZCW — la propiedad GA4 creada a mano.
+          · G-YT66TPQGQE — el flujo que Firebase creó junto al proyecto (es el
+            measurementId de firebaseConfig). La tarjeta "Estadísticas" de la
+            consola de Firebase lee SOLO este segundo flujo: como la app nunca
+            le enviaba nada, el panel salía vacío aunque hubiera visitas. -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-2HTKF0DZCW"></script>
     <script>
       window.dataLayer = window.dataLayer || [];
       function gtag(){dataLayer.push(arguments);}
       gtag('js', new Date());
       gtag('config', 'G-2HTKF0DZCW');
+      gtag('config', 'G-YT66TPQGQE');
     </script>
 
     <!-- Pantalla de carga: CSS puro, se muestra al instante (antes de que Babel
@@ -137,16 +151,19 @@
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
 
-    <script src="./src/drive.js?v=37"></script>
-    <script type="text/babel" data-presets="react" src="./src/data.js?v=37"></script>
-    <script type="text/babel" data-presets="react" src="./src/items.jsx?v=37"></script>
-    <script type="text/babel" data-presets="react" src="./src/Connector.jsx?v=37"></script>
-    <script type="text/babel" data-presets="react" src="./src/Topbar.jsx?v=37"></script>
-    <script type="text/babel" data-presets="react" src="./src/ContextSidebar.jsx?v=37"></script>
-    <script type="text/babel" data-presets="react" src="./src/TextFormatSidebar.jsx?v=37"></script>
-    <script type="text/babel" data-presets="react" src="./src/DocModal.jsx?v=37"></script>
-    <script type="text/babel" data-presets="react" src="./src/Home.jsx?v=37"></script>
-    <script type="text/babel" data-presets="react" src="./src/Canvas.jsx?v=37"></script>
-    <script type="text/babel" data-presets="react" src="./src/app.jsx?v=37"></script>
+    <!-- Antes que nada: marca <html data-mobile/data-touch> (de lo que cuelga
+         todo el CSS responsive) y traduce gestos táctiles a eventos de ratón. -->
+    <script src="./src/touch.js?v=38"></script>
+    <script src="./src/drive.js?v=38"></script>
+    <script type="text/babel" data-presets="react" src="./src/data.js?v=38"></script>
+    <script type="text/babel" data-presets="react" src="./src/items.jsx?v=38"></script>
+    <script type="text/babel" data-presets="react" src="./src/Connector.jsx?v=38"></script>
+    <script type="text/babel" data-presets="react" src="./src/Topbar.jsx?v=38"></script>
+    <script type="text/babel" data-presets="react" src="./src/ContextSidebar.jsx?v=38"></script>
+    <script type="text/babel" data-presets="react" src="./src/TextFormatSidebar.jsx?v=38"></script>
+    <script type="text/babel" data-presets="react" src="./src/DocModal.jsx?v=38"></script>
+    <script type="text/babel" data-presets="react" src="./src/Home.jsx?v=38"></script>
+    <script type="text/babel" data-presets="react" src="./src/Canvas.jsx?v=38"></script>
+    <script type="text/babel" data-presets="react" src="./src/app.jsx?v=38"></script>
   </body>
 </html>

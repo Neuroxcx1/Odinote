@@ -3375,3 +3375,346 @@ body.odi-busy iframe { pointer-events: none !important; }
   pointer-events: none;
 }
 .emoji-pick .project-icon-img { width: 20px; height: 20px; }
+
+/* ==========================================================================
+   MODO MÓVIL / VENTANA ESTRECHA
+   --------------------------------------------------------------------------
+   touch.js pone <html data-mobile="1"> cuando el puntero es táctil o la
+   ventana baja de 860px, y lo recalcula al redimensionar o girar. Todo lo de
+   abajo cuelga de ese atributo, así que la app se reorganiza sola al cambiar
+   el tamaño de la ventana sin recargar.
+
+   La idea: la barra de herramientas superior (13 botones que no caben en un
+   móvil) pasa a ser un RAÍL VERTICAL en el borde derecho; para retroceder de
+   nivel aparece una flecha ← grande arriba a la izquierda; y todo lo que
+   colgaba de la barra superior se pliega en un panel "⋯".
+   ========================================================================== */
+
+/* Controles que solo existen en móvil: ocultos por defecto. .topbar-tail usa
+   display:contents para que en escritorio la barra quede exactamente igual
+   que antes de existir este bloque. */
+.crumb-back,
+.tools-fab,
+.topbar-more,
+.topbar-tail-scrim,
+.ms-side-toggle,
+.ms-side-scrim { display: none; }
+.topbar-tail { display: contents; }
+
+html[data-mobile="1"] {
+  /* Evita el "rebote" y el tirar-para-recargar mientras se panea el lienzo */
+  overscroll-behavior: none;
+}
+html[data-mobile="1"] body {
+  overscroll-behavior: none;
+  /* Quita el retardo de 300ms y el zoom por doble toque de la propia página */
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+/* 100% de alto en móvil incluye la barra de URL, que aparece y desaparece y
+   deja la parte de abajo recortada. Cascada de menos a más fiable: vh clásico
+   → medida real que escribe touch.js (para navegadores sin dvh) → dvh, que es
+   lo correcto donde exista y gana por ir el último. */
+html[data-mobile="1"],
+html[data-mobile="1"] body,
+html[data-mobile="1"] #root {
+  height: 100vh;
+  height: var(--app-h, 100vh);
+  height: 100dvh;
+}
+
+/* ── Barra superior ──────────────────────────────────────────────────── */
+html[data-mobile="1"] .topbar {
+  gap: 4px;
+  padding: 5px 6px;
+  padding-left: max(6px, env(safe-area-inset-left));
+  padding-right: max(6px, env(safe-area-inset-right));
+  flex-wrap: nowrap;
+}
+html[data-mobile="1"] .topbar .brand { flex: 0 0 auto; }
+html[data-mobile="1"] .topbar .brand-mark { width: 26px; height: 26px; }
+html[data-mobile="1"] .topbar > .topbar-spacer { display: none; }
+
+html[data-mobile="1"] .crumb-back {
+  display: grid; place-items: center;
+  flex: 0 0 auto;
+  width: 38px; height: 38px;
+  border-radius: 10px;
+  border: 1.5px solid var(--line);
+  background: var(--paper);
+  color: var(--ink);
+  box-shadow: var(--pop-sm);
+}
+html[data-mobile="1"] .crumb-back:active { transform: scale(0.94); }
+html[data-mobile="1"] .crumb-back .material-symbols-rounded { font-size: 21px; }
+
+/* Con el dedo no se acierta a una miga de 13px: dejamos solo la actual, grande
+   y legible, y el retroceso se hace con la flecha ←. */
+html[data-mobile="1"] .crumbs {
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: none;
+  font-size: 14px;
+  overflow: hidden;
+}
+html[data-mobile="1"] .crumbs .crumb-sep,
+html[data-mobile="1"] .crumbs .crumb-ellipsis { display: none; }
+html[data-mobile="1"] .crumbs .crumb { display: none; }
+html[data-mobile="1"] .crumbs .crumb:last-of-type {
+  display: inline-flex;
+  max-width: 100%;
+  padding: 6px 4px;
+  font-weight: 700;
+}
+
+/* ── Panel "⋯" con las acciones que no caben ─────────────────────────── */
+html[data-mobile="1"] .topbar-more {
+  display: grid; place-items: center;
+  flex: 0 0 auto;
+  width: 38px; height: 38px;
+  border-radius: 10px;
+  border: 1.5px solid var(--line);
+  background: var(--paper);
+  color: var(--ink);
+  box-shadow: var(--pop-sm);
+}
+html[data-mobile="1"] .topbar-more .material-symbols-rounded { font-size: 21px; }
+
+html[data-mobile="1"] .topbar-tail { display: none; }
+html[data-mobile="1"] .topbar-tail.open {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+  position: fixed;
+  top: 54px;
+  right: 6px;
+  left: auto;
+  width: min(320px, calc(100vw - 12px));
+  max-height: calc(100dvh - 66px);
+  overflow-y: auto;
+  padding: 12px;
+  background: var(--paper);
+  border: 1.5px solid var(--line);
+  border-radius: 14px;
+  box-shadow: var(--pop-deep);
+  z-index: 320;
+  animation: scale-in 140ms var(--e-out);
+}
+html[data-mobile="1"] .topbar-tail.open > .topbar-spacer {
+  flex: 0 0 auto !important;
+  justify-content: flex-start !important;
+  gap: 10px;
+}
+html[data-mobile="1"] .topbar-tail.open .topbar-actions {
+  flex-wrap: wrap;
+  gap: 10px;
+}
+/* Dentro del panel sí hay sitio: devolvemos el texto a Feedback y Apoyar */
+html[data-mobile="1"] .topbar-tail.open .feedback-topbar-btn,
+html[data-mobile="1"] .topbar-tail.open .kofi-topbar-btn {
+  width: auto; height: 38px;
+  padding: 0 14px;
+  border-radius: 10px;
+}
+html[data-mobile="1"] .topbar-tail.open .feedback-topbar-btn span:not(.material-symbols-rounded),
+html[data-mobile="1"] .topbar-tail.open .kofi-topbar-btn span:not(.material-symbols-rounded) {
+  display: inline;
+}
+html[data-mobile="1"] .topbar-tail.open .icon-btn { width: 44px; height: 44px; }
+html[data-mobile="1"] .topbar-tail.open .volume-slider { display: block; width: 90px; }
+html[data-mobile="1"] .topbar-more + .topbar-tail-scrim,
+html[data-mobile="1"] .topbar-tail-scrim { display: block; position: fixed; inset: 0; z-index: 310; }
+
+/* ── Raíl vertical de herramientas (borde derecho) ───────────────────── */
+html[data-mobile="1"] .tools {
+  position: fixed;
+  top: 56px;
+  right: max(6px, env(safe-area-inset-right));
+  bottom: 78px;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 5px;
+  border-radius: 14px;
+  background: var(--paper);
+  box-shadow: var(--pop-deep);
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: none;
+  z-index: 60;
+  animation: none;
+}
+html[data-mobile="1"] .tools::-webkit-scrollbar { width: 0; height: 0; }
+html[data-mobile="1"] .tools.rail-closed { display: none; }
+html[data-mobile="1"] .tools .tool { padding: 2px; }
+html[data-mobile="1"] .tools .tool:hover { transform: none; background: none; }
+html[data-mobile="1"] .tools .tool .tool-icon { width: 38px; height: 38px; border-radius: 10px; }
+html[data-mobile="1"] .tools .tool .material-symbols-rounded { font-size: 21px; }
+html[data-mobile="1"] .tools .tool-divider {
+  width: 26px; height: 1.5px; margin: 3px 0; flex: 0 0 auto;
+}
+/* El menú de extras debe abrirse hacia la izquierda: pegado al borde derecho
+   no cabría. */
+html[data-mobile="1"] .extra-tools-popout {
+  top: auto; bottom: 0;
+  left: auto; right: calc(100% + 8px);
+  margin-top: 0;
+}
+
+html[data-mobile="1"] .tools-fab {
+  display: grid; place-items: center;
+  position: fixed;
+  right: max(10px, env(safe-area-inset-right));
+  bottom: calc(14px + env(safe-area-inset-bottom));
+  width: 54px; height: 54px;
+  border-radius: 50%;
+  background: var(--olive);
+  color: #fff;
+  border: 1.5px solid var(--line);
+  box-shadow: 0 6px 20px rgba(0,0,0,0.28);
+  z-index: 66;
+}
+html[data-mobile="1"] .tools-fab:active { transform: scale(0.93); }
+html[data-mobile="1"] .tools-fab .material-symbols-rounded { font-size: 26px; }
+
+/* ── Lienzo: controles reubicados para no chocar con el raíl ─────────── */
+html[data-mobile="1"] .zoom-ctrls {
+  left: max(10px, env(safe-area-inset-left));
+  right: auto;
+  bottom: calc(14px + env(safe-area-inset-bottom));
+  border-radius: 10px;
+}
+html[data-mobile="1"] .zoom-ctrls button { padding: 9px 12px; font-size: 14px; }
+html[data-mobile="1"] .mini-search {
+  width: auto;
+  left: 8px; right: 8px;
+  transform: none;
+  top: 8px;
+}
+html[data-mobile="1"] .place-hint {
+  top: auto;
+  bottom: calc(80px + env(safe-area-inset-bottom));
+  left: 8px; right: 8px;
+  transform: none;
+  justify-content: center;
+}
+
+/* La barra de formato/acciones del nodo seleccionado era una columna estrecha
+   pegada a la izquierda; en vertical estorba, así que pasa a ser una tira
+   horizontal desplazable encima de los controles inferiores. */
+html[data-mobile="1"] .ctx-side,
+html[data-mobile="1"] .ctx-side.text-format,
+html[data-mobile="1"] .ctx-side.ctx-side-day {
+  position: fixed;
+  top: auto;
+  left: max(8px, env(safe-area-inset-left));
+  right: max(76px, env(safe-area-inset-right));
+  bottom: calc(78px + env(safe-area-inset-bottom));
+  width: auto;
+  max-width: none;
+  flex-direction: row;
+  align-items: center;
+  gap: 4px;
+  padding: 6px;
+  border-radius: 12px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  z-index: 120;
+}
+html[data-mobile="1"] .ctx-side::-webkit-scrollbar { width: 0; height: 0; }
+html[data-mobile="1"] .ctx-side .ctx-close {
+  width: 36px; height: 36px; flex: 0 0 auto; margin: 0 2px 0 0;
+}
+html[data-mobile="1"] .ctx-side .ctx-btn { flex: 0 0 auto; min-width: 50px; }
+html[data-mobile="1"] .ctx-side .ctx-sep {
+  width: 1.5px; height: 28px; margin: 0 2px; flex: 0 0 auto;
+}
+
+/* ── Modales y menús a tamaño de pulgar ──────────────────────────────── */
+html[data-mobile="1"] .modal {
+  width: min(440px, calc(100vw - 20px));
+  max-height: 86dvh;
+  overflow-y: auto;
+  border-radius: 12px;
+}
+html[data-mobile="1"] .doc-modal {
+  width: calc(100vw - 16px);
+  max-width: none;
+  height: calc(100dvh - 60px);
+  max-height: none;
+  border-radius: 12px;
+}
+html[data-mobile="1"] .context-menu {
+  min-width: 210px;
+  max-height: 70dvh;
+  overflow-y: auto;
+}
+html[data-mobile="1"] .context-menu button,
+html[data-mobile="1"] .context-menu .ctx-item { min-height: 40px; }
+
+/* ── Pantalla de inicio ──────────────────────────────────────────────── */
+html[data-mobile="1"] .ms-side-toggle {
+  display: grid; place-items: center;
+  flex: 0 0 auto;
+  width: 40px; height: 40px;
+  border-radius: 10px;
+  border: 1.5px solid var(--line);
+  background: var(--paper);
+  color: var(--ink);
+  box-shadow: var(--pop-sm);
+}
+html[data-mobile="1"] .ms-side-toggle .material-symbols-rounded { font-size: 22px; }
+
+html[data-mobile="1"] .ms-side {
+  display: flex;
+  position: fixed;
+  top: 0; bottom: 0; left: 0;
+  width: min(300px, 84vw);
+  z-index: 300;
+  transform: translateX(-102%);
+  transition: transform 220ms var(--e-out);
+  box-shadow: var(--pop-deep);
+  padding-top: max(16px, env(safe-area-inset-top));
+}
+html[data-mobile="1"] .miro-home.side-open .ms-side { transform: none; }
+html[data-mobile="1"] .ms-side-scrim {
+  display: block;
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.45);
+  z-index: 299;
+  animation: fade-in 160ms var(--e-out);
+}
+html[data-mobile="1"] .ms-main { padding: 12px 14px 90px; }
+/* Los 7 controles de la derecha ocupan 316px: no caben junto al buscador en un
+   móvil de 375px, así que bajan a su propia fila. */
+html[data-mobile="1"] .ms-top { gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+html[data-mobile="1"] .ms-side-toggle { order: 0; }
+html[data-mobile="1"] .ms-search { order: 1; flex: 1 1 auto; min-width: 0; padding: 9px 11px; }
+html[data-mobile="1"] .ms-search kbd { display: none; }
+html[data-mobile="1"] .ms-top-actions {
+  order: 2;
+  flex: 1 1 100%;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+html[data-mobile="1"] .ms-top-actions .icon-btn { width: 40px; height: 40px; margin-right: 0 !important; }
+html[data-mobile="1"] .ms-top-actions .lang-switch { height: 40px; width: 52px; }
+html[data-mobile="1"] .project-grid {
+  grid-template-columns: 1fr;
+  padding: 0 14px 80px;
+  gap: 12px;
+}
+html[data-mobile="1"] .home-hero,
+html[data-mobile="1"] .home-toolbar,
+html[data-mobile="1"] .section-header { padding-left: 14px; padding-right: 14px; }
+html[data-mobile="1"] .ms-hero { grid-template-columns: 1fr; }
+html[data-mobile="1"] .ms-hero-art { display: none; }
+
+/* ── Orientación horizontal: el raíl derecho se queda, pero la barra
+      superior se encoge para no comerse el poco alto disponible. ─────── */
+html[data-mobile="1"][data-orient="landscape"] .topbar { padding-top: 3px; padding-bottom: 3px; }
+html[data-mobile="1"][data-orient="landscape"] .tools { top: 50px; bottom: 68px; }
+html[data-mobile="1"][data-orient="landscape"] .tools .tool .tool-icon { width: 34px; height: 34px; }

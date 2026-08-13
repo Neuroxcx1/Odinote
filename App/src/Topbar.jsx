@@ -47,6 +47,16 @@ function Topbar({
 }) {
   const t = window.TRANSLATIONS[lang];
   const [extraOpen, setExtraOpen] = React.useState(false);
+  // En móvil la barra no cabe en una fila: las acciones de la derecha se
+  // pliegan en un panel y las herramientas pasan a un raíl vertical.
+  const [moreOpen, setMoreOpen] = React.useState(false);
+  const [railOpen, setRailOpen] = React.useState(true);
+
+  const goBack = () => {
+    if (crumbs.length > 1) onCrumb(crumbs.length - 2);
+    else onHome();
+    window.playAudioTone && window.playAudioTone('click');
+  };
 
   const startToolDrag = (e, toolId) => {
     if (e.button !== 0) return;
@@ -59,6 +69,16 @@ function Topbar({
     <div className="topbar">
       <button className="brand press" onClick={onHome} title={t.home}>
         <div className="brand-mark"><window.BrandMark/></div>
+      </button>
+      {/* Retroceder un nivel: en escritorio se hace pulsando la miga anterior,
+          pero con el dedo esas migas son diminutas. Solo se ve en móvil. */}
+      <button
+        className="crumb-back"
+        onClick={goBack}
+        title={window.t('Volver al nivel anterior', 'Back one level')}
+        aria-label={window.t('Volver', 'Back')}
+      >
+        <span className="material-symbols-rounded">arrow_back</span>
       </button>
       <div className="crumbs">
         {(() => {
@@ -104,7 +124,18 @@ function Topbar({
 
       <div className="topbar-spacer"/>
 
-      <div className="tools">
+      {/* Muestra u oculta el raíl de herramientas (solo visible en móvil, donde
+          el raíl ocupa el borde derecho de la pantalla). */}
+      <button
+        className={`tools-fab ${railOpen ? 'open' : ''}`}
+        onClick={() => { setRailOpen(o => !o); window.playAudioTone && window.playAudioTone('click'); }}
+        title={railOpen ? window.t('Ocultar herramientas', 'Hide tools') : window.t('Mostrar herramientas', 'Show tools')}
+        aria-label={window.t('Herramientas', 'Tools')}
+      >
+        <span className="material-symbols-rounded">{railOpen ? 'close' : 'widgets'}</span>
+      </button>
+
+      <div className={`tools ${railOpen ? 'rail-open' : 'rail-closed'}`}>
         {TOOLS.map((tool, idx) => (
           <React.Fragment key={tool.id}>
             {idx === 4 && <div className="tool-divider"/>}
@@ -190,6 +221,20 @@ function Topbar({
         </div>
       </div>
 
+      {/* Botón "⋯": en móvil despliega todo lo que sigue como panel; en
+          escritorio está oculto y .topbar-tail usa display:contents, así que la
+          barra se ve exactamente igual que antes. */}
+      <button
+        className="topbar-more"
+        onClick={() => { setMoreOpen(o => !o); window.playAudioTone && window.playAudioTone('click'); }}
+        title={window.t('Más opciones', 'More options')}
+        aria-label={window.t('Más opciones', 'More options')}
+      >
+        <span className="material-symbols-rounded">{moreOpen ? 'expand_less' : 'more_vert'}</span>
+      </button>
+      {moreOpen && <div className="topbar-tail-scrim" onClick={() => setMoreOpen(false)}/>}
+
+      <div className={`topbar-tail ${moreOpen ? 'open' : ''}`}>
       <div className="topbar-spacer" style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center' }}>
         <button
           className="feedback-topbar-btn"
@@ -374,6 +419,7 @@ function Topbar({
             <option value="ru" title="Русский (Russian)">RU - Русский (Russian)</option>
           </select>
         </div>
+      </div>
       </div>
     </div>
   );

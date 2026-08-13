@@ -731,6 +731,156 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
     };
   }, []);
 
+  // ───── Gestos táctiles del lienzo ─────
+  // touch.js traduce un dedo a eventos de ratón para todo lo demás (arrastrar
+  // nodos, tiradores, conectores…), pero se aparta del lienzo vacío: aquí un
+  // dedo significa PANEAR. Dibujar una marquesina con el dedo sería inútil y
+  // dejaría el lienzo inmóvil, que es justo lo que hace difícil usarlo en el
+  // móvil hoy. Dos dedos = zoom de pellizco, como en cualquier mapa.
+  useEffectCanvas(() => {
+    const el = surfaceRef.current;
+    if (!el) return;
+
+    let mode = null;      // 'pan' | 'pinch' | null
+    let start = null;
+    let moved = false;
+    let longPress = null;
+
+    const clearLong = () => { if (longPress) { clearTimeout(longPress); longPress = null; } };
+    const gap = (a, b) => Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+
+    const isBareSurface = (target) => {
+      if (!target) return false;
+      if (el.classList.contains('placing') || el.classList.contains('linking')) return false;
+      if (target === el) return true;
+      const cl = target.classList;
+      return !!cl && (cl.contains('canvas-surface') || cl.contains('canvas-content') ||
+                      cl.contains('connectors') || cl.contains('board-cover-grid'));
+    };
+
+    const beginPinch = (e) => {
+      clearLong();
+      const rect = el.getBoundingClientRect();
+      const a = e.touches[0], b = e.touches[1];
+      mode = 'pinch';
+      moved = true;
+      start = {
+        gap: gap(a, b) || 1,
+        mx: (a.clientX + b.clientX) / 2 - rect.left,
+        my: (a.clientY + b.clientY) / 2 - rect.top,
+        scale: scaleRef.current,
+        pan: { ...panRef.current },
+      };
+    };
+
+    const onTouchStart = (e) => {
+      if (e.touches.length >= 2) {
+        beginPinch(e);
+        if (e.cancelable) e.preventDefault();
+        return;
+      }
+      const t = e.touches[0];
+      if (!t) return;
+      const target = document.elementFromPoint(t.clientX, t.clientY) || e.target;
+      if (!isBareSurface(target)) { mode = null; return; }
+
+      mode = 'pan';
+      moved = false;
+      start = { x: t.clientX, y: t.clientY, pan: { ...panRef.current }, target };
+      if (e.cancelable) e.preventDefault();
+
+      // Mantener pulsado sobre el lienzo vacío abre el menú de crear nodo, que
+      // en escritorio es el clic derecho.
+      const px = t.clientX, py = t.clientY;
+      clearLong();
+      longPress = setTimeout(() => {
+        longPress = null;
+        if (mode !== 'pan' || moved) return;
+        mode = null;
+        target.dispatchEvent(new MouseEvent('contextmenu', {
+          bubbles: true, cancelable: true, view: window,
+          clientX: px, clientY: py, button: 2,
+        }));
+        if (navigator.vibrate) { try { navigator.vibrate(12); } catch (err) {} }
+      }, 520);
+    };
+
+    const onTouchMove = (e) => {
+      if (mode === 'pinch') {
+        if (e.touches.length < 2) return;
+        if (e.cancelable) e.preventDefault();
+        const a = e.touches[0], b = e.touches[1];
+        const rect = el.getBoundingClientRect();
+        const factor = (gap(a, b) || 1) / start.gap;
+        const ns = Math.min(2.5, Math.max(0.2, start.scale * factor));
+        // El punto del lienzo bajo el centro del pellizco debe quedarse quieto,
+        // y además el centro puede desplazarse: eso panea mientras se hace zoom.
+        const mx = (a.clientX + b.clientX) / 2 - rect.left;
+        const my = (a.clientY + b.clientY) / 2 - rect.top;
+        setScale(ns);
+        setPan({
+          x: mx - (start.mx - start.pan.x) * (ns / start.scale),
+          y: my - (start.my - start.pan.y) * (ns / start.scale),
+        });
+        return;
+      }
+      if (mode !== 'pan') return;
+      const t = e.touches[0];
+      if (!t) return;
+      const dx = t.clientX - start.x;
+      const dy = t.clientY - start.y;
+      if (!moved && (Math.abs(dx) > 4 || Math.abs(dy) > 4)) { moved = true; clearLong(); }
+      if (!moved) return;
+      if (e.cancelable) e.preventDefault();
+      setPan({ x: start.pan.x + dx, y: start.pan.y + dy });
+    };
+
+    const onTouchEnd = (e) => {
+      clearLong();
+      if (mode === 'pinch') {
+        // Al soltar un dedo, el zoom termina; el que queda no debe dar un salto.
+        if (e.touches.length === 1) {
+          mode = 'pan';
+          moved = true;
+          start = { x: e.touches[0].clientX, y: e.touches[0].clientY, pan: { ...panRef.current } };
+        } else {
+          mode = null;
+          setScale(s => Math.round(s * 20) / 20);
+        }
+        return;
+      }
+      if (e.touches.length === 0) {
+        // Toque limpio sobre el lienzo vacío: en escritorio esto es un clic que
+        // deselecciona y cierra el editor abierto. Como aquí bloqueamos los
+        // eventos de compatibilidad para poder panear, lo emitimos a mano.
+        if (mode === 'pan' && !moved && start && start.target) {
+          const t = e.changedTouches[0];
+          const init = {
+            bubbles: true, cancelable: true, view: window,
+            clientX: t ? t.clientX : start.x,
+            clientY: t ? t.clientY : start.y,
+            button: 0,
+          };
+          start.target.dispatchEvent(new MouseEvent('mousedown', { ...init, buttons: 1, detail: 1 }));
+          start.target.dispatchEvent(new MouseEvent('mouseup', { ...init, buttons: 0 }));
+        }
+        mode = null;
+      }
+    };
+
+    el.addEventListener('touchstart', onTouchStart, { passive: false });
+    el.addEventListener('touchmove', onTouchMove, { passive: false });
+    el.addEventListener('touchend', onTouchEnd, { passive: false });
+    el.addEventListener('touchcancel', onTouchEnd, { passive: false });
+    return () => {
+      clearLong();
+      el.removeEventListener('touchstart', onTouchStart);
+      el.removeEventListener('touchmove', onTouchMove);
+      el.removeEventListener('touchend', onTouchEnd);
+      el.removeEventListener('touchcancel', onTouchEnd);
+    };
+  }, []);
+
   // ───── Keyboard ─────
   useEffectCanvas(() => {
     const onKey = (e) => {

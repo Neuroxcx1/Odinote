@@ -581,6 +581,10 @@ ipcMain.handle('download-media-to-vault', async (event, { folderPath, url, fileN
 
 let authServer = null;
 let authPort = 61234;
+// Secreto de un solo uso para el inicio de sesión en curso. Se inyecta en la
+// página que servimos y se exige de vuelta al recibir el perfil: así el único
+// que puede entregarnos una sesión es la pestaña que abrimos nosotros.
+let authNonce = null;
 
 function startAuthServer() {
   if (authServer) return;
@@ -589,19 +593,49 @@ function startAuthServer() {
   const path = require('path');
 
   authServer = http.createServer((req, res) => {
+    // Este servidor escucha en 127.0.0.1 mientras dura el login. Antes
+    // respondía con `Access-Control-Allow-Origin: *`, así que CUALQUIER web
+    // abierta en el navegador podía enviarle un perfil falso —con el token de
+    // Drive de un atacante— y la app habría sincronizado los proyectos del
+    // usuario contra la cuenta equivocada. Ahora solo aceptamos peticiones de
+    // nuestro propio origen y con el nonce correcto.
+    const origin = req.headers.origin;
+    const allowedOrigins = [`http://localhost:${authPort}`, `http://127.0.0.1:${authPort}`];
+    if (origin && !allowedOrigins.includes(origin)) {
+      logToFile(`Auth server: origen rechazado (${origin})`);
+      res.writeHead(403);
+      res.end('Forbidden');
+      return;
+    }
+
     if (req.method === 'POST' && req.url === '/auth-success') {
       let body = '';
       req.on('data', chunk => {
         body += chunk.toString();
+        // Un cuerpo enorme solo puede ser basura: cortamos por lo sano.
+        if (body.length > 64 * 1024) { req.destroy(); }
       });
       req.on('end', () => {
         try {
-          const profile = JSON.parse(body);
+          const payload = JSON.parse(body);
+          if (!authNonce || payload.nonce !== authNonce) {
+            logToFile('Auth server: nonce inválido, perfil descartado');
+            res.writeHead(401);
+            res.end('Unauthorized');
+            return;
+          }
+          authNonce = null; // un solo uso
+          const profile = {
+            name: payload.name,
+            email: payload.email,
+            picture: payload.picture,
+            accessToken: payload.accessToken,
+          };
           logToFile(`Received auth-success via POST for ${profile.email}`);
           if (mainWindow) {
             mainWindow.webContents.send('google-signin-completed', profile);
           }
-          res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+          res.writeHead(200, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ success: true }));
 
           setTimeout(() => {
@@ -618,13 +652,13 @@ function startAuthServer() {
       });
     } else if (req.url.startsWith('/local-login.html') || req.url === '/' || req.url.startsWith('/?code=')) {
       const filePath = path.join(__dirname, 'local-login.html');
-      fs.readFile(filePath, (err, content) => {
+      fs.readFile(filePath, 'utf-8', (err, content) => {
         if (err) {
           res.writeHead(500);
           res.end('Error loading local-login.html');
         } else {
           res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-          res.end(content);
+          res.end(content.replace('__ODINOTE_AUTH_NONCE__', authNonce || ''));
         }
       });
     } else {
@@ -661,6 +695,7 @@ ipcMain.handle('set-window-theme', async (event, theme) => {
 
 ipcMain.handle('start-google-login', async () => {
   logToFile('IPC Call: start-google-login');
+  authNonce = require('crypto').randomBytes(24).toString('hex');
   startAuthServer();
   const authUrl = `http://localhost:${authPort}/`;
   shell.openExternal(authUrl);
