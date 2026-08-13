@@ -367,6 +367,9 @@ function duplicateCanvasState(state, origId, newId) {
   });
 }
 
+// Zoom con el que se abre un lienzo que aún no tiene cámara guardada.
+const defaultScale = () => (window.odiIsMobile && window.odiIsMobile()) ? 0.7 : 1;
+
 function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn, setCanvases: setExtCanvases, updateAvailable, onUpdateClick, volume, onChangeVolume, onSettingsClick, vaultPath, userProfile, onUserClick, projects, setProjects, onSharingClick, onManualSync, isSyncingDrive, needsDriveAuth }) {
   const currentProject = projects ? projects.find(p => p.id === projectId) : null;
   const [canvases, _setCanvases] = useStateCanvas(() => canvasesIn || JSON.parse(JSON.stringify(window.INITIAL_CANVASES)));
@@ -437,8 +440,16 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
   }, [currentId]);
 
   const [pan, setPan] = useStateCanvas({ x: 40, y: 20 });
-  const [scale, setScale] = useStateCanvas(1);
+  // En un móvil, al 100% una nota corriente (300px) ocupa el 80% del ancho y
+  // no ves nada alrededor. Los lienzos sin cámara guardada se abren más
+  // alejados para tener contexto; acercar es un pellizco.
+  const [scale, setScale] = useStateCanvas(defaultScale);
   const [showBgSelector, setShowBgSelector] = useStateCanvas(false);
+  // Al crear una nota, el escritorio abre el editor de una. En el móvil eso
+  // encadenaba tres cosas de golpe (nodo nuevo + salto de zoom + teclado) y
+  // era justo lo que se sentía descontrolado: ahora se crea seleccionada y se
+  // entra a escribir con un toque doble, cuando tú quieras.
+  const skipAutoEdit = () => !!(window.odiIsMobile && window.odiIsMobile());
   const [windowSize, setWindowSize] = useStateCanvas({ w: window.innerWidth, h: window.innerHeight });
   useEffectCanvas(() => {
     const handleResize = () => {
@@ -461,11 +472,13 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
     setCroppingId(null);
     const saved = canvases[currentId];
     if (saved && saved.pan && saved.scale !== undefined) {
+      // Si el lienzo ya tiene cámara guardada se respeta tal cual, también en
+      // móvil: es el zoom que el usuario dejó puesto.
       setPan(saved.pan);
       setScale(saved.scale);
     } else {
       setPan({ x: 40, y: 20 });
-      setScale(1);
+      setScale(defaultScale());
     }
   // eslint-disable-next-line
   }, [currentId]);
@@ -892,7 +905,6 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
   useEffectCanvas(() => {
     if (!editing) return;
     if (!(window.odiIsMobile && window.odiIsMobile())) return;
-    if (scaleRef.current >= 1) return;
     const el = surfaceRef.current;
     const item = current.items.find(i => i.id === editing);
     if (!el || !item) return;
@@ -900,12 +912,23 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
     const def = defaultDims(item.type);
     const w = item.w !== undefined ? item.w : def.w;
     const h = item.h !== undefined ? item.h : def.h;
-    setScale(1);
+    // El raíl de herramientas flota sobre el borde derecho, así que el ancho
+    // realmente visible es menor: si no lo descontamos, el nodo que estás
+    // escribiendo se mete por debajo del raíl.
+    const RAIL = 76;
+    const visibleW = rect.width - RAIL;
+    // Acercamos lo justo para que el nodo quepa en ese ancho, nunca más del
+    // 100%: saltar siempre al 100% dejaba una nota pequeña comiéndose toda la
+    // pantalla. Y nunca alejamos, para no deshacer un zoom hecho a mano.
+    const fit = Math.min(1, (visibleW - 16) / w);
+    const ns = Math.max(scaleRef.current, fit);
+    if (ns <= scaleRef.current + 0.01) return; // ya se lee bien: no tocar la vista
+    setScale(ns);
     // Un tercio de alto en vez de la mitad: el teclado se come la parte de
     // abajo, así el nodo que se está editando queda por encima de él.
     setPan({
-      x: rect.width / 2 - (item.x + w / 2),
-      y: rect.height * 0.32 - (item.y + h / 2),
+      x: visibleW / 2 - (item.x + w / 2) * ns,
+      y: rect.height * 0.32 - (item.y + h / 2) * ns,
     });
   }, [editing]);
 
@@ -1975,7 +1998,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
           });
           setSelected(item.id);
           // auto-enter edit mode for text types
-          if (['note','comment','bigtitle'].includes(item.type)) {
+          if (['note','comment','bigtitle'].includes(item.type) && !skipAutoEdit()) {
             setTimeout(() => setEditing(item.id), 40);
           }
           if (item.type === 'doc') {
@@ -3936,7 +3959,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
         });
         setSelected(item.id);
         window.playAudioTone && window.playAudioTone('drop');
-        if (['note','comment','bigtitle'].includes(item.type)) setTimeout(() => setEditing(item.id), 40);
+        if (['note','comment','bigtitle'].includes(item.type) && !skipAutoEdit()) setTimeout(() => setEditing(item.id), 40);
         if (item.type === 'doc') setTimeout(() => setDocOpen({ id: item.id }), 40);
         if (['link','todo','board','column','map','frame'].includes(item.type)) setTimeout(() => setEditing(item.id), 40);
       }

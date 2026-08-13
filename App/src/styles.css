@@ -3578,25 +3578,43 @@ html[data-mobile="1"] .tools-fab {
 html[data-mobile="1"] .tools-fab:active { transform: scale(0.93); }
 html[data-mobile="1"] .tools-fab .material-symbols-rounded { font-size: 26px; }
 
-/* ── Lienzo: controles reubicados para no chocar con el raíl ─────────── */
+/* ── Franja inferior del lienzo ──────────────────────────────────────
+   En escritorio hay cuatro cosas repartidas por los lados: zoom (abajo a la
+   derecha), selector de fondo (a su izquierda), pastillas de estado (abajo a
+   la izquierda) y la barra de formato del nodo. Al estrechar la pantalla se
+   amontonan todas en la misma esquina. En vez de reubicarlas una a una las
+   ordenamos en FILAS fijas de abajo hacia arriba, que es lo único que
+   garantiza que no se pisen aunque cambie el ancho:
+
+     fila A (abajo):  zoom · fondo ......................... botón flotante
+     fila B:          pastillas de estado
+     fila C:          barra de formato del nodo seleccionado
+
+   El hueco de la derecha (76px) lo reservamos para el raíl y el botón. */
+
+/* Fila A */
 html[data-mobile="1"] .zoom-ctrls {
-  left: max(10px, env(safe-area-inset-left));
+  left: max(8px, env(safe-area-inset-left));
   right: auto;
   bottom: calc(14px + env(safe-area-inset-bottom));
   border-radius: 10px;
 }
 html[data-mobile="1"] .zoom-ctrls button { padding: 9px 12px; font-size: 14px; }
+/* Lleva la posición en estilo inline (right:160px), así que hace falta
+   !important para sacarlo de en medio de las pastillas. */
+html[data-mobile="1"] .canvas-bg-selector {
+  left: 156px !important;
+  right: auto !important;
+  bottom: calc(17px + env(safe-area-inset-bottom)) !important;
+}
 
-/* Las pastillas de estado vivían en la misma esquina que el zoom (left:16 /
-   bottom:16) y se solapaban con él. Las corremos a la derecha de los botones
-   de zoom, en la misma fila, sin llegar al botón flotante de herramientas. */
+/* Fila B */
 html[data-mobile="1"] .status-bar {
-  left: 158px;
-  right: 78px;
-  bottom: calc(18px + env(safe-area-inset-bottom));
+  left: max(8px, env(safe-area-inset-left));
+  right: 76px;
+  bottom: calc(60px + env(safe-area-inset-bottom));
   gap: 5px;
-  flex-wrap: wrap;
-  justify-content: flex-start;
+  flex-wrap: nowrap;
   pointer-events: none; /* que no roben toques al lienzo entre pastilla y pastilla */
 }
 html[data-mobile="1"] .status-bar > * { pointer-events: auto; }
@@ -3606,16 +3624,19 @@ html[data-mobile="1"] .status-bar > * { pointer-events: auto; }
 html[data-mobile="1"] .status-bar .status-pill:not(.privacy-status-pill):not(.accent) {
   display: none;
 }
+/* El raíl flota sobre el lienzo por la derecha: el buscador tiene que
+   terminar antes o queda medio tapado (y parecía que se salía del marco). */
 html[data-mobile="1"] .mini-search {
   width: auto;
-  left: 8px; right: 8px;
+  left: 8px;
+  right: 76px;
   transform: none;
   top: 8px;
 }
 html[data-mobile="1"] .place-hint {
   top: auto;
-  bottom: calc(80px + env(safe-area-inset-bottom));
-  left: 8px; right: 8px;
+  bottom: calc(150px + env(safe-area-inset-bottom));
+  left: 8px; right: 76px;
   transform: none;
   justify-content: center;
 }
@@ -3630,7 +3651,8 @@ html[data-mobile="1"] .ctx-side.ctx-side-day {
   top: auto;
   left: max(8px, env(safe-area-inset-left));
   right: max(76px, env(safe-area-inset-right));
-  bottom: calc(78px + env(safe-area-inset-bottom));
+  /* fila C: por encima de las pastillas de estado (fila B, abajo 60) */
+  bottom: calc(98px + env(safe-area-inset-bottom));
   width: auto;
   max-width: none;
   flex-direction: row;
