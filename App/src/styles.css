@@ -3554,13 +3554,22 @@ html[data-mobile="1"] .tools .tool .material-symbols-rounded { font-size: 21px; 
 html[data-mobile="1"] .tools .tool-divider {
   width: 26px; height: 1.5px; margin: 3px 0; flex: 0 0 auto;
 }
-/* El menú de extras debe abrirse hacia la izquierda: pegado al borde derecho
-   no cabría. */
+/* El menú de extras (calendario, comentario, archivo, mapa) es hijo del raíl,
+   que lleva overflow para poder desplazarse: en posición absoluta quedaba
+   recortado por ese overflow y el botón "…" parecía no hacer nada. Con
+   position:fixed sale del recorte y se abre hacia la izquierda del raíl. */
 html[data-mobile="1"] .extra-tools-popout {
-  top: auto; bottom: 0;
-  left: auto; right: calc(100% + 8px);
-  margin-top: 0;
+  position: fixed;
+  top: auto;
+  left: auto;
+  right: 72px;
+  bottom: 80px;
+  margin: 0;
+  max-height: 60dvh;
+  overflow-y: auto;
+  z-index: 420;
 }
+html[data-mobile="1"] .extra-tools-btn { min-height: 42px; }
 
 html[data-mobile="1"] .tools-fab {
   display: grid; place-items: center;
@@ -3688,6 +3697,17 @@ html[data-mobile="1"] .doc-modal {
   max-height: none;
   border-radius: 12px;
 }
+/* Ajustes y demás ventanas grandes llevan el ancho en estilo inline
+   (width: 680px), que en una pantalla de 360px se sale por los dos lados: hace
+   falta !important para poder encogerlas. */
+html[data-mobile="1"] .doc-modal-window {
+  width: calc(100vw - 16px) !important;
+  max-width: none !important;
+  max-height: 88dvh !important;
+  padding: 16px !important;
+  overflow-y: auto;
+  border-radius: 12px !important;
+}
 html[data-mobile="1"] .context-menu {
   min-width: 210px;
   max-height: 70dvh;
@@ -3755,6 +3775,58 @@ html[data-mobile="1"] .section-header { padding-left: 14px; padding-right: 14px;
 html[data-mobile="1"] .ms-hero { grid-template-columns: 1fr; }
 html[data-mobile="1"] .ms-hero-art { display: none; }
 
+/* Línea guía al reordenar tareas de un to-do: sin ella se arrastraba a ciegas,
+   sin saber si la tarea iba a quedar por encima o por debajo de la de al lado. */
+.todo-row { position: relative; }
+.todo-row.drop-before::before,
+.todo-row.drop-after::after {
+  content: '';
+  position: absolute;
+  left: 2px; right: 2px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--olive);
+  box-shadow: 0 0 0 1.5px var(--paper);
+  z-index: 5;
+  pointer-events: none;
+}
+.todo-row.drop-before::before { top: -2px; }
+.todo-row.drop-after::after { bottom: -2px; }
+
+/* Nodo sobre el que caerá la flecha que se está arrastrando. En escritorio esto
+   lo dice el :hover encendiendo los puntos de anclaje; con el dedo no hay hover,
+   así que la flecha se soltaba a ciegas y quedaba suelta sin saber por qué. */
+.item.link-target > .item-card,
+.item.link-target > * {
+  outline: 2.5px solid var(--olive);
+  outline-offset: 3px;
+  border-radius: 3px;
+}
+.item.link-target .anchor { opacity: 1 !important; transform: scale(1.15) !important; }
+
+/* Mientras se tira de una flecha, todos los nodos enseñan dónde se puede
+   enganchar (equivalente táctil de pasar el ratón por encima). */
+.canvas-wrap.linking .item .anchor,
+.canvas-wrap.conn-drag .item .anchor {
+  opacity: 0.75;
+  transform: scale(1);
+}
+
+/* Versión del código cargado, junto al título de Ajustes. Sirve para
+   distinguir "el arreglo no funciona" de "el navegador está sirviendo una
+   copia vieja de su caché", que desde un móvil no se puede saber de otro modo. */
+.odi-build-tag {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: var(--bg);
+  border: 1.5px solid var(--line-soft);
+  color: var(--ink-3);
+  white-space: nowrap;
+}
+
 /* ── Manipular nodos con el dedo ──────────────────────────────────────
    Esto cuelga de data-touch (hay pantalla táctil), no de data-mobile: una
    tableta o un portátil táctil grandes conservan la disposición de escritorio
@@ -3789,3 +3861,47 @@ html[data-touch="1"] .connect-handle::before {
 html[data-mobile="1"][data-orient="landscape"] .topbar { padding-top: 3px; padding-bottom: 3px; }
 html[data-mobile="1"][data-orient="landscape"] .tools { top: 50px; bottom: 68px; }
 html[data-mobile="1"][data-orient="landscape"] .tools .tool .tool-icon { width: 34px; height: 34px; }
+
+/* En horizontal solo quedan ~315px de alto: las tres filas de antes ocupaban
+   casi la mitad y la barra del nodo aparecía flotando en medio de la pantalla.
+   Aquí sobra ANCHO y falta ALTO, así que se reparten al revés: zoom y fondo se
+   apilan en una columna pegada a la izquierda, y la barra del nodo se queda en
+   una sola tira baja, sin etiquetas de texto. */
+html[data-mobile="1"][data-orient="landscape"] .zoom-ctrls {
+  bottom: calc(8px + env(safe-area-inset-bottom));
+}
+html[data-mobile="1"][data-orient="landscape"] .canvas-bg-selector {
+  left: max(8px, env(safe-area-inset-left)) !important;
+  bottom: calc(52px + env(safe-area-inset-bottom)) !important;
+}
+/* Las pastillas de estado son puramente informativas: en horizontal el alto es
+   demasiado escaso para gastarlo en ellas. */
+html[data-mobile="1"][data-orient="landscape"] .status-bar { display: none; }
+
+html[data-mobile="1"][data-orient="landscape"] .ctx-side,
+html[data-mobile="1"][data-orient="landscape"] .ctx-side.text-format,
+html[data-mobile="1"][data-orient="landscape"] .ctx-side.ctx-side-day {
+  left: 156px;
+  right: 76px;
+  bottom: calc(8px + env(safe-area-inset-bottom));
+  padding: 4px 6px;
+  gap: 2px;
+}
+/* Solo iconos: con el texto debajo la tira mide 64px y aquí eso es un quinto
+   de la pantalla. */
+html[data-mobile="1"][data-orient="landscape"] .ctx-side .ctx-btn {
+  min-width: 42px;
+  padding: 6px 4px;
+}
+html[data-mobile="1"][data-orient="landscape"] .ctx-side .ctx-btn > span:not(.material-symbols-rounded) {
+  display: none;
+}
+html[data-mobile="1"][data-orient="landscape"] .mini-search { top: 6px; }
+/* Los desplegables de la barra del nodo (paleta, emoji…) se abren hacia arriba
+   para no salirse por abajo. */
+html[data-mobile="1"][data-orient="landscape"] .ctx-side .ctx-popout {
+  bottom: calc(100% + 6px);
+  top: auto;
+  max-height: 200px;
+  overflow-y: auto;
+}

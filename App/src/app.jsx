@@ -47,7 +47,8 @@ try {
 
 // Marcador de build: si la consola no muestra esta versión, el navegador está
 // sirviendo JS cacheado (subir ?v= en index.html invalida la caché)
-console.log('[ODINOTE] Código cargado: v41');
+window.ODINOTE_BUILD = 'v43';
+console.log('[ODINOTE] Código cargado: ' + window.ODINOTE_BUILD);
 
 // Global shortcuts configuration
 window.shortcuts = {
@@ -2077,6 +2078,15 @@ function App() {
                 <span className="material-symbols-rounded" style={{ fontSize: '24px' }}>settings</span>
                 <span style={{ fontWeight: '700', fontSize: '18px' }}>
                   {window.t('Ajustes de Odinote', 'Odinote Settings')}
+                </span>
+                {/* En el móvil no hay consola: sin esto es imposible saber si el
+                    navegador está sirviendo el código nuevo o una copia vieja de
+                    su caché, y un fallo ya arreglado parece seguir ahí. */}
+                <span
+                  className="odi-build-tag"
+                  title={window.t('Versión del código cargado', 'Loaded code version')}
+                >
+                  {CURRENT_VERSION} · {window.ODINOTE_BUILD}
                 </span>
               </div>
               <button 

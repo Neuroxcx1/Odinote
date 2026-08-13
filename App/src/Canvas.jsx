@@ -445,6 +445,8 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
   // alejados para tener contexto; acercar es un pellizco.
   const [scale, setScale] = useStateCanvas(defaultScale);
   const [showBgSelector, setShowBgSelector] = useStateCanvas(false);
+  // Nodo sobre el que caería la flecha que se está arrastrando ahora mismo.
+  const [linkTargetId, setLinkTargetId] = useStateCanvas(null);
   // Al crear una nota, el escritorio abre el editor de una. En el móvil eso
   // encadenaba tres cosas de golpe (nodo nuevo + salto de zoom + teclado) y
   // era justo lo que se sentía descontrolado: ahora se crea seleccionada y se
@@ -3060,6 +3062,36 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
 
     let currentDropTodoId = null;
 
+    // Posición en la que caería la tarea. La misma cuenta se hacía solo al
+    // soltar, así que durante el arrastre no había forma de saber si la tarea
+    // iba a quedar por encima o por debajo de la de al lado.
+    const insertIndexAt = (destId, clientY) => {
+      const destEl = destId && document.querySelector(`[data-item-id="${destId}"]`);
+      if (!destEl) return 0;
+      const rows = Array.from(destEl.querySelectorAll('.todo-row'));
+      for (let i = 0; i < rows.length; i++) {
+        const rect = rows[i].getBoundingClientRect();
+        if (clientY < rect.top + rect.height / 2) return i;
+      }
+      return rows.length;
+    };
+
+    // La línea se pinta tocando el DOM en vez de con estado de React: durante
+    // un arrastre esto se ejecuta en cada movimiento del dedo y re-renderizar
+    // el nodo entero cada vez lo volvería lento.
+    const paintDropLine = (destId, clientY) => {
+      document.querySelectorAll('.todo-row.drop-before, .todo-row.drop-after')
+        .forEach(r => r.classList.remove('drop-before', 'drop-after'));
+      if (!destId) return;
+      const destEl = document.querySelector(`[data-item-id="${destId}"]`);
+      if (!destEl) return;
+      const rows = Array.from(destEl.querySelectorAll('.todo-row'));
+      if (!rows.length) return;
+      const idx = insertIndexAt(destId, clientY);
+      if (idx >= rows.length) rows[rows.length - 1].classList.add('drop-after');
+      else rows[idx].classList.add('drop-before');
+    };
+
     const onMove = (ev) => {
       setDraggedTask(prev => prev ? { ...prev, x: ev.clientX, y: ev.clientY } : null);
 
@@ -3072,6 +3104,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
         currentDropTodoId = newDropId;
         setDropTargetTodo(newDropId);
       }
+      paintDropLine(newDropId, ev.clientY);
     };
 
     const onUp = (ev) => {
@@ -3080,6 +3113,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
       window.removeEventListener('mouseup', onUp);
       setDraggedTask(null);
       setDropTargetTodo(null);
+      paintDropLine(null);
 
       const canvasPt = screenToCanvas(ev.clientX, ev.clientY);
 
@@ -3113,17 +3147,10 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
           let newSrcItems = [...srcTodo.items];
           let insertIdx = (destTodo.items || []).length; // default to end
 
-          const destEl = document.querySelector(`[data-item-id="${currentDropTodoId}"]`);
-          if (destEl) {
-            const rows = Array.from(destEl.querySelectorAll('.todo-row'));
-            for (let i = 0; i < rows.length; i++) {
-              const rect = rows[i].getBoundingClientRect();
-              const middleY = rect.top + rect.height / 2;
-              if (ev.clientY < middleY) {
-                insertIdx = i;
-                break;
-              }
-            }
+          // Misma cuenta que pinta la línea guía, para que caiga exactamente
+          // donde el usuario ha visto que iba a caer.
+          if (document.querySelector(`[data-item-id="${currentDropTodoId}"]`)) {
+            insertIdx = insertIndexAt(currentDropTodoId, ev.clientY);
           }
 
           let updatedItems = c.items;
@@ -3223,13 +3250,26 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
     const startPos = anchorPos(fromRect, fromAnchor);
     setPendingConn({ fromId, fromAnchor, fromX: startPos.x, fromY: startPos.y, mx: startPos.x, my: startPos.y });
 
+    // Nodo que hay bajo el puntero mientras se arrastra la flecha. En escritorio
+    // esto se ve solo, porque al pasar por encima de un nodo se encienden sus
+    // puntos de anclaje; con el dedo no existe "pasar por encima", así que sin
+    // esto no hay forma de saber si la flecha va a engancharse o a quedar suelta.
+    const highlightUnder = (ev) => {
+      const el = document.elementFromPoint(ev.clientX, ev.clientY);
+      const itemEl = el && el.closest ? el.closest('.item, .col-child-wrap') : null;
+      const id = itemEl && itemEl.getAttribute('data-item-id');
+      setLinkTargetId(id && id !== fromId ? id : null);
+    };
+
     const onMove = (ev) => {
       const p = screenToCanvas(ev.clientX, ev.clientY);
       setPendingConn(pc => pc && { ...pc, mx: p.x, my: p.y });
+      highlightUnder(ev);
     };
     const onUp = (ev) => {
       window.removeEventListener('mousemove', onMove);
       window.removeEventListener('mouseup', onUp);
+      setLinkTargetId(null);
       const el = document.elementFromPoint(ev.clientX, ev.clientY);
       const itemEl = el?.closest('.item, .col-child-wrap');
       const targetId = itemEl?.getAttribute('data-item-id');
@@ -3267,13 +3307,26 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
     }
     if (!fromEnd) return;
 
+    // Nodo que hay bajo el puntero mientras se arrastra la flecha. En escritorio
+    // esto se ve solo, porque al pasar por encima de un nodo se encienden sus
+    // puntos de anclaje; con el dedo no existe "pasar por encima", así que sin
+    // esto no hay forma de saber si la flecha va a engancharse o a quedar suelta.
+    const highlightUnder = (ev) => {
+      const el = document.elementFromPoint(ev.clientX, ev.clientY);
+      const itemEl = el && el.closest ? el.closest('.item, .col-child-wrap') : null;
+      const id = itemEl && itemEl.getAttribute('data-item-id');
+      setLinkTargetId(id && id !== fromId ? id : null);
+    };
+
     const onMove = (ev) => {
       const p = screenToCanvas(ev.clientX, ev.clientY);
       setPendingConn(pc => pc && { ...pc, mx: p.x, my: p.y });
+      highlightUnder(ev);
     };
     const onUp = (ev) => {
       window.removeEventListener('mousemove', onMove);
       window.removeEventListener('mouseup', onUp);
+      setLinkTargetId(null);
       const el = document.elementFromPoint(ev.clientX, ev.clientY);
       const itemEl = el?.closest('.item, .col-child-wrap');
       const targetId = itemEl?.getAttribute('data-item-id');
@@ -3866,6 +3919,8 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
   }, [current.items]);
 
   const wrapClass = ['canvas-wrap', `canvas-bg-${current.bgColor || 'default'}`];
+  // Flecha en curso: enciende los puntos de anclaje de todos los nodos
+  if (pendingConn) wrapClass.push('conn-drag');
   if (transition === 'entering') wrapClass.push('entering');
   if (activeTool && activeTool !== 'line') wrapClass.push('placing');
   if (activeTool === 'line') wrapClass.push('linking');
@@ -4351,7 +4406,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
                 <div
                   key={item.id}
                   data-item-id={item.id}
-                  className={`item ${item.type === 'frame' ? 'item-frame' : ''} ${(selected === item.id || selectedIds.includes(item.id)) ? 'selected' : ''} ${item._dragging ? 'dragging' : ''} ${isEditing ? 'editing' : ''} ${item._new ? 'new-item' : ''} ${isDropTarget ? 'drop-target' : ''}`}
+                  className={`item ${item.type === 'frame' ? 'item-frame' : ''} ${(selected === item.id || selectedIds.includes(item.id)) ? 'selected' : ''} ${item._dragging ? 'dragging' : ''} ${isEditing ? 'editing' : ''} ${item._new ? 'new-item' : ''} ${isDropTarget ? 'drop-target' : ''} ${linkTargetId === item.id ? 'link-target' : ''}`}
                   style={{
                     left: item.x, top: item.y,
                     width: item.w !== undefined ? item.w : def.w,
@@ -4378,7 +4433,12 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
                       setSelected(item.id);
                       setSelectedIds([]);
                       setSelectedConn(null);
-                      setEditing(item.id);
+                      // Con el dedo NO se entra a editar tocando dos veces. Dos
+                      // toques seguidos son lo que uno hace sin querer al
+                      // seleccionar y arrastrar, y el editor se abría solo (con
+                      // teclado incluido) impidiendo mover el nodo. En táctil se
+                      // edita con el botón "Editar" de la barra del nodo.
+                      if (!(window.odiIsTouch && window.odiIsTouch())) setEditing(item.id);
                     }
                   }}
                   onContextMenu={(e)=>{

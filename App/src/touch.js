@@ -158,6 +158,11 @@
     return ev;
   }
 
+  // Elemento que hay bajo el dedo ahora mismo (puede no ser el del touchstart).
+  function targetUnder(touch) {
+    return document.elementFromPoint(touch.clientX, touch.clientY);
+  }
+
   function findTouch(list, id) {
     for (let i = 0; i < list.length; i++) {
       if (list[i].identifier === id) return list[i];
@@ -257,7 +262,12 @@
     }
 
     if (e.cancelable) e.preventDefault();
-    fireMouse('mousemove', t, drag.target);
+    // Un ratón de verdad emite mousemove sobre el elemento que hay DEBAJO del
+    // cursor en cada instante, no sobre el que se pulsó. Todo lo que detecta un
+    // destino soltando encima (una flecha que busca nodo, una tarjeta que cae
+    // en una columna) mira ese destino: si le mandamos siempre el nodo de
+    // origen, nunca encuentra nada.
+    fireMouse('mousemove', t, targetUnder(t) || drag.target);
   }, { capture: true, passive: false });
 
   function endTouch(e) {
@@ -277,7 +287,9 @@
       fireMouse('mousedown', t, target, 1);
       fireMouse('mouseup', t, target);
     } else {
-      fireMouse('mouseup', t, target);
+      // Igual que en mousemove: al soltar, el evento debe salir del elemento
+      // que hay bajo el dedo, que es el destino del arrastre.
+      fireMouse('mouseup', t, (moved && targetUnder(t)) || target);
       if (moved) { lastTap = null; return; }
     }
 
