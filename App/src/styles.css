@@ -3755,6 +3755,35 @@ html[data-mobile="1"] .section-header { padding-left: 14px; padding-right: 14px;
 html[data-mobile="1"] .ms-hero { grid-template-columns: 1fr; }
 html[data-mobile="1"] .ms-hero-art { display: none; }
 
+/* ── Manipular nodos con el dedo ──────────────────────────────────────
+   Esto cuelga de data-touch (hay pantalla táctil), no de data-mobile: una
+   tableta o un portátil táctil grandes conservan la disposición de escritorio
+   pero necesitan igualmente objetivos del tamaño de un dedo. */
+
+/* Sin ratón no existe :hover, así que el punto del que se tira para crear un
+   conector NO aparecía jamás: unir dos nodos era imposible en un móvil. Con el
+   dedo el gesto equivalente a "apuntar" es seleccionar. */
+html[data-touch="1"] .item.selected > .anchors > .connect-handle,
+html[data-touch="1"] .col-child-wrap.selected > .anchors > .connect-handle {
+  opacity: 1;
+  transform: scale(calc(1 * var(--handle-scale, 1)));
+}
+
+/* La zona sensible crece hasta un tamaño de dedo sin que cambie lo que se ve:
+   el tirador sigue siendo igual de discreto, pero ya no hay que acertarle a
+   10px. Los márgenes son distintos para que las esquinas no se coman el punto
+   de conexión del centro del lado derecho. */
+html[data-touch="1"] .handle::before {
+  top: -12px; left: -12px; right: -12px; bottom: -12px;
+}
+html[data-touch="1"] .anchor::before,
+html[data-touch="1"] .connect-handle::before {
+  content: '';
+  position: absolute;
+  top: -8px; left: -8px; right: -8px; bottom: -8px;
+  pointer-events: auto;
+}
+
 /* ── Orientación horizontal: el raíl derecho se queda, pero la barra
       superior se encoge para no comerse el poco alto disponible. ─────── */
 html[data-mobile="1"][data-orient="landscape"] .topbar { padding-top: 3px; padding-bottom: 3px; }
