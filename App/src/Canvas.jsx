@@ -881,6 +881,34 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
     };
   }, []);
 
+  // ───── Editar texto en móvil sin que el navegador secuestre el zoom ─────
+  // Al enfocar un texto diminuto (el lienzo suele estar al 50%, o sea letra de
+  // ~6px), el navegador móvil hace SU propio zoom para que se vea el cursor.
+  // Ese zoom es del navegador, no del lienzo: los botones − / + no lo
+  // deshacen y el usuario se queda encerrado. Adelantándonos y acercando
+  // nosotros a 100%, el texto ya es legible y el navegador no interviene; y si
+  // aun así lo hiciera, se puede salir con un pellizco (por eso el viewport ya
+  // no lleva user-scalable=no).
+  useEffectCanvas(() => {
+    if (!editing) return;
+    if (!(window.odiIsMobile && window.odiIsMobile())) return;
+    if (scaleRef.current >= 1) return;
+    const el = surfaceRef.current;
+    const item = current.items.find(i => i.id === editing);
+    if (!el || !item) return;
+    const rect = el.getBoundingClientRect();
+    const def = defaultDims(item.type);
+    const w = item.w !== undefined ? item.w : def.w;
+    const h = item.h !== undefined ? item.h : def.h;
+    setScale(1);
+    // Un tercio de alto en vez de la mitad: el teclado se come la parte de
+    // abajo, así el nodo que se está editando queda por encima de él.
+    setPan({
+      x: rect.width / 2 - (item.x + w / 2),
+      y: rect.height * 0.32 - (item.y + h / 2),
+    });
+  }, [editing]);
+
   // ───── Keyboard ─────
   useEffectCanvas(() => {
     const onKey = (e) => {

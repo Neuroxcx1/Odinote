@@ -3586,6 +3586,26 @@ html[data-mobile="1"] .zoom-ctrls {
   border-radius: 10px;
 }
 html[data-mobile="1"] .zoom-ctrls button { padding: 9px 12px; font-size: 14px; }
+
+/* Las pastillas de estado vivían en la misma esquina que el zoom (left:16 /
+   bottom:16) y se solapaban con él. Las corremos a la derecha de los botones
+   de zoom, en la misma fila, sin llegar al botón flotante de herramientas. */
+html[data-mobile="1"] .status-bar {
+  left: 158px;
+  right: 78px;
+  bottom: calc(18px + env(safe-area-inset-bottom));
+  gap: 5px;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  pointer-events: none; /* que no roben toques al lienzo entre pastilla y pastilla */
+}
+html[data-mobile="1"] .status-bar > * { pointer-events: auto; }
+/* "Guardado" y el número de nodos son informativos; en una pantalla de
+   teléfono solo tapan el lienzo. Dejamos la que hace algo (online/offline) y
+   la del nivel de anidación, que sí orienta dentro de los tableros. */
+html[data-mobile="1"] .status-bar .status-pill:not(.privacy-status-pill):not(.accent) {
+  display: none;
+}
 html[data-mobile="1"] .mini-search {
   width: auto;
   left: 8px; right: 8px;

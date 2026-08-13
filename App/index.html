@@ -2,13 +2,16 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <!-- El lienzo tiene su propio zoom de pellizco (Canvas.jsx): si además
-         dejamos el zoom del navegador, cada gesto hace las dos cosas a la vez.
+    <!-- NO poner maximum-scale ni user-scalable=no: el navegador móvil sigue
+         acercándose por su cuenta al enfocar un texto pequeño, pero entonces
+         el usuario ya no puede alejarse y se queda atrapado. El zoom de
+         pellizco del lienzo lo resolvemos cancelando el gesto en Canvas.jsx, y
+         el zoom por doble toque con `touch-action: manipulation`.
          viewport-fit=cover habilita env(safe-area-inset-*) en móviles con
          muesca, que usamos para no meter botones bajo la barra del sistema. -->
     <meta
       name="viewport"
-      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
+      content="width=device-width, initial-scale=1.0, viewport-fit=cover"
     />
     <meta
       name="description"
@@ -18,7 +21,7 @@
     <link rel="icon" type="image/png" href="./Icon/Icon.png" />
     <link rel="stylesheet" href="./lib/fonts.css" />
     <link rel="stylesheet" href="./lib/github.min.css" />
-    <link rel="stylesheet" href="./src/styles.css?v=38" />
+    <link rel="stylesheet" href="./src/styles.css?v=39" />
     
     <!-- Google Analytics (GA4).
          Se envía a DOS propiedades a propósito:
@@ -153,17 +156,17 @@
 
     <!-- Antes que nada: marca <html data-mobile/data-touch> (de lo que cuelga
          todo el CSS responsive) y traduce gestos táctiles a eventos de ratón. -->
-    <script src="./src/touch.js?v=38"></script>
-    <script src="./src/drive.js?v=38"></script>
-    <script type="text/babel" data-presets="react" src="./src/data.js?v=38"></script>
-    <script type="text/babel" data-presets="react" src="./src/items.jsx?v=38"></script>
-    <script type="text/babel" data-presets="react" src="./src/Connector.jsx?v=38"></script>
-    <script type="text/babel" data-presets="react" src="./src/Topbar.jsx?v=38"></script>
-    <script type="text/babel" data-presets="react" src="./src/ContextSidebar.jsx?v=38"></script>
-    <script type="text/babel" data-presets="react" src="./src/TextFormatSidebar.jsx?v=38"></script>
-    <script type="text/babel" data-presets="react" src="./src/DocModal.jsx?v=38"></script>
-    <script type="text/babel" data-presets="react" src="./src/Home.jsx?v=38"></script>
-    <script type="text/babel" data-presets="react" src="./src/Canvas.jsx?v=38"></script>
-    <script type="text/babel" data-presets="react" src="./src/app.jsx?v=38"></script>
+    <script src="./src/touch.js?v=39"></script>
+    <script src="./src/drive.js?v=39"></script>
+    <script type="text/babel" data-presets="react" src="./src/data.js?v=39"></script>
+    <script type="text/babel" data-presets="react" src="./src/items.jsx?v=39"></script>
+    <script type="text/babel" data-presets="react" src="./src/Connector.jsx?v=39"></script>
+    <script type="text/babel" data-presets="react" src="./src/Topbar.jsx?v=39"></script>
+    <script type="text/babel" data-presets="react" src="./src/ContextSidebar.jsx?v=39"></script>
+    <script type="text/babel" data-presets="react" src="./src/TextFormatSidebar.jsx?v=39"></script>
+    <script type="text/babel" data-presets="react" src="./src/DocModal.jsx?v=39"></script>
+    <script type="text/babel" data-presets="react" src="./src/Home.jsx?v=39"></script>
+    <script type="text/babel" data-presets="react" src="./src/Canvas.jsx?v=39"></script>
+    <script type="text/babel" data-presets="react" src="./src/app.jsx?v=39"></script>
   </body>
 </html>
