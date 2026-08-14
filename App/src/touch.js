@@ -23,8 +23,22 @@
   const MOBILE_MAX_WIDTH = 860;   // móvil o ventana estrecha
   const TOUCH_MAX_WIDTH = 1180;   // tablet: táctil pero con sitio de sobra
 
+  // ¿El aparato puede producir toques?
+  //
+  // Antes esto era solo `(pointer: coarse)`, y esa consulta mira ÚNICAMENTE el
+  // puntero principal. Basta con que el navegador declare otra cosa —modo
+  // escritorio, un ratón o un lápiz emparejados— para que dé `false` en un
+  // teléfono, y entonces TODA esta capa se queda dormida: no hay puente
+  // táctil, ni touch-action, ni puntos de conexión al seleccionar. Los toques
+  // sueltos siguen funcionando porque los emula el navegador, pero arrastrar
+  // no, que es exactamente el fallo que salía solo en el móvil real.
+  // Preguntamos por capacidad, que es lo que de verdad importa aquí.
+  const mq = (q) => !!(window.matchMedia && window.matchMedia(q).matches);
   const isCoarse = () =>
-    window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+    typeof window.ontouchstart !== 'undefined' ||
+    (navigator.maxTouchPoints || 0) > 0 ||
+    mq('(any-pointer: coarse)') ||
+    mq('(pointer: coarse)');
   const isNarrow = () => window.innerWidth <= MOBILE_MAX_WIDTH;
   // Un portátil táctil de 1920px no debe pasar a la disposición de móvil solo
   // por tener pantalla táctil: ahí la barra superior cabe de sobra. El puente
@@ -60,6 +74,15 @@
 
   window.odiIsMobile = isMobile;
   window.odiIsTouch = isCoarse;
+
+  // Capacidad no es lo mismo que uso: un portátil táctil con ratón puede hacer
+  // las dos cosas. Para decidir cosas como "el doble toque NO entra a editar"
+  // hace falta saber con qué se acaba de interactuar, no qué admite el aparato.
+  window.odiLastInputWasTouch = false;
+  document.addEventListener('touchstart', () => { window.odiLastInputWasTouch = true; }, { capture: true, passive: true });
+  document.addEventListener('mousedown', (e) => {
+    if (!e.odiSynthetic) window.odiLastInputWasTouch = false;
+  }, true);
 
   // ─────────────────────────────────────────────────────────────
   // Candado del zoom del navegador mientras se escribe

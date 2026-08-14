@@ -3547,9 +3547,14 @@ html[data-mobile="1"] .topbar-tail-scrim { display: block; position: fixed; inse
 /* ── Raíl vertical de herramientas (borde derecho) ───────────────────── */
 html[data-mobile="1"] .tools {
   position: fixed;
-  top: 56px;
+  /* Anclado ABAJO y del alto de su contenido. Antes iba de arriba a abajo, y
+     en un móvil alargado eso dejaba un panel medio vacío de cientos de píxeles.
+     Pegado abajo, además, las herramientas caen donde llega el pulgar. En
+     pantallas cortas el max-height lo vuelve desplazable. */
+  top: auto;
   right: max(6px, env(safe-area-inset-right));
-  bottom: 78px;
+  bottom: calc(78px + env(safe-area-inset-bottom));
+  max-height: calc(100dvh - 148px);
   flex-direction: column;
   align-items: center;
   gap: 4px;
@@ -3895,7 +3900,12 @@ html[data-touch="1"] .connect-handle::before {
 /* ── Orientación horizontal: el raíl derecho se queda, pero la barra
       superior se encoge para no comerse el poco alto disponible. ─────── */
 html[data-mobile="1"][data-orient="landscape"] .topbar { padding-top: 3px; padding-bottom: 3px; }
-html[data-mobile="1"][data-orient="landscape"] .tools { top: 50px; bottom: 68px; }
+/* En horizontal el alto escasea: el raíl vuelve a ocuparlo todo y se desplaza. */
+html[data-mobile="1"][data-orient="landscape"] .tools {
+  top: 50px;
+  bottom: 68px;
+  max-height: none;
+}
 html[data-mobile="1"][data-orient="landscape"] .tools .tool .tool-icon { width: 34px; height: 34px; }
 
 /* En horizontal solo quedan ~315px de alto: las tres filas de antes ocupaban

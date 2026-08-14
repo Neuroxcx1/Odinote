@@ -4435,10 +4435,13 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
                       setSelectedConn(null);
                       // Con el dedo NO se entra a editar tocando dos veces. Dos
                       // toques seguidos son lo que uno hace sin querer al
-                      // seleccionar y arrastrar, y el editor se abría solo (con
-                      // teclado incluido) impidiendo mover el nodo. En táctil se
-                      // edita con el botón "Editar" de la barra del nodo.
-                      if (!(window.odiIsTouch && window.odiIsTouch())) setEditing(item.id);
+                      // seleccionar y arrastrar, o al pulsar Eliminar justo
+                      // después de seleccionar, y el editor se abría solo (con
+                      // teclado incluido). En táctil se edita con el botón
+                      // "Editar" de la barra del nodo. Se mira el último gesto
+                      // y no la capacidad del aparato, para que en un portátil
+                      // táctil el doble clic con ratón siga entrando a editar.
+                      if (!window.odiLastInputWasTouch) setEditing(item.id);
                     }
                   }}
                   onContextMenu={(e)=>{

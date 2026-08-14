@@ -47,7 +47,7 @@ try {
 
 // Marcador de build: si la consola no muestra esta versión, el navegador está
 // sirviendo JS cacheado (subir ?v= en index.html invalida la caché)
-window.ODINOTE_BUILD = 'v45';
+window.ODINOTE_BUILD = 'v46';
 console.log('[ODINOTE] Código cargado: ' + window.ODINOTE_BUILD);
 
 // Global shortcuts configuration
@@ -2084,9 +2084,13 @@ function App() {
                     su caché, y un fallo ya arreglado parece seguir ahí. */}
                 <span
                   className="odi-build-tag"
-                  title={window.t('Versión del código cargado', 'Loaded code version')}
+                  title={window.t('Versión y entorno detectado', 'Version and detected environment')}
                 >
-                  {CURRENT_VERSION} · {window.ODINOTE_BUILD}
+                  {CURRENT_VERSION} · {window.ODINOTE_BUILD} ·{' '}
+                  {window.innerWidth}×{window.innerHeight} ·{' '}
+                  {(window.odiIsTouch && window.odiIsTouch())
+                    ? window.t('táctil', 'touch')
+                    : window.t('SIN táctil', 'NO touch')}
                 </span>
               </div>
               <button 
