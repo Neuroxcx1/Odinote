@@ -62,6 +62,98 @@
   window.odiIsTouch = isCoarse;
 
   // ─────────────────────────────────────────────────────────────
+  // Candado del zoom del navegador mientras se escribe
+  //
+  // Aunque los campos ya no bajen de 16px, el navegador puede seguir
+  // ampliando la página al enfocar algo pequeño (por ejemplo el texto de un
+  // nodo con el lienzo alejado). Ese zoom no lo controla la app y deja al
+  // usuario atrapado. Mientras hay un campo enfocado prohibimos ampliar; al
+  // salir lo permitimos otra vez, para que nunca se quede encerrado.
+  // ─────────────────────────────────────────────────────────────
+  const VIEWPORT_FREE = 'width=device-width, initial-scale=1.0, viewport-fit=cover';
+  const VIEWPORT_LOCKED = VIEWPORT_FREE + ', maximum-scale=1.0';
+
+  function setViewport(content) {
+    const meta = document.querySelector('meta[name="viewport"]');
+    if (meta && meta.getAttribute('content') !== content) meta.setAttribute('content', content);
+  }
+
+  function isEditable(el) {
+    if (!el || el.nodeType !== 1) return false;
+    if (el.isContentEditable) return true;
+    const tag = el.tagName;
+    return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
+  }
+
+  document.addEventListener('focusin', (e) => {
+    if (isCoarse() && isEditable(e.target)) setViewport(VIEWPORT_LOCKED);
+  }, true);
+  document.addEventListener('focusout', () => {
+    if (!isCoarse()) return;
+    // Un respiro: al saltar de un campo a otro no queremos soltar y volver a
+    // echar el candado en el mismo parpadeo.
+    setTimeout(() => {
+      if (!isEditable(document.activeElement)) setViewport(VIEWPORT_FREE);
+    }, 80);
+  }, true);
+
+  // ─────────────────────────────────────────────────────────────
+  // Aviso de página ampliada
+  //
+  // Si el navegador ya arrastra un zoom guardado del sitio (Brave y Chrome lo
+  // recuerdan por dominio, y borrar cookies NO lo borra), la interfaz se ve
+  // gigante y parece que la app está rota. Arreglar la causa no deshace ese
+  // zoom ya guardado, así que hay que decírselo al usuario: es lo único que
+  // puede quitarlo él.
+  // ─────────────────────────────────────────────────────────────
+  function pageZoomFactor() {
+    try {
+      const sw = window.screen && window.screen.width;
+      if (!sw || !window.innerWidth) return 1;
+      return sw / window.innerWidth;
+    } catch (e) { return 1; }
+  }
+
+  let zoomNoticeShown = false;
+  function checkPageZoom() {
+    if (zoomNoticeShown || !isCoarse()) return;
+    // Solo en vertical: en horizontal screen.width sigue dando el lado corto
+    // en bastantes móviles y saldría un falso positivo.
+    if (window.innerHeight < window.innerWidth) return;
+    // Un móvil al 100% nunca baja de ~320px de ancho lógico.
+    if (!(pageZoomFactor() > 1.35 && window.innerWidth < 320)) return;
+
+    zoomNoticeShown = true;
+    const es = (navigator.language || 'en').toLowerCase().indexOf('es') === 0;
+    const bar = document.createElement('div');
+    bar.setAttribute('role', 'status');
+    bar.style.cssText = [
+      'position:fixed', 'left:8px', 'right:8px', 'bottom:8px', 'z-index:999998',
+      'background:#232123', 'color:#F0EEF0', 'padding:12px 14px', 'border-radius:12px',
+      'font:600 13px/1.45 system-ui,sans-serif', 'box-shadow:0 6px 24px rgba(0,0,0,.35)',
+      'display:flex', 'gap:10px', 'align-items:flex-start',
+    ].join(';');
+    const text = document.createElement('div');
+    text.style.flex = '1';
+    text.textContent = es
+      ? 'Tu navegador tiene esta página ampliada (' + Math.round(pageZoomFactor() * 100) + '%), por eso se ve todo gigante. Ponla al 100% en el menú ⋮ del navegador → Zoom.'
+      : 'Your browser has this page zoomed in (' + Math.round(pageZoomFactor() * 100) + '%), which is why everything looks huge. Set it back to 100% from the browser ⋮ menu → Zoom.';
+    const close = document.createElement('button');
+    close.textContent = es ? 'Vale' : 'Got it';
+    close.style.cssText = 'background:#90B968;color:#1A1A1A;border:0;border-radius:8px;padding:8px 12px;font:700 13px system-ui,sans-serif;flex:0 0 auto';
+    close.onclick = () => bar.remove();
+    bar.appendChild(text);
+    bar.appendChild(close);
+    (document.body || document.documentElement).appendChild(bar);
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => setTimeout(checkPageZoom, 1200));
+  } else {
+    setTimeout(checkPageZoom, 1200);
+  }
+
+  // ─────────────────────────────────────────────────────────────
   // Puente táctil → ratón
   // ─────────────────────────────────────────────────────────────
 
@@ -189,7 +281,15 @@
     if (!isCoarse()) return;
 
     // Segundo dedo: es un pellizco, que resuelve Canvas.jsx.
-    if (e.touches.length > 1) { abortDrag(); return; }
+    if (e.touches.length > 1) {
+      // Red de seguridad del candado de arriba: si el foco se perdió de una
+      // forma que no disparó focusout (el nodo se desmontó, el navegador cerró
+      // el teclado…), el candado se quedaría echado y el usuario otra vez sin
+      // poder alejarse. Dos dedos significa "quiero hacer zoom": se suelta.
+      setViewport(VIEWPORT_FREE);
+      abortDrag();
+      return;
+    }
 
     const t = e.changedTouches[0];
     const target = document.elementFromPoint(t.clientX, t.clientY) || e.target;

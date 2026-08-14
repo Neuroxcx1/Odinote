@@ -3423,6 +3423,24 @@ html[data-mobile="1"] #root {
   height: 100dvh;
 }
 
+/* CAUSA RAÍZ del zoom que se quedaba pegado: por debajo de 16px, el navegador
+   móvil AMPLÍA LA PÁGINA ENTERA al enfocar un campo, para que se lea el
+   cursor. Ese zoom es del navegador, no de la app: ni los botones − / + ni
+   recargar lo deshacen, y Brave además lo recuerda para el sitio. Basta con no
+   bajar de 16px en los campos de la interfaz para que nunca se dispare.
+   Los textos DENTRO del lienzo van aparte: los escala el zoom del propio
+   lienzo, y ahí lo resuelve el ajuste automático al entrar a editar. */
+html[data-mobile="1"] input:not([type="range"]):not([type="checkbox"]):not([type="radio"]):not([type="color"]),
+html[data-mobile="1"] textarea,
+html[data-mobile="1"] select {
+  font-size: 16px;
+}
+html[data-mobile="1"] .canvas-content input:not([type="range"]),
+html[data-mobile="1"] .canvas-content textarea,
+html[data-mobile="1"] .canvas-content select {
+  font-size: inherit;
+}
+
 /* ── Barra superior ──────────────────────────────────────────────────── */
 html[data-mobile="1"] .topbar {
   gap: 4px;
