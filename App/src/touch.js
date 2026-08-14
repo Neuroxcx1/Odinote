@@ -129,12 +129,11 @@
   // el resumen de cada gesto— y aparece en la consola del PC. Servido desde
   // GitHub Pages este bloque no se activa: no manda nada a ninguna parte.
   // ─────────────────────────────────────────────────────────────
-  const isLocalDev = (function () {
-    const h = location.hostname;
-    return h === 'localhost' || h === '127.0.0.1' ||
-      /^192\.168\./.test(h) || /^10\./.test(h) ||
-      /^172\.(1[6-9]|2\d|3[01])\./.test(h);
-  })();
+  // Solo el puerto de dev-server.js. Ojo: la app de escritorio también se
+  // sirve desde 127.0.0.1 (main.js usa el puerto 38471), así que comprobar
+  // "es una IP local" activaría esto DENTRO del ejecutable, mandando peticiones
+  // a un buzón que allí no existe. El puerto lo deja fuera sin lugar a dudas.
+  const isLocalDev = location.port === '4173' || /[?&]odidebug=1\b/.test(location.search);
 
   const logQueue = [];
   let logTimer = null;
