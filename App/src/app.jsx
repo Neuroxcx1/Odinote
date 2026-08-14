@@ -47,7 +47,7 @@ try {
 
 // Marcador de build: si la consola no muestra esta versión, el navegador está
 // sirviendo JS cacheado (subir ?v= en index.html invalida la caché)
-window.ODINOTE_BUILD = 'v46';
+window.ODINOTE_BUILD = 'v47';
 console.log('[ODINOTE] Código cargado: ' + window.ODINOTE_BUILD);
 
 // Global shortcuts configuration
@@ -199,6 +199,7 @@ function App() {
   const [updateProgress, setUpdateProgress] = useStateApp(0);
   const [contextMenu, setContextMenu] = useStateApp(null);
   const [settingsOpen, setSettingsOpen] = useStateApp(false);
+  const [showTouchDiag, setShowTouchDiag] = useStateApp(false);
   const [dictWords, setDictWords] = useStateApp([]);
   const [userProfile, setUserProfile] = useStateApp(() => {
     const savedProfile = localStorage.getItem('odinote.google_profile');
@@ -2082,16 +2083,17 @@ function App() {
                 {/* En el móvil no hay consola: sin esto es imposible saber si el
                     navegador está sirviendo el código nuevo o una copia vieja de
                     su caché, y un fallo ya arreglado parece seguir ahí. */}
-                <span
+                <button
                   className="odi-build-tag"
-                  title={window.t('Versión y entorno detectado', 'Version and detected environment')}
+                  title={window.t('Toca para ver el último gesto táctil', 'Tap to see the last touch gesture')}
+                  onClick={() => setShowTouchDiag(v => !v)}
                 >
                   {CURRENT_VERSION} · {window.ODINOTE_BUILD} ·{' '}
                   {window.innerWidth}×{window.innerHeight} ·{' '}
                   {(window.odiIsTouch && window.odiIsTouch())
                     ? window.t('táctil', 'touch')
                     : window.t('SIN táctil', 'NO touch')}
-                </span>
+                </button>
               </div>
               <button 
                 className="icon-btn" 
@@ -2101,7 +2103,26 @@ function App() {
                 <span className="material-symbols-rounded" style={{ fontSize: '20px', color: 'var(--text-soft, #595459)' }}>close</span>
               </button>
             </div>
-            
+
+            {/* Qué pasó con el último gesto táctil. En un móvil no hay consola:
+                sin esto, ante un "no puedo arrastrar" no hay forma de saber si
+                el toque llegó siquiera, si el puente lo tomó, o si el navegador
+                se quedó el gesto antes que la app. */}
+            {showTouchDiag && (
+              <div className="odi-touch-diag">
+                <div className="odi-touch-diag-title">
+                  {window.t('Último gesto táctil', 'Last touch gesture')}
+                </div>
+                <code>{window.odiTouchDiag || '—'}</code>
+                <div className="odi-touch-diag-hint">
+                  {window.t(
+                    'Cierra Ajustes, intenta arrastrar un nodo y vuelve aquí para leerlo.',
+                    'Close Settings, try dragging a node, then come back and read this.'
+                  )}
+                </div>
+              </div>
+            )}
+
             <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', overflowY: 'auto' }}>
               {/* Sección Corrector Ortográfico */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>

@@ -196,6 +196,27 @@
   let lastTap = null;          // { x, y, time } para detectar el doble toque
   let longPressTimer = null;
 
+  // Diagnóstico del último gesto. Desde un móvil no hay consola, y sin esto la
+  // única información disponible es "no funciona": no se puede saber si el
+  // toque llegó, si el puente lo tomó o lo dejó pasar, ni si el navegador
+  // permitió cancelarlo. Se ve tocando la etiqueta de versión en Ajustes.
+  window.odiTouchDiag = 'aún no se ha tocado nada';
+  let diag = null;
+  const shortName = (el) => {
+    if (!el || !el.tagName) return '?';
+    const c = (el.className && el.className.toString ? el.className.toString() : '').trim().split(/\s+/)[0];
+    return el.tagName.toLowerCase() + (c ? '.' + c : '');
+  };
+  const publishDiag = () => {
+    if (!diag) return;
+    window.odiTouchDiag =
+      'sobre ' + diag.target +
+      ' | puente ' + (diag.bridged ? 'SÍ' : 'NO (' + diag.skipReason + ')') +
+      ' | movs ' + diag.moves +
+      ' | cancelable ' + (diag.moves ? (diag.cancelable ? 'sí' : 'NO') : '-') +
+      ' | ' + diag.outcome;
+  };
+
   function closestEl(el, selector) {
     // SVGElement soporta closest en navegadores modernos, pero curamos el caso
     // de nodos de texto y de elementos ya desconectados del documento.
@@ -316,7 +337,20 @@
 
     const t = e.changedTouches[0];
     const target = document.elementFromPoint(t.clientX, t.clientY) || e.target;
-    if (shouldSkip(target)) { drag = null; return; }
+
+    diag = { target: shortName(target), bridged: false, skipReason: '', moves: 0, cancelable: e.cancelable, outcome: 'en curso' };
+    publishDiag();
+
+    if (shouldSkip(target)) {
+      diag.skipReason = closestEl(target, NATIVE_SELECTOR) ? 'campo nativo'
+        : isBareCanvasSurface(target) ? 'lienzo (lo lleva Canvas)'
+        : 'otro';
+      diag.outcome = 'ignorado';
+      publishDiag();
+      drag = null;
+      return;
+    }
+    diag.bridged = true;
 
     const inCanvas = !!closestEl(target, '.canvas-wrap');
     const scroller = scrollableAncestor(target);
@@ -355,11 +389,16 @@
 
     fireMouse('mousedown', t, target, 1);
 
-    // Pulsado largo = clic derecho, salvo con una herramienta activa (ahí el
-    // gesto ya significa "dibuja el nodo de este tamaño").
+    // Pulsado largo = clic derecho. SOLO fuera de un nodo: al arrastrar con el
+    // dedo es normal apoyarlo un instante antes de moverlo, y si ese instante
+    // pasaba de medio segundo el temporizador cerraba el arrastre y el nodo ya
+    // no se movía — "no puedo arrastrar" sin más pista. En un nodo no hace
+    // falta: su barra ya tiene color, editar, duplicar y eliminar. El menú de
+    // crear sobre el lienzo vacío lo lleva Canvas.jsx y no se toca.
     const wrap = closestEl(target, '.canvas-wrap');
     const toolActive = wrap && (wrap.classList.contains('placing') || wrap.classList.contains('linking'));
-    if (!toolActive) {
+    const onItem = !!closestEl(target, '.item, .col-child-wrap');
+    if (!toolActive && !onItem) {
       clearLongPress();
       longPressTimer = setTimeout(() => {
         longPressTimer = null;
@@ -380,6 +419,7 @@
     const t = findTouch(e.changedTouches, drag.id);
     if (!t) return;
     drag.last = t;
+    if (diag) { diag.moves++; diag.cancelable = e.cancelable; publishDiag(); }
 
     if (!drag.moved) {
       const dx = t.clientX - drag.startX;
@@ -402,7 +442,15 @@
       drag.axisDecided = true;
       const dx = Math.abs(t.clientX - drag.startX);
       const dy = Math.abs(t.clientY - drag.startY);
-      drag.scrolling = dy > dx;
+      // Claramente vertical, no "un poco más vertical que horizontal": si no,
+      // cualquier arrastre en diagonal se interpretaba como desplazamiento y
+      // el nodo se quedaba clavado. Y solo si de verdad queda contenido hacia
+      // ese lado.
+      const el = drag.scroller;
+      const room = (t.clientY < drag.startY)
+        ? el.scrollTop < el.scrollHeight - el.clientHeight - 1
+        : el.scrollTop > 1;
+      drag.scrolling = dy > dx * 1.6 && room;
       // Si es un desplazamiento, cerramos el arrastre de nodo ya iniciado
       // (no llegó a moverse, así que no deja rastro).
       if (drag.scrolling) fireMouse('mouseup', t, drag.target);
@@ -431,6 +479,13 @@
     const t = findTouch(e.changedTouches, drag.id) || drag.last;
     const { target, moved, deferred, scrolling } = drag;
     drag = null;
+
+    if (diag) {
+      diag.outcome = scrolling ? 'desplazó contenido'
+        : moved ? (deferred ? 'se apartó (era scroll)' : 'ARRASTRE')
+        : 'toque';
+      publishDiag();
+    }
 
     // Fue un desplazamiento del contenido de un nodo: el mouseup ya se emitió
     // al decidir el eje, y no hay ni clic ni doble toque que valgan.

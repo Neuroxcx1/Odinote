@@ -3848,7 +3848,26 @@ html[data-mobile="1"] .ms-hero-art { display: none; }
   border: 1.5px solid var(--line-soft);
   color: var(--ink-3);
   white-space: nowrap;
+  cursor: pointer;
 }
+.odi-touch-diag {
+  border: 1.5px solid var(--line-soft);
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: var(--bg);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.odi-touch-diag-title { font-size: 12px; font-weight: 700; color: var(--ink-2); }
+.odi-touch-diag code {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--ink);
+  word-break: break-word;
+}
+.odi-touch-diag-hint { font-size: 11.5px; color: var(--ink-3); line-height: 1.4; }
 
 /* En un móvil REAL el navegador decide en el compositor —antes de ejecutar
    nada de nuestro JS— si un gesto es un desplazamiento. Si el CSS no se lo
