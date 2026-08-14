@@ -184,17 +184,17 @@
 
   // ¿El dedo cayó sobre una zona que ya tiene scroll propio y contenido de
   // sobra? Entonces el usuario quiere desplazarla, no arrastrar el nodo.
-  function hasScrollableAncestor(el) {
+  function scrollableAncestor(el) {
     let node = el;
     while (node && node !== document.body && node.nodeType === 1) {
       const style = window.getComputedStyle(node);
       const oy = style.overflowY;
       const ox = style.overflowX;
-      if ((oy === 'auto' || oy === 'scroll') && node.scrollHeight - node.clientHeight > 4) return true;
-      if ((ox === 'auto' || ox === 'scroll') && node.scrollWidth - node.clientWidth > 4) return true;
+      if ((oy === 'auto' || oy === 'scroll') && node.scrollHeight - node.clientHeight > 4) return node;
+      if ((ox === 'auto' || ox === 'scroll') && node.scrollWidth - node.clientWidth > 4) return node;
       node = node.parentNode;
     }
-    return false;
+    return null;
   }
 
   // El lienzo vacío lo gobierna Canvas.jsx (un dedo = paneo). Con una
@@ -295,20 +295,32 @@
     const target = document.elementFromPoint(t.clientX, t.clientY) || e.target;
     if (shouldSkip(target)) { drag = null; return; }
 
-    // Zona con scroll propio (el raíl de herramientas, la lista de proyectos,
-    // el cuerpo de un documento…): el gesto todavía puede ser un desplazamiento,
-    // así que no bloqueamos nada y esperamos a ver. Si el dedo no se mueve,
-    // al levantarlo lo convertimos en clic; si se mueve, era un scroll.
-    const deferred = hasScrollableAncestor(target);
+    const inCanvas = !!closestEl(target, '.canvas-wrap');
+    const scroller = scrollableAncestor(target);
+
+    // Zona con scroll propio FUERA del lienzo (el raíl de herramientas, la
+    // lista de proyectos, un modal…): el gesto todavía puede ser un
+    // desplazamiento, así que no bloqueamos nada y esperamos a ver. Si el dedo
+    // no se mueve, al levantarlo lo convertimos en clic; si se mueve, era un
+    // scroll y nos apartamos.
+    const deferred = !inCanvas && !!scroller;
 
     drag = {
       id: t.identifier,
       target,
       startX: t.clientX,
       startY: t.clientY,
+      lastY: t.clientY,
       moved: false,
       last: t,
       deferred,
+      // Dentro del lienzo el desplazamiento nativo está apagado
+      // (touch-action: none), así que si hay una zona con scroll —una nota
+      // larga, por ejemplo— la desplazamos nosotros: dedo en vertical =
+      // desplazar su contenido, en horizontal = arrastrar el nodo.
+      scroller: inCanvas ? scroller : null,
+      axisDecided: false,
+      scrolling: false,
     };
 
     if (deferred) return;
@@ -361,6 +373,25 @@
       return;
     }
 
+    // Nota larga (u otra zona con scroll) dentro del lienzo: en cuanto se sabe
+    // hacia dónde va el dedo, o se desplaza su contenido o se arrastra el nodo.
+    if (drag.scroller && !drag.axisDecided && drag.moved) {
+      drag.axisDecided = true;
+      const dx = Math.abs(t.clientX - drag.startX);
+      const dy = Math.abs(t.clientY - drag.startY);
+      drag.scrolling = dy > dx;
+      // Si es un desplazamiento, cerramos el arrastre de nodo ya iniciado
+      // (no llegó a moverse, así que no deja rastro).
+      if (drag.scrolling) fireMouse('mouseup', t, drag.target);
+    }
+    if (drag.scrolling) {
+      if (e.cancelable) e.preventDefault();
+      drag.scroller.scrollTop -= (t.clientY - drag.lastY);
+      drag.lastY = t.clientY;
+      return;
+    }
+    drag.lastY = t.clientY;
+
     if (e.cancelable) e.preventDefault();
     // Un ratón de verdad emite mousemove sobre el elemento que hay DEBAJO del
     // cursor en cada instante, no sobre el que se pulsó. Todo lo que detecta un
@@ -375,8 +406,12 @@
     clearLongPress();
 
     const t = findTouch(e.changedTouches, drag.id) || drag.last;
-    const { target, moved, deferred } = drag;
+    const { target, moved, deferred, scrolling } = drag;
     drag = null;
+
+    // Fue un desplazamiento del contenido de un nodo: el mouseup ya se emitió
+    // al decidir el eje, y no hay ni clic ni doble toque que valgan.
+    if (scrolling) { lastTap = null; return; }
 
     if (deferred) {
       if (moved) { lastTap = null; return; }

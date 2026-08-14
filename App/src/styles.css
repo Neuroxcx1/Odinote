@@ -3845,6 +3845,24 @@ html[data-mobile="1"] .ms-hero-art { display: none; }
   white-space: nowrap;
 }
 
+/* En un móvil REAL el navegador decide en el compositor —antes de ejecutar
+   nada de nuestro JS— si un gesto es un desplazamiento. Si el CSS no se lo
+   prohíbe, se queda el gesto, y a partir de ahí los touchmove llegan ya sin
+   poder cancelarse: preventDefault deja de tener efecto y el nodo no se mueve.
+   El emulador del PC no hace esa optimización, y por eso arrastrar funcionaba
+   allí y no en el teléfono. Esto le dice que dentro del lienzo no hay nada que
+   desplazar y que pregunte siempre a la app.
+   Se marca también en los nodos y en las capas intermedias: que el valor del
+   antepasado alcance al descendiente depende de dónde considere el navegador
+   que hay un contenedor desplazable, y aquí no queremos depender de eso. El
+   desplazamiento interno de una nota larga lo hace touch.js a mano. */
+html[data-touch="1"] .canvas-wrap,
+html[data-touch="1"] .canvas-surface,
+html[data-touch="1"] .canvas-content,
+html[data-touch="1"] .canvas-content .item {
+  touch-action: none;
+}
+
 /* ── Manipular nodos con el dedo ──────────────────────────────────────
    Esto cuelga de data-touch (hay pantalla táctil), no de data-mobile: una
    tableta o un portátil táctil grandes conservan la disposición de escritorio
