@@ -1124,7 +1124,13 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
         currActive.tagName === 'TEXTAREA' || 
         currActive.isContentEditable
       );
-      if (!currEditing) {
+      // Con el dedo NO. Este div invisible existe solo para que Ctrl+V pegue
+      // una imagen en el nodo seleccionado; en un teléfono no hay Ctrl+V, y
+      // en cambio enfocar un contentEditable ABRE EL TECLADO. Como esto se
+      // ejecuta tras CADA cambio de selección, el teclado saltaba al tocar un
+      // nodo, al pulsar un botón de la barra o al borrar, y de paso el cambio
+      // de foco y el teclado moviendo la pantalla se comían el arrastre.
+      if (!currEditing && !window.odiLastInputWasTouch) {
         pasteIntRef.current?.focus();
       }
     }, 50);

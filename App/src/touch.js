@@ -121,6 +121,63 @@
   }, true);
 
   // ─────────────────────────────────────────────────────────────
+  // Diagnóstico remoto (SOLO en el servidor de pruebas de la red local)
+  //
+  // Un móvil no tiene devtools a mano, así que un fallo que solo pasa ahí es
+  // imposible de describir más allá de "no funciona". Cuando la página se
+  // sirve desde dev-server.js, le va mandando lo que ocurre —errores de JS y
+  // el resumen de cada gesto— y aparece en la consola del PC. Servido desde
+  // GitHub Pages este bloque no se activa: no manda nada a ninguna parte.
+  // ─────────────────────────────────────────────────────────────
+  const isLocalDev = (function () {
+    const h = location.hostname;
+    return h === 'localhost' || h === '127.0.0.1' ||
+      /^192\.168\./.test(h) || /^10\./.test(h) ||
+      /^172\.(1[6-9]|2\d|3[01])\./.test(h);
+  })();
+
+  const logQueue = [];
+  let logTimer = null;
+
+  function sendLogs() {
+    logTimer = null;
+    if (!logQueue.length) return;
+    const batch = logQueue.splice(0, logQueue.length);
+    try {
+      fetch('/__log', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(batch),
+        keepalive: true,
+      }).catch(function () {});
+    } catch (e) {}
+  }
+
+  function remoteLog(kind, text) {
+    if (!isLocalDev) return;
+    logQueue.push({ kind: kind, text: String(text).slice(0, 500) });
+    if (!logTimer) logTimer = setTimeout(sendLogs, 400);
+  }
+  window.odiRemoteLog = remoteLog;
+
+  if (isLocalDev) {
+    window.addEventListener('error', (e) => {
+      remoteLog('ERROR', (e.message || 'error') + ' @ ' + (e.filename || '?') + ':' + (e.lineno || '?'));
+    });
+    window.addEventListener('unhandledrejection', (e) => {
+      remoteLog('PROMESA', (e.reason && (e.reason.message || e.reason)) || 'rechazo sin motivo');
+    });
+    const origError = console.error;
+    console.error = function () {
+      try { remoteLog('console.error', Array.prototype.join.call(arguments, ' ')); } catch (err) {}
+      return origError.apply(console, arguments);
+    };
+    remoteLog('INICIO', 'build ' + (window.ODINOTE_BUILD || '?') +
+      ' · ' + window.innerWidth + 'x' + window.innerHeight +
+      ' · táctil=' + isCoarse() + ' · maxTouchPoints=' + (navigator.maxTouchPoints || 0));
+  }
+
+  // ─────────────────────────────────────────────────────────────
   // Aviso de página ampliada
   //
   // Si el navegador ya arrastra un zoom guardado del sitio (Brave y Chrome lo
@@ -485,6 +542,7 @@
         : moved ? (deferred ? 'se apartó (era scroll)' : 'ARRASTRE')
         : 'toque';
       publishDiag();
+      remoteLog('gesto', window.odiTouchDiag + ' | foco=' + shortName(document.activeElement));
     }
 
     // Fue un desplazamiento del contenido de un nodo: el mouseup ya se emitió

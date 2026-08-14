@@ -55,6 +55,30 @@ function deviceOf(userAgent) {
 }
 
 const server = http.createServer((req, res) => {
+  // Buzón de diagnóstico: la página manda aquí lo que pasa en el móvil (gestos,
+  // errores de JS) y sale por esta consola. Un teléfono no tiene devtools a
+  // mano, así que sin esto la única información posible es "no funciona".
+  // Solo existe en este servidor de pruebas; en GitHub Pages no hay nada de esto.
+  if (req.method === 'POST' && req.url === '/__log') {
+    let body = '';
+    req.on('data', c => { body += c; if (body.length > 64 * 1024) req.destroy(); });
+    req.on('end', () => {
+      const when = new Date().toTimeString().slice(0, 8);
+      const tag = deviceOf(req.headers['user-agent']);
+      try {
+        const entries = JSON.parse(body);
+        (Array.isArray(entries) ? entries : [entries]).forEach(m => {
+          console.log(`${when} [${tag}] ${m.kind}: ${m.text}`);
+        });
+      } catch (e) {
+        console.log(`${when} [${tag}] log ilegible: ${body.slice(0, 200)}`);
+      }
+      res.writeHead(204, { 'Access-Control-Allow-Origin': '*' });
+      res.end();
+    });
+    return;
+  }
+
   let rel = decodeURIComponent(req.url.split('?')[0]);
   if (rel === '/') rel = '/index.html';
 
