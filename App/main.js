@@ -334,15 +334,81 @@ ipcMain.handle('select-folder', async () => {
   return selectedPath;
 });
 
+// ─────────────────────────────────────────────────────────────
+// Bóveda local: un archivo por proyecto
+//
+// Antes TODO vivía en un único odinote.json. Con un solo archivo, un corte de
+// luz a media escritura o una línea corrupta se llevaba por delante todos los
+// proyectos a la vez, y no había forma de respaldar o restaurar uno suelto.
+// Ahora cada proyecto se guarda además en projects/<id>/project.json.
+//
+// odinote.json se SIGUE escribiendo igual que siempre, a propósito: es la red
+// de seguridad. Si el reparto por proyecto quedara incompleto por lo que sea,
+// la lectura lo detecta y vuelve a él sin perder nada.
+// ─────────────────────────────────────────────────────────────
+
+// Canvases que pertenecen a un proyecto: su raíz más los tableros anidados,
+// que se alcanzan siguiendo el canvasId de cada nodo "board".
+function canvasesOfProject(allCanvases, rootId) {
+  const out = {};
+  const visit = (id) => {
+    const c = allCanvases[id];
+    if (!c || out[id]) return;
+    out[id] = c;
+    (c.items || []).forEach(it => { if (it.canvasId) visit(it.canvasId); });
+  };
+  visit(rootId);
+  return out;
+}
+
+function readSplitVault(folderPath) {
+  const projectsDir = path.join(folderPath, 'projects');
+  if (!fs.existsSync(projectsDir)) return null;
+
+  const projects = [];
+  const canvases = {};
+  let meta = {};
+  for (const entry of fs.readdirSync(projectsDir)) {
+    const file = path.join(projectsDir, entry, 'project.json');
+    if (!fs.existsSync(file)) continue;
+    try {
+      const parsed = JSON.parse(fs.readFileSync(file, 'utf-8'));
+      if (parsed.project) projects.push(parsed.project);
+      Object.assign(canvases, parsed.canvases || {});
+      if (parsed.meta) meta = parsed.meta;
+    } catch (err) {
+      // Un proyecto ilegible ya no se lleva a los demás por delante: se anota
+      // y se sigue con el resto.
+      logToFile(`read-vault: ${entry}/project.json ilegible (${err.message}), se omite`);
+    }
+  }
+  if (!projects.length) return null;
+  return { ...meta, projects, canvases };
+}
+
 ipcMain.handle('read-vault', async (event, folderPath) => {
   logToFile(`IPC Call: read-vault at ${folderPath}`);
   activeVaultPath = folderPath;
   const filePath = path.join(folderPath, 'odinote.json');
   try {
-    if (fs.existsSync(filePath)) {
-      const content = fs.readFileSync(filePath, 'utf-8');
+    const split = readSplitVault(folderPath);
+    const legacy = fs.existsSync(filePath) ? JSON.parse(fs.readFileSync(filePath, 'utf-8')) : null;
+
+    // Se usa el reparto por proyecto salvo que el archivo antiguo tenga MÁS
+    // proyectos: eso significaría que el reparto se quedó a medias, y perder
+    // proyectos en silencio es lo único inaceptable aquí.
+    if (split) {
+      const legacyCount = (legacy && legacy.projects && legacy.projects.length) || 0;
+      if (split.projects.length >= legacyCount) {
+        logToFile(`IPC read-vault: leídos ${split.projects.length} proyectos de projects/`);
+        return split;
+      }
+      logToFile(`IPC read-vault: projects/ tiene ${split.projects.length} y odinote.json ${legacyCount}; se usa odinote.json`);
+    }
+
+    if (legacy) {
       logToFile(`IPC read-vault: Found odinote.json. Read successfully.`);
-      return JSON.parse(content);
+      return legacy;
     }
     logToFile(`IPC read-vault: odinote.json not found.`);
     return null;
@@ -357,7 +423,48 @@ ipcMain.handle('write-vault', async (event, { folderPath, data }) => {
   activeVaultPath = folderPath;
   const filePath = path.join(folderPath, 'odinote.json');
   try {
+    // 1. El archivo completo de siempre. Se escribe PRIMERO y pase lo que pase:
+    // es el respaldo del que tira la lectura si el reparto sale mal.
     fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf-8');
+
+    // 2. Y además, un archivo por proyecto.
+    try {
+      const { projects = [], canvases = {}, ...meta } = data || {};
+      const projectsDir = path.join(folderPath, 'projects');
+      fs.mkdirSync(projectsDir, { recursive: true });
+
+      const alive = new Set();
+      for (const project of projects) {
+        if (!project || !project.id) continue;
+        const safeId = String(project.id).replace(/[^a-zA-Z0-9._-]/g, '_');
+        alive.add(safeId);
+        const dir = path.join(projectsDir, safeId);
+        fs.mkdirSync(dir, { recursive: true });
+        const payload = { meta, project, canvases: canvasesOfProject(canvases, project.id) };
+        // Escritura atómica: a un archivo temporal y luego renombrar. Si se corta
+        // la corriente a media escritura, el project.json anterior sigue entero
+        // en vez de quedarse truncado.
+        const tmp = path.join(dir, 'project.json.tmp');
+        fs.writeFileSync(tmp, JSON.stringify(payload, null, 2), 'utf-8');
+        fs.renameSync(tmp, path.join(dir, 'project.json'));
+      }
+
+      // Carpetas de proyectos que ya no existen: se retiran para que la bóveda
+      // no acumule restos. Solo se toca lo que tenga un project.json nuestro.
+      for (const entry of fs.readdirSync(projectsDir)) {
+        if (alive.has(entry)) continue;
+        const stale = path.join(projectsDir, entry);
+        if (fs.existsSync(path.join(stale, 'project.json'))) {
+          fs.rmSync(stale, { recursive: true, force: true });
+          logToFile(`write-vault: retirada la carpeta del proyecto eliminado ${entry}`);
+        }
+      }
+    } catch (splitErr) {
+      // El reparto es una mejora, no un requisito: si falla, odinote.json ya
+      // está escrito y la app sigue funcionando exactamente como antes.
+      logToFile(`write-vault: el reparto por proyecto falló (${splitErr.message}); odinote.json sí se guardó`);
+    }
+
     logToFile(`IPC write-vault: Saved successfully.`);
     return true;
   } catch (err) {

@@ -6,6 +6,7 @@
   "scripts": {
     "start": "electron main.js",
     "dev:web": "node dev-server.js",
+    "test:drive": "node scripts/test-drive.js",
     "build:exe": "electron-packager . Odinote --platform=win32 --arch=x64 --out=dist --overwrite --icon=Icon/Icon.ico && node scripts/build-zip.js",
     "build:exe-only": "electron-packager . Odinote --platform=win32 --arch=x64 --out=dist --overwrite --icon=Icon/Icon.ico",
     "build:installer": "electron-builder --win --x64"
