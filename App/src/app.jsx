@@ -47,7 +47,7 @@ try {
 
 // Marcador de build: si la consola no muestra esta versión, el navegador está
 // sirviendo JS cacheado (subir ?v= en index.html invalida la caché)
-window.ODINOTE_BUILD = 'v49';
+window.ODINOTE_BUILD = 'v50';
 console.log('[ODINOTE] Código cargado: ' + window.ODINOTE_BUILD);
 
 // Global shortcuts configuration
@@ -332,12 +332,17 @@ function App() {
     }
   };
 
-  // Nada puede estar "online" si Drive no funciona o no hay sesión
-  const forceAllProjectsOffline = () => {
-    setProjects(prev => prev.some(p => p.isPublic || p.isRemote)
-      ? prev.map(p => (p.isPublic || p.isRemote) ? { ...p, isPublic: false, isRemote: false } : p)
-      : prev);
-  };
+  // "Este proyecto está publicado en Drive" y "puedo hablar con Drive ahora
+  // mismo" son dos cosas distintas, y antes se guardaban en la misma variable:
+  // cuando el token caducaba (le pasa a la hora) se ponía isPublic:false a todo,
+  // y eso se guardaba en disco. Al renovar la sesión no se recuperaba, porque la
+  // importación se salta los proyectos sin cambios remotos — así que un proyecto
+  // publicado hace semanas se quedaba marcado "Offline" para siempre aunque
+  // siguiera perfectamente sincronizado en Drive.
+  //
+  // Ahora isPublic solo lo cambia el usuario al publicar o retirar un proyecto,
+  // y que Drive esté alcanzable es este estado aparte, que no se persiste.
+  const [driveReachable, setDriveReachable] = useStateApp(true);
 
   // Flujo de autenticación con Google, compartido entre el primer login y la
   // renovación del token de Drive (que caduca ~1 hora). En la renovación no se
@@ -406,6 +411,7 @@ function App() {
       if (cancelled) return;
       if (check.ok) {
         window._odiDriveBlocked = false;
+        setDriveReachable(true);
         syncProjectsFromGoogleDrive(userProfile.accessToken);
         return;
       }
@@ -415,7 +421,9 @@ function App() {
         window._odiDriveBlocked = true;
         notifyDriveBlocked(check);
       }
-      forceAllProjectsOffline();
+      // Drive no responde: se marca la CONEXIÓN como caída, no los proyectos.
+      // Siguen publicados; simplemente ahora mismo no se puede sincronizar.
+      setDriveReachable(false);
     })();
     return () => { cancelled = true; };
   }, [userProfile && userProfile.accessToken]);
@@ -437,8 +445,10 @@ function App() {
   // Sin sesión iniciada no puede haber nada online: todos los puestos de trabajo
   // pasan a offline y se quedan así hasta que el usuario los vuelva a publicar
   useEffectApp(() => {
-    if (loading || userProfile) return;
-    forceAllProjectsOffline();
+    if (loading) return;
+    // Sin sesión no se puede sincronizar, pero los proyectos publicados siguen
+    // publicados: al volver a entrar deben reaparecer como tales.
+    if (!userProfile) setDriveReachable(false);
   }, [userProfile, loading]);
 
   const [sharingModalOpen, setSharingModalOpen] = useStateApp(false);
@@ -1950,6 +1960,7 @@ function App() {
       onManualSync={manualDriveRefresh}
       isSyncingDrive={isSyncingDrive}
       needsDriveAuth={!!(userProfile && !userProfile.accessToken)}
+      driveReachable={driveReachable}
     />;
   } else {
     activeView = <window.Canvas
@@ -1974,6 +1985,7 @@ function App() {
       onSharingClick={(pid) => { setActiveSharingProjectId(pid); setInviteEmail(''); setSharingModalOpen(true); }}
       onManualSync={manualDriveRefresh}
       needsDriveAuth={!!(userProfile && !userProfile.accessToken)}
+      driveReachable={driveReachable}
     />;
   }
 
