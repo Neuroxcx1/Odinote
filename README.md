@@ -84,6 +84,33 @@ Build a Windows executable with `npm run build:exe`, or an installer with `npm r
 
 Electron + React, with JSX transpiled in the browser — no bundler, no build step for the web version. Google Drive integration uses Google's official APIs directly from your device; sign-in uses Firebase Authentication for accounts only. Your note content never touches a server we control.
 
+### Building from source
+
+The app builds and runs with no setup. Google Drive sync is the one exception:
+it needs OAuth credentials, and those are not in this repository. Everything
+else — the canvas, nested boards, search, links, the local vault — works
+without them.
+
+To enable Drive in your own build:
+
+1. Go to [Google Cloud Console](https://console.cloud.google.com) and pick or
+   create a project.
+2. **APIs & Services → Credentials → Create credentials → OAuth client ID**.
+3. Application type: **Desktop app**.
+4. Copy `App/google-oauth.example.json` to `App/google-oauth.json` and paste in
+   the two values it gives you.
+
+That file is gitignored but is packaged into the executable, which is what makes
+Drive work in a release build.
+
+Google requires the client secret for desktop clients even when using PKCE.
+It is not truly confidential — it ships inside any downloadable app and can be
+read straight out of the binary, which Google acknowledges for installed apps.
+PKCE is what actually protects the flow: every attempt is signed with a one-shot
+value only the running process knows, so an intercepted code is useless to
+anyone else. Keeping the file out of the repository is about not publishing it
+and being able to rotate it later, not about hiding it from users.
+
 ## Contributing
 
 Issues and pull requests are genuinely welcome — bug reports especially.

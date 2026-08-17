@@ -1,0 +1,25 @@
+{
+  "_leeme": [
+    "Copia este archivo como google-oauth.json (sin .example) y pon dentro tus",
+    "credenciales. Ese archivo NO va al repositorio, pero sí entra en el",
+    "ejecutable al empaquetar, que es lo que hace que funcione Google Drive.",
+    "",
+    "Para conseguirlas, en https://console.cloud.google.com :",
+    "  1. Elige tu proyecto (o crea uno).",
+    "  2. APIs y servicios -> Credenciales.",
+    "  3. Crear credenciales -> ID de cliente de OAuth.",
+    "  4. Tipo de aplicacion: Aplicacion de escritorio.",
+    "  5. Copia aqui los dos valores que te da.",
+    "",
+    "Google pide el secreto tambien en los clientes de escritorio, aunque se use",
+    "PKCE. No es confidencial de verdad —viaja dentro del ejecutable— y Google lo",
+    "asume; lo que protege el flujo es PKCE. Aun asi se mantiene fuera del",
+    "repositorio, para no publicarlo y para poder cambiarlo sin tocar el",
+    "historial.",
+    "",
+    "Sin este archivo el programa funciona entero salvo la conexion con Drive.",
+    "Los proyectos siguen guardandose en el equipo como siempre."
+  ],
+  "client_id": "PON-AQUI-TU-ID.apps.googleusercontent.com",
+  "client_secret": "PON-AQUI-TU-SECRETO"
+}

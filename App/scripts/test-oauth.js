@@ -44,11 +44,37 @@ check('se manda el verificador al canjear el código',
 check('se pide el permiso de Drive',
   /auth\/drive\.file/.test(main));
 
-// ── Nada de secretos en el código ──
-check('NO hay ningún secreto de cliente en main.js',
-  !/GOCSPX-/.test(main) && !/client_secret/.test(main));
-check('el ID de cliente sí está (es público y va en el ejecutable)',
-  /apps\.googleusercontent\.com/.test(main));
+// ── Las credenciales ──
+// Google EXIGE el secreto también en los clientes de escritorio, aunque se use
+// PKCE: sin él el canje falla con "client_secret is missing". Así que tiene que
+// mandarse, pero NO puede estar escrito en el código: la protección de GitHub
+// bloquea la subida en cuanto lo reconoce. Vive en google-oauth.json, que está
+// fuera del repositorio y sí entra en el ejecutable al empaquetar.
+const APP_DIR = path.join(__dirname, '..');
+const fuentes = ['main.js', 'preload.js', 'src/app.jsx', 'google-oauth.example.json']
+  .map(f => ({ f, txt: fs.readFileSync(path.join(APP_DIR, f), 'utf-8') }));
+
+fuentes.forEach(({ f, txt }) => {
+  check(`no hay credenciales escritas en ${f}`,
+    !/GOCSPX-[A-Za-z0-9_-]{10,}/.test(txt) &&
+    !/\d{10,}-[a-z0-9]{20,}\.apps\.googleusercontent\.com/.test(txt));
+});
+
+check('las credenciales se leen de google-oauth.json',
+  /google-oauth\.json/.test(main) && /function leeCredenciales/.test(main));
+check('el secreto se manda al canjear el código (sin él Google rechaza)',
+  /client_secret: GOOGLE_CLIENT_SECRET,[\s\S]{0,120}grant_type: 'authorization_code'/.test(main));
+check('…y también al renovar con el token de refresco',
+  /client_secret: GOOGLE_CLIENT_SECRET,[\s\S]{0,120}grant_type: 'refresh_token'/.test(main));
+check('sin credenciales se avisa con todas las letras, no se falla en silencio',
+  /sin-credenciales/.test(main));
+check('hay un ejemplo con instrucciones para quien compile',
+  fs.existsSync(path.join(APP_DIR, 'google-oauth.example.json')));
+
+// Y que el archivo de verdad no pueda subirse ni por descuido
+const gitignore = fs.readFileSync(path.join(APP_DIR, '..', '.gitignore'), 'utf-8');
+check('google-oauth.json está en .gitignore',
+  /App\/google-oauth\.json/.test(gitignore));
 
 // ── El token de refresco se guarda cifrado, o no se guarda ──
 check('el token de refresco se cifra con safeStorage',

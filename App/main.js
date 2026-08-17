@@ -709,12 +709,41 @@ let authNonce = null;
 // de Electron (que en Windows usa DPAPI, atado a su cuenta del sistema). No hay
 // servidor, no hay base de datos, y no pasa por ningún sitio nuestro.
 //
-// Se usa PKCE en vez de un secreto de cliente. En una aplicación de escritorio
-// el "secreto" viajaría dentro del ejecutable, así que de secreto no tiene
-// nada; Google lo sabe y por eso admite este método, en el que cada intento se
-// protege con un valor de un solo uso inventado en el momento.
+// Sobre las credenciales, porque hay un matiz que confunde:
+//
+// Google EXIGE el "secreto de cliente" también en los clientes de escritorio,
+// aunque se use PKCE. Lo dice su documentación del flujo para aplicaciones
+// instaladas, y sin él el canje falla con "client_secret is missing".
+//
+// Ahora bien, de secreto tiene poco: en un programa que se descarga ese valor
+// viaja dentro del ejecutable y cualquiera puede sacarlo con un editor de
+// texto. Google lo asume. Lo que protege el flujo NO es ese valor, sino PKCE:
+// cada intento se firma con un número inventado en el momento que solo conoce
+// este proceso, así que un código robado por el camino no le sirve a nadie.
+//
+// Aun así no se escriben aquí, sino en google-oauth.json, que NO va al
+// repositorio. Dos razones: la protección de GitHub bloquea la subida en
+// cuanto reconoce el patrón, y si algún día hay que cambiar las credenciales
+// se cambian sin reescribir el historial. El archivo sí entra en el ejecutable
+// al empaquetar, así que quien descarga el programa no nota nada.
+//
+// Quien clone el repositorio para compilarlo tendrá que crear las suyas: está
+// explicado en google-oauth.example.json y en el README.
 // =====================================================
-const GOOGLE_CLIENT_ID = '160850813780-jcg45agcss4oqmgqm5freselp2dedjvo.apps.googleusercontent.com';
+function leeCredenciales() {
+  try {
+    const cfg = JSON.parse(fs.readFileSync(path.join(__dirname, 'google-oauth.json'), 'utf-8'));
+    if (cfg && cfg.client_id && cfg.client_secret) return cfg;
+    logToFile('google-oauth.json existe pero le faltan client_id o client_secret.');
+  } catch (e) {
+    logToFile('Sin google-oauth.json: la conexión con Google Drive queda desactivada.');
+  }
+  return null;
+}
+
+const CREDENCIALES = leeCredenciales();
+const GOOGLE_CLIENT_ID = CREDENCIALES ? CREDENCIALES.client_id : null;
+const GOOGLE_CLIENT_SECRET = CREDENCIALES ? CREDENCIALES.client_secret : null;
 const GOOGLE_SCOPES = [
   'https://www.googleapis.com/auth/drive.file',
   'https://www.googleapis.com/auth/userinfo.email',
@@ -946,6 +975,7 @@ function startAuthServer() {
 
       pideTokens({
         client_id: GOOGLE_CLIENT_ID,
+        client_secret: GOOGLE_CLIENT_SECRET,
         code,
         code_verifier: verificador,
         grant_type: 'authorization_code',
@@ -1017,11 +1047,23 @@ ipcMain.handle('set-window-theme', async (event, theme) => {
 
 ipcMain.handle('start-google-login', async () => {
   logToFile('IPC Call: start-google-login');
+  // Sin credenciales no se abre nada: más vale decirlo con todas las letras que
+  // mandar al usuario a una página de Google que va a fallar sin explicación.
+  if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET) {
+    return {
+      ok: false,
+      error: 'sin-credenciales',
+      mensaje: 'Esta compilación no trae credenciales de Google (falta App/google-oauth.json), ' +
+        'así que no puede conectarse a Drive. Si has compilado tú el programa, crea ese archivo ' +
+        'siguiendo google-oauth.example.json.',
+    };
+  }
   authNonce = require('crypto').randomBytes(24).toString('hex');
   startAuthServer();
   // Se va directo a Google en vez de pasar por la página de Firebase: ese
   // rodeo era justo lo que impedía obtener el token de refresco.
   shell.openExternal(urlDeAutorizacion());
+  return { ok: true };
 });
 
 // Renovar el permiso de Drive sin molestar al usuario. La aplicación llama aquí
@@ -1032,6 +1074,7 @@ ipcMain.handle('google-refresh-access', async () => {
   try {
     const tok = await pideTokens({
       client_id: GOOGLE_CLIENT_ID,
+      client_secret: GOOGLE_CLIENT_SECRET,
       refresh_token: refresco,
       grant_type: 'refresh_token',
     });

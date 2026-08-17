@@ -31,3 +31,9 @@ Thumbs.db
 
 # Exclude local marketing webpage from main Git repo
 Website/
+
+# Credenciales de Google para la conexión con Drive.
+# Sí entran en el ejecutable al empaquetar, pero nunca en el repositorio:
+# la protección de GitHub bloquea la subida, y así se pueden cambiar sin
+# reescribir el historial. Copia google-oauth.example.json para crearlo.
+App/google-oauth.json
