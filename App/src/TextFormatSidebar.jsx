@@ -282,6 +282,7 @@ function TextFormatSidebar({ item, lang, onUpdate, onClose, variant, noCodeQuote
           </button>
           )}
 
+
           {!noCodeQuote && (
           <button className="ctx-btn" onClick={()=>{
             const ed = findEditor();
@@ -332,6 +333,29 @@ function TextFormatSidebar({ item, lang, onUpdate, onClose, variant, noCodeQuote
           )}
         </>
       )}
+
+      {/* Enlazar con otro nodo. FUERA del bloque de arriba a propósito: ese
+          está cerrado para títulos y leyendas porque usan execCommand, que en
+          esos tipos formatearía otro nodo. Enlazar no usa execCommand —solo
+          envuelve la selección—, así que puede estar en todos los textos. */}
+      <div className="ctx-sep-h"/>
+      <button
+        className="ctx-btn"
+        onClick={()=>{
+          const sel = window.getSelection();
+          if (!sel || sel.isCollapsed || !sel.rangeCount) {
+            window.showToast && window.showToast(
+              window.t('Selecciona antes el texto que quieres enlazar.', 'Select the text you want to link first.')
+            );
+            return;
+          }
+          window.odiStartLinkFromSelection && window.odiStartLinkFromSelection(sel.getRangeAt(0).cloneRange());
+        }}
+        title={lang==='es'?'Enlazar la selección con otro nodo':'Link selection to another node'}
+      >
+        <span className="material-symbols-rounded">add_link</span>
+        <span>{lang==='es'?'Enlazar':'Link'}</span>
+      </button>
     </div>
 
     {colorOpen && (

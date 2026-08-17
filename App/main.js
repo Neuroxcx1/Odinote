@@ -693,6 +693,157 @@ let authPort = 61234;
 // que puede entregarnos una sesión es la pestaña que abrimos nosotros.
 let authNonce = null;
 
+// =====================================================
+// ACCESO A GOOGLE DRIVE QUE NO CADUCA CADA HORA
+//
+// Hasta ahora la sesión se abría con Firebase, que devuelve un permiso de Drive
+// de una hora y NADA con lo que renovarlo: Firebase renueva su propia sesión,
+// no el permiso de Google. Por eso al cabo de una hora la aplicación tenía que
+// volver a pedir que te conectaras, una y otra vez.
+//
+// Aquí se habla directamente con Google, pidiendo `access_type=offline`. Google
+// devuelve entonces un TOKEN DE REFRESCO: un papel con el que se puede pedir un
+// permiso nuevo cuando el de una hora caduca, sin molestar a nadie.
+//
+// Ese papel se guarda SOLO en el equipo del usuario, cifrado con `safeStorage`
+// de Electron (que en Windows usa DPAPI, atado a su cuenta del sistema). No hay
+// servidor, no hay base de datos, y no pasa por ningún sitio nuestro.
+//
+// Se usa PKCE en vez de un secreto de cliente. En una aplicación de escritorio
+// el "secreto" viajaría dentro del ejecutable, así que de secreto no tiene
+// nada; Google lo sabe y por eso admite este método, en el que cada intento se
+// protege con un valor de un solo uso inventado en el momento.
+// =====================================================
+const GOOGLE_CLIENT_ID = '160850813780-jcg45agcss4oqmgqm5freselp2dedjvo.apps.googleusercontent.com';
+const GOOGLE_SCOPES = [
+  'https://www.googleapis.com/auth/drive.file',
+  'https://www.googleapis.com/auth/userinfo.email',
+  'https://www.googleapis.com/auth/userinfo.profile',
+].join(' ');
+
+let pkceVerifier = null;   // el valor de un solo uso del intento en curso
+let pkceState = null;      // para reconocer que la respuesta es de nuestro intento
+
+function base64url(buf) {
+  return buf.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+function nuevoPkce() {
+  const crypto = require('crypto');
+  pkceVerifier = base64url(crypto.randomBytes(48));
+  pkceState = base64url(crypto.randomBytes(18));
+  const challenge = base64url(crypto.createHash('sha256').update(pkceVerifier).digest());
+  return { challenge, state: pkceState };
+}
+
+function urlDeAutorizacion() {
+  const { challenge, state } = nuevoPkce();
+  const params = new URLSearchParams({
+    client_id: GOOGLE_CLIENT_ID,
+    redirect_uri: `http://127.0.0.1:${authPort}/oauth`,
+    response_type: 'code',
+    scope: GOOGLE_SCOPES,
+    code_challenge: challenge,
+    code_challenge_method: 'S256',
+    state,
+    // Sin esto Google no da token de refresco, que es justo lo que buscamos.
+    access_type: 'offline',
+    // Y sin esto solo lo da la PRIMERA vez que el usuario acepta: si ya había
+    // aceptado antes, las siguientes veces volvería sin él y estaríamos igual.
+    prompt: 'consent',
+  });
+  return 'https://accounts.google.com/o/oauth2/v2/auth?' + params.toString();
+}
+
+// Habla con Google para cambiar un papel por otro. Vale tanto para el primer
+// canje (código → tokens) como para las renovaciones (refresco → permiso nuevo).
+function pideTokens(cuerpo) {
+  return new Promise((resolve, reject) => {
+    const https = require('https');
+    const datos = new URLSearchParams(cuerpo).toString();
+    const req = https.request({
+      hostname: 'oauth2.googleapis.com',
+      path: '/token',
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Content-Length': Buffer.byteLength(datos),
+      },
+    }, (res) => {
+      let out = '';
+      res.on('data', c => { out += c; });
+      res.on('end', () => {
+        try {
+          const json = JSON.parse(out);
+          if (res.statusCode >= 400) return reject(new Error(json.error_description || json.error || `HTTP ${res.statusCode}`));
+          resolve(json);
+        } catch (e) { reject(new Error('Respuesta ilegible de Google')); }
+      });
+    });
+    req.on('error', reject);
+    req.write(datos);
+    req.end();
+  });
+}
+
+// ── Guardar el token de refresco en este equipo, cifrado ──
+function rutaRefresco() {
+  return path.join(app.getPath('userData'), 'google-refresh.bin');
+}
+
+function guardaRefresco(token) {
+  try {
+    const { safeStorage } = require('electron');
+    if (!token) return false;
+    if (safeStorage.isEncryptionAvailable()) {
+      fs.writeFileSync(rutaRefresco(), safeStorage.encryptString(token));
+      logToFile('Token de refresco guardado (cifrado).');
+      return true;
+    }
+    // Sin cifrado disponible NO se guarda en claro: preferimos que vuelva a
+    // pedir la sesión antes que dejar la llave escrita en un archivo legible.
+    logToFile('safeStorage no disponible: no se guarda el token de refresco.');
+    return false;
+  } catch (e) {
+    logToFile(`Error guardando el token de refresco: ${e.message}`);
+    return false;
+  }
+}
+
+function leeRefresco() {
+  try {
+    const { safeStorage } = require('electron');
+    const ruta = rutaRefresco();
+    if (!fs.existsSync(ruta) || !safeStorage.isEncryptionAvailable()) return null;
+    return safeStorage.decryptString(fs.readFileSync(ruta)) || null;
+  } catch (e) {
+    logToFile(`Error leyendo el token de refresco: ${e.message}`);
+    return null;
+  }
+}
+
+function borraRefresco() {
+  try { fs.unlinkSync(rutaRefresco()); } catch (e) {}
+}
+
+// Datos de la persona, para enseñar su nombre y su foto en la aplicación.
+function pidePerfil(accessToken) {
+  return new Promise((resolve) => {
+    const https = require('https');
+    https.get({
+      hostname: 'www.googleapis.com',
+      path: '/oauth2/v3/userinfo',
+      headers: { Authorization: 'Bearer ' + accessToken },
+    }, (res) => {
+      let out = '';
+      res.on('data', c => { out += c; });
+      res.on('end', () => {
+        try { resolve(JSON.parse(out)); } catch (e) { resolve({}); }
+      });
+    }).on('error', () => resolve({}));
+  });
+}
+
 function startAuthServer() {
   if (authServer) return;
   const http = require('http');
@@ -757,6 +908,70 @@ function startAuthServer() {
           res.end('Bad Request');
         }
       });
+    } else if (req.url.startsWith('/oauth')) {
+      // Google devuelve aquí al usuario tras aceptar. Llega el código de un solo
+      // uso, que se cambia por el permiso y —lo importante— por el token de
+      // refresco. Todo esto ocurre en este equipo; el navegador solo trae el
+      // código y se le enseña una página de "ya puedes cerrar".
+      const url = new URL(req.url, `http://127.0.0.1:${authPort}`);
+      const code = url.searchParams.get('code');
+      const estado = url.searchParams.get('state');
+      const errorGoogle = url.searchParams.get('error');
+
+      const cierra = (titulo, texto, ok) => {
+        res.writeHead(ok ? 200 : 400, { 'Content-Type': 'text/html; charset=utf-8' });
+        res.end(`<!doctype html><meta charset="utf-8"><title>${titulo}</title>` +
+          `<body style="font-family:system-ui;background:#14121F;color:#EDEAF6;display:grid;place-items:center;height:100vh;margin:0">` +
+          `<div style="text-align:center;max-width:420px;padding:24px">` +
+          `<div style="font-size:44px;margin-bottom:10px">${ok ? '✓' : '✕'}</div>` +
+          `<h1 style="font-size:19px;margin:0 0 8px">${titulo}</h1>` +
+          `<p style="opacity:.7;font-size:14px;margin:0">${texto}</p></div></body>`);
+      };
+
+      if (errorGoogle) {
+        logToFile(`OAuth: Google devolvió error "${errorGoogle}"`);
+        cierra('No se pudo conectar', 'Vuelve a Odinote e inténtalo otra vez.', false);
+        if (mainWindow) mainWindow.webContents.send('google-signin-failed', { error: errorGoogle });
+        return;
+      }
+      if (!code || !estado || estado !== pkceState || !pkceVerifier) {
+        // La respuesta no es del intento que abrimos nosotros: se descarta.
+        logToFile('OAuth: respuesta descartada (estado o verificador que no cuadran)');
+        cierra('Petición no válida', 'Vuelve a Odinote y empieza la conexión de nuevo.', false);
+        return;
+      }
+
+      const verificador = pkceVerifier;
+      pkceVerifier = null; pkceState = null;   // un solo uso
+
+      pideTokens({
+        client_id: GOOGLE_CLIENT_ID,
+        code,
+        code_verifier: verificador,
+        grant_type: 'authorization_code',
+        redirect_uri: `http://127.0.0.1:${authPort}/oauth`,
+      }).then(async (tok) => {
+        const guardado = guardaRefresco(tok.refresh_token);
+        const perfil = await pidePerfil(tok.access_token);
+        logToFile(`OAuth: sesión iniciada para ${perfil.email || '?'} (refresco ${guardado ? 'guardado' : 'NO guardado'})`);
+        if (mainWindow) {
+          mainWindow.webContents.send('google-signin-completed', {
+            name: perfil.name || 'Google User',
+            email: perfil.email || '',
+            picture: perfil.picture || '',
+            accessToken: tok.access_token,
+            // Con esto la aplicación sabe si puede renovar sola o si tendrá que
+            // volver a pedir la sesión cuando caduque.
+            puedeRenovar: guardado,
+          });
+        }
+        cierra('Ya está', 'Puedes cerrar esta pestaña y volver a Odinote.', true);
+        setTimeout(() => { if (authServer) { authServer.close(); authServer = null; } }, 1500);
+      }).catch((err) => {
+        logToFile(`OAuth: fallo al canjear el código — ${err.message}`);
+        cierra('No se pudo completar', err.message, false);
+        if (mainWindow) mainWindow.webContents.send('google-signin-failed', { error: err.message });
+      });
     } else if (req.url.startsWith('/local-login.html') || req.url === '/' || req.url.startsWith('/?code=')) {
       const filePath = path.join(__dirname, 'local-login.html');
       fs.readFile(filePath, 'utf-8', (err, content) => {
@@ -804,9 +1019,39 @@ ipcMain.handle('start-google-login', async () => {
   logToFile('IPC Call: start-google-login');
   authNonce = require('crypto').randomBytes(24).toString('hex');
   startAuthServer();
-  const authUrl = `http://localhost:${authPort}/`;
-  shell.openExternal(authUrl);
+  // Se va directo a Google en vez de pasar por la página de Firebase: ese
+  // rodeo era justo lo que impedía obtener el token de refresco.
+  shell.openExternal(urlDeAutorizacion());
 });
+
+// Renovar el permiso de Drive sin molestar al usuario. La aplicación llama aquí
+// cuando Drive contesta 401, y sigue trabajando con el permiso nuevo.
+ipcMain.handle('google-refresh-access', async () => {
+  const refresco = leeRefresco();
+  if (!refresco) return { ok: false, reason: 'sin-refresco' };
+  try {
+    const tok = await pideTokens({
+      client_id: GOOGLE_CLIENT_ID,
+      refresh_token: refresco,
+      grant_type: 'refresh_token',
+    });
+    logToFile('OAuth: permiso de Drive renovado en silencio.');
+    return { ok: true, accessToken: tok.access_token, expiresIn: tok.expires_in || 3600 };
+  } catch (err) {
+    logToFile(`OAuth: no se pudo renovar — ${err.message}`);
+    // Si Google dice que el papel ya no vale (revocado, contraseña cambiada, o
+    // caducado por tener la app en modo de prueba), se tira y se pedirá sesión.
+    if (/invalid_grant|expired|revoked/i.test(err.message)) borraRefresco();
+    return { ok: false, reason: err.message };
+  }
+});
+
+// ¿Hay guardado un permiso con el que renovar? Lo pregunta la aplicación al
+// arrancar, para saber si puede reconectarse sola.
+ipcMain.handle('google-has-refresh', async () => ({ ok: !!leeRefresco() }));
+
+// Cerrar sesión: se borra el papel de este equipo.
+ipcMain.handle('google-sign-out', async () => { borraRefresco(); return { ok: true }; });
 
 // Descarga el instalador (.exe) del último release y lo lanza, para actualizar
 // sin que el usuario tenga que ir a GitHub. Devuelve { ok } o { ok:false, error }.

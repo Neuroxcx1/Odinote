@@ -370,7 +370,7 @@ function duplicateCanvasState(state, origId, newId) {
 // Zoom con el que se abre un lienzo que aún no tiene cámara guardada.
 const defaultScale = () => (window.odiIsMobile && window.odiIsMobile()) ? 0.7 : 1;
 
-function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn, setCanvases: setExtCanvases, updateAvailable, onUpdateClick, volume, onChangeVolume, onSettingsClick, vaultPath, userProfile, onUserClick, projects, setProjects, onSharingClick, onManualSync, isSyncingDrive, needsDriveAuth, driveReachable }) {
+function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn, setCanvases: setExtCanvases, updateAvailable, onUpdateClick, volume, onChangeVolume, onSettingsClick, vaultPath, userProfile, onUserClick, projects, setProjects, onSharingClick, onManualSync, isSyncingDrive, needsDriveAuth, driveReachable, jumpTarget, onSearchClick, onGoToNode, onGraphClick }) {
   const currentProject = projects ? projects.find(p => p.id === projectId) : null;
   const [canvases, _setCanvases] = useStateCanvas(() => canvasesIn || JSON.parse(JSON.stringify(window.INITIAL_CANVASES)));
   // Stable ref to App's setter — avoids the infinite loop caused by it being a dep on every render
@@ -746,6 +746,70 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
     };
   }, []);
 
+  // Quién enlaza al nodo seleccionado. Se recalcula solo al cambiar la
+  // selección o el contenido, no en cada render: recorre todos los proyectos.
+  const backlinksForSelected = useMemoCanvas(() => {
+    if (!selected || !window.OdiLinks) return [];
+    try {
+      return window.OdiLinks.backlinksFor({
+        projects: projects || [], canvases, targetItemId: selected, lang,
+      });
+    } catch (e) { return []; }
+  }, [selected, canvases, projects, lang]);
+
+  // ───── Salto desde el buscador global ─────
+  // Baja por la cadena de tableros hasta el lienzo del resultado, centra el
+  // nodo y lo resalta un momento. Sin esto, encontrar algo enterrado a cuatro
+  // niveles no serviría de nada: sabrías dónde está pero no cómo llegar.
+  const [jumpHighlight, setJumpHighlight] = useStateCanvas(null);
+  useEffectCanvas(() => {
+    if (!jumpTarget || jumpTarget.projectId !== projectId) return;
+    const trail = (jumpTarget.trailIds && jumpTarget.trailIds.length)
+      ? jumpTarget.trailIds
+      : [projectId];
+    // Si el salto salió de un enlace dentro de un documento, hay que cerrarlo:
+    // si no, la vista viaja por detrás y el documento sigue tapándola, así que
+    // parece que no ha pasado nada.
+    setDocOpen(null);
+    setFileOpen(null);
+    setStack(trail);
+
+    // Un respiro para que el lienzo destino ya esté montado y medido antes de
+    // calcular dónde está el nodo.
+    const t = setTimeout(() => {
+      const canvas = canvases[jumpTarget.canvasId];
+      const item = canvas && (canvas.items || []).find(i => i.id === jumpTarget.itemId);
+      const el = surfaceRef.current;
+      if (item && el) {
+        const rect = el.getBoundingClientRect();
+        const def = defaultDims(item.type);
+        const w = item.w !== undefined ? item.w : def.w;
+        const h = item.h !== undefined ? item.h : def.h;
+        const s = scaleRef.current || 1;
+        setPan({
+          x: rect.width / 2 - (item.x + w / 2) * s,
+          y: rect.height / 2 - (item.y + h / 2) * s,
+        });
+        setSelected(item.id);
+      }
+      setJumpHighlight(jumpTarget.itemId);
+
+      // Tras mover la cámara de golpe, el navegador reutiliza la imagen que ya
+      // tenía rasterizada de la capa transformada y se ve borrosa hasta que
+      // algo la obliga a repintar (por eso se arreglaba al mover el lienzo a
+      // mano). Este empujón de una milésima la fuerza a redibujarse nítida.
+      if (el) {
+        el.style.willChange = 'transform';
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => { if (el) el.style.willChange = ''; });
+        });
+      }
+    }, 60);
+
+    const clear = setTimeout(() => setJumpHighlight(null), 3400);
+    return () => { clearTimeout(t); clearTimeout(clear); };
+  }, [jumpTarget && jumpTarget.nonce]);
+
   // ───── Gestos táctiles del lienzo ─────
   // touch.js traduce un dedo a eventos de ratón para todo lo demás (arrastrar
   // nodos, tiradores, conectores…), pero se aparta del lienzo vacío: aquí un
@@ -947,8 +1011,12 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
                e.shiftKey === !!s.shift &&
                e.altKey === !!s.alt;
       };
-      // While the read-only file viewer is open, don't run canvas shortcuts (it has its own Esc)
-      if (fileOpen) return;
+      // Con el visor de archivos o el editor de documentos abiertos, el lienzo
+      // no ejecuta NINGUNO de sus atajos: cada uno tiene los suyos y su propio
+      // Esc. Antes solo se comprobaba el visor, y por eso pulsar Suprimir en el
+      // documento mientras el foco no estaba dentro del texto —por ejemplo tras
+      // usar un botón de la barra— borraba el nodo entero del lienzo.
+      if (fileOpen || docOpen) return;
       const tag = (e.target.tagName || '').toLowerCase();
       const isPasteInt = e.target === pasteIntRef.current;
       const inField = !isPasteInt && (tag === 'input' || tag === 'textarea' || e.target.isContentEditable);
@@ -4109,6 +4177,8 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
             lang={lang}
             isColChild={isColChild}
             callbacks={callbacks}
+            backlinks={backlinksForSelected}
+            onGoToBacklink={(b) => onGoToNode && onGoToNode(b)}
             onStartEdit={() => setEditing(selectedItem.id)}
             onUpdate={(patch) => {
               if (isColChild) {
@@ -4412,7 +4482,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
                 <div
                   key={item.id}
                   data-item-id={item.id}
-                  className={`item ${item.type === 'frame' ? 'item-frame' : ''} ${(selected === item.id || selectedIds.includes(item.id)) ? 'selected' : ''} ${item._dragging ? 'dragging' : ''} ${isEditing ? 'editing' : ''} ${item._new ? 'new-item' : ''} ${isDropTarget ? 'drop-target' : ''} ${linkTargetId === item.id ? 'link-target' : ''}`}
+                  className={`item ${item.type === 'frame' ? 'item-frame' : ''} ${(selected === item.id || selectedIds.includes(item.id)) ? 'selected' : ''} ${item._dragging ? 'dragging' : ''} ${isEditing ? 'editing' : ''} ${item._new ? 'new-item' : ''} ${isDropTarget ? 'drop-target' : ''} ${linkTargetId === item.id ? 'link-target' : ''} ${jumpHighlight === item.id ? 'jump-target' : ''}`}
                   style={{
                     left: item.x, top: item.y,
                     width: item.w !== undefined ? item.w : def.w,
@@ -4590,6 +4660,16 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
         <div className="mini-search" onMouseDown={(e)=>e.stopPropagation()}>
           <span className="material-symbols-rounded" style={{color:'var(--ink-3)', fontSize: 17}}>search</span>
           <input placeholder={window.TRANSLATIONS[lang].search_canvas} value={search} onChange={(e)=>setSearch(e.target.value)}/>
+          {/* Puerta al buscador global. En móvil no hay Ctrl+K, así que este
+              botón es el único acceso; en escritorio recuerda el atajo. */}
+          <button
+            className="mini-search-global"
+            onClick={() => onSearchClick && onSearchClick()}
+            title={window.t('Buscar en todos los proyectos (Ctrl+K)', 'Search every project (Ctrl+K)')}
+          >
+            <span className="material-symbols-rounded" style={{ fontSize: 16 }}>travel_explore</span>
+            <span className="mini-search-kbd">Ctrl K</span>
+          </button>
           {search && (
             <button onClick={()=>setSearch('')}>
               <span className="material-symbols-rounded" style={{fontSize: 15, color:'var(--ink-3)'}}>close</span>
@@ -4648,6 +4728,16 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
             );
           })()}
           <div className="status-pill"><div className="dot-live"/> {window.t('Guardado', 'Saved')}</div>
+          {/* Vista de conexiones, junto al contador de nodos: es información
+              sobre el lienzo, así que vive con el resto de la información. */}
+          <button
+            className="odi-graph-btn"
+            onClick={() => { onGraphClick && onGraphClick(); window.playAudioTone && window.playAudioTone('click'); }}
+            title={window.t('Ver cómo se conectan los nodos', 'See how the nodes connect')}
+          >
+            <span className="material-symbols-rounded">hub</span>
+            <span>{window.t('Conexiones', 'Connections')}</span>
+          </button>
           <div className="status-pill">
             <span className="material-symbols-rounded" style={{fontSize:14}}>category</span>
             {current.items.length} {window.TRANSLATIONS[lang].items_count}

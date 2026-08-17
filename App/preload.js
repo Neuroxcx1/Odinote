@@ -23,6 +23,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   removeWordFromDictionary: (word) => ipcRenderer.invoke('remove-word-from-dictionary', word),
   setWindowTheme: (theme) => ipcRenderer.invoke('set-window-theme', theme),
   startGoogleLogin: () => ipcRenderer.invoke('start-google-login'),
+  // Renovar el acceso a Drive sin molestar al usuario, y saber si se puede.
+  googleRefreshAccess: () => ipcRenderer.invoke('google-refresh-access'),
+  googleHasRefresh: () => ipcRenderer.invoke('google-has-refresh'),
+  googleSignOut: () => ipcRenderer.invoke('google-sign-out'),
   // Descarga el instalador del release y lo ejecuta (auto-actualización).
   // onProgress recibe el porcentaje descargado (0-100).
   downloadAndRunUpdate: (url, fileName, onProgress) => {

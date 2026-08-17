@@ -70,7 +70,7 @@ function resolveStripColor(key) {
 }
 
 function ContextSidebar({
-  item, lang, onUpdate, onDelete, onDuplicate, onOpen,
+  item, lang, onUpdate, onDelete, onDuplicate, onOpen, backlinks, onGoToBacklink,
   onClose, isColChild, onStartEdit, callbacks,
 }) {
   const [pane, setPane] = React.useState(null); // 'color' | 'emoji' | 'comments' | 'rename' | null
@@ -866,11 +866,41 @@ function ContextSidebar({
           <span className="material-symbols-rounded">delete</span>
           <span>{window.t('Eliminar', 'Delete')}</span>
         </button>
+        {/* Quién apunta a este nodo. Es la mitad que le falta a un enlace: sin
+            esto, el origen sabe del destino pero el destino no sabe de nadie, y
+            no puedes ver de qué depende lo que estás a punto de cambiar. */}
+        {backlinks && backlinks.length > 0 && (
+          <button
+            className={`ctx-btn ${pane === 'backlinks' ? 'active' : ''}`}
+            onClick={() => setPane(pane === 'backlinks' ? null : 'backlinks')}
+            title={window.t('Nodos que enlazan aquí', 'Nodes linking here')}
+          >
+            <span className="material-symbols-rounded">hub</span>
+            <span>{backlinks.length} {window.t('refs', 'refs')}</span>
+          </button>
+        )}
           </>
         )}
       </div>
 
       {/* Popout panes */}
+      {pane === 'backlinks' && (
+        <div className="ctx-popout odi-backlinks">
+          <div className="ctx-pop-title">
+            {window.t('Referenciado desde', 'Referenced from')}
+          </div>
+          {backlinks.map(b => (
+            <button
+              key={`${b.canvasId}:${b.itemId}`}
+              className="odi-backlink"
+              onClick={() => { onGoToBacklink && onGoToBacklink(b); setPane(null); }}
+            >
+              <span className="odi-backlink-text">“{b.linkText}”</span>
+              <span className="odi-backlink-path">{b.path.join(' / ')}</span>
+            </button>
+          ))}
+        </div>
+      )}
       {pane === 'color' && (
         <div className="ctx-popout">
           <div className="ctx-pop-section">

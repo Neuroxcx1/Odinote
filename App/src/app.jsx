@@ -47,7 +47,7 @@ try {
 
 // Marcador de build: si la consola no muestra esta versión, el navegador está
 // sirviendo JS cacheado (subir ?v= en index.html invalida la caché)
-window.ODINOTE_BUILD = 'v51';
+window.ODINOTE_BUILD = 'v74';
 console.log('[ODINOTE] Código cargado: ' + window.ODINOTE_BUILD);
 
 // Global shortcuts configuration
@@ -57,6 +57,10 @@ window.shortcuts = {
   duplicate: { key: 'd', ctrl: true, shift: false, alt: false, label: 'Ctrl + D' },
   selectAll: { key: 'a', ctrl: true, shift: false, alt: false, label: 'Ctrl + A' },
   search: { key: '/', ctrl: false, shift: false, alt: false, label: '/' },
+  // Comentar líneas dentro de un bloque de código. El Ctrl+/ de toda la vida
+  // exige Shift+7 en un teclado español, así que aquí manda Ctrl+7, que se
+  // pulsa de un tirón. Es configurable, y el Ctrl+/ inglés se sigue admitiendo.
+  commentCode: { key: '7', ctrl: true, shift: false, alt: false, label: 'Ctrl + 7' },
 };
 
 try {
@@ -200,6 +204,22 @@ function App() {
   const [contextMenu, setContextMenu] = useStateApp(null);
   const [settingsOpen, setSettingsOpen] = useStateApp(false);
   const [showTouchDiag, setShowTouchDiag] = useStateApp(false);
+  // Explicación del atajo señalado. Va en un elemento aparte con posición fija
+  // porque la lista de atajos está dentro de un contenedor con scroll, y ahí
+  // un globo colgado de la fila lo recortaba el propio contenedor: se veía el
+  // cursor de ayuda pero nunca el texto.
+  const [shortcutTip, setShortcutTip] = useStateApp(null);
+  const showTip = (e, texto) => {
+    if (!texto) return;
+    const r = e.currentTarget.getBoundingClientRect();
+    setShortcutTip({ texto, top: r.bottom + 8, left: r.left, width: r.width });
+  };
+  // Buscador global. jumpTarget lleva al lienzo el destino elegido: la cadena
+  // de tableros por la que bajar y el nodo que hay que resaltar al llegar.
+  const [searchOpen, setSearchOpen] = useStateApp(false);
+  const [searchMode, setSearchMode] = useStateApp('goto'); // 'goto' | 'link'
+  const [jumpTarget, setJumpTarget] = useStateApp(null);
+  const [graphOpen, setGraphOpen] = useStateApp(false);
   const [dictWords, setDictWords] = useStateApp([]);
   const [userProfile, setUserProfile] = useStateApp(() => {
     const savedProfile = localStorage.getItem('odinote.google_profile');
@@ -388,9 +408,38 @@ function App() {
     }
   };
 
-  // El token murió: lo limpiamos del perfil sin interrumpir al usuario con modales.
-  // El botón ↻ muestra un punto rojo y un solo clic en él renueva el acceso.
-  const invalidateDriveSession = () => {
+  // ── Renovar el acceso a Drive sin molestar ──
+  //
+  // En el escritorio hay guardado en el propio equipo un token de refresco, así
+  // que cuando el permiso de una hora caduca se pide otro y no se entera nadie.
+  // Solo si eso falla —porque el usuario revocó el acceso, o porque nunca llegó
+  // a guardarse— se le pide que vuelva a conectarse.
+  const renuevaAccesoDrive = async () => {
+    const api = window.electronAPI;
+    if (!api || !api.googleRefreshAccess) return null;
+    try {
+      const r = await api.googleRefreshAccess();
+      if (!r || !r.ok || !r.accessToken) return null;
+      setUserProfile(prev => {
+        const next = { ...(prev || {}), accessToken: r.accessToken };
+        localStorage.setItem('odinote.google_profile', JSON.stringify(next));
+        return next;
+      });
+      return r.accessToken;
+    } catch (e) {
+      return null;
+    }
+  };
+
+  // El token murió: primero se intenta renovar solo; si no se puede, se limpia
+  // del perfil sin interrumpir con ventanas. El botón ↻ muestra un punto rojo y
+  // un solo clic vuelve a conectar.
+  const invalidateDriveSession = async () => {
+    const nuevo = await renuevaAccesoDrive();
+    if (nuevo) {
+      setDriveReachable(true);
+      return;
+    }
     setUserProfile(prev => {
       if (!prev || !prev.accessToken) return prev;
       const next = { ...prev, accessToken: null };
@@ -399,6 +448,30 @@ function App() {
     });
     showToast(window.t('El acceso a Drive caducó: pulsa el botón ↻ para renovarlo con un clic.', 'Drive access expired: press the ↻ button to renew it with one click.'), 'error');
   };
+
+  // Renovar ANTES de que caduque, no después. El permiso dura una hora; a los 50
+  // minutos se pide otro. Así el usuario no llega a ver ni un fallo: sin esto,
+  // la primera petición de cada hora fallaba y había que reintentarla.
+  useEffectApp(() => {
+    if (!userProfile || !userProfile.accessToken) return;
+    if (!window.electronAPI || !window.electronAPI.googleRefreshAccess) return;
+    const t = setInterval(() => { renuevaAccesoDrive(); }, 50 * 60 * 1000);
+    return () => clearInterval(t);
+  }, [userProfile && userProfile.accessToken]);
+
+  // Al arrancar, si hay un token de refresco guardado se recupera la sesión sola
+  // aunque el permiso guardado en el navegador esté muerto.
+  useEffectApp(() => {
+    const api = window.electronAPI;
+    if (!api || !api.googleHasRefresh) return;
+    const perfil = userProfile;
+    if (!perfil || perfil.accessToken) return;   // ya hay permiso, o no hay sesión
+    (async () => {
+      const r = await api.googleHasRefresh();
+      if (r && r.ok) await renuevaAccesoDrive();
+    })();
+    // Solo al arrancar y cuando el perfil pasa a quedarse sin permiso
+  }, [userProfile && userProfile.email, userProfile && userProfile.accessToken]);
 
   // Al arrancar o tras iniciar sesión: validar token e importar los proyectos guardados en Drive.
   // Si Drive no funciona (token muerto, API deshabilitada o sin red), los puestos de trabajo
@@ -510,6 +583,7 @@ function App() {
       duplicate: { key: 'd', ctrl: true, shift: false, alt: false, label: 'Ctrl + D' },
       selectAll: { key: 'a', ctrl: true, shift: false, alt: false, label: 'Ctrl + A' },
       search: { key: '/', ctrl: false, shift: false, alt: false, label: '/' },
+      commentCode: { key: '7', ctrl: true, shift: false, alt: false, label: 'Ctrl + 7' },
     };
     setShState(defaults);
     window.shortcuts = defaults;
@@ -529,7 +603,7 @@ function App() {
   const ignoreNextPersistRef = React.useRef(false);
   const isIncomingRemoteChangeRef = React.useRef(false);
 
-  const CURRENT_VERSION = '1.0.5'; // debe coincidir con package.json
+  const CURRENT_VERSION = '1.0.6'; // debe coincidir con package.json
 
   // Compara versiones semánticas "a.b.c": devuelve true si `latest` > `current`
   const isNewerVersion = (latest, current) => {
@@ -682,6 +756,15 @@ function App() {
   useEffectApp(() => {
     if (window.electronAPI && window.electronAPI.onShowContextMenu) {
       const unsub = window.electronAPI.onShowContextMenu((data) => {
+        // La selección hay que guardarla AHORA: al abrirse el menú el foco se
+        // va del editor y el rango se pierde, y sin él no se podría envolver el
+        // texto elegido en un enlace.
+        try {
+          const sel = window.getSelection();
+          savedSelectionRef.current = (sel && sel.rangeCount && !sel.isCollapsed)
+            ? { range: sel.getRangeAt(0).cloneRange(), editor: sel.anchorNode && sel.anchorNode.parentElement }
+            : null;
+        } catch (e) { savedSelectionRef.current = null; }
         setContextMenu(data);
       });
       
@@ -1468,6 +1551,142 @@ function App() {
 
   const goHome = () => setView({ kind: 'home' });
 
+  // Ctrl/Cmd+K abre el buscador global desde cualquier pantalla, incluso
+  // escribiendo dentro de una nota: es el atajo estándar y se espera que
+  // funcione siempre.
+  useEffectApp(() => {
+    const onKey = (e) => {
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'k' || e.key === 'K')) {
+        e.preventDefault();
+        setSearchMode('goto');
+        setSearchOpen(v => !v);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
+  // ───── Enlaces entre nodos: el disparador "[[" ─────
+  // Al escribir "[[" dentro de cualquier texto (nota, documento, comentario o
+  // leyenda) se abre el mismo buscador, pero para ELEGIR DESTINO en vez de
+  // navegar. Es el gesto de Obsidian, y reaprovecha el buscador entero.
+  const linkAnchorRef = React.useRef(null);
+  const savedSelectionRef = React.useRef(null);
+  useEffectApp(() => {
+    const onInput = (e) => {
+      const el = e.target;
+      if (!el || !el.isContentEditable) return;
+      const sel = window.getSelection();
+      if (!sel || !sel.anchorNode || sel.anchorNode.nodeType !== 3) return;
+      const offset = sel.anchorOffset;
+      if (offset < 2) return;
+      if (sel.anchorNode.textContent.slice(offset - 2, offset) !== '[[') return;
+      // Se recuerda dónde estaba el cursor para poder sustituir los corchetes
+      // por el enlace cuando el usuario elija destino.
+      linkAnchorRef.current = { kind: 'brackets', editor: el, node: sel.anchorNode, offset };
+      setSearchMode('link');
+      setSearchOpen(true);
+    };
+    document.addEventListener('input', onInput, true);
+    return () => document.removeEventListener('input', onInput, true);
+  }, []);
+
+  // Puerta para la barra de formato, que vive en otro componente.
+  useEffectApp(() => {
+    window.odiStartLinkFromSelection = (range) => {
+      const container = range.commonAncestorContainer;
+      const el = (container.nodeType === 1 ? container : container.parentElement);
+      linkAnchorRef.current = { kind: 'selection', range, editor: el };
+      setSearchMode('link');
+      setSearchOpen(true);
+    };
+    return () => { window.odiStartLinkFromSelection = null; };
+  }, []);
+
+  // Sustituye los "[[" por el enlace al nodo elegido.
+  const insertLinkTo = (hit) => {
+    const anchor = linkAnchorRef.current;
+    linkAnchorRef.current = null;
+    savedSelectionRef.current = null;
+    if (!anchor || !hit) return;
+
+    let range, editor, label;
+
+    if (anchor.kind === 'selection') {
+      // Desde el menú contextual: se envuelve el texto ya seleccionado, así que
+      // el enlace conserva las palabras que el usuario escribió.
+      range = anchor.range;
+      if (!range) return;
+      editor = (range.commonAncestorContainer.nodeType === 1
+        ? range.commonAncestorContainer
+        : range.commonAncestorContainer.parentElement);
+      editor = editor && editor.closest('[contenteditable="true"]');
+      if (!editor) return;
+      label = range.toString();
+      range.deleteContents();
+    } else {
+      // Desde "[[": se quitan los corchetes y se pone el nombre del destino.
+      const { node, offset } = anchor;
+      editor = anchor.editor;
+      if (!editor || !node || !node.isConnected) return;
+      if (node.textContent.slice(offset - 2, offset) !== '[[') return;
+      // El nombre del nodo desde el principio, no el extracto con contexto:
+      // ese traía el texto de alrededor de la coincidencia y el enlace salía
+      // empezado por la mitad de una palabra.
+      label = (hit.label || hit.snippet || '').replace(/^…/, '').replace(/…$/, '').trim() || window.t('nodo', 'node');
+      range = document.createRange();
+      range.setStart(node, offset - 2);
+      range.setEnd(node, offset);
+      range.deleteContents();
+    }
+
+    const frag = range.createContextualFragment(
+      window.OdiLinks.makeLinkHtml({ itemId: hit.itemId, canvasId: hit.canvasId, text: label }) +
+      (anchor.kind === 'selection' ? '' : '&nbsp;')
+    );
+    range.insertNode(frag);
+
+    // Cursor detrás del enlace, y avisar para que se guarde el cambio
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    const after = document.createRange();
+    after.selectNodeContents(editor);
+    after.collapse(false);
+    sel.addRange(after);
+    editor.focus();
+    editor.dispatchEvent(new Event('input', { bubbles: true }));
+  };
+
+  // Pulsar un enlace lleva a su nodo, igual que un resultado del buscador.
+  useEffectApp(() => {
+    const onClick = (e) => {
+      const a = e.target && e.target.closest && e.target.closest('a.odi-link');
+      if (!a) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const itemId = a.getAttribute(window.OdiLinks.NODE_ATTR);
+      const canvasId = a.getAttribute(window.OdiLinks.CANVAS_ATTR);
+      if (!itemId) return;
+      // Se localiza el destino para saber su proyecto y por dónde bajar
+      const target = window.OdiSearch.locate({ projects, canvases, itemId, canvasId, lang });
+      if (target) goToSearchHit(target);
+      else showToast(window.t('Ese nodo ya no existe.', 'That node no longer exists.'), 'error');
+    };
+    document.addEventListener('click', onClick, true);
+    return () => document.removeEventListener('click', onClick, true);
+  }, [projects, canvases, lang]);
+
+  // Ir a un resultado: abrir su proyecto y pasarle al lienzo por dónde bajar.
+  // El nonce hace que dos saltos seguidos al MISMO nodo se distingan, para que
+  // el segundo también resalte en vez de quedarse mudo.
+  const goToSearchHit = (hit) => {
+    if (!hit) return;
+    setJumpTarget({ ...hit, nonce: Date.now() });
+    setView(v => (v.kind === 'canvas' && v.projectId === hit.projectId)
+      ? v
+      : { kind: 'canvas', projectId: hit.projectId });
+  };
+
   const createProject = (project) => {
     setProjects(p => [project, ...p]);
     setCanvases(prev => ({
@@ -1966,6 +2185,10 @@ function App() {
     activeView = <window.Canvas
       key={view.projectId}
       projectId={view.projectId}
+      jumpTarget={jumpTarget}
+      onSearchClick={() => { setSearchMode("goto"); setSearchOpen(true); }}
+      onGoToNode={goToSearchHit}
+      onGraphClick={() => setGraphOpen(true)}
       isSyncingDrive={isSyncingDrive}
       lang={lang} setLang={setLang}
       theme={theme} setTheme={setTheme}
@@ -1992,6 +2215,37 @@ function App() {
   return (
     <>
       {activeView}
+      <window.SearchPalette
+        open={searchOpen}
+        mode={searchMode}
+        onClose={() => { setSearchOpen(false); linkAnchorRef.current = null; }}
+        projects={projects}
+        canvases={canvases}
+        lang={lang}
+        onGoTo={searchMode === 'link' ? insertLinkTo : goToSearchHit}
+      />
+      {shortcutTip && (
+        <div
+          className="odi-sh-tip"
+          style={{ top: shortcutTip.top, left: shortcutTip.left, width: shortcutTip.width }}
+        >
+          {shortcutTip.texto}
+        </div>
+      )}
+      <window.GraphView
+        open={graphOpen}
+        onClose={() => setGraphOpen(false)}
+        projects={projects}
+        canvases={canvases}
+        projectId={view.projectId}
+        lang={lang}
+        onGoTo={(n) => goToSearchHit({
+          projectId: view.projectId,
+          canvasId: n.canvasId,
+          trailIds: n.trailIds,
+          itemId: n.id,
+        })}
+      />
       {contextMenu && (
         <div
           className="custom-context-menu"
@@ -2055,6 +2309,30 @@ function App() {
                   <span className="material-symbols-rounded">content_paste</span>
                   <span>{lang === 'es' ? 'Pegar' : 'Paste'}</span>
                 </button>
+                {/* Enlazar el texto seleccionado con otro nodo. Es el mismo
+                    enlace que se hace escribiendo "[[", pero a partir de algo
+                    ya escrito, que es como suele surgir: relees una frase y te
+                    das cuenta de que apunta a otra parte. */}
+                {contextMenu.selectionText && contextMenu.selectionText.trim() !== '' && (
+                  <>
+                    <div className="ctx-menu-divider" />
+                    <button
+                      className="ctx-menu-item"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => {
+                        linkAnchorRef.current = savedSelectionRef.current
+                          ? { kind: 'selection', ...savedSelectionRef.current }
+                          : null;
+                        setContextMenu(null);
+                        setSearchMode('link');
+                        setSearchOpen(true);
+                      }}
+                    >
+                      <span className="material-symbols-rounded">add_link</span>
+                      <span>{lang === 'es' ? 'Enlazar con un nodo…' : 'Link to a node…'}</span>
+                    </button>
+                  </>
+                )}
               </>
             )}
 
@@ -2320,16 +2598,23 @@ function App() {
                       {window.t('Personalizables', 'Configurable')}
                     </div>
                     {[
-                      { id: 'undo', desc: window.t('Deshacer acción', 'Undo action') },
-                      { id: 'redo', desc: window.t('Rehacer acción', 'Redo action') },
-                      { id: 'duplicate', desc: window.t('Duplicar nodo', 'Duplicate selected node') },
-                      { id: 'selectAll', desc: window.t('Seleccionar todo', 'Select all items') },
-                      { id: 'search', desc: window.t('Enfocar buscador del lienzo', 'Focus search box') }
+                      { id: 'undo', desc: window.t('Deshacer acción', 'Undo action'),
+                        help: window.t('Deshace el último cambio. Los cambios seguidos se agrupan, para que no haya que pulsarlo veinte veces al borrar una frase.', 'Undoes the last change. Rapid edits are grouped, so deleting a sentence is one step, not twenty.') },
+                      { id: 'redo', desc: window.t('Rehacer acción', 'Redo action'),
+                        help: window.t('Vuelve a aplicar lo que acabas de deshacer.', 'Re-applies what you just undid.') },
+                      { id: 'duplicate', desc: window.t('Duplicar nodo', 'Duplicate selected node'),
+                        help: window.t('Crea una copia del nodo seleccionado justo al lado, con su contenido y su formato.', 'Creates a copy of the selected node beside it, keeping content and formatting.') },
+                      { id: 'selectAll', desc: window.t('Seleccionar todo', 'Select all items'),
+                        help: window.t('Selecciona todos los nodos y conectores del lienzo actual, no de todo el proyecto.', 'Selects every node and connector on the current canvas — not the whole project.') },
+                      { id: 'search', desc: window.t('Enfocar buscador del lienzo', 'Focus search box'),
+                        help: window.t('Pone el cursor en el buscador de ARRIBA, que atenúa lo que no coincide en este lienzo. Para buscar en todos los proyectos, usa Ctrl+K.', 'Focuses the search box above, which dims non-matching nodes on this canvas. To search every project, use Ctrl+K.') },
+                      { id: 'commentCode', desc: window.t('Comentar líneas de código', 'Comment code lines'),
+                        help: window.t('Dentro de un bloque de código, comenta o descomenta las líneas marcadas con la marca del lenguaje (//, #, --). Ctrl+/ también funciona, pero en un teclado español ese "/" pide Shift, así que por defecto es Ctrl+7.', 'Inside a code block, comments or uncomments the selected lines using that language\'s marker (//, #, --). Ctrl+/ also works, but on a Spanish keyboard that slash needs Shift, so the default here is Ctrl+7.') }
                     ].map((sh) => {
                       const cfg = shState[sh.id] || {};
                       const isListening = listeningKey === sh.id;
                       return (
-                        <div key={sh.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px', padding: '6px 8px', background: 'var(--bg-main, #FAF8F6)', borderRadius: '6px', border: '1.5px solid var(--line-soft, #E5E1DD)' }}>
+                        <div key={sh.id} className="odi-sh-row" onMouseEnter={(e)=>showTip(e, sh.help)} onMouseLeave={()=>setShortcutTip(null)} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px', padding: '6px 8px', background: 'var(--bg-main, #FAF8F6)', borderRadius: '6px', border: '1.5px solid var(--line-soft, #E5E1DD)' }}>
                           <span style={{ color: 'var(--text, #1A1A1A)', fontWeight: '500' }}>{sh.desc}</span>
                           <button
                             onClick={() => setListeningKey(isListening ? null : sh.id)}
@@ -2359,23 +2644,42 @@ function App() {
                       {window.t('Fijos de Sistema', 'System Fixed')}
                     </div>
                     {[
-                      { keys: ['Ctrl', 'C'], desc: window.t('Copiar nodos', 'Copy nodes') },
-                      { keys: ['Ctrl', 'V'], desc: window.t('Pegar nodos / archivos', 'Paste nodes or files') },
-                      { keys: ['Ctrl', 'X'], desc: window.t('Cortar nodos', 'Cut nodes') },
-                      { keys: ['F12', 'Ctrl+Shift+I'], desc: window.t('Consola de depuración', 'Toggle DevTools') },
-                      { keys: ['Ctrl', 'Botón Central'], desc: window.t('Paneo de cámara global', 'Global camera panning') },
-                      { keys: ['Shift', 'Click'], desc: window.t('Selección múltiple individual', 'Toggle item selection') },
-                      { keys: ['Shift', 'Arrastrar'], desc: window.t('Seleccionar por recuadro', 'Box selection') },
-                      { keys: ['Alt', 'Arrastrar'], desc: window.t('Desplazar lienzo (Paneo)', 'Pan the canvas') },
-                      { keys: ['Ctrl', 'Rueda'], desc: window.t('Acercar / Alejar (Zoom)', 'Zoom In / Out') },
-                      { keys: ['↑', '↓', '←', '→'], desc: window.t('Mover nodo seleccionado', 'Move selected node') },
-                      { keys: ['Doble Clic'], desc: window.t('Editar texto / Renombrar', 'Edit text / Rename') },
-                      { keys: ['Clic Derecho'], desc: window.t('Creación rápida / Opciones', 'Quick-create / Options') },
-                      { keys: ['Tab', 'Enter'], desc: window.t('Navegar y editar celdas (Tablas)', 'Navigate and edit cells (Tables)') },
-                      { keys: ['Supr', 'Backspace'], desc: window.t('Eliminar elemento', 'Delete item') },
-                      { keys: ['Esc'], desc: window.t('Limpiar selección / Cerrar', 'Clear selection / Close') }
+                      { keys: ['Ctrl', 'K'], desc: window.t('Buscar en TODO', 'Search everything'), nuevo: true,
+                        help: window.t('Busca en todos los proyectos y en todos los tableros anidados a la vez, y te lleva al resultado. Es la forma de encontrar algo que enterraste hace meses.', 'Searches every project and every nested board at once and takes you to the result. This is how you find something you buried months ago.') },
+                      { keys: ['[', '['], desc: window.t('Enlazar con otro nodo', 'Link to another node'), nuevo: true,
+                        help: window.t('Escribiendo dos corchetes dentro de cualquier texto se abre el buscador para elegir un nodo. La palabra queda enlazada y el nodo de destino mostrará que le apuntas desde aquí. También sale con clic derecho sobre texto seleccionado.', 'Typing two brackets inside any text opens the picker. The word becomes a link, and the target node will show it is referenced from here. Also available by right-clicking selected text.') },
+                      { keys: ['Ctrl', 'C'], desc: window.t('Copiar nodos', 'Copy nodes'),
+                        help: window.t('Copia los nodos seleccionados, con su contenido y su formato, listos para pegar en otro lienzo o proyecto.', 'Copies the selected nodes with their content and formatting, ready to paste into another canvas or project.') },
+                      { keys: ['Ctrl', 'V'], desc: window.t('Pegar nodos / archivos', 'Paste nodes or files'),
+                        help: window.t('Pega nodos copiados, y también imágenes o archivos del portapapeles: se convierten en nodos automáticamente.', 'Pastes copied nodes, and also images or files from the clipboard: they become nodes automatically.') },
+                      { keys: ['Ctrl', 'X'], desc: window.t('Cortar nodos', 'Cut nodes'),
+                        help: window.t('Copia y elimina en un paso, para mover nodos entre tableros.', 'Copies and deletes in one step, to move nodes between boards.') },
+                      { keys: ['F12', 'Ctrl+Shift+I'], desc: window.t('Consola de depuración', 'Toggle DevTools'),
+                        help: window.t('Abre las herramientas de desarrollo del navegador. Útil solo para diagnosticar fallos: si algo va mal, aquí aparece el motivo.', 'Opens the browser developer tools. Only useful for diagnosing problems: if something breaks, the reason shows up here.') },
+                      { keys: ['Ctrl', 'Botón Central'], desc: window.t('Paneo de cámara global', 'Global camera panning'),
+                        help: window.t('Mueve el lienzo arrastrando con la rueda pulsada, sin tocar ningún nodo por el camino.', 'Moves the canvas by dragging with the wheel pressed, without touching any node along the way.') },
+                      { keys: ['Shift', 'Click'], desc: window.t('Selección múltiple individual', 'Toggle item selection'),
+                        help: window.t('Añade o quita un nodo de la selección sin perder los que ya tenías elegidos.', 'Adds or removes one node from the selection without losing the ones already picked.') },
+                      { keys: ['Shift', 'Arrastrar'], desc: window.t('Seleccionar por recuadro', 'Box selection'),
+                        help: window.t('Dibuja un rectángulo y selecciona todo lo que quede dentro, sumándolo a lo ya seleccionado.', 'Draws a rectangle and selects everything inside it, adding to the current selection.') },
+                      { keys: ['Alt', 'Arrastrar'], desc: window.t('Desplazar lienzo (Paneo)', 'Pan the canvas'),
+                        help: window.t('Mueve la vista arrastrando desde cualquier punto, incluso encima de un nodo, sin moverlo.', 'Moves the view by dragging from anywhere, even over a node, without moving it.') },
+                      { keys: ['Ctrl', 'Rueda'], desc: window.t('Acercar / Alejar (Zoom)', 'Zoom In / Out'),
+                        help: window.t('Acerca o aleja manteniendo bajo el cursor el punto que estabas mirando.', 'Zooms in or out keeping the point under the cursor where it was.') },
+                      { keys: ['↑', '↓', '←', '→'], desc: window.t('Mover nodo seleccionado', 'Move selected node'),
+                        help: window.t('Desplaza el nodo elegido paso a paso, para ajustarlo con precisión cuando arrastrar se queda corto.', 'Nudges the selected node step by step, for precision that dragging cannot give.') },
+                      { keys: ['Doble Clic'], desc: window.t('Editar texto / Renombrar', 'Edit text / Rename'),
+                        help: window.t('Entra a editar el nodo. En pantallas táctiles NO se usa: ahí se edita con el botón "Editar" de la barra del nodo, porque dos toques seguidos son lo que uno hace al arrastrar.', 'Enters edit mode. NOT used on touch screens: there you edit with the "Edit" button on the node bar, since two quick taps is what dragging looks like.') },
+                      { keys: ['Clic Derecho'], desc: window.t('Creación rápida / Opciones', 'Quick-create / Options'),
+                        help: window.t('Sobre el lienzo vacío abre el menú de crear nodos. Sobre un texto seleccionado ofrece cortar, copiar, pegar y enlazar. Con el dedo equivale a mantener pulsado.', 'On empty canvas it opens the create menu. On selected text it offers cut, copy, paste and link. With a finger, press and hold does the same.') },
+                      { keys: ['Tab', 'Enter'], desc: window.t('Navegar y editar celdas (Tablas)', 'Navigate and edit cells (Tables)'),
+                        help: window.t('Dentro de una tabla, Tab salta a la celda siguiente y Enter entra a editarla, como en una hoja de cálculo.', 'Inside a table, Tab moves to the next cell and Enter starts editing it, like a spreadsheet.') },
+                      { keys: ['Supr', 'Backspace'], desc: window.t('Eliminar elemento', 'Delete item'),
+                        help: window.t('Borra los nodos o conectores seleccionados. Dentro de una celda de tabla borra su contenido en lugar del nodo entero.', 'Deletes the selected nodes or connectors. Inside a table cell it clears the cell instead of the whole node.') },
+                      { keys: ['Esc'], desc: window.t('Limpiar selección / Cerrar', 'Clear selection / Close'),
+                        help: window.t('Sale del modo edición, suelta la herramienta activa y cierra menús y ventanas.', 'Leaves edit mode, drops the active tool, and closes menus and dialogs.') }
                     ].map((sh, idx) => (
-                      <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px', padding: '6px 8px', background: 'var(--bg-main, #FAF8F6)', borderRadius: '6px', border: '1.5px solid var(--line-soft, #E5E1DD)' }}>
+                      <div key={idx} className="odi-sh-row" onMouseEnter={(e)=>showTip(e, sh.help)} onMouseLeave={()=>setShortcutTip(null)} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px', padding: '6px 8px', background: 'var(--bg-main, #FAF8F6)', borderRadius: '6px', border: '1.5px solid var(--line-soft, #E5E1DD)' }}>
                         <span style={{ color: 'var(--text, #1A1A1A)', fontWeight: '500' }}>{sh.desc}</span>
                         <div style={{ display: 'flex', gap: '3px' }}>
                           {sh.keys.map((k, ki) => (

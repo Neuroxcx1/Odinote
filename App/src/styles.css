@@ -2256,29 +2256,263 @@ body.odi-busy iframe { pointer-events: none !important; }
 
 /* Doc fullscreen modal */
 .doc-modal-backdrop { position: fixed; inset: 0; background: color-mix(in srgb, var(--ink) 60%, transparent); backdrop-filter: blur(4px); z-index: 200; display: grid; place-items: center; animation: fade-in 160ms var(--e-out); }
+/* El documento ocupa la pantalla entera, como un procesador de textos: escribir
+   un texto largo dentro de una ventanita en medio del lienzo no tenía sentido,
+   y además dejaba un borde que cerraba el editor al pulsarlo por accidente. */
 .doc-modal {
   background: var(--paper);
-  border: 1.5px solid var(--line);
-  border-radius: 2px;
-  box-shadow: var(--pop-deep);
-  width: min(1100px, calc(100vw - 80px));
-  height: min(940px, calc(100vh - 60px));
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
   display: flex; flex-direction: column;
-  animation: scale-in 220ms var(--e-out);
+  animation: fade-in 140ms var(--e-out);
   overflow: hidden;
 }
 .doc-modal-head { display: flex; align-items: center; gap: 10px; padding: 12px 18px; border-bottom: 1.5px solid var(--line); background: var(--paper-2); }
 .doc-title-input { font-family: var(--font-display); font-weight: 800; font-size: 20px; flex: 1; letter-spacing: -0.02em; }
 .doc-modal-body { display: flex; flex: 1; min-height: 0; }
-.doc-modal-toolbar { width: 60px; border-right: 1.5px solid var(--line); display: flex; flex-direction: column; padding: 8px 0; align-items: center; background: var(--paper-2); }
-.doc-modal-toolbar button { width: 44px; height: 36px; display: grid; place-items: center; color: var(--ink-2); border-radius: 2px; margin: 2px 0; transition: background 100ms; }
-.doc-modal-toolbar button:hover { background: var(--bg); color: var(--ink); }
-.doc-modal-toolbar button.active { background: var(--olive); color: white; }
-.doc-modal-toolbar button:disabled { opacity: 0.32; cursor: default; }
-.doc-modal-toolbar button:disabled:hover { background: none; color: var(--ink-2); }
-.doc-modal-toolbar .doc-tool-sep { width: 28px; height: 1px; background: var(--line-soft); margin: 4px 0; }
-.doc-modal-toolbar .doc-tool-label { font-family: var(--font-display); font-weight: 800; font-size: 18px; }
-.doc-modal-toolbar button i { font-style: italic; font-weight: 800; font-size: 16px; }
+
+/* ── Barra de herramientas: horizontal y por categorías ── */
+.doc-ribbon {
+  flex: 0 0 auto;
+  display: flex; align-items: stretch; flex-wrap: wrap;
+  gap: 0; padding: 4px 12px 0;
+  border-bottom: 1.5px solid var(--line);
+  background: var(--paper-2);
+}
+.doc-group {
+  display: flex; flex-direction: column; align-items: center;
+  padding: 0 10px;
+  border-right: 1px solid var(--line-soft);
+}
+.doc-group:last-child { border-right: none; }
+.doc-group-btns { display: flex; align-items: center; gap: 2px; }
+.doc-group-name {
+  font-size: 9.5px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase;
+  color: var(--ink-3); margin-top: 1px; padding-bottom: 3px;
+}
+.doc-ribbon button {
+  width: 32px; height: 30px; display: grid; place-items: center;
+  color: var(--ink-2); border-radius: 3px; transition: background 100ms;
+}
+.doc-ribbon button:hover { background: var(--bg); color: var(--ink); }
+.doc-ribbon button.active { background: var(--olive); color: white; }
+.doc-ribbon button:disabled { opacity: 0.32; cursor: default; }
+.doc-ribbon button:disabled:hover { background: none; color: var(--ink-2); }
+.doc-ribbon .material-symbols-rounded { font-size: 19px; }
+.doc-ribbon .doc-tool-label { font-family: var(--font-display); font-weight: 800; font-size: 17px; }
+.doc-ribbon button i { font-style: italic; font-weight: 800; font-size: 16px; }
+.doc-font-btn { width: auto !important; padding: 0 4px; gap: 0; display: flex !important; align-items: center; }
+.doc-font-btn .doc-caret { font-size: 15px !important; opacity: 0.6; }
+.doc-size-ctrl { display: flex; align-items: center; }
+.doc-ribbon .doc-size-num {
+  font-family: var(--font-display); font-weight: 800; font-size: 13px;
+  width: 34px; letter-spacing: -0.2px;
+}
+/* Por encima del velo del documento (200) y de su propia capa de cierre (209) */
+.doc-tool-pop {
+  z-index: 1300; background: var(--paper); border: 1.5px solid var(--line);
+  border-radius: 4px; box-shadow: 0 12px 34px rgba(0,0,0,0.17); padding: 8px;
+}
+.doc-pop-title {
+  font-size: 10.5px; font-weight: 800; letter-spacing: 0.4px; text-transform: uppercase;
+  color: var(--ink-2); margin-bottom: 7px;
+}
+.doc-size-list {
+  display: grid; grid-template-columns: repeat(2, 46px); gap: 3px;
+  max-height: 300px; overflow-y: auto;
+}
+.doc-size-list button {
+  height: 28px; border-radius: 3px; font-weight: 700; font-size: 12.5px;
+  color: var(--ink-2); display: grid; place-items: center;
+}
+.doc-size-list button:hover { background: var(--bg); color: var(--ink); }
+.doc-size-list button.active { background: var(--olive); color: #fff; }
+.doc-color-grid { display: grid; grid-template-columns: repeat(4, 26px); gap: 5px; }
+.doc-color-swatch {
+  width: 26px; height: 26px; border-radius: 3px; border: 1.5px solid var(--line);
+  display: grid; place-items: center; color: var(--ink-2);
+}
+.doc-color-swatch:hover { transform: scale(1.12); }
+.doc-menu-list { display: flex; flex-direction: column; gap: 2px; min-width: 132px; max-height: 300px; overflow-y: auto; }
+.doc-menu-list button {
+  height: 30px; padding: 0 10px; border-radius: 3px; text-align: left;
+  font-size: 13px; color: var(--ink-2); display: flex; align-items: center;
+}
+.doc-menu-list button:hover { background: var(--bg); color: var(--ink); }
+/* El editor y su barra de estado, apilados dentro del cuerpo del documento */
+.doc-modal-pane-wrap { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.doc-modal-pane-wrap .doc-modal-editor-pane { flex: 1; min-height: 0; }
+.doc-status {
+  flex: 0 0 auto; display: flex; align-items: center; gap: 6px;
+  padding: 5px 14px; border-top: 1.5px solid var(--line);
+  background: var(--paper-2); color: var(--ink-3);
+  font-size: 11px; font-weight: 600; letter-spacing: 0.2px;
+}
+.doc-status-sep { opacity: 0.5; }
+/* Elementos nuevos dentro del documento */
+.doc-color-libre { display: flex; align-items: center; gap: 6px; margin-top: 9px; padding-top: 9px; border-top: 1px solid var(--line-soft); }
+.doc-color-libre input[type="color"] {
+  width: 30px; height: 26px; padding: 0; border: 1.5px solid var(--line);
+  border-radius: 3px; background: none; cursor: pointer; flex: 0 0 auto;
+}
+.doc-color-ok {
+  flex: 1; height: 26px; border-radius: 3px; font-size: 11.5px; font-weight: 700;
+  background: var(--bg); color: var(--ink-2); border: 1.5px solid var(--line-soft);
+}
+.doc-color-ok:hover { background: var(--olive); color: #fff; border-color: var(--olive); }
+.doc-modal-content h3 { font-family: var(--font-display); font-size: 17px; font-weight: 700; margin: 16px 0 8px; }
+/* Bloque de código. Antes no tenía estilo propio: el <pre> se quedaba con el
+   ajuste por defecto (sin partir líneas), así que una línea larga sacaba una
+   barra de desplazamiento horizontal y el texto se salía de la caja. Se copia
+   lo que hacen las notas, pero con los colores del tema en vez de fijos, que en
+   modo oscuro cantaban. */
+/* ── Bloque de código: un editor aparte, no texto enriquecido ──
+   El <textarea> transparente va encima de la capa coloreada. Para que el cursor
+   caiga exactamente sobre la letra que toca, las dos capas tienen que compartir
+   TODAS las medidas del texto: familia, tamaño, interlineado, relleno, ajuste de
+   línea y tabulación. Cualquier diferencia se nota como un desfase creciente. */
+.doc-modal-content pre.odi-code {
+  position: relative;
+  display: block;
+  background: var(--bg-2, var(--bg));
+  border: 1.5px solid var(--line-soft);
+  border-left: 3px solid var(--olive);
+  border-radius: 3px;
+  margin: 14px 0;
+  padding: 0;
+  overflow: hidden;
+}
+.odi-code:focus-within { border-color: var(--olive); }
+.odi-code-head {
+  display: flex; align-items: center; gap: 8px;
+  padding: 4px 10px;
+  border-bottom: 1px solid var(--line-soft);
+  background: color-mix(in srgb, var(--ink) 5%, transparent);
+  user-select: none;
+}
+.odi-code-lang {
+  font-family: var(--font-mono); font-size: 10px; font-weight: 700;
+  letter-spacing: 0.5px; text-transform: uppercase; color: var(--ink-3);
+}
+.odi-code-tip { margin-left: auto; font-size: 10px; color: var(--ink-3); font-weight: 600; white-space: nowrap; }
+.odi-code-body { position: relative; }
+.odi-code-hl,
+.odi-code-src {
+  margin: 0;
+  padding: 10px 13px;
+  border: 0;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.6;
+  letter-spacing: 0;
+  tab-size: 2;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  word-break: normal;
+  box-sizing: border-box;
+  width: 100%;
+  background: transparent;
+}
+.odi-code-hl { color: var(--ink); pointer-events: none; min-height: 1.6em; }
+.odi-code-hl code { display: block; background: none !important; padding: 0 !important; font: inherit; }
+.odi-code-src {
+  position: absolute; inset: 0;
+  resize: none; overflow: hidden; display: block;
+  color: transparent;
+  caret-color: var(--olive);
+  -webkit-text-fill-color: transparent;
+}
+.odi-code-src::selection { background: color-mix(in srgb, var(--olive) 35%, transparent); }
+.odi-code-src:focus { outline: none; }
+
+/* ── Colores del código ──
+   La hoja que trae el resaltador (lib/github.min.css) es de tema claro y sobre
+   el documento en oscuro daba azules ilegibles, así que los colores se definen
+   aquí, con un juego para cada tema. Van con !important porque esa hoja se
+   carga después.
+
+   Cada FAMILIA de cosas lleva su tono, no un color por capricho: lo que declara
+   algo (palabras clave) en morado, lo que nombra (funciones y clases) en azul y
+   cian, los datos (cadenas y números) en verde y naranja, lo que viene de fuera
+   (tipos y funciones del lenguaje) en dorado, y lo accesorio (comentarios,
+   signos) apagado. Así el ojo separa por color antes de leer. */
+:root {
+  --cod-comentario: #7A8B99;   --cod-clave:    #A63FBF;
+  --cod-cadena:     #2E8B4A;   --cod-numero:   #C9721F;
+  --cod-funcion:    #2C6FCF;   --cod-clase:    #0E8B94;
+  --cod-tipo:       #9A7B12;   --cod-variable: #C0392B;
+  --cod-literal:    #C2185B;   --cod-meta:     #6B7F2E;
+  --cod-signo:      #857E8C;   --cod-etiqueta: #7A5AC7;
+  --cod-atributo:   #B5651D;   --cod-regexp:   #0F8A7E;
+}
+[data-theme="dark"] {
+  --cod-comentario: #6E7A85;   --cod-clave:    #D8A0F0;
+  --cod-cadena:     #8FD17A;   --cod-numero:   #F5A65B;
+  --cod-funcion:    #6FB6FF;   --cod-clase:    #4FD6D0;
+  --cod-tipo:       #EFD05C;   --cod-variable: #FF8C7A;
+  --cod-literal:    #FF7EB6;   --cod-meta:     #BEDC7A;
+  --cod-signo:      #9A93A5;   --cod-etiqueta: #C4A7F5;
+  --cod-atributo:   #FFB870;   --cod-regexp:   #5FE0C0;
+}
+.odi-code-hl .hljs-comment,
+.odi-code-hl .hljs-quote            { color: var(--cod-comentario) !important; font-style: italic; }
+.odi-code-hl .hljs-doctag            { color: var(--cod-comentario) !important; font-weight: 700; }
+.odi-code-hl .hljs-keyword,
+.odi-code-hl .hljs-selector-tag,
+.odi-code-hl .hljs-keyword.hljs-meta { color: var(--cod-clave) !important; font-weight: 600; }
+.odi-code-hl .hljs-string,
+.odi-code-hl .hljs-addition,
+.odi-code-hl .hljs-char.escape_,
+.odi-code-hl .hljs-formula           { color: var(--cod-cadena) !important; }
+.odi-code-hl .hljs-regexp,
+.odi-code-hl .hljs-link,
+.odi-code-hl .hljs-symbol            { color: var(--cod-regexp) !important; }
+.odi-code-hl .hljs-number,
+.odi-code-hl .hljs-bullet             { color: var(--cod-numero) !important; }
+.odi-code-hl .hljs-literal            { color: var(--cod-literal) !important; font-weight: 600; }
+.odi-code-hl .hljs-title,
+.odi-code-hl .hljs-title.function_,
+.odi-code-hl .hljs-section,
+.odi-code-hl .hljs-selector-id        { color: var(--cod-funcion) !important; font-weight: 600; }
+.odi-code-hl .hljs-title.class_,
+.odi-code-hl .hljs-title.class_.inherited__,
+.odi-code-hl .hljs-selector-class     { color: var(--cod-clase) !important; font-weight: 600; }
+.odi-code-hl .hljs-type,
+.odi-code-hl .hljs-built_in,
+.odi-code-hl .hljs-variable.language_ { color: var(--cod-tipo) !important; }
+.odi-code-hl .hljs-variable,
+.odi-code-hl .hljs-template-variable,
+.odi-code-hl .hljs-property,
+.odi-code-hl .hljs-selector-attr,
+.odi-code-hl .hljs-selector-pseudo    { color: var(--cod-variable) !important; }
+.odi-code-hl .hljs-attr,
+.odi-code-hl .hljs-attribute          { color: var(--cod-atributo) !important; }
+.odi-code-hl .hljs-name,
+.odi-code-hl .hljs-tag,
+.odi-code-hl .hljs-template-tag       { color: var(--cod-etiqueta) !important; }
+.odi-code-hl .hljs-meta,
+.odi-code-hl .hljs-meta .hljs-string  { color: var(--cod-meta) !important; }
+.odi-code-hl .hljs-params,
+.odi-code-hl .hljs-subst              { color: var(--ink) !important; }
+.odi-code-hl .hljs-operator,
+.odi-code-hl .hljs-punctuation        { color: var(--cod-signo) !important; }
+.odi-code-hl .hljs-deletion           { color: var(--cod-variable) !important; }
+.odi-code-hl .hljs-emphasis           { font-style: italic; }
+.odi-code-hl .hljs-strong             { font-weight: 700; }
+
+.doc-ribbon .doc-color-btn { display: flex !important; flex-direction: column; align-items: center; justify-content: center; gap: 0; }
+.doc-ribbon .doc-color-btn .material-symbols-rounded { font-size: 17px; line-height: 1; }
+.doc-color-bar { width: 17px; height: 4px; border-radius: 1px; margin-top: 1px; display: block; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.12); }
+/* Siempre un párrafo pulsable detrás del bloque, para poder seguir escribiendo
+   texto normal sin quedarse atrapado dentro del código. */
+.doc-modal-content pre.odi-code + p { min-height: 1.5em; margin: 12px 0; cursor: text; }
+.doc-modal-content hr { border: none; border-top: 1.5px solid var(--line); margin: 18px 0; }
+.doc-modal-content sup, .doc-modal-content sub { font-size: 0.72em; line-height: 0; }
+.doc-modal-content mark { background: #FFF3A3; color: inherit; padding: 0 1px; }
 .doc-modal-editor-pane {
   flex: 1;
   overflow-y: auto;
@@ -3714,12 +3948,20 @@ html[data-mobile="1"] .modal {
   border-radius: 12px;
 }
 html[data-mobile="1"] .doc-modal {
-  width: calc(100vw - 16px);
+  width: 100vw;
   max-width: none;
-  height: calc(100dvh - 60px);
+  height: 100dvh;
   max-height: none;
-  border-radius: 12px;
+  border-radius: 0;
 }
+/* En el móvil la barra ocupa varias filas. Se aprieta y se quitan los nombres
+   de categoría: ahí lo que escasea es el alto de pantalla, y con siete rótulos
+   la barra se comía un tercio del sitio para escribir. */
+html[data-mobile="1"] .doc-ribbon { padding: 3px 6px 0; }
+html[data-mobile="1"] .doc-group { padding: 0 5px; }
+html[data-mobile="1"] .doc-group-name { display: none; }
+html[data-mobile="1"] .doc-ribbon button { width: 30px; height: 30px; }
+html[data-mobile="1"] .doc-group-btns { padding-bottom: 3px; }
 /* Ajustes y demás ventanas grandes llevan el ancho en estilo inline
    (width: 680px), que en una pantalla de 360px se sale por los dos lados: hace
    falta !important para poder encogerlas. */
@@ -3970,3 +4212,331 @@ html[data-mobile="1"][data-orient="landscape"] .ctx-side .ctx-popout {
   max-height: 200px;
   overflow-y: auto;
 }
+
+/* ==========================================================================
+   BUSCADOR GLOBAL (Ctrl+K)
+   ========================================================================== */
+.odi-sp-backdrop {
+  position: fixed; inset: 0; z-index: 9500;
+  background: color-mix(in srgb, var(--ink) 45%, transparent);
+  backdrop-filter: blur(3px);
+  display: flex; align-items: flex-start; justify-content: center;
+  padding: 10vh 16px 16px;
+  animation: fade-in 120ms var(--e-out);
+}
+.odi-sp {
+  width: min(680px, 100%);
+  max-height: 70vh;
+  display: flex; flex-direction: column;
+  background: var(--paper);
+  border: 1.5px solid var(--line);
+  border-radius: 14px;
+  box-shadow: var(--pop-deep);
+  overflow: hidden;
+  animation: scale-in 140ms var(--e-out);
+}
+.odi-sp-field {
+  display: flex; align-items: center; gap: 10px;
+  padding: 12px 14px;
+  border-bottom: 1.5px solid var(--line-soft);
+  flex: 0 0 auto;
+}
+.odi-sp-field > .material-symbols-rounded { color: var(--ink-3); font-size: 20px; }
+.odi-sp-field input {
+  flex: 1; min-width: 0;
+  font-size: 16px;              /* 16px o el móvil amplía la página al enfocar */
+  font-weight: 600;
+  border: none; outline: none; background: transparent; color: var(--ink);
+}
+.odi-sp-close {
+  display: grid; place-items: center;
+  width: 32px; height: 32px; border-radius: 8px;
+  color: var(--ink-3); flex: 0 0 auto;
+}
+.odi-sp-close:hover { background: var(--bg); color: var(--ink); }
+
+.odi-sp-list { overflow-y: auto; flex: 1 1 auto; padding: 6px; }
+.odi-sp-empty { padding: 22px 16px; color: var(--ink-3); font-size: 13px; line-height: 1.5; text-align: center; }
+
+.odi-sp-hit {
+  display: flex; align-items: flex-start; gap: 10px;
+  width: 100%; text-align: left;
+  padding: 10px 12px;
+  border-radius: 9px;
+  background: none; border: none; cursor: pointer;
+}
+.odi-sp-hit.active { background: var(--bg); }
+.odi-sp-icon {
+  font-size: 19px; color: var(--ink-2);
+  flex: 0 0 auto; margin-top: 1px;
+}
+.odi-sp-text { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1; }
+.odi-sp-snippet {
+  font-size: 13.5px; font-weight: 600; color: var(--ink);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.odi-sp-path {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 4px;
+  font-size: 11.5px; color: var(--ink-3); font-weight: 600;
+}
+.odi-sp-sep { opacity: 0.5; }
+
+.odi-sp-foot {
+  display: flex; align-items: center; gap: 14px;
+  padding: 8px 14px;
+  border-top: 1.5px solid var(--line-soft);
+  font-size: 11.5px; color: var(--ink-3);
+  flex: 0 0 auto;
+}
+.odi-sp-foot kbd {
+  font-family: var(--font-mono); font-size: 10.5px;
+  padding: 1px 5px; margin-right: 3px;
+  background: var(--bg); border: 1px solid var(--line-soft); border-radius: 4px;
+}
+.odi-sp-count { margin-left: auto; }
+
+/* Nodo al que ha saltado el buscador: un destello para no perderlo de vista */
+.item.jump-target > * { outline: 3px solid var(--olive); outline-offset: 4px; border-radius: 3px; }
+.item.jump-target { animation: odi-jump-pulse 1.6s ease-out 2; }
+@keyframes odi-jump-pulse {
+  0%, 100% { filter: none; }
+  50% { filter: drop-shadow(0 0 12px var(--olive)); }
+}
+
+/* En móvil ocupa casi toda la pantalla: los resultados llevan ruta larga */
+html[data-mobile="1"] .odi-sp-backdrop { padding: 8px; align-items: stretch; }
+html[data-mobile="1"] .odi-sp { max-height: none; height: 100%; width: 100%; }
+html[data-mobile="1"] .odi-sp-hit { padding: 12px; }
+html[data-mobile="1"] .odi-sp-foot { display: none; }
+
+/* Botón del buscador del lienzo que abre el buscador global */
+.mini-search-global {
+  display: inline-flex; align-items: center; gap: 5px;
+  flex: 0 0 auto;
+  padding: 3px 7px;
+  border-radius: 6px;
+  border: 1.5px solid var(--line-soft);
+  background: var(--bg);
+  color: var(--ink-2);
+  transition: background 100ms, color 100ms;
+}
+.mini-search-global:hover { background: var(--paper); color: var(--ink); }
+.mini-search-kbd { font-family: var(--font-mono); font-size: 10px; font-weight: 700; letter-spacing: -0.02em; }
+/* Con el dedo no hay atajo de teclado que recordar */
+html[data-mobile="1"] .mini-search-kbd { display: none; }
+html[data-mobile="1"] .mini-search-global { padding: 6px; }
+
+/* ==========================================================================
+   ENLACES ENTRE NODOS Y BACKLINKS
+   ========================================================================== */
+a.odi-link {
+  color: var(--olive);
+  text-decoration: none;
+  border-bottom: 1.5px solid color-mix(in srgb, var(--olive) 45%, transparent);
+  cursor: pointer;
+  padding: 0 1px;
+  border-radius: 2px;
+  transition: background 100ms, border-color 100ms;
+}
+a.odi-link:hover {
+  background: color-mix(in srgb, var(--olive) 14%, transparent);
+  border-bottom-color: var(--olive);
+}
+[data-theme="dark"] a.odi-link { color: #A8CC7E; }
+
+.odi-backlinks { min-width: 230px; max-width: 320px; max-height: 300px; overflow-y: auto; }
+.odi-backlink {
+  display: flex; flex-direction: column; gap: 2px;
+  width: 100%; text-align: left;
+  padding: 7px 9px;
+  border-radius: 7px;
+  background: none; border: none; cursor: pointer;
+}
+.odi-backlink:hover { background: var(--bg); }
+.odi-backlink-text { font-size: 12.5px; font-weight: 700; color: var(--ink); }
+.odi-backlink-path { font-size: 11px; color: var(--ink-3); font-weight: 600; }
+
+
+
+/* ── Color de los enlaces entre nodos ──────────────────────────────────
+   Morado a propósito: el verde es el color de "activo/seleccionado" en toda la
+   app (herramienta activa, nodo destino, línea de guía), y un enlace en verde
+   se confundía con una selección. El morado no lo usa nada más. */
+:root { --odi-link: #7C5CBF; --odi-link-soft: #E9E2F7; }
+[data-theme="dark"] { --odi-link: #B49BEA; --odi-link-soft: #3A3350; }
+
+a.odi-link {
+  color: var(--odi-link);
+  border-bottom-color: color-mix(in srgb, var(--odi-link) 45%, transparent);
+}
+a.odi-link:hover {
+  background: var(--odi-link-soft);
+  border-bottom-color: var(--odi-link);
+}
+[data-theme="dark"] a.odi-link { color: var(--odi-link); }
+/* Dentro de una leyenda el enlace usaba el color de los enlaces web */
+.node-caption a.odi-link { color: var(--odi-link); text-decoration: none; }
+
+/* La leyenda de la imagen: franja propia debajo, nunca encima de la foto.
+   La leyenda se sacó del marco en el JSX (dentro quedaba recortada por su
+   overflow:hidden), y aquí el marco cede la altura que ocupa la franja. */
+.image-card .item-card { position: relative; }
+.image-card .item-card:has(> .image-caption) > .image-frame {
+  height: calc(100% - 34px) !important;
+}
+.image-card .image-caption {
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  width: auto;
+  box-sizing: border-box;
+  padding: 4px 10px;
+  background: var(--paper);
+  border-top: 1.5px solid var(--line-soft);
+  border-radius: 0;
+  backdrop-filter: none;
+  font-size: 11.5px;
+  overflow: hidden;
+}
+
+
+/* ==========================================================================
+   VISTA DE CONEXIONES
+   ========================================================================== */
+/* Botón: junto al contador de nodos, abajo a la izquierda, con el mismo
+   aspecto de pastilla que sus vecinos para que no cante. */
+.odi-graph-btn {
+  display: flex; align-items: center; gap: 6px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: var(--paper);
+  border: 1.5px solid var(--line);
+  box-shadow: var(--pop-sm);
+  color: var(--ink-2);
+  font-size: 11.5px; font-weight: 600;
+  cursor: pointer;
+  transition: color 120ms, border-color 120ms;
+}
+.odi-graph-btn:hover { color: var(--odi-link); border-color: var(--odi-link); }
+.odi-graph-btn .material-symbols-rounded { font-size: 15px; }
+html[data-mobile="1"] .odi-graph-btn span:not(.material-symbols-rounded) { display: none; }
+
+.odi-graph-backdrop {
+  position: fixed; inset: 0; z-index: 9400;
+  background: rgba(8, 7, 14, 0.72);
+  backdrop-filter: blur(6px);
+  display: grid; place-items: center;
+  padding: 0;
+  animation: fade-in 160ms var(--e-out);
+}
+/* A pantalla completa: un grafo necesita sitio, y en un recuadro pequeño los
+   grupos se amontonan y no se distingue nada. */
+.odi-graph {
+  width: 100vw; height: 100vh;
+  display: flex; flex-direction: column;
+  background: #14121F;
+  border: none; border-radius: 0;
+  overflow: hidden;
+  animation: fade-in 200ms var(--e-out);
+}
+.odi-graph-head {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 18px;
+  border-bottom: 1px solid rgba(255,255,255,0.09);
+  font-size: 13.5px;
+  color: #EDEAF6;
+  flex: 0 0 auto;
+  background: rgba(255,255,255,0.02);
+}
+.odi-graph-head > .material-symbols-rounded { color: #B49BEA; font-size: 21px; }
+.odi-graph-count { color: rgba(237,234,246,0.5); font-size: 11.5px; font-weight: 600; }
+.odi-graph-legend { margin-left: auto; display: flex; align-items: center; gap: 8px; font-size: 11px; color: rgba(237,234,246,0.5); font-weight: 600; }
+.odi-graph-legend i { width: 15px; height: 2.5px; border-radius: 2px; display: inline-block; }
+.odi-legend-nest { background: rgba(237,234,246,0.4); }
+.odi-legend-link { background: #B49BEA; }
+/* Escala de capas. Las bolitas son redondas para no confundirlas con las rayas
+   de arriba, que representan relaciones y no nodos. */
+.odi-legend-capas {
+  display: flex; align-items: center; gap: 8px;
+  padding-left: 9px; margin-left: 2px;
+  border-left: 1px solid rgba(255,255,255,0.12);
+  flex-wrap: wrap;
+}
+.odi-legend-capa { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+.odi-graph-legend .odi-legend-capa b,
+.odi-graph-foot .odi-legend-capa b {
+  width: 9px; height: 9px; border-radius: 50%; display: inline-block; flex: 0 0 auto;
+}
+.odi-legend-board { background: transparent; box-shadow: inset 0 0 0 1.6px rgba(255,255,255,0.65); }
+.odi-graph-foot .odi-legend-capa { color: rgba(237,234,246,0.55); font-size: 11.5px; font-weight: 600; }
+.odi-graph-close, .odi-graph-zoom {
+  display: grid; place-items: center; width: 32px; height: 32px;
+  border-radius: 8px; color: rgba(237,234,246,0.65);
+}
+.odi-graph-close:hover, .odi-graph-zoom:hover { background: rgba(255,255,255,0.09); color: #fff; }
+
+.odi-graph-canvas {
+  flex: 1 1 auto; position: relative; overflow: hidden;
+  background:
+    radial-gradient(circle at 50% 45%, #241F38 0%, #14121F 62%),
+    #14121F;
+  cursor: grab;
+}
+.odi-graph-canvas:active { cursor: grabbing; }
+.odi-graph-empty { display: grid; place-items: center; height: 100%; color: rgba(237,234,246,0.45); font-size: 13px; padding: 20px; text-align: center; }
+
+.odi-edge { stroke-width: 1.1; }
+.odi-edge.is-nest { stroke: #6E6A85; }
+.odi-edge.is-link { stroke: #B49BEA; stroke-width: 1.7; }
+
+.odi-gnode { cursor: pointer; }
+/* El halo se consigue con el filtro de desenfoque del SVG; la transición del
+   relleno hace que encenderse al pasar el ratón no sea un salto brusco. */
+/* El color lo pone la vista según la capa de anidamiento del nodo, así que aquí
+   solo queda la transición y el resalte al pasar por encima. El señalado se
+   marca con un aro blanco en vez de cambiándole el color: si se lo cambiara,
+   dejaría de verse a qué capa pertenece justo cuando lo estás mirando. */
+.odi-gcircle { fill: #8E86B8; transition: r 140ms ease; }
+.odi-gcircle.is-hover { stroke: #FFFFFF; stroke-width: 2; }
+.odi-gring { fill: none; stroke: rgba(255,255,255,0.55); stroke-width: 1.4; pointer-events: none; }
+.odi-glabel { font-weight: 700; fill: rgba(237,234,246,0.92); font-family: var(--font-display); pointer-events: none; paint-order: stroke; stroke: #14121F; stroke-width: 3px; }
+
+.odi-graph-foot {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 18px;
+  border-top: 1px solid rgba(255,255,255,0.09);
+  font-size: 12px; color: #EDEAF6;
+  flex: 0 0 auto; min-height: 40px;
+  background: rgba(255,255,255,0.02);
+}
+.odi-graph-path { color: rgba(237,234,246,0.5); font-size: 11.5px; font-weight: 600; }
+.odi-graph-deg { margin-left: auto; color: #B49BEA; font-weight: 700; font-size: 11.5px; }
+.odi-graph-hint { color: rgba(237,234,246,0.45); font-size: 11.5px; }
+
+/* Explicación del atajo señalado. Posición FIJA y fuera de la lista: colgarla
+   de la fila con ::after no servía, porque la lista de atajos tiene scroll y
+   el globo quedaba recortado por su contenedor — se veía el cursor de ayuda
+   pero nunca el texto. */
+.odi-sh-row { cursor: help; }
+.odi-sh-tip {
+  position: fixed;
+  z-index: 10050;
+  min-width: 240px;
+  max-width: 380px;
+  padding: 10px 12px;
+  background: var(--ink);
+  color: var(--bg);
+  border-radius: 9px;
+  font-size: 11.5px;
+  font-weight: 500;
+  line-height: 1.5;
+  box-shadow: 0 8px 26px rgba(0,0,0,0.34);
+  pointer-events: none;
+  animation: fade-in 110ms var(--e-out);
+}
+
+/* El cursor cuenta lo que se puede hacer: sobre un nodo, agarrarlo. */
+.odi-gnode { cursor: grab; }
+.odi-gnode:active { cursor: grabbing; }

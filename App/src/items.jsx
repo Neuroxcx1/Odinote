@@ -852,7 +852,6 @@ function ImageItem({ item, lang, onUpdate, callbacks }) {
 
               </>
             )}
-            {item.showCaption && <NodeCaption item={item} lang={lang} onUpdate={onUpdate} className="image-caption"/>}
             {!isCropping && (
               <button
                 className="image-change-btn"
@@ -882,6 +881,13 @@ function ImageItem({ item, lang, onUpdate, callbacks }) {
               {window.t('Clic · pegar · soltar imagen', 'Click · paste · drop image')}
             </span>
           </div>
+        )}
+        {/* La leyenda va FUERA del marco de la imagen a propósito. Dentro
+            quedaba superpuesta sobre la foto, y el marco tiene overflow:hidden,
+            así que tampoco se podía sacar solo con CSS: se recortaba. Aquí
+            abajo tiene su propia franja y la imagen se ve entera. */}
+        {item.showCaption && (
+          <NodeCaption item={item} lang={lang} onUpdate={onUpdate} className="image-caption"/>
         )}
         <input ref={fileRef} type="file" accept="image/*" style={{display:'none'}} onChange={onPick}/>
       </div>
@@ -3879,16 +3885,27 @@ function BigTitleItem({ item, lang, editing, onUpdate }) {
   const fontStyle = item.italic ? 'italic' : 'normal';
   const textDecoration = [item.underline && 'underline', item.strike && 'line-through'].filter(Boolean).join(' ') || 'none';
 
+  // innerHTML y no innerText: leer con innerText borraba cualquier etiqueta al
+  // guardar, así que un enlace insertado en un título desaparecía en el mismo
+  // instante en que se escribía. El título sigue sin tener formato propio —su
+  // negrita, color y alineación son propiedades del nodo—, pero ahora puede
+  // contener enlaces a otros nodos como las notas.
   React.useEffect(() => {
     if (!ref.current) return;
-    if (ref.current.innerText !== (text || '')) {
-      ref.current.innerText = text || '';
+    const sano = window.repairEscapedMarkup ? window.repairEscapedMarkup(text || '') : (text || '');
+    if (ref.current.innerHTML !== sano) {
+      ref.current.innerHTML = sano;
+    }
+    // Si estaba escapado, se deja arreglado también en los datos, para que no
+    // vuelva a salir el marcado a la vista en el próximo arranque.
+    if (sano !== (text || '')) {
+      onUpdate({ content: { es: sano, en: sano } });
     }
   }, [item.id, text]);
 
   const onInput = () => {
     if (!ref.current) return;
-    onUpdate({ content: { es: ref.current.innerText, en: ref.current.innerText } });
+    onUpdate({ content: { es: ref.current.innerHTML, en: ref.current.innerHTML } });
   };
 
   const hasColor = item.color && item.color !== 'transparent';
