@@ -1141,6 +1141,18 @@ function LinkItem({ item, lang, onUpdate, editing, onEndEdit }) {
 }
 
 // ──────────────── TODO ────────────────
+// Las tareas se guardaban como texto plano y ahora se guardan con formato. Al
+// abrir una lista escrita antes hay que decidir cuál de las dos cosas es lo que
+// hay: si el texto no trae ninguna etiqueta de las que genera el programa, es
+// texto plano y se escapa. Sin esto, una tarea que dijera "arreglar x < y" se
+// interpretaría como marcado y desaparecería media línea.
+const ETIQUETAS_DE_FILA = /<\/?(b|i|u|s|em|strong|strike|br|span|a|font)[ >\/]/i;
+function htmlDeFila(txt) {
+  const t = txt == null ? '' : String(txt);
+  if (ETIQUETAS_DE_FILA.test(t)) return t;
+  return t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
 function TodoItem({ item, lang, onUpdate, editing, callbacks }) {
   const subs = item.items || [];
   const bg = window.nodeBg(item);
@@ -1434,32 +1446,58 @@ function TodoItem({ item, lang, onUpdate, editing, callbacks }) {
                   onMouseDown={(e)=>{ callbacks?.selectItem?.(item.id); e.stopPropagation(); }}
                 />
                 <div className="todo-row-body">
-                  <textarea
+                  {/* Texto con formato, no texto plano.
+                      Antes esto era un <textarea>, y en un <textarea> no cabe el
+                      formato: la negrita tenía que guardarse como propiedad de
+                      la TAREA ENTERA, así que se aplicaba a toda la línea aunque
+                      solo hubieras marcado una palabra. Siendo un editable con
+                      formato, la negrita, la cursiva, el color y los enlaces se
+                      aplican a lo seleccionado, igual que en una nota. Las
+                      propiedades antiguas se respetan como estilo de base de la
+                      fila, para no cambiar lo que ya estaba escrito. */}
+                  <div
                     className="todo-input"
-                    value={pickLang(ti.text, lang)}
-                    placeholder={window.t('Tarea…', 'Task…')}
+                    contentEditable
+                    suppressContentEditableWarning
                     spellCheck={true}
-                    rows={1}
-                    onChange={(e)=>{
-                      updateRow(idx, { text: { es: e.target.value, en: e.target.value } });
-                      e.target.style.height = '0px';
-                      e.target.style.height = e.target.scrollHeight + 'px';
-                    }}
+                    data-placeholder={window.t('Tarea…', 'Task…')}
                     ref={(el) => {
-                      if (el) {
-                        el.style.height = '0px';
-                        el.style.height = el.scrollHeight + 'px';
+                      if (!el) return;
+                      const html = htmlDeFila(pickLang(ti.text, lang));
+                      // Solo se escribe si hace falta, y nunca mientras se está
+                      // escribiendo: rehacer el contenido manda el cursor al
+                      // principio en cada tecla.
+                      if (el.innerHTML !== html && document.activeElement !== el) {
+                        el.innerHTML = html;
                       }
+                    }}
+                    onInput={(e)=>{
+                      const html = e.currentTarget.innerHTML;
+                      updateRow(idx, { text: { es: html, en: html } });
                     }}
                     onClick={(e)=>e.stopPropagation()}
                     onMouseDown={(e)=>{ callbacks?.selectItem?.(item.id); e.stopPropagation(); }}
                     onFocus={()=>{
                       setFocusedRow(ti.id);
+                      // Al escribir en una tarea se entra en modo edición, igual
+                      // que en una nota. Sin esto el lienzo seguía creyendo que
+                      // el nodo solo estaba SELECCIONADO, así que la barra
+                      // lateral seguía enseñando las opciones del to-do en vez
+                      // de las del texto que estabas escribiendo.
+                      callbacks?.startEdit?.(item.id);
+                    }}
+                    onPaste={(e)=>{
+                      // Se pega como texto plano: si no, una tarea arrastra los
+                      // colores y los tamaños de la página de la que venga.
+                      e.preventDefault();
+                      const t = (e.clipboardData || window.clipboardData).getData('text/plain');
+                      document.execCommand('insertText', false, t);
                     }}
                     onKeyDown={(e)=>{
+                      const vacia = !(e.currentTarget.textContent || '').trim();
                       if (e.key === 'Enter') {
                         if (e.shiftKey) {
-                          // Let Shift+Enter insert a newline natively
+                          // Shift+Intro parte la línea dentro de la misma tarea
                         } else {
                           e.preventDefault();
                           addRow(idx);
@@ -1473,8 +1511,8 @@ function TodoItem({ item, lang, onUpdate, editing, callbacks }) {
                         e.preventDefault();
                         indentRow(idx, e.shiftKey ? -1 : +1);
                       }
-                      if (e.key === 'Backspace' && !e.target.value) {
-                        // First step out of any indentation, then (at level 0) delete the row
+                      if (e.key === 'Backspace' && vacia) {
+                        // Primero se sale de la sangría; ya en el nivel 0, se borra la fila
                         if ((ti.indent || 0) > 0) {
                           e.preventDefault();
                           indentRow(idx, -1);
@@ -1490,7 +1528,9 @@ function TodoItem({ item, lang, onUpdate, editing, callbacks }) {
                     }}
                     style={{
                       // Tamaño desde los botones A+/A− (inline: la variable CSS
-                      // heredada no llegaba hasta aquí) y formato por tarea
+                      // heredada no llegaba hasta aquí). Lo demás son las
+                      // propiedades antiguas por fila, que siguen valiendo como
+                      // estilo de base de la tarea.
                       fontSize: `calc(13px * var(--node-scale, 1) * ${item.textScale || 1})`,
                       fontWeight: ti.bold ? 700 : undefined,
                       fontStyle: ti.italic ? 'italic' : undefined,

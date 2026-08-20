@@ -1183,6 +1183,22 @@ body.odi-busy iframe { pointer-events: none !important; }
   word-break: normal;
   white-space: pre-wrap;
 }
+/* La fila del to-do dejo de ser un <textarea> y pasa a ser texto con formato,
+   asi que necesita lo que un textarea traia de serie: el aviso de fila vacia y
+   que el formato no se salga de la caja. */
+.todo-input:empty::before {
+  content: attr(data-placeholder);
+  color: var(--ink-3);
+  pointer-events: none;
+}
+.todo-input:focus { outline: none; }
+/* Una tarea es una linea, no un documento: los bloques que el navegador pueda
+   crear al pegar o al partir la linea se aplanan para que no descuadren la fila. */
+.todo-input p, .todo-input div { margin: 0; display: inline; }
+.todo-input h1, .todo-input h2, .todo-input h3 { font-size: inherit; font-weight: 700; margin: 0; display: inline; }
+.todo-input img { display: none; }
+.todo-row.done .todo-input { opacity: 0.55; }
+
 .todo-add { display: flex; align-items: center; gap: 6px; margin-top: 4px; padding: 3px 0; color: var(--ink-3); cursor: pointer; font-size: calc(12px * var(--node-scale, 1)); flex-shrink: 0; }
 .todo-add:hover { color: var(--ink); }
 .todo-add .material-symbols-rounded { font-size: 14px; }
