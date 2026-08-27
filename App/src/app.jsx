@@ -603,7 +603,7 @@ function App() {
   const ignoreNextPersistRef = React.useRef(false);
   const isIncomingRemoteChangeRef = React.useRef(false);
 
-  const CURRENT_VERSION = '1.0.6'; // debe coincidir con package.json
+  const CURRENT_VERSION = '1.0.7'; // debe coincidir con package.json
 
   // Compara versiones semánticas "a.b.c": devuelve true si `latest` > `current`
   const isNewerVersion = (latest, current) => {
