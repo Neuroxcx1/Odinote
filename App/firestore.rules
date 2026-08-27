@@ -37,7 +37,11 @@ service cloud.firestore {
       }
 
       // La sala solo dice quién la abrió y cuándo. Nada más cabe dentro.
-      allow get, list: if conSesion();
+      //
+      // `get` y no `list`: se puede consultar una sala si sabes su código,
+      // pero nadie puede pedir la lista de salas abiertas. Sin esto, el código
+      // dejaría de ser una llave — bastaría con mirar cuáles hay.
+      allow get: if conSesion();
 
       allow create: if conSesion()
         && codigo.size() >= 6 && codigo.size() <= 32
