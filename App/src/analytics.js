@@ -30,6 +30,19 @@
   }
   window.odiTrack = odiTrack;
 
+  // Escritorio y web separados SIN tocar nada en la consola.
+  //
+  // La forma fina de separarlos es la propiedad odi_platform de arriba, pero
+  // para verla hay que darla de alta como dimensión personalizada en Google
+  // Analytics, y hasta que eso pase el dato se recoge y no se puede mirar.
+  // Un nombre de evento distinto por plataforma sale en el informe de eventos
+  // tal cual, sin configurar nada: dos contadores que se leen de un vistazo.
+  function odiTrackPorPlataforma(nombre, params) {
+    odiTrack(nombre, params);
+    odiTrack(nombre + '_' + (window.ODINOTE_PLATFORM || 'x'), params);
+  }
+  window.odiTrackPorPlataforma = odiTrackPorPlataforma;
+
   // ── Minutos de uso de verdad ──
   //
   // El "tiempo de interacción" que da Analytics por su cuenta se queda corto
@@ -61,14 +74,14 @@
       // El número acumulado permite ver la distribución (cuánta gente pasa del
       // minuto 5, del 20…), que es lo que de verdad dice si la aplicación se
       // usa o solo se prueba.
-      odiTrack('uso_activo', { minuto: minutos });
+      odiTrackPorPlataforma('uso_activo', { minuto: minutos });
     }, MINUTO);
   }
 
   // ── Apertura ──
   function anunciaApertura() {
     if (!activo()) return;
-    odiTrack('app_abierta', {
+    odiTrackPorPlataforma('app_abierta', {
       tema: document.body.getAttribute('data-theme') || 'light',
       idioma: (window.currentLang || 'es'),
       // Ancho en tramos, no exacto: sirve para saber si hay que cuidar el móvil
