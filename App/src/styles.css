@@ -4759,3 +4759,22 @@ html[data-touch="1"] .handle::before {
   .ms-join-top span:not(.material-symbols-rounded) { display: none; }
   .ms-join-top { padding: 7px 9px; }
 }
+
+/* ── Los botones de cada proyecto, en modo lista ──
+   Están colocados en la esquina de la PORTADA, que en modo cuadrícula es la
+   franja ancha de arriba y funciona bien. En lista la portada se encoge a una
+   miniatura de 84 px a la izquierda, así que los tres botones aterrizaban
+   encima de ella, tapándola y pisándose entre sí.
+   En lista se anclan al final de la FILA, que es donde se esperan. */
+.ms-grid-list .ms-project-card { position: relative; }
+.ms-grid-list .ms-card-actions {
+  top: 50%;
+  right: 14px;
+  transform: translateY(-50%);
+  /* Fuera de la portada: la referencia pasa a ser la fila entera. */
+  position: absolute;
+}
+/* La portada deja de ser el marco de referencia solo en este modo. */
+.ms-grid-list .ms-project-cover { position: static; }
+/* Con el dedo no hay "pasar por encima", así que se ven siempre. */
+html[data-touch="1"] .ms-grid-list .ms-card-actions { opacity: 1; }
