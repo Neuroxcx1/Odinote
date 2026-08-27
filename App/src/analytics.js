@@ -91,11 +91,19 @@
     arrancaLatido();
   }
 
-  if (document.readyState === 'complete' || document.readyState === 'interactive') {
-    setTimeout(anunciaApertura, 1200);
-  } else {
-    window.addEventListener('DOMContentLoaded', () => setTimeout(anunciaApertura, 1200));
-  }
+  // Se espera a que la aplicación esté viva de verdad antes de anunciar nada.
+  //
+  // Este archivo es JavaScript normal y se ejecuta de inmediato, pero el resto
+  // de la aplicación son .jsx que Babel traduce en el navegador y tardan un
+  // rato largo en arrancar. Si se avisaba a ciegas a los 1,2 segundos, la
+  // versión salía en blanco justo en el evento más importante — y en un
+  // ordenador lento el aviso llegaba antes que la propia aplicación.
+  let esperas = 0;
+  (function esperaALaApp() {
+    if (window.ODINOTE_BUILD) { anunciaApertura(); return; }
+    if (++esperas > 60) { anunciaApertura(); return; }  // 30 s: algo falló, se avisa igual
+    setTimeout(esperaALaApp, 500);
+  })();
 
   if (typeof module !== 'undefined' && module.exports) module.exports = { odiTrack };
 })();
