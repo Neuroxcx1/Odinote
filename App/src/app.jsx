@@ -47,7 +47,7 @@ try {
 
 // Marcador de build: si la consola no muestra esta versión, el navegador está
 // sirviendo JS cacheado (subir ?v= en index.html invalida la caché)
-window.ODINOTE_BUILD = 'v94';
+window.ODINOTE_BUILD = 'v95';
 console.log('[ODINOTE] Código cargado: ' + window.ODINOTE_BUILD);
 
 // Global shortcuts configuration
@@ -559,10 +559,46 @@ function App() {
     }
   };
 
+  // Unirse desde el menú principal, donde todavía no hay ningún lienzo abierto.
+  //
+  // El mando de la sesión vive dentro del lienzo, así que antes hay que abrir
+  // uno. Pedirle a la persona que "abra un proyecto primero" para poder entrar
+  // al de otro no tiene ningún sentido: se abre solo. Se prefiere el último
+  // que estuviera usando, y si no tiene ninguno se le crea uno para la ocasión.
+  const abreLienzoParaUnirse = async () => {
+    if (window.__odiVivo) return true;
+    const candidato = projects.find(p => !p.deleted);
+    if (candidato) {
+      openProject(candidato.id);
+    } else {
+      const nuevo = {
+        id: `proj-${Date.now()}`,
+        name: { es: 'Sesión compartida', en: 'Shared session' },
+        emoji: '🤝',
+        cover: 'linear-gradient(135deg, #A8BEE4 0%, #D5E1F6 100%)',
+        starred: false,
+      };
+      createProject(nuevo);
+      openProject(nuevo.id);
+    }
+    // Esperar a que el lienzo se monte de verdad (los .jsx los traduce Babel
+    // en el navegador y tarda un poco en un equipo lento).
+    for (let i = 0; i < 40; i++) {
+      await new Promise(r => setTimeout(r, 150));
+      if (window.__odiVivo) return true;
+    }
+    return false;
+  };
+
   const entraSalaEnVivo = async (codigo) => {
     if (!window.__odiVivo) {
-      showToast(window.t('Abre un proyecto antes de unirte a una sesión.', 'Open a project before joining a session.'), 'error');
-      return;
+      setSalaOcupada(true);
+      const listo = await abreLienzoParaUnirse();
+      setSalaOcupada(false);
+      if (!listo) {
+        showToast(window.t('No se pudo abrir un lienzo para la sesión.', 'Could not open a canvas for the session.'), 'error');
+        return;
+      }
     }
     setSalaOcupada(true);
     setSalaError(null);

@@ -4673,3 +4673,63 @@ html[data-mobile="1"] .odi-graph-btn span:not(.material-symbols-rounded) { displ
   box-shadow: 0 1px 4px rgba(0,0,0,0.25);
   font-family: var(--font-body);
 }
+
+/* ── El grafo de conexiones en un celular ──
+   La cabecera era una sola fila con título, cuenta, leyenda y dos botones. En
+   vertical no cabe: la leyenda empujaba y el botón de cerrar quedaba fuera de
+   la pantalla, así que no había forma de salir del grafo. La leyenda se
+   esconde de la cabecera (ya está entera abajo, en el pie) y los botones se
+   quedan siempre a la vista. */
+html[data-mobile="1"] .odi-graph-head {
+  gap: 8px;
+  padding: 10px 12px;
+  font-size: 12.5px;
+}
+html[data-mobile="1"] .odi-graph-head > .odi-graph-legend { display: none; }
+html[data-mobile="1"] .odi-graph-head > strong {
+  flex: 0 1 auto; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+html[data-mobile="1"] .odi-graph-count {
+  flex: 1 1 auto; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: 11px;
+}
+/* Que no los encoja nadie: son la única salida del grafo. */
+html[data-mobile="1"] .odi-graph-close,
+html[data-mobile="1"] .odi-graph-zoom {
+  flex: 0 0 auto;
+  width: 38px; height: 38px;   /* dedo, no ratón */
+}
+/* El pie con la leyenda sí puede ocupar varias líneas. */
+html[data-mobile="1"] .odi-graph-foot {
+  flex-wrap: wrap;
+  row-gap: 6px;
+}
+
+/* ── Calidad de vida con el dedo ── */
+
+/* La lámina que se lleva el arrastre del nodo elegido. Invisible a propósito:
+   lo que se ve debajo es el nodo de siempre. Va por debajo de los tiradores de
+   tamaño, para que redimensionar siga ganando en las esquinas. */
+.item-drag-shield {
+  position: absolute; inset: 0;
+  z-index: 9;
+  cursor: grab;
+  touch-action: none;
+  background: transparent;
+}
+
+/* Los tiradores de tamaño, del tamaño de un dedo y no de un puntero.
+   La zona sensible ya era grande, pero el cuadradito de 10 px casi no se veía
+   en una pantalla de teléfono y no invitaba a agarrarlo. */
+html[data-touch="1"] .handle {
+  width: 18px; height: 18px;
+  border-width: 2px;
+  border-radius: 4px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+}
+html[data-touch="1"] .handles { inset: -10px; }
+html[data-touch="1"] .handle::before {
+  top: -14px; left: -14px; right: -14px; bottom: -14px;
+}

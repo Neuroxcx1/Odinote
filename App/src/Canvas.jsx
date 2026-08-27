@@ -4973,6 +4973,37 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
                       ))}
                     </div>
                   )}
+                  {/* Con el dedo: arrastrar desde CUALQUIER punto del nodo.
+                      Un calendario o una tabla son una rejilla de controles
+                      pequeños, y al tocarlos el dedo caía siempre en una
+                      casilla en vez de en el nodo: había que acertarle al
+                      borde para poder moverlo. Con el nodo ya elegido, esta
+                      lámina invisible se lleva el arrastre; un toque limpio
+                      sobre ella entra a editar, que es lo que se quería hacer
+                      al tocar dentro. Se aparta sola mientras se edita. */}
+                  {window.odiIsTouch && window.odiIsTouch() &&
+                   selected === item.id && !isEditing && croppingId !== item.id &&
+                   ['calendar', 'table', 'todo', 'column', 'map'].includes(item.type) && (
+                    <div
+                      className="item-drag-shield"
+                      onMouseDown={(e) => {
+                        const x0 = e.clientX, y0 = e.clientY;
+                        let movido = false;
+                        const alMover = (ev) => {
+                          if (Math.hypot(ev.clientX - x0, ev.clientY - y0) > 6) movido = true;
+                        };
+                        const alSoltar = () => {
+                          window.removeEventListener('mousemove', alMover);
+                          window.removeEventListener('mouseup', alSoltar);
+                          if (!movido) setEditing(item.id);
+                        };
+                        window.addEventListener('mousemove', alMover);
+                        window.addEventListener('mouseup', alSoltar);
+                        startDragItem(e, item.id);
+                      }}
+                    />
+                  )}
+
                   {/* Resize handles */}
                   {(selected === item.id || (selectedIds.includes(item.id) && selectedIds.length > 1)) && !isEditing && croppingId !== item.id && (
                     <div className="handles">
