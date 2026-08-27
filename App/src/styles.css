@@ -4735,29 +4735,54 @@ html[data-touch="1"] .handle::before {
 }
 
 /* Unirse a una sesión, en la barra de arriba del inicio.
+
    Con texto y no solo icono: es la puerta de entrada para quien llega con un
-   código en la mano, y un icono suelto no se lee como "entra aquí". */
+   código en la mano, y un icono suelto no se lee como "entra aquí".
+
+   Relleno y no transparente: al lado de siete botones de icono, un contorno
+   fino se leía como un adorno más y la gente pasaba de largo. Y el punto que
+   late dice de qué va sin tener que explicarlo — es lo mismo que se ve en
+   cualquier sitio para decir "esto es en directo". */
 .ms-join-top {
-  display: flex; align-items: center; gap: 7px;
-  margin-right: 10px;
-  padding: 7px 13px;
+  display: flex; align-items: center; gap: 8px;
+  margin-right: 12px;
+  padding: 8px 15px 8px 13px;
   border-radius: 8px;
-  border: 1.5px solid var(--olive, #6A8546);
-  background: transparent;
-  color: var(--olive, #6A8546);
+  border: 1.5px solid var(--line);
+  background: var(--olive, #6A8546);
+  color: #FFFFFF;
   font-size: 12.5px; font-weight: 700;
   white-space: nowrap;
   cursor: pointer;
-  transition: background 120ms, transform 140ms var(--e-out);
+  box-shadow: var(--pop-sm);
+  transition: transform 140ms var(--e-out), box-shadow 140ms var(--e-out), background 120ms;
 }
-.ms-join-top .material-symbols-rounded { font-size: 18px; }
-.ms-join-top:hover { background: rgba(106, 133, 70, 0.10); }
-[data-theme="dark"] .ms-join-top { border-color: #7FA85A; color: #A8D183; }
-[data-theme="dark"] .ms-join-top:hover { background: rgba(144, 185, 104, 0.14); }
+.ms-join-top .material-symbols-rounded { font-size: 19px; color: #FFFFFF; }
+.ms-join-top:hover { background: #7FA85A; transform: translate(-1px, -2px); box-shadow: var(--pop-hover); }
+.ms-join-top:active { transform: translate(1px, 1px); box-shadow: 0 0 0 0 var(--line); }
+[data-theme="dark"] .ms-join-top { background: #5B7F44; border-color: #1A1A1A; }
+[data-theme="dark"] .ms-join-top:hover { background: #6D9552; }
+
+/* El punto que late: "hay sesiones esperando". */
+.ms-join-top::after {
+  content: '';
+  width: 7px; height: 7px; border-radius: 50%;
+  background: #EAF5DE;
+  box-shadow: 0 0 0 0 rgba(234, 245, 222, 0.7);
+  animation: latido-sesion 2s ease-out infinite;
+  flex: 0 0 auto;
+}
+@keyframes latido-sesion {
+  0%   { box-shadow: 0 0 0 0 rgba(234, 245, 222, 0.7); }
+  70%  { box-shadow: 0 0 0 7px rgba(234, 245, 222, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(234, 245, 222, 0); }
+}
 /* En una ventana estrecha se queda solo el icono, para no empujar al resto. */
 @media (max-width: 1100px) {
   .ms-join-top span:not(.material-symbols-rounded) { display: none; }
-  .ms-join-top { padding: 7px 9px; }
+  .ms-join-top::after { display: none; }
+  .ms-join-top { padding: 8px 10px; }
+}
 }
 
 /* ── Los botones de cada proyecto, en modo lista ──
