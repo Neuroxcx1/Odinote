@@ -47,7 +47,7 @@ try {
 
 // Marcador de build: si la consola no muestra esta versión, el navegador está
 // sirviendo JS cacheado (subir ?v= en index.html invalida la caché)
-window.ODINOTE_BUILD = 'v88';
+window.ODINOTE_BUILD = 'v92';
 console.log('[ODINOTE] Código cargado: ' + window.ODINOTE_BUILD);
 
 // Global shortcuts configuration
@@ -528,6 +528,69 @@ function App() {
   const [activeSharingProjectId, setActiveSharingProjectId] = useStateApp(null);
   const [joiningModalOpen, setJoiningModalOpen] = useStateApp(false);
   const [inviteEmail, setInviteEmail] = useStateApp('');
+
+  // ── Sesión en vivo ──
+  // El mando lo tiene Canvas (window.__odiVivo), porque el lienzo es quien
+  // sabe qué ha cambiado. Aquí solo está la ventana con el código.
+  const [salaCodigo, setSalaCodigo] = useStateApp(null);
+  const [salaOcupada, setSalaOcupada] = useStateApp(false);
+  const [salaError, setSalaError] = useStateApp(null);
+  const codigoEntradaRef = React.useRef(null);
+
+  const abreSalaEnVivo = async () => {
+    if (!window.__odiVivo) {
+      showToast(window.t('Abre un proyecto antes de empezar una sesión.', 'Open a project before starting a session.'), 'error');
+      return;
+    }
+    setSalaOcupada(true);
+    setSalaError(null);
+    try {
+      const r = await window.__odiVivo.conecta({ modo: 'abrir', nombre: (userProfile && userProfile.name) || 'Anfitrión' });
+      setSalaCodigo(r.codigo);
+      window.odiTrack && window.odiTrack('sala_abierta', {});
+    } catch (err) {
+      console.error('[SALA] no se pudo abrir', err);
+      setSalaError(err.message === 'sin-soporte'
+        ? window.t('Este navegador no admite las sesiones en vivo.', 'This browser does not support live sessions.')
+        : window.t('No se pudo abrir la sala: ' + err.message, 'Could not open the room: ' + err.message));
+      window.odiTrack && window.odiTrack('sala_abierta_fallo', { motivo: String(err.message).slice(0, 60) });
+    } finally {
+      setSalaOcupada(false);
+    }
+  };
+
+  const entraSalaEnVivo = async (codigo) => {
+    if (!window.__odiVivo) {
+      showToast(window.t('Abre un proyecto antes de unirte a una sesión.', 'Open a project before joining a session.'), 'error');
+      return;
+    }
+    setSalaOcupada(true);
+    setSalaError(null);
+    try {
+      await window.__odiVivo.conecta({ modo: 'entrar', codigo, nombre: (userProfile && userProfile.name) || 'Invitado' });
+      setSalaCodigo(String(codigo).trim().toUpperCase());
+      setJoiningModalOpen(false);
+      showToast(window.t('Conectado. Vas a ver el proyecto del anfitrión.', 'Connected. You will see the host\'s project.'));
+      window.odiTrack && window.odiTrack('sala_unido', {});
+    } catch (err) {
+      console.error('[SALA] no se pudo entrar', err);
+      const motivos = {
+        'sala-no-existe': window.t('Ese código no corresponde a ninguna sesión abierta.', 'That code does not match any open session.'),
+        'es-tu-propia-sala': window.t('Ese es tu propio código: dáselo a la otra persona.', 'That is your own code: give it to the other person.'),
+        'sin-soporte': window.t('Este navegador no admite las sesiones en vivo.', 'This browser does not support live sessions.'),
+      };
+      setSalaError(motivos[err.message] || window.t('No se pudo conectar: ' + err.message, 'Could not connect: ' + err.message));
+      window.odiTrack && window.odiTrack('sala_unido_fallo', { motivo: String(err.message).slice(0, 60) });
+    } finally {
+      setSalaOcupada(false);
+    }
+  };
+
+  const cierraSalaEnVivo = async () => {
+    if (window.__odiVivo) await window.__odiVivo.desconecta();
+    setSalaCodigo(null);
+    setSalaError(null);
+  };
   const [inviteBusy, setInviteBusy] = useStateApp(false);
 
   useEffectApp(() => {
@@ -2955,9 +3018,88 @@ function App() {
                     {window.t('Colaboración en línea', 'Online Collaboration')}
                   </h3>
                 </div>
-                <button className="icon-btn lift" onClick={() => setSharingModalOpen(false)}>
+                <button className="icon-btn lift" onClick={() => { setSharingModalOpen(false); }}>
                   <span className="material-symbols-rounded">close</span>
                 </button>
+              </div>
+
+              {/* ── Sesión en vivo ──
+                  Va lo primero porque es lo que se busca al abrir esta ventana:
+                  trabajar CON alguien ahora mismo. Lo de Drive de más abajo es
+                  otra cosa —guardar en la nube— y se explica sola. */}
+              <div style={{
+                border: '1.5px solid var(--line-soft, #D5D1CD)', borderRadius: '10px',
+                padding: '14px', marginBottom: '18px',
+                background: salaCodigo ? 'rgba(144, 185, 104, 0.08)' : 'var(--bg-card, #FFFFFF)',
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                  <span className="material-symbols-rounded" style={{ fontSize: 20, color: salaCodigo ? 'var(--brand-green, #90B968)' : 'var(--text-soft)' }}>
+                    {salaCodigo ? 'sensors' : 'groups'}
+                  </span>
+                  <strong style={{ fontSize: '13.5px' }}>{window.t('Trabajar juntos ahora', 'Work together now')}</strong>
+                </div>
+
+                {!salaCodigo ? (
+                  <>
+                    <p style={{ margin: '0 0 12px 0', fontSize: '11.5px', color: 'var(--text-soft)', lineHeight: 1.45 }}>
+                      {window.t(
+                        'Comparte un código y veréis el mismo lienzo a la vez, cada uno con su cursor de color. Los cambios viajan directos entre vuestros equipos, sin pasar por ningún servidor.',
+                        'Share a code and you will both see the same canvas at once, each with a coloured cursor. Changes travel straight between your machines, through no server.'
+                      )}
+                    </p>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <button
+                        className="btn lift"
+                        disabled={salaOcupada}
+                        onClick={abreSalaEnVivo}
+                        style={{ flex: 1, padding: '9px 12px', borderRadius: '8px', background: 'var(--olive, #6A8546)', color: 'white', border: 'none', fontWeight: 700, fontSize: '12.5px', cursor: 'pointer', opacity: salaOcupada ? 0.6 : 1 }}
+                      >
+                        {salaOcupada ? window.t('Abriendo…', 'Opening…') : window.t('Empezar sesión', 'Start session')}
+                      </button>
+                      <button
+                        className="btn"
+                        disabled={salaOcupada}
+                        onClick={() => { setSalaError(null); setJoiningModalOpen(true); }}
+                        style={{ flex: 1, padding: '9px 12px', borderRadius: '8px', background: 'transparent', color: 'var(--ink)', border: '1.5px solid var(--line-soft)', fontWeight: 700, fontSize: '12.5px', cursor: 'pointer' }}
+                      >
+                        {window.t('Unirme con un código', 'Join with a code')}
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <p style={{ margin: '0 0 8px 0', fontSize: '11.5px', color: 'var(--text-soft)' }}>
+                      {window.t('Dale este código a quien quieras invitar:', 'Give this code to whoever you want to invite:')}
+                    </p>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <code style={{
+                        flex: 1, fontFamily: 'var(--font-mono, monospace)', fontSize: '22px', fontWeight: 800,
+                        letterSpacing: '0.16em', textAlign: 'center', padding: '10px',
+                        background: 'var(--bg-main, #E5E1DD)', borderRadius: '8px', color: 'var(--ink)',
+                      }}>{salaCodigo}</code>
+                      <button
+                        className="btn"
+                        onClick={() => { navigator.clipboard.writeText(salaCodigo); showToast(window.t('Código copiado.', 'Code copied.')); }}
+                        style={{ padding: '9px 12px', borderRadius: '8px', border: '1.5px solid var(--line-soft)', cursor: 'pointer', fontSize: '12px', fontWeight: 700 }}
+                      >
+                        {window.t('Copiar', 'Copy')}
+                      </button>
+                    </div>
+                    <button
+                      className="btn"
+                      onClick={cierraSalaEnVivo}
+                      style={{ marginTop: '10px', width: '100%', padding: '7px', borderRadius: '8px', border: '1px solid var(--wine)', color: 'var(--wine)', background: 'transparent', cursor: 'pointer', fontSize: '11.5px', fontWeight: 700 }}
+                    >
+                      {window.t('Terminar sesión en vivo', 'End live session')}
+                    </button>
+                  </>
+                )}
+
+                {salaError && (
+                  <p style={{ margin: '10px 0 0 0', fontSize: '11.5px', color: 'var(--wine, #E6544F)', lineHeight: 1.4 }}>
+                    {salaError}
+                  </p>
+                )}
               </div>
 
               {!project.isPublic ? (
@@ -3373,93 +3515,13 @@ function App() {
                 <button
                   className="btn btn-primary"
                   onClick={() => {
-                    const token = tokenInputRef.current?.value.trim();
-                    if (!token) return;
-                    if (!userProfile?.name) {
-                      showToast(window.t('Configura tu nombre en tu perfil antes de unirte.', 'Configure your name in your profile before joining.'), 'error');
-                      setUserModalOpen(true);
-                      return;
-                    }
-                    
-                    if (firestoreDB) {
-                      showToast(window.t('Conectando al servidor...', 'Connecting to server...'));
-                      firestoreDB.collection('workspaces').doc(token).get()
-                        .then((doc) => {
-                          if (!doc.exists) {
-                            showToast(window.t('Token no válido o puesto de trabajo inexistente.', 'Invalid token or non-existent workspace.'), 'error');
-                            return;
-                          }
-                          const data = doc.data();
-                          const remoteId = token; // El ID del proyecto remoto local es el mismo token
-
-                          const remoteProj = {
-                            id: remoteId,
-                            name: data.name || { en: 'Remote Workspace', es: 'Puesto Remoto' },
-                            emoji: data.emoji || '☁️',
-                            cover: data.cover || 'linear-gradient(135deg, #A8BEE4 0%, #D5E1F6 100%)',
-                            starred: false,
-                            isPublic: true,
-                            isRemote: true,
-                            shareToken: token,
-                            items: Object.keys(data.canvases || {}).length,
-                            updated: { en: 'Just now', es: 'Ahora mismo' }
-                          };
-
-                          setProjects(prev => {
-                            if (prev.some(p => p.id === remoteId)) return prev;
-                            return [remoteProj, ...prev];
-                          });
-
-                          if (data.canvases) {
-                            setCanvases(prev => ({
-                              ...prev,
-                              [remoteId]: cleanCanvases(data.canvases)
-                            }));
-                          }
-
-                          setJoiningModalOpen(false);
-                          showToast(window.t('¡Conectado al puesto de trabajo de tu amigo con éxito!', 'Connected to your friend\'s workspace successfully!'));
-                          
-                          // Abrir el proyecto directamente
-                          openProject(remoteId);
-                        })
-                        .catch((err) => {
-                          console.error("Error connecting to remote database workspace:", err);
-                          showToast(window.t('Fallo de red al conectar al puesto de trabajo.', 'Network failure connecting to workspace.'), 'error');
-                        });
-                    } else {
-                      // Fallback simulado corregido para evitar la pantalla en blanco
-                      const remoteId = 'remote-' + Math.random().toString(36).substr(2, 9);
-                      const newProj = {
-                        id: remoteId,
-                        name: { en: 'Remote Workspace (Simulated)', es: 'Puesto Remoto (Simulado)' },
-                        emoji: '☁️',
-                        cover: 'linear-gradient(135deg, #A8BEE4 0%, #D5E1F6 100%)',
-                        starred: false,
-                        isPublic: true,
-                        isRemote: true,
-                        shareToken: token,
-                        items: 3,
-                        updated: { en: 'Just now', es: 'Ahora mismo' }
-                      };
-                      setProjects(prev => [newProj, ...prev]);
-
-                      setCanvases(prev => ({
-                        ...prev,
-                        [remoteId]: {
-                          title: { es: 'Puesto Remoto (Simulado)', en: 'Remote Workspace (Simulated)' },
-                          items: [
-                            { id: '1', type: 'bigtitle', x: 200, y: 150, width: 400, height: 60, title: { es: '¡Conectado con éxito!', en: 'Connected successfully!' } },
-                            { id: '2', type: 'note', x: 200, y: 250, width: 220, height: 120, content: { es: 'Este lienzo está sincronizado a través de la red (simulado).', en: 'This canvas is synchronized over the network (simulated).' }, color: '#FAF9F6' },
-                            { id: '3', type: 'note', x: 450, y: 250, width: 220, height: 120, content: { es: 'Puedes agregar y editar tarjetas como de costumbre.', en: 'You can add and edit cards as usual.' }, color: '#FAF9F6' }
-                          ],
-                          connectors: []
-                        }
-                      }));
-
-                      setJoiningModalOpen(false);
-                      showToast(window.t('¡Conectado al puesto de trabajo de tu amigo con éxito!', 'Connected to your friend\'s workspace successfully!'));
-                    }
+                    // Antes esto fabricaba un proyecto FALSO con tres notas de
+                    // mentira y decía "conectado con éxito": Firestore estaba
+                    // apagado y la rama de verdad nunca se ejecutaba. Ahora
+                    // abre una conexión real con el equipo del anfitrión.
+                    const codigo = tokenInputRef.current?.value.trim();
+                    if (!codigo) return;
+                    entraSalaEnVivo(codigo);
                   }}
                   style={{
                     padding: '8px 16px',

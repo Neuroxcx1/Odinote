@@ -436,6 +436,173 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
     connectors: [],
   };
 
+  // ───── Sesión en vivo ─────
+  //
+  // Todo el trabajo del lienzo pasa por el estado de arriba, así que aquí está
+  // el único sitio donde hay que mirar para saber qué mandar: se compara con
+  // lo último que se envió y solo viaja la diferencia. Lo que llega del otro
+  // lado entra por _setCanvases, sin pasar por el historial y marcado para que
+  // no rebote de vuelta.
+  const sesionRef = useRefCanvas(null);
+  const ultimoEnviadoRef = useRefCanvas(null);
+  const aplicandoRemotoRef = useRefCanvas(false);
+  const [cursoresAjenos, setCursoresAjenos] = useStateCanvas({});   // uid -> {x, y, lienzo, color, nombre}
+  const [participantes, setParticipantes] = useStateCanvas([]);
+
+  const aplicaRemoto = useCallbackCanvas((ops) => {
+    if (!ops || !ops.length) return;
+    aplicandoRemotoRef.current = true;
+    skipHistory.current = true;
+    _setCanvases(prev => {
+      const next = window.OdiSync.aplica(prev, ops);
+      // Lo que llega del otro no debe volver a salir hacia él.
+      ultimoEnviadoRef.current = next;
+      return next;
+    });
+  }, []);
+
+  // Envío: cada cambio local se compara con lo último enviado.
+  useEffectCanvas(() => {
+    const s = sesionRef.current;
+    if (!s) { ultimoEnviadoRef.current = canvases; return; }
+    if (aplicandoRemotoRef.current) { aplicandoRemotoRef.current = false; return; }
+    if (ultimoEnviadoRef.current === canvases) return;
+    // Durante un arrastre se dejan pasar los cambios igual: son 50 bytes por
+    // fotograma y es justo lo que hace que el otro vea el nodo moverse.
+    const ops = window.OdiSync.diff(ultimoEnviadoRef.current || {}, canvases);
+    ultimoEnviadoRef.current = canvases;
+    if (ops.length) s.envia({ t: 'ops', ops }, null);
+  }, [canvases]);
+
+  // El puntero se manda aparte y con cuentagotas: 20 veces por segundo basta
+  // para que se vea fluido, y así no se mezcla con los cambios de verdad.
+  const ultimoCursorRef = useRefCanvas(0);
+  const mandaCursor = useCallbackCanvas((clientX, clientY) => {
+    const s = sesionRef.current;
+    if (!s) return;
+    const ahora = Date.now();
+    if (ahora - ultimoCursorRef.current < 50) return;
+    ultimoCursorRef.current = ahora;
+    const p = screenToCanvas(clientX, clientY);
+    s.envia({ t: 'cursor', x: Math.round(p.x), y: Math.round(p.y), lienzo: currentId }, null);
+  }, [currentId]);
+
+  const colorDe = (uid) => {
+    const p = participantes.find(x => x.uid === uid);
+    return (p && p.color) || '#595459';
+  };
+  const nombreDe = (uid) => {
+    const p = participantes.find(x => x.uid === uid);
+    return (p && p.nombre) || 'Invitado';
+  };
+
+  const recibeMensaje = useCallbackCanvas((m, de) => {
+    if (m.t === 'ops') { aplicaRemoto(m.ops); return; }
+
+    if (m.t === 'cursor') {
+      setCursoresAjenos(prev => ({ ...prev, [de]: { x: m.x, y: m.y, lienzo: m.lienzo, visto: Date.now() } }));
+      return;
+    }
+
+    if (m.t === 'quienes') { setParticipantes(m.lista || []); return; }
+
+    if (m.t === 'proyecto') {
+      // Quien acaba de entrar recibe el proyecto entero una sola vez y a
+      // partir de ahí solo los cambios.
+      //
+      // Se MEZCLA, no se sustituye: los lienzos que trae el anfitrión se
+      // añaden a los que ya tenía esta persona. Sustituir el estado entero le
+      // borraría del disco sus propios proyectos, porque este mismo estado es
+      // el que se guarda.
+      aplicandoRemotoRef.current = true;
+      skipHistory.current = true;
+      _setCanvases(prev => {
+        const mezcla = { ...prev, ...(m.canvases || {}) };
+        ultimoEnviadoRef.current = mezcla;
+        return mezcla;
+      });
+      // Y hay que ir a SU tablero: el invitado seguía mirando el suyo, que no
+      // existe en el proyecto del anfitrión, así que veía un lienzo vacío.
+      if (m.raiz) setStack([m.raiz]);
+      showToastCanvas(window.t('Proyecto recibido del anfitrión.', 'Project received from the host.'));
+      return;
+    }
+
+    if (m.t === 'adios') {
+      setCursoresAjenos(prev => { const n = { ...prev }; delete n[de]; return n; });
+    }
+  }, [aplicaRemoto]);
+
+  const showToastCanvas = (msg, tipo) => { window.showToast && window.showToast(msg, tipo); };
+
+  const desconectaSesion = useCallbackCanvas(async () => {
+    const s = sesionRef.current;
+    sesionRef.current = null;
+    setParticipantes([]);
+    setCursoresAjenos({});
+    if (s) await s.cierra();
+  }, []);
+
+  const conectaSesion = useCallbackCanvas(async ({ modo, codigo, nombre }) => {
+    if (sesionRef.current) await desconectaSesion();
+    const callbacks = {
+      onMensaje: recibeMensaje,
+      onParticipantes: (lista) => setParticipantes(lista),
+      onEstado: (estado, uid) => {
+        if (estado === 'conectado') {
+          showToastCanvas(window.t('Alguien se ha unido a la sesión.', 'Someone joined the session.'));
+        } else if (estado === 'desconectado' || estado === 'failed') {
+          setCursoresAjenos(prev => { const n = { ...prev }; delete n[uid]; return n; });
+        }
+      },
+      onError: (err) => {
+        console.error('[SALA]', err);
+        showToastCanvas(window.t('Error en la sesión en vivo: ' + err.message, 'Live session error: ' + err.message), 'error');
+      },
+      // Lo que se le manda a quien entra: el proyecto tal y como está ahora.
+      pideProyecto: () => ({ canvases: canvasesLiveRef.current, raiz: projectId }),
+    };
+    const s = modo === 'abrir'
+      ? await window.OdiRealtime.abreSala({ nombre, callbacks })
+      : await window.OdiRealtime.entraSala({ codigo, nombre, callbacks });
+    sesionRef.current = s;
+    ultimoEnviadoRef.current = canvasesLiveRef.current;
+    return { codigo: s.codigo };
+  }, [recibeMensaje, desconectaSesion, projectId]);
+
+  // El modal de compartir vive en app.jsx; se le deja aquí el mando, como ya
+  // se hace con otras piezas que necesitan hablar entre archivos.
+  useEffectCanvas(() => {
+    window.__odiVivo = {
+      conecta: conectaSesion,
+      desconecta: desconectaSesion,
+      activa: () => !!sesionRef.current,
+      codigo: () => sesionRef.current && sesionRef.current.codigo,
+      participantes: () => participantes,
+      diagnostico: () => sesionRef.current && sesionRef.current.diagnostico(),
+    };
+    return () => { delete window.__odiVivo; };
+  }, [conectaSesion, desconectaSesion, participantes]);
+
+  // Un cursor que lleva diez segundos sin moverse es alguien que se fue sin
+  // avisar (cerró el portátil, se cayó el wifi): se retira solo.
+  useEffectCanvas(() => {
+    if (!Object.keys(cursoresAjenos).length) return;
+    const t = setInterval(() => {
+      const corte = Date.now() - 10000;
+      setCursoresAjenos(prev => {
+        let cambio = false;
+        const n = {};
+        Object.keys(prev).forEach(k => {
+          if (prev[k].visto > corte) n[k] = prev[k]; else cambio = true;
+        });
+        return cambio ? n : prev;
+      });
+    }, 4000);
+    return () => clearInterval(t);
+  }, [cursoresAjenos]);
+
+
   useEffectCanvas(() => {
     if (canvases[currentId]) return;
     setCanvases(prev => ({
@@ -4623,6 +4790,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
           backgroundPosition: `${pan.x}px ${pan.y}px`
         }}
         onMouseDown={onSurfaceMouseDown}
+        onMouseMove={(e) => { if (sesionRef.current) mandaCursor(e.clientX, e.clientY); }}
         onDoubleClick={onSurfaceDoubleClick}
         onContextMenu={onSurfaceContextMenu}
       >
@@ -4862,6 +5030,33 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
                 })}
               </svg>
             ) : null}
+
+            {/* Cursores de las otras personas. Van dentro de la capa que se
+                mueve con el lienzo, así que si alguien señala un nodo, su
+                flecha señala ESE nodo aunque cada uno tenga el lienzo en otro
+                sitio o con otro zoom. Solo se ven los que están mirando este
+                mismo tablero. */}
+            {Object.keys(cursoresAjenos).map(uid => {
+              const c = cursoresAjenos[uid];
+              if (!c || c.lienzo !== currentId) return null;
+              const color = colorDe(uid);
+              return (
+                <div
+                  key={uid}
+                  className="odi-cursor"
+                  // El puntero se dibuja siempre del mismo tamaño: se deshace
+                  // el zoom del lienzo para que no acabe siendo una flecha
+                  // gigante al alejarse ni un punto al acercarse.
+                  style={{ left: c.x, top: c.y, transform: `scale(${1 / scale})` }}
+                >
+                  <svg width="20" height="22" viewBox="0 0 20 22" style={{ display: 'block' }}>
+                    <path d="M2 1 L2 17 L6.5 13 L9.5 20 L12.5 18.7 L9.6 12 L15.5 12 Z"
+                          fill={color} stroke="#fff" strokeWidth="1.4" strokeLinejoin="round"/>
+                  </svg>
+                  <span className="odi-cursor-nombre" style={{ background: color }}>{nombreDe(uid)}</span>
+                </div>
+              );
+            })}
 
             {/* Connector toolbar moved to left sidebar (rendered above) */}
           </div>

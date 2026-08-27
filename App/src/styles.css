@@ -4642,3 +4642,34 @@ html[data-mobile="1"] .odi-graph-btn span:not(.material-symbols-rounded) { displ
   overflow-y: auto;
   animation: fade-in 140ms var(--e-out);
 }
+
+/* ══════════════════════════════════════════════════════════════════
+   Sesión en vivo: los cursores de las otras personas
+   ══════════════════════════════════════════════════════════════════ */
+
+/* Van dentro de la capa que se mueve con el lienzo, así que su posición son
+   coordenadas del lienzo y no de la pantalla: si alguien señala una nota,
+   señala esa nota aunque cada uno tenga la vista en otro sitio. */
+.odi-cursor {
+  position: absolute;
+  pointer-events: none;
+  z-index: 9500;
+  /* El puntero no se agranda ni se encoge con el zoom: a la mitad de zoom
+     seguiría siendo un puntero del tamaño de un puntero. */
+  transform: scale(calc(1 / var(--zoom, 1)));
+  transform-origin: 0 0;
+  transition: left 90ms linear, top 90ms linear;
+  will-change: left, top;
+}
+.odi-cursor-nombre {
+  position: absolute;
+  left: 15px; top: 16px;
+  padding: 2px 7px;
+  border-radius: 10px;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.25);
+  font-family: var(--font-body);
+}
