@@ -44,50 +44,75 @@ function TextFormatSidebar({ item, lang, onUpdate, onClose, variant, noCodeQuote
     '#993844', '#1F4D3F',
   ];
 
+  // ── Qué botones salen encendidos ──
+  //
+  // Hay dos clases de nodo y no se pueden mirar igual:
+  //
+  //  · Título, marco y mapa guardan el formato como PROPIEDADES del nodo. Ahí
+  //    el estado se lee de las props en cada render y ya está. Antes se metía
+  //    en un estado que refrescaba un setInterval, y ese intervalo se quedaba
+  //    con el `item` del render en que se creó: quitarle la negrita al título
+  //    cambiaba el texto pero el botón seguía verde para siempre, así que
+  //    parecía averiado. (Solo `align` estaba en las dependencias, por eso la
+  //    alineación era lo único que respondía.)
+  //
+  //  · Notas, comentarios y tareas son HTML editable: ahí el formato depende
+  //    de dónde esté el cursor, y eso solo se puede preguntar al navegador.
+  //    Para eso sigue el sondeo — pero llamando siempre a la última versión.
+  const propActive = React.useMemo(() => {
+    if (item.type === 'bigtitle') {
+      return {
+        bold: item.bold !== false,
+        italic: !!item.italic,
+        strike: !!item.strike,
+        underline: !!item.underline,
+        alignLeft: (item.align || 'center') === 'left',
+        alignCenter: (item.align || 'center') === 'center',
+        alignRight: (item.align || 'center') === 'right',
+        alignJustify: (item.align || 'center') === 'justify',
+      };
+    }
+    if (item.type === 'frame' || item.type === 'map') {
+      return {
+        alignLeft: (item.titleAlign || 'left') === 'left',
+        alignCenter: (item.titleAlign || 'left') === 'center',
+        alignRight: (item.titleAlign || 'left') === 'right',
+        alignJustify: (item.titleAlign || 'left') === 'justify',
+      };
+    }
+    return null;
+  }, [item.type, item.bold, item.italic, item.strike, item.underline, item.align, item.titleAlign]);
+
   const refresh = () => {
+    if (propActive) return; // se lee de las props, no hay nada que sondear
     try {
-      if (item.type === 'bigtitle') {
-        setActive({
-          // El título aplica B/I/S/U a todo el nodo (texto uniforme)
-          bold: item.bold !== false,
-          italic: !!item.italic,
-          strike: !!item.strike,
-          underline: !!item.underline,
-          alignLeft: (item.align || 'center') === 'left',
-          alignCenter: (item.align || 'center') === 'center',
-          alignRight: (item.align || 'center') === 'right',
-          alignJustify: (item.align || 'center') === 'justify',
-        });
-      } else if (item.type === 'frame' || item.type === 'map') {
-        setActive({
-          alignLeft: (item.titleAlign || 'left') === 'left',
-          alignCenter: (item.titleAlign || 'left') === 'center',
-          alignRight: (item.titleAlign || 'left') === 'right',
-          alignJustify: (item.titleAlign || 'left') === 'justify',
-        });
-      } else {
-        setActive({
-          bold: document.queryCommandState('bold'),
-          italic: document.queryCommandState('italic'),
-          underline: document.queryCommandState('underline'),
-          strike: document.queryCommandState('strikeThrough'),
-          ul: document.queryCommandState('insertUnorderedList'),
-          ol: document.queryCommandState('insertOrderedList'),
-          alignLeft: document.queryCommandState('justifyLeft'),
-          alignCenter: document.queryCommandState('justifyCenter'),
-          alignRight: document.queryCommandState('justifyRight'),
-          alignJustify: document.queryCommandState('justifyFull'),
-        });
-      }
+      setActive({
+        bold: document.queryCommandState('bold'),
+        italic: document.queryCommandState('italic'),
+        underline: document.queryCommandState('underline'),
+        strike: document.queryCommandState('strikeThrough'),
+        ul: document.queryCommandState('insertUnorderedList'),
+        ol: document.queryCommandState('insertOrderedList'),
+        alignLeft: document.queryCommandState('justifyLeft'),
+        alignCenter: document.queryCommandState('justifyCenter'),
+        alignRight: document.queryCommandState('justifyRight'),
+        alignJustify: document.queryCommandState('justifyFull'),
+      });
     } catch {}
   };
 
+  // Lo que se pinta: las propiedades del nodo cuando las hay, y si no lo que
+  // diga el navegador sobre la selección actual.
+  const shown = propActive || active;
+
+  // El intervalo llama a través de una ref: así siempre ejecuta la función del
+  // último render y no la que existía cuando se montó el temporizador.
+  const refreshRef = React.useRef(refresh);
+  refreshRef.current = refresh;
   React.useEffect(() => {
-    const iv = setInterval(refresh, 250);
+    const iv = setInterval(() => refreshRef.current(), 250);
     return () => clearInterval(iv);
-    // item.items y la fila enfocada entran aquí para que los toggles B/I/S/U
-    // reflejen la tarea activa en vez de quedarse con un closure viejo
-  }, [item.id, item.align, item.titleAlign, item.items, focusedTodoRowId]);
+  }, []);
 
   // Helper: find the active contenteditable; if not focused, focus the note's editor
   const findEditor = () => {
@@ -169,22 +194,22 @@ function TextFormatSidebar({ item, lang, onUpdate, onClose, variant, noCodeQuote
         <>
           {/* En el título y en las tareas, B/I/S/U son toggles de propiedad
               (texto plano); en las notas usan execCommand por selección. */}
-          <button className={`ctx-btn ${active.bold ? 'active' : ''}`} onClick={()=> isBigTitle ? onUpdate({ bold: item.bold === false }) : exec('bold')}>
+          <button className={`ctx-btn ${shown.bold ? 'active' : ''}`} onClick={()=> isBigTitle ? onUpdate({ bold: item.bold === false }) : exec('bold')}>
             <div className="ctx-letter" style={{fontWeight: 800}}>B</div>
             <span>{lang==='es'?'Negrita':'Bold'}</span>
           </button>
 
-          <button className={`ctx-btn ${active.italic ? 'active' : ''}`} onClick={()=> isBigTitle ? onUpdate({ italic: !item.italic }) : exec('italic')}>
+          <button className={`ctx-btn ${shown.italic ? 'active' : ''}`} onClick={()=> isBigTitle ? onUpdate({ italic: !item.italic }) : exec('italic')}>
             <div className="ctx-letter" style={{fontStyle: 'italic', fontWeight: 700}}>I</div>
             <span>{lang==='es'?'Cursiva':'Italic'}</span>
           </button>
 
-          <button className={`ctx-btn ${active.strike ? 'active' : ''}`} onClick={()=> isBigTitle ? onUpdate({ strike: !item.strike }) : exec('strikeThrough')}>
+          <button className={`ctx-btn ${shown.strike ? 'active' : ''}`} onClick={()=> isBigTitle ? onUpdate({ strike: !item.strike }) : exec('strikeThrough')}>
             <div className="ctx-letter" style={{textDecoration: 'line-through', fontWeight: 700}}>S</div>
             <span>{lang==='es'?'Tachado':'Strike'}</span>
           </button>
 
-          <button className={`ctx-btn ${active.underline ? 'active' : ''}`} onClick={()=> isBigTitle ? onUpdate({ underline: !item.underline }) : exec('underline')}>
+          <button className={`ctx-btn ${shown.underline ? 'active' : ''}`} onClick={()=> isBigTitle ? onUpdate({ underline: !item.underline }) : exec('underline')}>
             <div className="ctx-letter" style={{textDecoration: 'underline', fontWeight: 700}}>U</div>
             <span>{lang==='es'?'Subrayado':'Underline'}</span>
           </button>
@@ -197,7 +222,7 @@ function TextFormatSidebar({ item, lang, onUpdate, onClose, variant, noCodeQuote
           <div className="ctx-sep-h"/>
 
           <button
-            className={`ctx-btn ${active.alignLeft ? 'active' : ''}`}
+            className={`ctx-btn ${shown.alignLeft ? 'active' : ''}`}
             onClick={()=>{
               if (isBigTitle) {
                 onUpdate({ align: 'left' });
@@ -214,7 +239,7 @@ function TextFormatSidebar({ item, lang, onUpdate, onClose, variant, noCodeQuote
           </button>
 
           <button
-            className={`ctx-btn ${active.alignCenter ? 'active' : ''}`}
+            className={`ctx-btn ${shown.alignCenter ? 'active' : ''}`}
             onClick={()=>{
               if (isBigTitle) {
                 onUpdate({ align: 'center' });
@@ -231,7 +256,7 @@ function TextFormatSidebar({ item, lang, onUpdate, onClose, variant, noCodeQuote
           </button>
 
           <button
-            className={`ctx-btn ${active.alignRight ? 'active' : ''}`}
+            className={`ctx-btn ${shown.alignRight ? 'active' : ''}`}
             onClick={()=>{
               if (isBigTitle) {
                 onUpdate({ align: 'right' });
@@ -248,7 +273,7 @@ function TextFormatSidebar({ item, lang, onUpdate, onClose, variant, noCodeQuote
           </button>
 
           <button
-            className={`ctx-btn ${active.alignJustify ? 'active' : ''}`}
+            className={`ctx-btn ${shown.alignJustify ? 'active' : ''}`}
             onClick={()=>{
               if (isBigTitle) {
                 onUpdate({ align: 'justify' });
@@ -270,12 +295,12 @@ function TextFormatSidebar({ item, lang, onUpdate, onClose, variant, noCodeQuote
         <>
           <div className="ctx-sep-h"/>
 
-          <button className={`ctx-btn ${active.ul ? 'active' : ''}`} onClick={()=>exec('insertUnorderedList')}>
+          <button className={`ctx-btn ${shown.ul ? 'active' : ''}`} onClick={()=>exec('insertUnorderedList')}>
             <span className="material-symbols-rounded">format_list_bulleted</span>
             <span>{lang==='es'?'Lista':'Bullets'}</span>
           </button>
 
-          <button className={`ctx-btn ${active.ol ? 'active' : ''}`} onClick={()=>exec('insertOrderedList')}>
+          <button className={`ctx-btn ${shown.ol ? 'active' : ''}`} onClick={()=>exec('insertOrderedList')}>
             <span className="material-symbols-rounded">format_list_numbered</span>
             <span>{lang==='es'?'Numerada':'Numbered'}</span>
           </button>
