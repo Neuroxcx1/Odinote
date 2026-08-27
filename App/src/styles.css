@@ -681,22 +681,106 @@ a, button, select, input[type="submit"], input[type="button"], [role="button"],
    ============================================ */
 .app { height: 100%; display: flex; flex-direction: column; }
 .topbar { display: flex; align-items: center; gap: 12px; padding: 8px 14px; background: var(--paper); border-bottom: 1.5px solid var(--line); z-index: 50; position: relative; }
-.crumbs { display: flex; align-items: center; gap: 4px; font-weight: 600; font-size: 13px; flex-wrap: nowrap; min-width: 0; }
-.crumb { display: inline-flex; align-items: center; gap: 6px; padding: 4px 8px; border-radius: 2px; cursor: pointer; transition: background 100ms; max-width: 180px; }
-.crumb-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.crumb-ellipsis { cursor: default; color: var(--ink-3); padding: 4px 4px; }
-.crumb-ellipsis:hover { background: none; }
-.crumb:hover { background: var(--bg); }
-.crumb-chip { width: 14px; height: 14px; border-radius: 2px; border: 1.5px solid var(--line); }
-.crumb-sep { color: var(--ink-3); font-size: 13px; }
-.crumb input { font: inherit; min-width: 60px; max-width: 200px; }
+/* ── Ruta: una pastilla con el sitio actual y el camino en un desplegable ──
+   La cadena separada por "/" crecia con cada tablero anidado hasta comerse la
+   barra de nodos y acabar cortada. Esto ocupa lo mismo con dos niveles que con
+   diez, y el camino completo sigue a un clic. */
+/* Flecha de subir un nivel: en escritorio es un boton discreto junto a la
+   pastilla; en movil, el bloque de mas abajo la agranda para el dedo. */
+.crumb-back {
+  display: grid; place-items: center; flex: 0 0 auto;
+  width: 30px; height: 30px; border-radius: 8px;
+  color: var(--ink-2); transition: background 120ms, color 120ms;
+}
+.crumb-back:hover { background: var(--bg); color: var(--ink); }
+.crumb-back .material-symbols-rounded { font-size: 19px; }
+/* El ancho lo manda el CONTENEDOR, no la pastilla. Un min-width en la pastilla
+   no la protege: como el contenedor si se encoge, la pastilla se desbordaba y
+   volvia a taparle el sitio a la barra de nodos. Reservando aqui, el flex del
+   topbar respeta el hueco y la pastilla simplemente lo rellena. */
+.crumb-path {
+  position: relative; display: flex; align-items: center;
+  flex: 0 1 auto; min-width: 132px; max-width: 240px;
+}
+.crumb-pill {
+  display: inline-flex; align-items: center; gap: 7px;
+  width: 100%; max-width: 100%; min-width: 0;
+  padding: 5px 8px; border-radius: 999px;
+  border: 1.5px solid var(--line-soft); background: var(--paper);
+  font-weight: 600; font-size: 13px; color: var(--ink);
+  transition: border-color 120ms, background 120ms;
+}
+.crumb-pill:hover { border-color: var(--line); background: var(--bg); }
+.crumb-pill.open { border-color: var(--olive); background: var(--bg); }
+.crumb-pill-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.crumb-pill-home { font-size: 16px; color: var(--ink-2); }
+.crumb-pill-caret { font-size: 17px; color: var(--ink-3); flex-shrink: 0; margin-left: -1px; }
+.crumb-path-scrim { position: fixed; inset: 0; z-index: 300; }
+.crumb-path-menu {
+  position: absolute; top: calc(100% + 6px); left: 0; z-index: 301;
+  min-width: 240px; max-width: 340px;
+  background: var(--paper); border: 1.5px solid var(--line);
+  border-radius: 10px; box-shadow: var(--pop-deep); padding: 6px;
+  animation: fade-in 120ms var(--e-out);
+}
+.crumb-path-title {
+  font-size: 10px; font-weight: 800; letter-spacing: 0.5px; text-transform: uppercase;
+  color: var(--ink-3); padding: 4px 8px 6px;
+}
+.crumb-path-item {
+  display: flex; align-items: center; gap: 8px; width: 100%;
+  padding: 7px 8px; border-radius: 6px; font-size: 13px; font-weight: 600;
+  color: var(--ink-2); text-align: left; min-width: 0;
+}
+.crumb-path-item:hover { background: var(--bg); color: var(--ink); }
+.crumb-path-item.current { color: var(--ink); background: color-mix(in srgb, var(--olive) 12%, transparent); }
+.crumb-path-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.crumb-path-here { font-size: 15px; color: var(--olive); flex-shrink: 0; }
+/* .crumb-chip se sigue usando: es el cuadradito de color del tablero, tanto en
+   la pastilla como en cada linea del desplegable. El resto de la cadena de
+   migas (.crumb, .crumb-sep, .crumb-ellipsis) ya no existe en el HTML. */
+.crumb-chip { width: 13px; height: 13px; border-radius: 3px; border: 1.5px solid var(--line); flex-shrink: 0; }
 
 .topbar-spacer { flex: 1; }
 
 /* Tamaños base COMPACTOS: se aplican en todas las resoluciones (incluidas >2K),
    para que la barra no se agrande ni se solape en pantallas grandes. Los
-   breakpoints de abajo solo reducen aún más en pantallas pequeñas. */
-.tools { display: flex; align-items: center; gap: 3px; background: var(--bg); border: 1.5px solid var(--line); border-radius: 8px; padding: 4px; box-shadow: var(--pop-sm); }
+   breakpoints de abajo reducen aún más en pantallas pequeñas, pero NO son lo
+   que evita el solape: eso lo hacen min-width:0 + overflow-x:auto de aquí
+   abajo, así que no hay una anchura de ventana capaz de romperlo. Sin
+   min-width:0 un elemento flex nunca se encoge por debajo de su contenido —
+   por eso, en cualquier hueco entre el modo móvil (860px) y el primer
+   breakpoint de escritorio, esta barra se salía de su sitio y tapaba las
+   migas de pan de la izquierda, sin que importara la resolución del monitor. */
+/* El contenedor es quien se encoge; la barra de dentro solo se desplaza. El
+   deslizador cuelga debajo y solo existe cuando hay algo que desplazar. */
+.tools-wrap {
+  display: flex; flex-direction: column; align-items: stretch;
+  flex: 0 1 auto; min-width: 0; gap: 3px;
+}
+.tools-slider {
+  -webkit-appearance: none; appearance: none;
+  width: 100%; height: 4px; margin: 0;
+  background: var(--line-soft); border-radius: 999px; cursor: pointer;
+}
+.tools-slider::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none;
+  width: 46px; height: 8px; margin-top: -2px;
+  border-radius: 999px; background: var(--ink-3); border: none; cursor: grab;
+}
+.tools-slider::-webkit-slider-thumb:active { background: var(--olive); cursor: grabbing; }
+.tools-slider::-moz-range-thumb {
+  width: 46px; height: 8px; border-radius: 999px;
+  background: var(--ink-3); border: none; cursor: grab;
+}
+.tools-slider:hover::-webkit-slider-thumb { background: var(--ink-2); }
+
+.tools {
+  display: flex; align-items: center; gap: 3px; background: var(--bg);
+  border: 1.5px solid var(--line); border-radius: 8px; padding: 4px; box-shadow: var(--pop-sm);
+  min-width: 0; max-width: 100%; overflow-x: auto; overflow-y: hidden; scrollbar-width: none;
+}
+.tools::-webkit-scrollbar { display: none; }
 .tool { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 4px 7px; border-radius: 6px; transition: transform 120ms var(--e-out), background 100ms; }
 .tool:hover { transform: translateY(-1px); background: var(--line-softer); }
 .tool .tool-icon { width: 31px; height: 31px; border-radius: 8px; display: grid; place-items: center; border: 1.5px solid var(--line); box-shadow: var(--pop-sm); color: var(--ink); background: var(--tool-bg); transition: transform 100ms var(--e-out); }
@@ -707,7 +791,7 @@ a, button, select, input[type="submit"], input[type="button"], [role="button"],
 .tool .material-symbols-rounded { font-size: 19px; }
 .tool-divider { width: 1.5px; height: 32px; background: var(--line-soft); margin: 0 3px; }
 
-.topbar-actions { display: flex; align-items: center; gap: 5px; }
+.topbar-actions { display: flex; align-items: center; gap: 5px; flex-shrink: 0; }
 .icon-btn { width: 38px; height: 38px; border-radius: 8px; display: grid; place-items: center; border: 1.5px solid var(--line); background: var(--paper); box-shadow: var(--pop-sm); transition: transform 140ms var(--e-out), box-shadow 140ms var(--e-out); }
 .icon-btn:hover { transform: translate(-1px, -1px); box-shadow: var(--pop-hover); }
 .icon-btn .material-symbols-rounded { font-size: 22px; }
@@ -1397,6 +1481,16 @@ body.odi-busy iframe { pointer-events: none !important; }
   word-break: break-word;
 }
 .board-foot .board-title-edit { font: inherit; font-weight: 700; background: transparent; border: none; }
+/* El titulo del tablero es ahora el mismo div editable siempre (como el
+   titulo grande): sin texto se ve el nombre por defecto en gris, en vez de
+   quedarse en blanco. */
+.board-foot .board-foot-title:empty::before {
+  content: attr(data-placeholder);
+  opacity: 0.6;
+  pointer-events: none;
+}
+.board-foot .board-foot-title:focus { outline: none; }
+
 .board-foot .board-count { font-family: var(--font-mono); font-size: 12px; color: inherit; opacity: 0.7; }
 
 /* ── Board inside a column: Milanote-style horizontal card (icon left, name + count right) ── */
@@ -3496,25 +3590,21 @@ body.odi-busy iframe { pointer-events: none !important; }
 }
 
 /* ==========================================================================
-   RESPONSIVE DESIGN SYSTEM — TOPBAR & TOOLS (1080p and smaller screens)
+   BARRA SUPERIOR EN PANTALLAS PEQUENAS
+
+   La barra de NODOS no se encoge. Antes se le quitaban los rotulos por debajo
+   de 1440px y se le achicaban los iconos por debajo de 1920px, asi que la misma
+   herramienta tenia tres aspectos distintos segun el monitor. Ahora mantiene en
+   todas partes el tamano que tenia en 2K, y el sitio sale de otro lado: la ruta
+   es una pastilla fija (ocupa igual con dos niveles que con diez) y lo que se
+   reduce es lo accesorio de la derecha. Si aun asi no cabe, la barra de nodos
+   se desplaza con la rueda en vez de cortarse.
    ========================================================================== */
 
-/* En resoluciones de 1920px o menos (pantallas 1080p), reducimos paddings, márgenes y el
-   tamaño de los botones para que la barra superior no se desborde ni se solapen elementos */
 @media (max-width: 1920px) {
   .topbar {
     gap: 7px;
     padding: 6px 10px;
-  }
-  .tool {
-    padding: 4px 5px;
-  }
-  .tool .tool-icon {
-    width: 29px;
-    height: 29px;
-  }
-  .tool .material-symbols-rounded {
-    font-size: 18px;
   }
   .icon-btn {
     width: 36px;
@@ -3530,7 +3620,7 @@ body.odi-busy iframe { pointer-events: none !important; }
   }
 }
 
-/* En resoluciones de 1680px o menos, ocultamos el texto de Feedback y Apoyar para ahorrar espacio, convirtiéndolos en botones de iconos circulares */
+/* Feedback y Apoyar pasan a ser iconos redondos: es lo primero que sobra */
 @media (max-width: 1680px) {
   .feedback-topbar-btn span:not(.material-symbols-rounded),
   .kofi-topbar-btn span:not(.material-symbols-rounded) {
@@ -3549,37 +3639,22 @@ body.odi-busy iframe { pointer-events: none !important; }
     border-radius: 50%;
   }
   .volume-slider {
-    width: 50px; /* Acortar slider de volumen */
+    width: 50px;
   }
+  .crumb-path { max-width: 200px; }
 }
 
-/* En resoluciones de 1440px o menos (como laptops u pantallas escaladas), ocultamos el texto de las herramientas centrales para que solo queden los iconos, similar a Figma o Miro */
 @media (max-width: 1440px) {
-  .tool .tool-label {
-    display: none;
-  }
-  .tool {
-    padding: 4px;
-    gap: 0;
-  }
-  .tools {
-    gap: 2px;
-  }
-  .crumbs {
-    max-width: 220px; /* Limitar el tamaño máximo de las migas de pan */
-  }
-  .crumb {
-    max-width: 100px;
-  }
   .volume-ctrl {
     gap: 2px;
   }
   .volume-slider {
     width: 40px;
   }
+  .crumb-path { max-width: 170px; }
 }
 
-/* En pantallas aún más pequeñas (1200px o menos), ocultamos el slider de volumen del todo */
+/* Aqui ya se quita el deslizador de volumen entero */
 @media (max-width: 1200px) {
   .volume-slider {
     display: none;
@@ -3587,12 +3662,7 @@ body.odi-busy iframe { pointer-events: none !important; }
   .volume-ctrl {
     margin-right: 0;
   }
-  .crumbs {
-    max-width: 150px;
-  }
-  .crumb {
-    max-width: 70px;
-  }
+  .crumb-path { min-width: 120px; max-width: 150px; }
 }
 
 .ms-card-dropdown-item:hover {
@@ -3642,8 +3712,10 @@ body.odi-busy iframe { pointer-events: none !important; }
 
 /* Controles que solo existen en móvil: ocultos por defecto. .topbar-tail usa
    display:contents para que en escritorio la barra quede exactamente igual
-   que antes de existir este bloque. */
-.crumb-back,
+   que antes de existir este bloque.
+
+   .crumb-back ya NO está aquí: al sustituir la cadena de migas por una sola
+   pastilla, la flecha de subir un nivel hace falta también en escritorio. */
 .tools-fab,
 .topbar-more,
 .topbar-tail-scrim,
@@ -3716,24 +3788,18 @@ html[data-mobile="1"] .crumb-back {
 html[data-mobile="1"] .crumb-back:active { transform: scale(0.94); }
 html[data-mobile="1"] .crumb-back .material-symbols-rounded { font-size: 21px; }
 
-/* Con el dedo no se acierta a una miga de 13px: dejamos solo la actual, grande
-   y legible, y el retroceso se hace con la flecha ←. */
-html[data-mobile="1"] .crumbs {
-  flex: 1 1 auto;
-  min-width: 0;
-  max-width: none;
-  font-size: 14px;
-  overflow: hidden;
-}
-html[data-mobile="1"] .crumbs .crumb-sep,
-html[data-mobile="1"] .crumbs .crumb-ellipsis { display: none; }
-html[data-mobile="1"] .crumbs .crumb { display: none; }
-html[data-mobile="1"] .crumbs .crumb:last-of-type {
-  display: inline-flex;
+/* Con el dedo la pastilla de la ruta se agranda un poco y ocupa el ancho que
+   sobre; el desplegable con el camino completo funciona igual que en el PC. */
+html[data-mobile="1"] .crumb-path { flex: 1 1 auto; min-width: 0; max-width: none; }
+html[data-mobile="1"] .crumb-pill {
   max-width: 100%;
-  padding: 6px 4px;
+  width: 100%;
+  font-size: 14px;
   font-weight: 700;
+  padding: 7px 10px;
 }
+html[data-mobile="1"] .crumb-path-menu { min-width: 220px; max-width: 78vw; }
+html[data-mobile="1"] .crumb-path-item { padding: 10px 8px; font-size: 14px; }
 
 /* ── Panel "⋯" con las acciones que no caben ─────────────────────────── */
 html[data-mobile="1"] .topbar-more {
@@ -3795,6 +3861,11 @@ html[data-mobile="1"] .topbar-more + .topbar-tail-scrim,
 html[data-mobile="1"] .topbar-tail-scrim { display: block; position: fixed; inset: 0; z-index: 310; }
 
 /* ── Raíl vertical de herramientas (borde derecho) ───────────────────── */
+/* En movil la barra es un rail vertical fijo, asi que el contenedor no debe
+   ocupar sitio en la fila y el deslizador no aplica: el rail se desplaza
+   solo, con el dedo. */
+html[data-mobile="1"] .tools-wrap { display: contents; }
+html[data-mobile="1"] .tools-slider { display: none; }
 html[data-mobile="1"] .tools {
   position: fixed;
   /* Anclado ABAJO y del alto de su contenido. Antes iba de arriba a abajo, y

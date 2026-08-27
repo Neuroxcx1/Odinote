@@ -22,6 +22,13 @@ const TOOLS = [
   { id: 'line',     icon: 'arrow_outward', label: 'tool_line',     bg: '#FFFFFF', fg: '#1A1A1A' },
 ];
 
+// touch.js marca <html data-mobile="1"> cuando la pantalla es de movil. Se
+// consulta en el momento de dibujar: cambia al girar el aparato o al redimensionar.
+function esMovil() {
+  return typeof document !== 'undefined' &&
+    document.documentElement.getAttribute('data-mobile') === '1';
+}
+
 const EXTRA_TOOLS = [
   { id: 'calendar', icon: 'calendar_month',label: 'tool_calendar', bg: '#E6544F', fg: 'white' },
   { id: 'comment',  icon: 'forum',         label: 'tool_comment',  bg: '#90B968', fg: 'white' },
@@ -47,10 +54,79 @@ function Topbar({
 }) {
   const t = window.TRANSLATIONS[lang];
   const [extraOpen, setExtraOpen] = React.useState(false);
+  // Donde se dibuja el panel de extras. Va en coordenadas de pantalla porque
+  // el panel se pinta fuera de la barra (que recorta), no dentro de ella.
+  const [extraPos, setExtraPos] = React.useState({ left: 0, top: 0 });
+  const extraBtnRef = React.useRef(null);
+
+  // El panel se coloca cuando ya esta en el DOM, con un efecto de disposicion:
+  // se ejecuta despues de que React monte y antes de pintar, sin depender del
+  // bucle de fotogramas. Ademas se encaja en la ventana, para que no se salga
+  // por la derecha cuando el boton queda cerca del borde.
+  React.useLayoutEffect(() => {
+    if (!extraOpen) return;
+    const ANCHO = 150; // ancho del panel mas su margen
+    const coloca = () => {
+      const el = extraBtnRef.current;
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      setExtraPos({
+        left: Math.max(8, Math.min(r.left, window.innerWidth - ANCHO - 8)),
+        top: r.bottom + 8,
+      });
+    };
+    coloca();
+    // Y otra vez en el turno siguiente, por si el navegador movio la barra al
+    // pulsar un boton que estaba a medias fuera (lo hace para traerlo a la
+    // vista, y ocurre despues de este efecto). Es una precaucion barata.
+    const t = setTimeout(coloca, 0);
+    return () => clearTimeout(t);
+  }, [extraOpen]);
   // En móvil la barra no cabe en una fila: las acciones de la derecha se
   // pliegan en un panel y las herramientas pasan a un raíl vertical.
   const [moreOpen, setMoreOpen] = React.useState(false);
   const [railOpen, setRailOpen] = React.useState(true);
+  // ── Deslizador de la barra de nodos ──
+  // Solo aparece cuando la barra esta REALMENTE cortada. En una pantalla ancha
+  // no pinta nada y solo seria ruido, asi que se mide el desbordamiento de
+  // verdad en vez de suponerlo por la anchura de la ventana: hay quien tiene la
+  // ventana a medio monitor, o el zoom del sistema al 150%.
+  const toolsRef = React.useRef(null);
+  const [toolsCortada, setToolsCortada] = React.useState(false);
+  const [toolsPos, setToolsPos] = React.useState(0);
+
+  const midaToolsFn = React.useCallback(() => {
+    const el = toolsRef.current;
+    if (!el) return;
+    const sobra = el.scrollWidth - el.clientWidth;
+    // 4px de margen: sin el, un redondeo de medio pixel encendia el deslizador
+    // en pantallas donde en realidad cabe todo.
+    setToolsCortada(sobra > 4);
+    setToolsPos(sobra > 0 ? el.scrollLeft / sobra : 0);
+  }, []);
+
+  React.useEffect(() => {
+    const el = toolsRef.current;
+    if (!el) return;
+    midaToolsFn();
+    const ro = new ResizeObserver(midaToolsFn);
+    ro.observe(el);
+    window.addEventListener('resize', midaToolsFn);
+    return () => { ro.disconnect(); window.removeEventListener('resize', midaToolsFn); };
+  }, [midaToolsFn, railOpen]);
+
+  const muevaTools = (frac) => {
+    const el = toolsRef.current;
+    if (!el) return;
+    el.scrollLeft = frac * (el.scrollWidth - el.clientWidth);
+  };
+
+  // Desplegable con el camino completo hasta donde estas.
+  const [pathOpen, setPathOpen] = React.useState(false);
+  const actual = crumbs[crumbs.length - 1] || { label: window.t('Inicio', 'Home') };
+  // Al cambiar de tablero se cierra solo: si no, se quedaria abierto
+  // enseniando una ruta que ya no es la actual.
+  React.useEffect(() => { setPathOpen(false); }, [crumbs.length, actual.id]);
 
   const goBack = () => {
     if (crumbs.length > 1) onCrumb(crumbs.length - 2);
@@ -70,8 +146,11 @@ function Topbar({
       <button className="brand press" onClick={onHome} title={t.home}>
         <div className="brand-mark"><window.BrandMark/></div>
       </button>
-      {/* Retroceder un nivel: en escritorio se hace pulsando la miga anterior,
-          pero con el dedo esas migas son diminutas. Solo se ve en móvil. */}
+      {/* Retroceder un nivel. Antes solo estaba en móvil, porque en escritorio
+          se subía pulsando la miga anterior de la cadena. Al desaparecer esa
+          cadena hace falta en todas partes: es el gesto de subir un nivel de un
+          solo clic, sin abrir el desplegable de la ruta. */}
+      {crumbs.length > 1 && (
       <button
         className="crumb-back"
         onClick={goBack}
@@ -80,46 +159,55 @@ function Topbar({
       >
         <span className="material-symbols-rounded">arrow_back</span>
       </button>
-      <div className="crumbs">
-        {(() => {
-          // Collapse long trails to: Inicio · first · … · penultimate · current
-          let shown;
-          if (crumbs.length <= 5) {
-            shown = crumbs.map((c, i) => ({ c, i }));
-          } else {
-            shown = [
-              { c: crumbs[0], i: 0 },
-              { c: crumbs[1], i: 1 },
-              { ellipsis: true },
-              { c: crumbs[crumbs.length - 2], i: crumbs.length - 2 },
-              { c: crumbs[crumbs.length - 1], i: crumbs.length - 1 },
-            ];
-          }
-          return shown.map((entry, pos) => {
-            if (entry.ellipsis) {
-              return (
-                <React.Fragment key="ellipsis">
-                  <div className="crumb crumb-ellipsis" title={window.t('Niveles ocultos', 'Hidden levels')}>…</div>
-                  <span className="crumb-sep">/</span>
-                </React.Fragment>
-              );
-            }
-            const { c, i } = entry;
-            return (
-              <React.Fragment key={c.id || i}>
-                <div
-                  className="crumb"
-                  onClick={()=>onCrumb(i)}
+      )}
+      {/* Ruta actual.
+          Antes era la cadena entera separada por "/", y con tableros anidados
+          crecía sin límite: se comía el espacio de la barra de nodos y acababa
+          cortada. Ahora es una sola pastilla con el sitio donde estás, y el
+          camino completo se despliega al pulsarla. Ocupa lo mismo con dos
+          niveles que con diez. */}
+      <div className="crumb-path">
+        <button
+          className={`crumb-pill ${pathOpen ? 'open' : ''}`}
+          onClick={() => { setPathOpen(o => !o); window.playAudioTone && window.playAudioTone('click'); }}
+          title={crumbs.map(c => c.label).join('  ›  ')}
+        >
+          {actual.chipColor
+            ? <div className="crumb-chip" style={{background: actual.chipColor}}/>
+            : <span className="material-symbols-rounded crumb-pill-home">home</span>}
+          <span className="crumb-pill-label">{actual.label}</span>
+          {crumbs.length > 1 && (
+            <span className="material-symbols-rounded crumb-pill-caret">
+              {pathOpen ? 'expand_less' : 'expand_more'}
+            </span>
+          )}
+        </button>
+
+        {pathOpen && (
+          <>
+            <div className="crumb-path-scrim" onClick={() => setPathOpen(false)}/>
+            <div className="crumb-path-menu">
+              <div className="crumb-path-title">{window.t('Dónde estás', 'Where you are')}</div>
+              {crumbs.map((c, i) => (
+                <button
+                  key={c.id || i}
+                  className={`crumb-path-item ${i === crumbs.length - 1 ? 'current' : ''}`}
+                  style={{ paddingLeft: 10 + Math.min(i, 6) * 13 }}
+                  onClick={() => { setPathOpen(false); onCrumb(i); }}
+                  title={c.label}
                 >
-                  {c.chipColor && <div className="crumb-chip" style={{background: c.chipColor}}/>}
-                  {!c.chipColor && i === 0 && <span className="material-symbols-rounded" style={{fontSize:14}}>home</span>}
-                  <span className="crumb-label">{c.label}</span>
-                </div>
-                {pos < shown.length - 1 && <span className="crumb-sep">/</span>}
-              </React.Fragment>
-            );
-          });
-        })()}
+                  {c.chipColor
+                    ? <div className="crumb-chip" style={{background: c.chipColor}}/>
+                    : <span className="material-symbols-rounded" style={{fontSize:15}}>home</span>}
+                  <span className="crumb-path-label">{c.label}</span>
+                  {i === crumbs.length - 1 && (
+                    <span className="material-symbols-rounded crumb-path-here">my_location</span>
+                  )}
+                </button>
+              ))}
+            </div>
+          </>
+        )}
       </div>
 
       <div className="topbar-spacer"/>
@@ -135,7 +223,12 @@ function Topbar({
         <span className="material-symbols-rounded">{railOpen ? 'close' : 'widgets'}</span>
       </button>
 
-      <div className={`tools ${railOpen ? 'rail-open' : 'rail-closed'}`}>
+      <div className="tools-wrap">
+      <div
+        className={`tools ${railOpen ? 'rail-open' : 'rail-closed'}`}
+        ref={toolsRef}
+        onScroll={midaToolsFn}
+      >
         {TOOLS.map((tool, idx) => (
           <React.Fragment key={tool.id}>
             {idx === 4 && <div className="tool-divider"/>}
@@ -162,64 +255,102 @@ function Topbar({
         ))}
 
         {/* Botón de tres puntos para herramientas extras */}
-        <div style={{ position: 'relative' }}>
-          <button
-            className={`tool press ${extraOpen ? 'active' : ''}`}
-            title={window.t('Más herramientas', 'More tools')}
-            onClick={() => {
-              setExtraOpen(o => !o);
-              window.playAudioTone && window.playAudioTone('click');
-            }}
-          >
-            <div className="tool-icon" style={{ background: '#E1DFE3', color: '#1A1A1A' }}>
-              <span className="material-symbols-rounded">more_horiz</span>
-            </div>
-            <div className="tool-label">{window.t('Más', 'More')}</div>
-          </button>
-
-          {extraOpen && (
-            <>
-              <div 
-                style={{ position: 'fixed', inset: 0, zIndex: 400 }} 
-                onClick={() => setExtraOpen(false)} 
-              />
-              <div className="extra-tools-popout" onMouseDown={(e)=>e.stopPropagation()}>
-                <div className="extra-tools-title">
-                  {window.t('EXTRAS', 'EXTRAS')}
-                </div>
-                {EXTRA_TOOLS.map(tool => (
-                  <button
-                    key={tool.id}
-                    className="extra-tools-btn"
-                    onMouseDown={(e) => {
-                      setExtraOpen(false);
-                      startToolDrag(e, tool.id);
-                    }}
-                    onClick={() => {
-                      setExtraOpen(false);
-                      window.playAudioTone && window.playAudioTone('click');
-                      setActiveTool(tool.id);
-                    }}
-                  >
-                    <div
-                      className="extra-tools-icon"
-                      style={{
-                        background: activeTool === tool.id ? 'var(--olive)' : tool.bg,
-                        color: activeTool === tool.id ? 'white' : (tool.fg || 'var(--ink)'),
-                      }}
-                    >
-                      <span className="material-symbols-rounded" style={{ fontSize: '16px' }}>{tool.icon}</span>
-                    </div>
-                    <span className="extra-tools-label">
-                      {t[tool.label] || tool.id}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </>
-          )}
-        </div>
+        <button
+          ref={extraBtnRef}
+          className={`tool press ${extraOpen ? 'active' : ''}`}
+          title={window.t('Más herramientas', 'More tools')}
+          onClick={() => {
+            setExtraOpen(o => !o);
+            window.playAudioTone && window.playAudioTone('click');
+          }}
+        >
+          <div className="tool-icon" style={{ background: '#E1DFE3', color: '#1A1A1A' }}>
+            <span className="material-symbols-rounded">more_horiz</span>
+          </div>
+          <div className="tool-label">{window.t('Más', 'More')}</div>
+        </button>
       </div>
+
+      {/* Deslizador: solo cuando la barra esta cortada de verdad. Si cabe todo,
+          no se dibuja — no es una barra de scroll permanente. */}
+      {toolsCortada && (
+        <input
+          className="tools-slider"
+          type="range"
+          min="0" max="1000" step="1"
+          value={Math.round(toolsPos * 1000)}
+          onChange={(e) => {
+            // El pulgar se mueve con lo que dice el propio deslizador, sin
+            // esperar al evento de scroll de la barra: asi el control responde
+            // aunque el navegador agrupe o retrase ese evento.
+            const frac = Number(e.target.value) / 1000;
+            setToolsPos(frac);
+            muevaTools(frac);
+          }}
+          title={window.t('Desplazar las herramientas', 'Scroll the tools')}
+          aria-label={window.t('Desplazar las herramientas', 'Scroll the tools')}
+        />
+      )}
+      </div>
+
+      {/* Panel de herramientas extras.
+          Va con un portal al final de la página, FUERA de la barra. La barra
+          recorta lo que se sale de ella (hace falta para poder desplazarla), y
+          este panel cuelga por debajo: dentro quedaba cortado y no se veía
+          nada al pulsar "Más". Al estar fuera, se coloca en coordenadas fijas
+          calculadas desde el botón. */}
+      {extraOpen && ReactDOM.createPortal(
+        <>
+          <div
+            style={{ position: 'fixed', inset: 0, zIndex: 400 }}
+            onClick={() => setExtraOpen(false)}
+          />
+          <div
+            className="extra-tools-popout"
+            /* En movil el panel se ancla al rail vertical desde la hoja de
+               estilos (right/bottom). Poner left/top aqui la pisaba y el panel
+               se iba fuera de la pantalla, asi que ahi se deja en auto y manda
+               el CSS. */
+            style={esMovil()
+              ? { position: 'fixed', left: 'auto', top: 'auto', margin: 0 }
+              : { position: 'fixed', left: extraPos.left, top: extraPos.top, margin: 0 }}
+            onMouseDown={(e)=>e.stopPropagation()}
+          >
+            <div className="extra-tools-title">
+              {window.t('EXTRAS', 'EXTRAS')}
+            </div>
+            {EXTRA_TOOLS.map(tool => (
+              <button
+                key={tool.id}
+                className="extra-tools-btn"
+                onMouseDown={(e) => {
+                  setExtraOpen(false);
+                  startToolDrag(e, tool.id);
+                }}
+                onClick={() => {
+                  setExtraOpen(false);
+                  window.playAudioTone && window.playAudioTone('click');
+                  setActiveTool(tool.id);
+                }}
+              >
+                <div
+                  className="extra-tools-icon"
+                  style={{
+                    background: activeTool === tool.id ? 'var(--olive)' : tool.bg,
+                    color: activeTool === tool.id ? 'white' : (tool.fg || 'var(--ink)'),
+                  }}
+                >
+                  <span className="material-symbols-rounded" style={{ fontSize: '16px' }}>{tool.icon}</span>
+                </div>
+                <span className="extra-tools-label">
+                  {t[tool.label] || tool.id}
+                </span>
+              </button>
+            ))}
+          </div>
+        </>,
+        document.body
+      )}
 
       {/* Botón "⋯": en móvil despliega todo lo que sigue como panel; en
           escritorio está oculto y .topbar-tail usa display:contents, así que la

@@ -6,11 +6,11 @@
   "scripts": {
     "start": "electron main.js",
     "dev:web": "node dev-server.js",
-    "test:drive": "node scripts/test-drive.js && node scripts/test-oauth.js && node scripts/test-todo.js",
+    "test:drive": "node scripts/test-drive.js && node scripts/test-oauth.js && node scripts/test-todo.js && node scripts/test-connector.js",
     "test:search": "node scripts/test-search.js",
     "test:links": "node scripts/test-links.js",
     "test:graph": "node scripts/test-graph.js",
-    "test": "node scripts/test-search.js && node scripts/test-links.js && node scripts/test-graph.js && node scripts/test-drive.js && node scripts/test-oauth.js && node scripts/test-todo.js",
+    "test": "node scripts/test-search.js && node scripts/test-links.js && node scripts/test-graph.js && node scripts/test-drive.js && node scripts/test-oauth.js && node scripts/test-todo.js && node scripts/test-connector.js",
     "build:pre": "node scripts/build-pre.js",
     "build:exe": "electron-packager . Odinote --platform=win32 --arch=x64 --out=dist --overwrite --icon=Icon/Icon.ico && node scripts/build-zip.js",
     "build:exe-only": "electron-packager . Odinote --platform=win32 --arch=x64 --out=dist --overwrite --icon=Icon/Icon.ico",

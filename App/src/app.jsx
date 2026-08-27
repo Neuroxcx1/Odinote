@@ -47,7 +47,7 @@ try {
 
 // Marcador de build: si la consola no muestra esta versión, el navegador está
 // sirviendo JS cacheado (subir ?v= en index.html invalida la caché)
-window.ODINOTE_BUILD = 'v78';
+window.ODINOTE_BUILD = 'v89';
 console.log('[ODINOTE] Código cargado: ' + window.ODINOTE_BUILD);
 
 // Global shortcuts configuration
@@ -2185,6 +2185,18 @@ function App() {
     activeView = <window.Canvas
       key={view.projectId}
       projectId={view.projectId}
+      /* El tablero concreto en el que estabas al cerrar, no solo el proyecto.
+         Antes solo se guardaba projectId, asi que al abrir siempre caias en el
+         lienzo raiz aunque hubieras cerrado tres tableros mas adentro. */
+      initialTrail={view.trail}
+      onTrailChange={(trail) => setView(v => {
+        // El rastro siempre empieza por el proyecto: si no coincide, viene de
+        // un Canvas que ya no es el visible y se descarta.
+        if (v.kind !== 'canvas' || !trail || trail[0] !== v.projectId) return v;
+        const igual = Array.isArray(v.trail) && v.trail.length === trail.length &&
+          v.trail.every((x, i) => x === trail[i]);
+        return igual ? v : { ...v, trail };
+      })}
       jumpTarget={jumpTarget}
       onSearchClick={() => { setSearchMode("goto"); setSearchOpen(true); }}
       onGoToNode={goToSearchHit}
