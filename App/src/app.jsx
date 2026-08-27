@@ -47,7 +47,7 @@ try {
 
 // Marcador de build: si la consola no muestra esta versión, el navegador está
 // sirviendo JS cacheado (subir ?v= en index.html invalida la caché)
-window.ODINOTE_BUILD = 'v101';
+window.ODINOTE_BUILD = 'v102';
 console.log('[ODINOTE] Código cargado: ' + window.ODINOTE_BUILD);
 
 // Global shortcuts configuration
@@ -570,6 +570,9 @@ function App() {
   const [salaCodigo, setSalaCodigo] = useStateApp(null);
   const [salaOcupada, setSalaOcupada] = useStateApp(false);
   const [salaError, setSalaError] = useStateApp(null);
+  // Copiar el código no merece una ventana que haya que cerrar: el propio
+  // botón dice que lo hizo y se le olvida solo.
+  const [codigoCopiado, setCodigoCopiado] = useStateApp(false);
   const codigoEntradaRef = React.useRef(null);
 
   const abreSalaEnVivo = async () => {
@@ -3185,10 +3188,25 @@ function App() {
                       }}>{salaCodigo}</code>
                       <button
                         className="btn"
-                        onClick={() => { navigator.clipboard.writeText(salaCodigo); showToast(window.t('Código copiado.', 'Code copied.')); }}
-                        style={{ padding: '9px 12px', borderRadius: '8px', border: '1.5px solid var(--line-soft)', cursor: 'pointer', fontSize: '12px', fontWeight: 700 }}
+                        onClick={() => {
+                          navigator.clipboard.writeText(salaCodigo);
+                          window.playAudioTone && window.playAudioTone('click');
+                          setCodigoCopiado(true);
+                          setTimeout(() => setCodigoCopiado(false), 1800);
+                        }}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: '5px',
+                          padding: '9px 12px', borderRadius: '8px',
+                          border: '1.5px solid ' + (codigoCopiado ? 'var(--brand-green, #90B968)' : 'var(--line-soft)'),
+                          color: codigoCopiado ? 'var(--brand-green, #90B968)' : 'inherit',
+                          cursor: 'pointer', fontSize: '12px', fontWeight: 700,
+                          transition: 'color 120ms, border-color 120ms',
+                        }}
                       >
-                        {window.t('Copiar', 'Copy')}
+                        <span className="material-symbols-rounded" style={{ fontSize: 16 }}>
+                          {codigoCopiado ? 'check' : 'content_copy'}
+                        </span>
+                        <span>{codigoCopiado ? window.t('Copiado', 'Copied') : window.t('Copiar', 'Copy')}</span>
                       </button>
                     </div>
                     {/* Mandar el código por correo. Odinote no tiene servidor
@@ -3305,27 +3323,14 @@ function App() {
                     </button>
                   </div>
 
-                  <div>
-                    <label style={{ display: 'block', fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-soft, #595459)', marginBottom: '6px' }}>
-                      {window.t('Token de invitación (Comparte esto)', 'Invitation Token (Share this)')}
-                    </label>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', background: 'var(--bg-main, #E5E1DD)', borderRadius: '8px', border: '1.5px solid var(--line-soft, #D5D1CD)' }}>
-                      <code style={{ fontFamily: 'monospace', fontSize: '12px', fontWeight: '700', color: 'var(--ink, #1A1A1A)' }}>
-                        {project.shareToken}
-                      </code>
-                      <button
-                        className="btn btn-ghost"
-                        onClick={() => {
-                          navigator.clipboard.writeText(project.shareToken);
-                          window.playAudioTone && window.playAudioTone('click');
-                          alert(window.t('¡Token copiado al portapapeles!', 'Token copied to clipboard!'));
-                        }}
-                        style={{ padding: '4px 8px', fontSize: '11px', border: '1px solid var(--line-soft)', borderRadius: '4px', cursor: 'pointer' }}
-                      >
-                        {window.t('Copiar', 'Copy')}
-                      </button>
-                    </div>
-                  </div>
+                  {/* Aquí vivía el "Token de invitación (Comparte esto)": un
+                      odi-tok-xxxx-xxxx de treinta caracteres que ya no sirve
+                      para entrar a ningún sitio. Quedaba justo debajo del
+                      código de la sesión y decía "comparte esto", así que era
+                      el que la gente copiaba — y luego no funcionaba. Ese
+                      token sigue existiendo por dentro para marcar el proyecto
+                      como publicado en Drive, pero no es nada que nadie tenga
+                      que ver ni copiar. */}
 
                   <div style={{ borderTop: '1px solid var(--line-soft, #E5E1DD)', paddingTop: '16px' }}>
                     <h4 style={{ margin: '0 0 8px 0', fontSize: '13px', fontWeight: '700', color: 'var(--text-soft)' }}>
