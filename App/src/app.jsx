@@ -47,7 +47,7 @@ try {
 
 // Marcador de build: si la consola no muestra esta versión, el navegador está
 // sirviendo JS cacheado (subir ?v= en index.html invalida la caché)
-window.ODINOTE_BUILD = 'v86';
+window.ODINOTE_BUILD = 'v87';
 console.log('[ODINOTE] Código cargado: ' + window.ODINOTE_BUILD);
 
 // Global shortcuts configuration
@@ -2384,6 +2384,11 @@ function App() {
                 >
                   {CURRENT_VERSION} · {window.ODINOTE_BUILD} ·{' '}
                   {window.innerWidth}×{window.innerHeight} ·{' '}
+                  {/* Cómo se ve la aplicación a sí misma. Si aquí no pone
+                      "escritorio" dentro del programa instalado, es que el
+                      puente con Electron no llegó y las estadísticas de esa
+                      copia se están contando como si fuera la web. */}
+                  {window.ODINOTE_PLATFORM || '?'} ·{' '}
                   {(window.odiIsTouch && window.odiIsTouch())
                     ? window.t('táctil', 'touch')
                     : window.t('SIN táctil', 'NO touch')}
@@ -3493,11 +3498,15 @@ function App() {
             backdropFilter: 'blur(2px)'
           }}
         >
-          <div 
-            className="doc-modal" 
-            style={{ 
-              width: '420px', 
-              background: 'var(--bg, #FAF9F6)', 
+          {/* Clase propia y no `doc-modal`: esa es la del editor de documentos,
+              que ocupa la pantalla entera a propósito (width y height al 100%).
+              El ancho lo pisaba el estilo de aquí, pero el alto no, y por eso
+              un aviso de dos líneas salía como una columna de arriba abajo. */}
+          <div
+            className="odi-dialog"
+            style={{
+              width: '420px',
+              background: 'var(--bg, #FAF9F6)',
               border: '2px solid var(--line, #595459)', 
               padding: '24px', 
               borderRadius: '12px', 

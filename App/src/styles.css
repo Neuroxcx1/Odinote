@@ -4605,3 +4605,14 @@ html[data-mobile="1"] .odi-graph-btn span:not(.material-symbols-rounded) { displ
 [data-theme="dark"] .ctx-btn-primary { background: #4C6B39; color: #E8F5DC; }
 [data-theme="dark"] .ctx-btn-primary .material-symbols-rounded { color: #E8F5DC; }
 [data-theme="dark"] .ctx-btn-primary:hover { background: #5B7F44; }
+
+/* Avisos y confirmaciones: una cajita del tamaño de su contenido.
+   Antes reutilizaban la clase del editor de documentos, que ocupa la pantalla
+   entera por diseño, y una pregunta de una línea salía estirada de arriba
+   abajo. Solo crece si el mensaje es largo, y entonces se desplaza por dentro. */
+.odi-dialog {
+  max-width: 92vw;
+  max-height: 80vh;
+  overflow-y: auto;
+  animation: fade-in 140ms var(--e-out);
+}
