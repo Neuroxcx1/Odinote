@@ -40,6 +40,7 @@ function Topbar({
   onToolDragStart,
   updateAvailable, onUpdateClick,
   volume, onChangeVolume,
+  onEstadoCompartir, estadoCompartir, estadoTitulo,
   onSettingsClick,
   userProfile, onUserClick,
   onManualSync,
@@ -310,6 +311,29 @@ function Topbar({
         >
           <span className="material-symbols-rounded">redo</span>
         </button>
+
+        {/* Online / Offline y compartir.
+            Vivía abajo del todo, en la fila de pastillas de estado junto a
+            "Guardado" y "2 nodos" — información de fondo que nadie mira. Pero
+            no es un dato: es el botón que abre el compartir y las sesiones en
+            vivo. Aquí arriba, con el resto de acciones, se ve y se pulsa. */}
+        {onEstadoCompartir && (
+          <button
+            className={`odi-share-pill ${estadoCompartir}`}
+            title={estadoTitulo}
+            onClick={() => { onEstadoCompartir(); window.playAudioTone && window.playAudioTone('click'); }}
+          >
+            <span className="material-symbols-rounded">
+              {estadoCompartir === 'offline' ? 'cloud_off' : estadoCompartir === 'caido' ? 'cloud_alert' : 'cloud_done'}
+            </span>
+            <span>
+              {estadoCompartir === 'offline' ? window.t('Compartir', 'Share')
+                : estadoCompartir === 'caido' ? window.t('Sin conexión', 'Disconnected')
+                : window.t('Online', 'Online')}
+            </span>
+          </button>
+        )}
+
         <div className="volume-ctrl" style={{ marginRight: 6 }}>
           <button
             className="icon-btn-mute"

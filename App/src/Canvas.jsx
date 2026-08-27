@@ -4558,6 +4558,24 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
         onUpdateClick={onUpdateClick}
         volume={volume}
         onChangeVolume={onChangeVolume}
+        {...(() => {
+          // El estado de compartir sube a la barra de arriba. Tres estados y no
+          // dos: publicado y "puedo hablar con Drive ahora mismo" son cosas
+          // distintas, y confundirlas dejaba proyectos publicados marcados como
+          // offline para siempre cuando caducaba el permiso.
+          if (!currentProject) return {};
+          const publicado = !!currentProject.isPublic;
+          const caido = publicado && driveReachable === false;
+          return {
+            estadoCompartir: !publicado ? 'offline' : caido ? 'caido' : 'online',
+            estadoTitulo: !publicado
+              ? window.t('Solo en este equipo. Haz clic para compartirlo o trabajar en vivo con alguien.', 'Only on this device. Click to share it or work live with someone.')
+              : caido
+                ? window.t('Publicado en tu Google Drive, pero ahora no hay conexión: los cambios se guardan aquí y se subirán al reconectar.', 'Published to your Google Drive, but there is no connection right now: changes are saved here and will upload once reconnected.')
+                : window.t('Publicado en tu Google Drive. Haz clic para compartir o empezar una sesión en vivo.', 'Published to your Google Drive. Click to share or start a live session.'),
+            onEstadoCompartir: () => { onSharingClick && onSharingClick(projectId); },
+          };
+        })()}
         userProfile={userProfile}
         onUserClick={onUserClick}
       />
@@ -5173,40 +5191,10 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
 
         {/* Status pills */}
         <div className="status-bar">
-          {currentProject && (() => {
-            // Tres estados, no dos. Antes "publicado" y "hay conexión con Drive"
-            // compartían variable, así que un proyecto publicado se mostraba como
-            // Offline en cuanto caducaba el token — y se quedaba así.
-            const published = !!currentProject.isPublic;
-            const linkDown = published && driveReachable === false;
-            const color = !published ? 'var(--text-soft, #595459)'
-              : linkDown ? 'var(--wine, #E6544F)'
-              : 'var(--brand-green, #90B968)';
-            return (
-              <button
-                className={`status-pill privacy-status-pill ${published ? 'public' : 'private'}`}
-                title={!published
-                  ? window.t('Puesto de trabajo offline, solo en este equipo (Haga clic para ponerlo online)', 'Workspace offline, only on this device (Click to put it online)')
-                  : linkDown
-                    ? window.t('Publicado en tu Google Drive, pero ahora mismo no hay conexión con Drive: los cambios se guardan en este equipo y se subirán al reconectar', 'Published to your Google Drive, but Drive is unreachable right now: changes are saved on this device and will upload once reconnected')
-                    : window.t('Puesto de trabajo online, sincronizado con tu Google Drive (Haga clic para gestionar)', 'Workspace online, synced with your Google Drive (Click to manage)')}
-                onClick={() => { onSharingClick && onSharingClick(projectId); window.playAudioTone && window.playAudioTone('click'); }}
-                style={{
-                  cursor: 'pointer',
-                  background: published && !linkDown ? 'rgba(144, 185, 104, 0.12)' : 'var(--paper)',
-                  borderColor: published ? color : 'var(--line)',
-                  color: color,
-                }}
-              >
-                <span className="material-symbols-rounded" style={{ fontSize: 14 }}>
-                  {!published ? 'cloud_off' : linkDown ? 'cloud_alert' : 'cloud_done'}
-                </span>
-                {!published ? window.t('Offline', 'Offline')
-                  : linkDown ? window.t('Sin conexión', 'Disconnected')
-                  : window.t('Online', 'Online')}
-              </button>
-            );
-          })()}
+          {/* La pastilla de Online/Offline se mudó a la barra de arriba,
+              junto al volumen: no era un dato de fondo como "Guardado" o el
+              número de nodos, sino el botón que abre compartir y las
+              sesiones en vivo. Abajo del todo nadie lo miraba. */}
           <div className="status-pill"><div className="dot-live"/> {window.t('Guardado', 'Saved')}</div>
           {/* Vista de conexiones, junto al contador de nodos: es información
               sobre el lienzo, así que vive con el resto de la información. */}

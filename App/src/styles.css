@@ -4803,3 +4803,49 @@ html[data-touch="1"] .handle::before {
 .ms-grid-list .ms-project-cover { position: static; }
 /* Con el dedo no hay "pasar por encima", así que se ven siempre. */
 html[data-touch="1"] .ms-grid-list .ms-card-actions { opacity: 1; }
+
+/* ── Online / Compartir, en la barra de arriba ──
+   Antes era una pastilla gris en la fila de abajo, entre "Guardado" y el
+   número de nodos: parecía un dato más y nadie caía en que se podía pulsar.
+   Es la puerta a compartir y a las sesiones en vivo, así que va arriba con el
+   resto de acciones y con el peso de un botón de verdad. */
+.odi-share-pill {
+  display: flex; align-items: center; gap: 6px;
+  margin-right: 8px;
+  padding: 7px 12px;
+  border-radius: 8px;
+  border: 1.5px solid var(--line);
+  font-size: 12px; font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+  box-shadow: var(--pop-sm);
+  transition: transform 140ms var(--e-out), box-shadow 140ms var(--e-out), background 120ms;
+}
+.odi-share-pill .material-symbols-rounded { font-size: 17px; }
+.odi-share-pill:hover { transform: translate(-1px, -2px); box-shadow: var(--pop-hover); }
+.odi-share-pill:active { transform: translate(1px, 1px); box-shadow: 0 0 0 0 var(--line); }
+
+/* Sin publicar: invita a hacerlo, sin gritar. */
+.odi-share-pill.offline { background: var(--paper); color: var(--ink-2); }
+.odi-share-pill.offline:hover { background: var(--bg-2); color: var(--ink); }
+
+/* Publicado y con conexión: verde de marca, relleno. */
+.odi-share-pill.online {
+  background: var(--olive, #6A8546); color: #FFFFFF;
+}
+.odi-share-pill.online .material-symbols-rounded { color: #FFFFFF; }
+.odi-share-pill.online:hover { background: #7FA85A; }
+[data-theme="dark"] .odi-share-pill.online { background: #5B7F44; }
+
+/* Publicado pero Drive no responde: hay que mirarlo, no ignorarlo. */
+.odi-share-pill.caido {
+  background: color-mix(in srgb, var(--wine) 14%, transparent);
+  color: var(--wine, #E6544F);
+  border-color: var(--wine, #E6544F);
+}
+
+/* En una ventana estrecha se queda el icono solo. */
+@media (max-width: 1250px) {
+  .odi-share-pill span:not(.material-symbols-rounded) { display: none; }
+  .odi-share-pill { padding: 7px 9px; }
+}
