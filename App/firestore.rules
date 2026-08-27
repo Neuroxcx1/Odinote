@@ -1,0 +1,72 @@
+// =====================================================
+// Odinote — reglas de seguridad de Cloud Firestore
+//
+// Pegar en: consola de Firebase → Firestore → pestaña "Reglas" → Publicar.
+//
+// Firestore aquí NO guarda ni una nota, ni un tablero, ni un dibujo. Todo eso
+// sigue viviendo en el equipo de cada persona y, si lo pone online, en SU
+// Google Drive. Lo único que pasa por aquí es el apretón de manos: las
+// direcciones que dos Odinote necesitan intercambiar para encontrarse y
+// hablarse directamente. En cuanto se encuentran, esos papelitos se borran y
+// el trabajo va de ordenador a ordenador sin tocar ningún servidor.
+//
+// Por qué está tan cerrado: el plan gratuito tiene una cuota diaria. Sin estas
+// restricciones, cualquiera podría escribir basura hasta agotarla y dejar sin
+// servicio a quien sí lo esté usando.
+// =====================================================
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Por defecto todo está prohibido. Lo de abajo son las ÚNICAS excepciones.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // ── Salas de encuentro ──
+    //
+    // El código de la sala es el que una persona comparte con otra. Hace falta
+    // haber iniciado sesión (vale la sesión anónima: no pide cuenta a nadie,
+    // solo sirve para que cada visitante tenga un identificador y no se pueda
+    // escribir en masa sin control).
+    match /salas/{codigo} {
+
+      function conSesion() {
+        return request.auth != null;
+      }
+
+      // La sala solo dice quién la abrió y cuándo. Nada más cabe dentro.
+      allow get, list: if conSesion();
+
+      allow create: if conSesion()
+        && codigo.size() >= 6 && codigo.size() <= 32
+        && request.resource.data.keys().hasOnly(['anfitrion', 'creadaEn', 'version'])
+        && request.resource.data.anfitrion == request.auth.uid;
+
+      // Solo quien abrió la sala puede cerrarla.
+      allow update, delete: if conSesion()
+        && resource.data.anfitrion == request.auth.uid;
+
+      // ── Los papelitos del apretón de manos ──
+      //
+      // Cada uno lleva la dirección de red de quien lo escribe. Se limita el
+      // tamaño porque una descripción de conexión legítima ocupa unos pocos
+      // kilobytes: quien intente meter aquí otra cosa se topa con el tope.
+      match /senales/{id} {
+        allow get, list: if conSesion();
+
+        allow create: if conSesion()
+          && request.resource.data.de == request.auth.uid
+          && request.resource.data.keys().hasOnly(['de', 'para', 'tipo', 'carga', 'creadaEn'])
+          && request.resource.data.tipo in ['oferta', 'respuesta', 'candidato']
+          && request.resource.data.carga is string
+          && request.resource.data.carga.size() < 8000;
+
+        // Cada cual limpia lo suyo cuando la conexión ya está hecha.
+        allow delete: if conSesion()
+          && resource.data.de == request.auth.uid;
+      }
+    }
+  }
+}
