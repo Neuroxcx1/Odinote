@@ -47,7 +47,7 @@ try {
 
 // Marcador de build: si la consola no muestra esta versión, el navegador está
 // sirviendo JS cacheado (subir ?v= en index.html invalida la caché)
-window.ODINOTE_BUILD = 'v95';
+window.ODINOTE_BUILD = 'v96';
 console.log('[ODINOTE] Código cargado: ' + window.ODINOTE_BUILD);
 
 // Global shortcuts configuration
@@ -299,6 +299,7 @@ function App() {
     // Escucha del inicio de sesion con Google completado en la ventana nativa
     if (window.electronAPI && window.electronAPI.onGoogleSigninCompleted) {
       const unsubscribe = window.electronAPI.onGoogleSigninCompleted((profile) => {
+        if (window._odiEsperaLogin) { clearTimeout(window._odiEsperaLogin); window._odiEsperaLogin = null; }
         setUserProfile(profile);
         localStorage.setItem('odinote.google_profile', JSON.stringify(profile));
         setWaitingForWebLogin(false);
@@ -371,6 +372,17 @@ function App() {
     setLoginError(null);
     if (window.electronAPI && window.electronAPI.startGoogleLogin) {
       setWaitingForWebLogin(true);
+      // Si Google falla en SU página (sin volver aquí), nadie nos avisa nunca y
+      // la ventana se quedaba en "esperando" hasta que la cerraras. A los dos
+      // minutos se corta y se dice qué mirar, en vez de dejarte colgado.
+      if (window._odiEsperaLogin) clearTimeout(window._odiEsperaLogin);
+      window._odiEsperaLogin = setTimeout(() => {
+        setWaitingForWebLogin(false);
+        setLoginError(window.t(
+          'Google no respondió. Si en el navegador viste "Se ha producido un error", el problema está en la configuración del proyecto de Google Cloud, no en Odinote: revisa la pantalla de consentimiento de OAuth. Prueba también en una ventana de incógnito.',
+          'Google never answered. If the browser showed "Something went wrong", the problem is in the Google Cloud project setup, not in Odinote: check the OAuth consent screen. Try an incognito window too.'
+        ));
+      }, 120000);
       window.electronAPI.startGoogleLogin()
         .catch((err) => {
           console.error('IPC startGoogleLogin error:', err);
