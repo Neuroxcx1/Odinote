@@ -4426,6 +4426,27 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
       window.removeEventListener('mouseup', onUp);
       setToolGhost(null);
       if (!dragging) {
+        // Dibujar no se "coloca": se empieza a dibujar. Pulsar el botón y
+        // tener que ir a dar otro clic al lienzo para que pase algo se sentía
+        // raro — con el resto de nodos tiene sentido elegir dónde va, pero
+        // aquí el sitio lo decide el propio trazo.
+        if (toolId === 'draw') {
+          setActiveTool(null);
+          const wrap = surfaceRef.current;
+          const rect = wrap ? wrap.getBoundingClientRect() : { width: 900, height: 600 };
+          // En el centro de lo que se está viendo ahora mismo.
+          const centro = screenToCanvas(rect.left + rect.width / 2, rect.top + rect.height / 2);
+          const def = defaultDims('draw');
+          const item = makeNewItem('draw', centro.x - def.w / 2, centro.y - def.h / 2, def.w, def.h, lang);
+          if (item) {
+            setCanvases(prev => {
+              const c = prev[currentId];
+              return { ...prev, [currentId]: { ...c, items: [...c.items, item] } };
+            });
+            window.playAudioTone && window.playAudioTone('create');
+          }
+          return;
+        }
         // click without drag → keep tool active for click-create
         return;
       }

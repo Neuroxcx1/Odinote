@@ -47,7 +47,7 @@ try {
 
 // Marcador de build: si la consola no muestra esta versión, el navegador está
 // sirviendo JS cacheado (subir ?v= en index.html invalida la caché)
-window.ODINOTE_BUILD = 'v92';
+window.ODINOTE_BUILD = 'v93';
 console.log('[ODINOTE] Código cargado: ' + window.ODINOTE_BUILD);
 
 // Global shortcuts configuration
@@ -1787,6 +1787,10 @@ function App() {
 
   const togglePublicProject = (projectId) => {
     if (!userProfile) {
+      // Cerrar la de compartir antes de pedir la sesión: las dos ventanas
+      // están al mismo nivel, así que la de iniciar sesión aparecía DETRÁS y
+      // parecía que el botón no hacía nada.
+      setSharingModalOpen(false);
       setUserModalOpen(true);
       return;
     }
@@ -2801,7 +2805,7 @@ function App() {
       {/* User Profile Modal */}
       {userModalOpen && (
         <div className="doc-modal-overlay" style={{ zIndex: 10000, display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.45)' }} onClick={() => setUserModalOpen(false)}>
-          <div className="doc-modal" style={{ width: '400px', background: 'var(--bg, #FAF9F6)', border: '1.5px solid var(--line, #595459)', padding: '24px', borderRadius: '12px', boxShadow: 'var(--pop-md)' }} onClick={(e) => e.stopPropagation()}>
+          <div className="odi-dialog" style={{ width: '400px', background: 'var(--bg, #FAF9F6)', border: '1.5px solid var(--line, #595459)', padding: '24px', borderRadius: '12px', boxShadow: 'var(--pop-md)' }} onClick={(e) => e.stopPropagation()}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <span className="material-symbols-rounded" style={{ fontSize: '24px', color: 'var(--olive, #6A8546)' }}>
@@ -3009,7 +3013,7 @@ function App() {
         if (!project) return null;
         return (
           <div className="doc-modal-overlay" style={{ zIndex: 10000, display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.45)' }} onClick={() => setSharingModalOpen(false)}>
-            <div className="doc-modal" style={{ width: '480px', background: 'var(--bg, #FAF9F6)', border: '1.5px solid var(--line, #595459)', padding: '24px', borderRadius: '12px', boxShadow: 'var(--pop-md)' }} onClick={(e) => e.stopPropagation()}>
+            <div className="odi-dialog" style={{ width: '480px', background: 'var(--bg, #FAF9F6)', border: '1.5px solid var(--line, #595459)', padding: '24px', borderRadius: '12px', boxShadow: 'var(--pop-md)' }} onClick={(e) => e.stopPropagation()}>
               
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -3085,6 +3089,39 @@ function App() {
                         {window.t('Copiar', 'Copy')}
                       </button>
                     </div>
+                    {/* Mandar el código por correo. Odinote no tiene servidor
+                        que envíe correos —y montar uno sería un gasto fijo por
+                        una línea de texto—, así que se abre el programa de
+                        correo de la persona con todo escrito. Sale de su
+                        cuenta de siempre, que además es lo que hace que al
+                        otro no le llegue a spam. */}
+                    <div style={{ display: 'flex', gap: '6px', marginTop: '10px' }}>
+                      <input
+                        type="email"
+                        value={inviteEmail}
+                        onChange={(e) => setInviteEmail(e.target.value)}
+                        placeholder={window.t('correo de tu compañero', 'your teammate\'s email')}
+                        style={{ flex: 1, padding: '7px 10px', fontSize: '12px', border: '1.5px solid var(--line-soft, #D5D1CD)', borderRadius: '6px', background: 'var(--bg-card, #FFFFFF)', color: 'var(--ink, #1A1A1A)' }}
+                      />
+                      <button
+                        className="btn lift"
+                        onClick={() => {
+                          const asunto = window.t('Te invito a mi lienzo de Odinote', 'Join my Odinote canvas');
+                          const cuerpo = window.t(
+                            `Abre Odinote (https://odinote-web.vercel.app), entra en cualquier proyecto, pulsa el botón de compartir y elige "Unirme con un código".\n\nEl código es: ${salaCodigo}\n\nTe estaré esperando.`,
+                            `Open Odinote (https://odinote-web.vercel.app), go into any project, press the share button and choose "Join with a code".\n\nThe code is: ${salaCodigo}\n\nI'll be waiting.`
+                          );
+                          const destino = (inviteEmail || '').trim();
+                          window.open(`mailto:${encodeURIComponent(destino)}?subject=${encodeURIComponent(asunto)}&body=${encodeURIComponent(cuerpo)}`, '_self');
+                          window.odiTrack && window.odiTrack('sala_invitacion_correo', {});
+                        }}
+                        style={{ padding: '7px 12px', fontSize: '11.5px', background: 'var(--olive)', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '4px' }}
+                      >
+                        <span className="material-symbols-rounded" style={{ fontSize: 14 }}>mail</span>
+                        <span>{window.t('Invitar', 'Invite')}</span>
+                      </button>
+                    </div>
+
                     <button
                       className="btn"
                       onClick={cierraSalaEnVivo}
@@ -3464,7 +3501,7 @@ function App() {
         let tokenInputRef = React.createRef();
         return (
           <div className="doc-modal-overlay" style={{ zIndex: 10000, display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.45)' }} onClick={() => setJoiningModalOpen(false)}>
-            <div className="doc-modal" style={{ width: '400px', background: 'var(--bg, #FAF9F6)', border: '1.5px solid var(--line, #595459)', padding: '24px', borderRadius: '12px', boxShadow: 'var(--pop-md)' }} onClick={(e) => e.stopPropagation()}>
+            <div className="odi-dialog" style={{ width: '400px', background: 'var(--bg, #FAF9F6)', border: '1.5px solid var(--line, #595459)', padding: '24px', borderRadius: '12px', boxShadow: 'var(--pop-md)' }} onClick={(e) => e.stopPropagation()}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <span className="material-symbols-rounded" style={{ fontSize: '24px', color: 'var(--olive, #6A8546)' }}>group_add</span>

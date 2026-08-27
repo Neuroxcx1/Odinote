@@ -488,7 +488,9 @@ function ContextSidebar({
               title={window.t('Seguir dibujando', 'Keep drawing')}
             >
               <span className="material-symbols-rounded">gesture</span>
-              <span>{window.t('Dibujar', 'Draw')}</span>
+              {/* "Editar" y no "Dibujar": el mismo botón que en el resto de
+                  nodos, porque hace lo mismo — entrar a modificarlo. */}
+              <span>{window.t('Editar', 'Edit', 'Modifier', 'Bearbeiten', 'Modifica', 'Editar', '编辑', '編集', '편집', 'تعديل', 'Изменить')}</span>
             </button>
             <button
               className={`ctx-btn ${pane === 'inkColor' ? 'active' : ''}`}
