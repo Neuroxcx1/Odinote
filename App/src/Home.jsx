@@ -248,6 +248,18 @@ function Home({ lang, setLang, theme, setTheme, onOpenProject, projects, onCreat
             />
           </div>
           <div className="ms-top-actions">
+            {/* Unirse a una sesión, arriba y con texto.
+                Estaba solo en la barra lateral y con el nombre viejo, y nadie
+                lo encontraba: quien llega con el código de un amigo lo busca
+                aquí, entre los botones de siempre. */}
+            <button
+              className="ms-join-top lift"
+              title={window.t('Entrar al lienzo de alguien con su código', 'Enter someone\'s canvas with their code')}
+              onClick={() => { onJoinProjectClick && onJoinProjectClick(); window.playAudioTone && window.playAudioTone('click'); }}
+            >
+              <span className="material-symbols-rounded">sensors</span>
+              <span>{window.t('Unirme a una sesión', 'Join a session')}</span>
+            </button>
             <button
               className="icon-btn lift"
               title={needsDriveAuth

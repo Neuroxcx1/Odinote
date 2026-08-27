@@ -4733,3 +4733,29 @@ html[data-touch="1"] .handles { inset: -10px; }
 html[data-touch="1"] .handle::before {
   top: -14px; left: -14px; right: -14px; bottom: -14px;
 }
+
+/* Unirse a una sesión, en la barra de arriba del inicio.
+   Con texto y no solo icono: es la puerta de entrada para quien llega con un
+   código en la mano, y un icono suelto no se lee como "entra aquí". */
+.ms-join-top {
+  display: flex; align-items: center; gap: 7px;
+  margin-right: 10px;
+  padding: 7px 13px;
+  border-radius: 8px;
+  border: 1.5px solid var(--olive, #6A8546);
+  background: transparent;
+  color: var(--olive, #6A8546);
+  font-size: 12.5px; font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 120ms, transform 140ms var(--e-out);
+}
+.ms-join-top .material-symbols-rounded { font-size: 18px; }
+.ms-join-top:hover { background: rgba(106, 133, 70, 0.10); }
+[data-theme="dark"] .ms-join-top { border-color: #7FA85A; color: #A8D183; }
+[data-theme="dark"] .ms-join-top:hover { background: rgba(144, 185, 104, 0.14); }
+/* En una ventana estrecha se queda solo el icono, para no empujar al resto. */
+@media (max-width: 1100px) {
+  .ms-join-top span:not(.material-symbols-rounded) { display: none; }
+  .ms-join-top { padding: 7px 9px; }
+}
