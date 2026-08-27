@@ -47,7 +47,7 @@ try {
 
 // Marcador de build: si la consola no muestra esta versión, el navegador está
 // sirviendo JS cacheado (subir ?v= en index.html invalida la caché)
-window.ODINOTE_BUILD = 'v100';
+window.ODINOTE_BUILD = 'v101';
 console.log('[ODINOTE] Código cargado: ' + window.ODINOTE_BUILD);
 
 // Global shortcuts configuration
@@ -415,7 +415,30 @@ function App() {
         })
         .catch((err) => {
           console.error('Auth web error:', err);
-          setLoginError(err.message);
+          // Firebase habla en inglés y en jerga. El caso que más se ve —abrir
+          // Odinote por la dirección de red de otro equipo, para probar desde
+          // el celular— soltaba un párrafo sobre "OAuth operations" y
+          // "authorized domains" que asusta y no dice lo único que importa:
+          // que las sesiones en vivo NO dependen de esto.
+          const traducciones = {
+            'auth/unauthorized-domain': window.t(
+              'Iniciar sesión con Google no funciona desde esta dirección (' + location.hostname + '), porque Google solo lo permite desde los dominios oficiales. Las sesiones en vivo NO usan esto: puedes unirte con un código sin cuenta. Google solo hace falta para Google Drive.',
+              'Signing in with Google does not work from this address (' + location.hostname + '), because Google only allows it from the official domains. Live sessions do NOT use it: you can join with a code and no account. Google is only needed for Google Drive.'
+            ),
+            'auth/popup-blocked': window.t(
+              'El navegador bloqueó la ventana de Google. Permite las ventanas emergentes para este sitio y vuelve a intentarlo.',
+              'The browser blocked the Google window. Allow pop-ups for this site and try again.'
+            ),
+            'auth/popup-closed-by-user': window.t(
+              'Se cerró la ventana de Google antes de terminar.',
+              'The Google window was closed before finishing.'
+            ),
+            'auth/network-request-failed': window.t(
+              'Sin conexión con Google. Revisa tu internet.',
+              'No connection to Google. Check your internet.'
+            ),
+          };
+          setLoginError(traducciones[err.code] || err.message);
         });
     }
   };
@@ -2918,6 +2941,33 @@ function App() {
                         <path fill="#EA4335" d="M9 3.58c1.32 0 2.5.45 3.44 1.35l2.58-2.58C13.47 1.09 11.43 0 9 0 5.5 0 2.4 2.18.91 5.16l2.87 2.24C4.51 5.22 6.57 3.58 9 3.58z"/>
                       </svg>
                       <span>{window.t('Iniciar sesión con Google', 'Sign in with Google')}</span>
+                    </button>
+
+                    {/* La salida, aquí mismo. Quien llega a esta ventana desde
+                        un celular por la dirección de red se encuentra con que
+                        Google no le deja pasar — y lo que quería hacer, entrar
+                        al lienzo de alguien, no necesitaba a Google para nada.
+                        Antes tenía que cerrar, buscar otro botón y adivinarlo. */}
+                    <button
+                      className="btn lift"
+                      onClick={() => {
+                        setUserModalOpen(false);
+                        setLoginError(null);
+                        setSalaError(null);
+                        setJoiningModalOpen(true);
+                        window.playAudioTone && window.playAudioTone('click');
+                      }}
+                      style={{
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+                        padding: '11px', borderRadius: '8px',
+                        border: '1.5px solid var(--line, #595459)',
+                        background: 'var(--olive, #6A8546)', color: '#FFFFFF',
+                        fontWeight: '700', fontSize: '13px', cursor: 'pointer',
+                        boxShadow: 'var(--pop-sm)',
+                      }}
+                    >
+                      <span className="material-symbols-rounded" style={{ fontSize: 18 }}>sensors</span>
+                      <span>{window.t('Unirme a una sesión con un código', 'Join a session with a code')}</span>
                     </button>
                   </>
                 ) : (
