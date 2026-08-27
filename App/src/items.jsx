@@ -4220,6 +4220,49 @@ function SwatchItem({ item, lang }) {
 }
 
 // ──────────────── Dispatcher ────────────────
+// ──────────────── DIBUJO ────────────────
+//
+// Los trazos se guardan como vectores en un espacio propio (vw × vh) y el nodo
+// solo los estira a su caja. Por eso se puede mover, escalar y recolorear sin
+// que pierdan un pelo de nitidez — y por eso ocupan una fracción de lo que
+// ocuparía la misma raya guardada como imagen.
+function DrawItem({ item }) {
+  const D = window.OdiDraw;
+  const strokes = item.strokes || [];
+  const vw = item.vw || item.w || 300;
+  const vh = item.vh || item.h || 200;
+
+  if (!strokes.length) {
+    return (
+      <div className="draw-card draw-empty">
+        <span className="material-symbols-rounded">gesture</span>
+        <span>{window.t('Doble clic para dibujar', 'Double-click to draw')}</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="draw-card" style={{ width: '100%', height: '100%' }}>
+      <svg
+        width="100%"
+        height="100%"
+        viewBox={`0 0 ${vw} ${vh}`}
+        preserveAspectRatio="none"
+        style={{ display: 'block', overflow: 'visible' }}
+      >
+        {strokes.map(s => {
+          const g = D.strokeGeometry(s);
+          if (!g) return null;
+          return g.mode === 'fill'
+            ? <path key={s.id} d={g.d} fill={s.color} stroke="none"/>
+            : <path key={s.id} d={g.d} fill="none" stroke={s.color} strokeWidth={g.width}
+                    strokeLinecap="round" strokeLinejoin="round"/>;
+        })}
+      </svg>
+    </div>
+  );
+}
+
 function ItemRenderer({ item, lang, editing, callbacks }) {
   const cb = callbacks || {};
   const onUpdate = (patch) => {
@@ -4251,6 +4294,7 @@ function ItemRenderer({ item, lang, editing, callbacks }) {
     case 'frame':    return <FrameItem item={item} lang={lang} editing={editing} onUpdate={onUpdate} callbacks={cb}/>;
     case 'bigtitle': return <BigTitleItem item={item} lang={lang} editing={editing} onUpdate={onUpdate}/>;
     case 'map':      return <MapItem item={item} lang={lang} editing={editing} onUpdate={onUpdate} onEndEdit={cb.endEdit} callbacks={cb}/>;
+    case 'draw':     return <DrawItem item={item}/>;
     default:         return <NoteItem  item={item} lang={lang}/>;
   }
 }

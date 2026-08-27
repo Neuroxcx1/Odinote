@@ -100,7 +100,18 @@ function ContextSidebar({
   const isFrame = item.type === 'frame';
   const isBigTitle = item.type === 'bigtitle';
   const isMap = item.type === 'map';
+  const isDraw = item.type === 'draw';
   const isCurrentlyCropping = isImage && callbacks?.croppingId === item.id;
+  // Dibujando: la barra se convierte en la caja de herramientas del lápiz y
+  // nada más. Es el mismo patrón del recorte de una imagen.
+  const isDrawingNow = isDraw && callbacks?.drawingId === item.id;
+
+  const DRAW_COLORS = [
+    '#1A1A1A', '#595459', '#FFFFFF', '#E6544F',
+    '#D88040', '#DDAF2C', '#90B968', '#3CA59E',
+    '#3D5A80', '#6C5FAF', '#955BA5', '#E58AB8',
+  ];
+  const DRAW_WIDTHS = [2, 4, 8, 14, 22];
 
   const downloadDocPdf = () => {
     if (!window.html2pdf) return;
@@ -162,6 +173,14 @@ function ContextSidebar({
               callbacks.setCroppingId(null);
               return;
             }
+            // Dibujando, "atrás" guarda: salir tirando lo dibujado sin avisar
+            // sería la peor forma de perder un rato de trabajo. Para tirarlo
+            // está el botón de descartar, que sí pregunta.
+            if (isDrawingNow) {
+              if (pane) { setPane(null); return; }
+              callbacks.saveDrawing();
+              return;
+            }
             // Step 1: if a sub-pane is open, just close it
             if (pane) { setPane(null); return; }
             // Step 2: if a table cell is focused, deselect cell to go back to table-level menu
@@ -183,6 +202,108 @@ function ContextSidebar({
             <span className="material-symbols-rounded">done</span>
             <span>{window.t('Listo', 'Done')}</span>
           </button>
+        ) : isDrawingNow ? (
+          <>
+            <button
+              className={`ctx-btn ${callbacks.drawTool === 'pen' ? 'active' : ''}`}
+              onClick={()=>callbacks.setDrawTool('pen')}
+              title={window.t('Lápiz', 'Pen')}
+            >
+              <span className="material-symbols-rounded">edit</span>
+              <span>{window.t('Lápiz', 'Pen')}</span>
+            </button>
+
+            <button
+              className={`ctx-btn ${callbacks.drawTool === 'move' ? 'active' : ''}`}
+              onClick={()=>callbacks.setDrawTool('move')}
+              title={window.t('Mover trazos', 'Move strokes')}
+            >
+              <span className="material-symbols-rounded">near_me</span>
+              <span>{window.t('Mover', 'Move')}</span>
+            </button>
+
+            <button
+              className={`ctx-btn ${callbacks.drawTool === 'eraser' ? 'active' : ''}`}
+              onClick={()=>callbacks.setDrawTool('eraser')}
+              title={window.t('Borrador', 'Eraser')}
+            >
+              <span className="material-symbols-rounded">ink_eraser</span>
+              <span>{window.t('Borrar', 'Erase')}</span>
+            </button>
+
+            <button
+              className={`ctx-btn ${pane === 'drawColor' ? 'active' : ''}`}
+              onClick={()=>setPane(pane === 'drawColor' ? null : 'drawColor')}
+              title="Color"
+            >
+              <div className="ctx-color-chip" style={{ background: callbacks.drawColor, border: '1.5px solid var(--line-soft)' }}/>
+              <span>Color</span>
+            </button>
+
+            <button
+              className={`ctx-btn ${pane === 'drawWidth' ? 'active' : ''}`}
+              onClick={()=>setPane(pane === 'drawWidth' ? null : 'drawWidth')}
+              title={window.t('Grosor', 'Thickness')}
+            >
+              <span className="material-symbols-rounded">line_weight</span>
+              <span>{window.t('Grosor', 'Width')}</span>
+            </button>
+
+            <button
+              className={`ctx-btn ${pane === 'drawPressure' ? 'active' : ''}`}
+              onClick={()=>setPane(pane === 'drawPressure' ? null : 'drawPressure')}
+              title={window.t('Cómo varía el trazo', 'How the stroke varies')}
+            >
+              <span className="material-symbols-rounded">stylus_note</span>
+              <span>{window.t('Trazo', 'Stroke')}</span>
+            </button>
+
+            <div className="ctx-sep-h"/>
+
+            <div style={{ display: 'flex', gap: 4 }}>
+              <button
+                className="ctx-btn"
+                disabled={!callbacks.canDrawUndo}
+                style={{ flex: 1, opacity: callbacks.canDrawUndo ? 1 : 0.35 }}
+                onClick={()=>callbacks.drawUndo()}
+                title={window.t('Deshacer', 'Undo')}
+              >
+                <span className="material-symbols-rounded">undo</span>
+              </button>
+              <button
+                className="ctx-btn"
+                disabled={!callbacks.canDrawRedo}
+                style={{ flex: 1, opacity: callbacks.canDrawRedo ? 1 : 0.35 }}
+                onClick={()=>callbacks.drawRedo()}
+                title={window.t('Rehacer', 'Redo')}
+              >
+                <span className="material-symbols-rounded">redo</span>
+              </button>
+            </div>
+
+            <div className="ctx-sep-h"/>
+
+            <button
+              className="ctx-btn"
+              onClick={()=>{
+                window.customConfirm(window.t('¿Descartar lo dibujado en esta sesión?', 'Discard what you drew in this session?'))
+                  .then(ok => { if (ok) callbacks.discardDrawing(); });
+              }}
+              title={window.t('Descartar', 'Discard')}
+            >
+              <span className="material-symbols-rounded">close</span>
+              <span>{window.t('Descartar', 'Discard')}</span>
+            </button>
+
+            <button
+              className="ctx-btn ctx-btn-primary"
+              onClick={()=>callbacks.saveDrawing()}
+              title={window.t('Guardar', 'Save')}
+            >
+              <span className="material-symbols-rounded">check</span>
+              <span>{window.t('Guardar', 'Save')}</span>
+            </button>
+          </>
         ) : (
           <>
             {/* Botón de editar universal: entra al modo edición del nodo (para las
@@ -199,7 +320,9 @@ function ContextSidebar({
                 <span>{window.t('Editar', 'Edit')}</span>
               </button>
             )}
-            {!tableCell && !isImage && (
+            {/* Un dibujo no tiene fondo de tarjeta: su color es el de la tinta,
+                y va en su propio botón (abajo) porque se aplica a los trazos. */}
+            {!tableCell && !isImage && !isDraw && (
               <button
             className={`ctx-btn ${(pane === 'color' || pane === 'colorHex') ? 'active' : ''}`}
             onClick={()=> isColor ? setPane(pane === 'colorHex' ? null : 'colorHex') : setPane(pane === 'color' ? null : 'color')}
@@ -353,6 +476,30 @@ function ContextSidebar({
             >
               <span className="material-symbols-rounded">open_in_new</span>
               <span>{window.t('Abrir', 'Open')}</span>
+            </button>
+          </>
+        )}
+
+        {isDraw && (
+          <>
+            <button
+              className="ctx-btn"
+              onClick={()=>{ callbacks.enterDrawMode(item.id); window.playAudioTone && window.playAudioTone('click'); }}
+              title={window.t('Seguir dibujando', 'Keep drawing')}
+            >
+              <span className="material-symbols-rounded">gesture</span>
+              <span>{window.t('Dibujar', 'Draw')}</span>
+            </button>
+            <button
+              className={`ctx-btn ${pane === 'inkColor' ? 'active' : ''}`}
+              onClick={()=>setPane(pane === 'inkColor' ? null : 'inkColor')}
+              title={window.t('Color de la tinta', 'Ink colour')}
+            >
+              <div className="ctx-color-chip" style={{
+                background: (item.strokes && item.strokes[0] && item.strokes[0].color) || '#1A1A1A',
+                border: '1.5px solid var(--line-soft)',
+              }}/>
+              <span>Color</span>
             </button>
           </>
         )}
@@ -1216,6 +1363,122 @@ function ContextSidebar({
                 >
                   <span className="material-symbols-rounded">{`format_align_${a}`}</span>
                 </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Paneles del dibujo ── */}
+      {pane === 'drawColor' && (
+        <div className="ctx-popout">
+          <div className="ctx-pop-section">
+            <div className="ctx-pop-title">
+              {callbacks.selectedStrokeId
+                ? window.t('Color de este trazo', 'This stroke’s colour')
+                : window.t('Color de la tinta', 'Ink colour')}
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px', marginTop: '6px' }}>
+              {DRAW_COLORS.map(c => (
+                <button
+                  key={c}
+                  className="text-color-swatch"
+                  style={{
+                    background: c,
+                    width: '24px', height: '24px', borderRadius: '50%', cursor: 'pointer',
+                    border: callbacks.drawColor === c ? '2.5px solid var(--wine)' : '1.5px solid var(--line-soft)',
+                  }}
+                  onClick={()=>callbacks.setDrawColor(c)}
+                  title={c}
+                />
+              ))}
+            </div>
+            <p style={{ margin: '8px 0 0', fontSize: 10.5, lineHeight: 1.35, color: 'var(--text-soft)' }}>
+              {callbacks.selectedStrokeId
+                ? window.t('Cambia el trazo elegido y la tinta siguiente.', 'Changes the picked stroke and the next ink.')
+                : window.t('Elige un trazo con “Mover” para recolorearlo.', 'Pick a stroke with “Move” to recolour it.')}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {pane === 'drawWidth' && (
+        <div className="ctx-popout">
+          <div className="ctx-pop-section">
+            <div className="ctx-pop-title">{window.t('Grosor del trazo', 'Stroke thickness')}</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 6 }}>
+              {DRAW_WIDTHS.map(w => (
+                <button
+                  key={w}
+                  className={`ctx-btn ${callbacks.drawWidth === w ? 'active' : ''}`}
+                  onClick={()=>callbacks.setDrawWidth(w)}
+                  style={{ flexDirection: 'row', gap: 8, justifyContent: 'flex-start', padding: '4px 8px' }}
+                  title={`${w} px`}
+                >
+                  <span style={{
+                    display: 'inline-block', width: 44, height: Math.max(2, w),
+                    borderRadius: 999, background: 'currentColor', flex: 'none',
+                  }}/>
+                  <span style={{ fontSize: 11 }}>{w}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {pane === 'drawPressure' && (
+        <div className="ctx-popout">
+          <div className="ctx-pop-section">
+            <div className="ctx-pop-title">{window.t('Cómo varía el trazo', 'How the stroke varies')}</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 6 }}>
+              {[
+                { id: 'auto',     icon: 'auto_awesome', label: window.t('Automático', 'Automatic'),  hint: window.t('Lápiz → presión · ratón → velocidad', 'Pen → pressure · mouse → speed') },
+                { id: 'pressure', icon: 'stylus',       label: window.t('Presión', 'Pressure'),      hint: window.t('Solo con lápiz digital', 'Digital pen only') },
+                { id: 'speed',    icon: 'speed',        label: window.t('Velocidad', 'Speed'),       hint: window.t('Despacio engorda, rápido afina', 'Slow thickens, fast thins') },
+                { id: 'uniform',  icon: 'horizontal_rule', label: window.t('Uniforme', 'Uniform'),   hint: window.t('Siempre el mismo grosor', 'Always the same width') },
+              ].map(m => (
+                <button
+                  key={m.id}
+                  className={`ctx-btn ${callbacks.drawPressureMode === m.id ? 'active' : ''}`}
+                  onClick={()=>callbacks.setDrawPressureMode(m.id)}
+                  style={{ flexDirection: 'row', gap: 8, justifyContent: 'flex-start', padding: '5px 8px', textAlign: 'left' }}
+                  title={m.hint}
+                >
+                  <span className="material-symbols-rounded" style={{ fontSize: 16, flex: 'none' }}>{m.icon}</span>
+                  <span style={{ fontSize: 11, lineHeight: 1.2 }}>{m.label}</span>
+                </button>
+              ))}
+            </div>
+            <p style={{ margin: '8px 0 0', fontSize: 10.5, lineHeight: 1.35, color: 'var(--text-soft)' }}>
+              {window.t(
+                'Sin lápiz digital el ratón no informa de presión: “Velocidad” es su equivalente.',
+                'Without a digital pen the mouse reports no pressure: “Speed” is its stand-in.'
+              )}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {pane === 'inkColor' && (
+        <div className="ctx-popout">
+          <div className="ctx-pop-section">
+            <div className="ctx-pop-title">{window.t('Color de la tinta', 'Ink colour')}</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px', marginTop: '6px' }}>
+              {DRAW_COLORS.map(c => (
+                <button
+                  key={c}
+                  className="text-color-swatch"
+                  style={{
+                    background: c,
+                    width: '24px', height: '24px', borderRadius: '50%', cursor: 'pointer',
+                    border: '1.5px solid var(--line-soft)',
+                  }}
+                  // Recolorea el dibujo entero: es lo que se espera de un nodo
+                  // ya guardado. Para teñir un solo trazo se entra a dibujar.
+                  onClick={()=>onUpdate({ strokes: (item.strokes || []).map(s => ({ ...s, color: c })) })}
+                  title={c}
+                />
               ))}
             </div>
           </div>

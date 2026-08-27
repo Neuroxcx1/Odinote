@@ -65,6 +65,7 @@ function defaultDims(type) {
     case 'frame':    return { w: 400, h: 400 };
     case 'bigtitle': return { w: 300, h: 80 };
     case 'map':      return { w: 340, h: 280 };
+    case 'draw':     return { w: 420, h: 300 };
     default:         return { w: 260, h: 160 };
   }
 }
@@ -174,6 +175,12 @@ function makeNewItem(type, x, y, w, h, lang) {
         color: 'transparent',
         align: 'center',
         content: { es: 'Título Grande', en: 'Large Title' } };
+    case 'draw': {
+      const size = defaultSize(420, 300);
+      // Nace vacío y abre el modo dibujo solo: nadie coloca un lienzo en
+      // blanco para mirarlo.
+      return { ...base, type: 'draw', ...size, strokes: [], vw: size.w, vh: size.h, _startDrawing: true };
+    }
     case 'map':
       return { ...base, type: 'map', ...defaultSize(340, 280),
         title: { es: 'Mapa de Google', en: 'Google Map' },
@@ -564,6 +571,21 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
   const [history, setHistory] = useStateCanvas([]);
   const [historyIdx, setHistoryIdx] = useStateCanvas(-1);
   const [croppingId, setCroppingId] = useStateCanvas(null);
+
+  // ── Modo dibujo ──
+  //
+  // Funciona como el recorte de una imagen: un nodo entra en un modo propio,
+  // la barra de la izquierda cambia a sus herramientas y el resto del lienzo
+  // se aparta. La diferencia es que aquí se trabaja sobre una COPIA (la
+  // sesión): así "Descartar" es gratis y todo lo dibujado entra en el
+  // historial general como un solo paso al guardar.
+  const [drawingId, setDrawingId] = useStateCanvas(null);
+  const [drawSession, setDrawSession] = useStateCanvas(null); // { strokes, past, future }
+  const [drawTool, setDrawTool] = useStateCanvas('pen');      // pen | move | eraser
+  const [drawColor, setDrawColor] = useStateCanvas('#E6544F');
+  const [drawWidth, setDrawWidth] = useStateCanvas(4);
+  const [drawPressureMode, setDrawPressureMode] = useStateCanvas('auto');
+  const [selectedStrokeId, setSelectedStrokeId] = useStateCanvas(null);
 
   // alignment guides and dragged task ghost
   const [guides, setGuides] = useStateCanvas(null);
@@ -1017,6 +1039,15 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
       // documento mientras el foco no estaba dentro del texto —por ejemplo tras
       // usar un botón de la barra— borraba el nodo entero del lienzo.
       if (fileOpen || docOpen) return;
+      // Mientras se dibuja, el lienzo cede el teclado al modo dibujo: aquí
+      // Ctrl+Z deshace trazos y Suprimir borra el trazo elegido, no el nodo.
+      if (drawingId) {
+        if (e.key === 'Escape') { e.preventDefault(); saveDrawing(); return; }
+        if (matchShortcut(window.shortcuts.undo)) { e.preventDefault(); drawUndo(); return; }
+        if (matchShortcut(window.shortcuts.redo)) { e.preventDefault(); drawRedo(); return; }
+        if (e.key === 'Backspace' || e.key === 'Delete') { e.preventDefault(); deleteSelectedStroke(); return; }
+        return;
+      }
       const tag = (e.target.tagName || '').toLowerCase();
       const isPasteInt = e.target === pasteIntRef.current;
       const inField = !isPasteInt && (tag === 'input' || tag === 'textarea' || e.target.isContentEditable);
@@ -1953,6 +1984,151 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
       }};
     });
   };
+
+  // ───── Modo dibujo ─────
+  //
+  // Dentro del modo se trabaja en coordenadas del LIENZO, no del nodo: así se
+  // puede seguir dibujando fuera de la caja actual y la caja se ajusta sola al
+  // guardar. El nodo guarda los trazos en un espacio propio (vw × vh) para
+  // poder estirarse sin deformar los datos.
+  const drawMovingRef = useRefCanvas(false);
+
+  const strokesToCanvasSpace = (item) => {
+    const D = window.OdiDraw;
+    const vw = item.vw || item.w || 1;
+    const vh = item.vh || item.h || 1;
+    const scaled = D.scaleStrokes(item.strokes || [], (item.w || vw) / vw, (item.h || vh) / vh);
+    return D.translateStrokes(scaled, item.x, item.y);
+  };
+
+  const enterDrawMode = (itemId) => {
+    const it = (canvasesLiveRef.current[currentId].items || []).find(i => i.id === itemId);
+    if (!it || it.type !== 'draw') return;
+    setSelected(itemId);
+    setEditing(null);
+    setSelectedStrokeId(null);
+    setDrawTool('pen');
+    setDrawSession({ strokes: strokesToCanvasSpace(it), past: [], future: [] });
+    setDrawingId(itemId);
+  };
+
+  // Cada cambio de la sesión guarda el estado anterior para el deshacer PROPIO
+  // del modo (los botones de la barra), que no toca el historial del lienzo.
+  const applyDrawChange = (fn) => {
+    setDrawSession(s => {
+      if (!s) return s;
+      const next = fn(s.strokes);
+      if (next === s.strokes) return s;
+      const past = [...s.past, s.strokes].slice(-60);
+      return { strokes: next, past, future: [] };
+    });
+  };
+
+  const commitStroke = (stroke) => applyDrawChange(list => [...list, stroke]);
+
+  const eraseStroke = (id) => applyDrawChange(list => {
+    if (!list.some(s => s.id === id)) return list;
+    return list.filter(s => s.id !== id);
+  });
+
+  const moveStroke = (id, dx, dy, isEnd) => {
+    if (isEnd) { drawMovingRef.current = false; return; }
+    const D = window.OdiDraw;
+    // Un arrastre entero es UN paso de deshacer, no uno por píxel recorrido.
+    if (!drawMovingRef.current) {
+      drawMovingRef.current = true;
+      applyDrawChange(list => list.map(s => s.id === id ? { ...s, pts: D.translateStrokes([s], dx, dy)[0].pts } : s));
+      return;
+    }
+    setDrawSession(s => s && ({
+      ...s,
+      strokes: s.strokes.map(st => st.id === id ? { ...st, pts: D.translateStrokes([st], dx, dy)[0].pts } : st),
+    }));
+  };
+
+  const recolorStroke = (hex) => {
+    setDrawColor(hex);
+    if (!selectedStrokeId) return;
+    applyDrawChange(list => list.map(s => s.id === selectedStrokeId ? { ...s, color: hex } : s));
+  };
+
+  const deleteSelectedStroke = () => {
+    if (!selectedStrokeId) return;
+    eraseStroke(selectedStrokeId);
+    setSelectedStrokeId(null);
+  };
+
+  const drawUndo = () => setDrawSession(s => {
+    if (!s || !s.past.length) return s;
+    const prev = s.past[s.past.length - 1];
+    return { strokes: prev, past: s.past.slice(0, -1), future: [s.strokes, ...s.future].slice(0, 60) };
+  });
+
+  const drawRedo = () => setDrawSession(s => {
+    if (!s || !s.future.length) return s;
+    return { strokes: s.future[0], past: [...s.past, s.strokes], future: s.future.slice(1) };
+  });
+
+  const exitDrawMode = () => {
+    setDrawingId(null);
+    setDrawSession(null);
+    setSelectedStrokeId(null);
+    drawMovingRef.current = false;
+  };
+
+  // Guardar: la caja del nodo se ajusta a lo que hay dibujado (si no, quedaría
+  // un rectángulo enorme medio vacío) y los trazos pasan al espacio del nodo.
+  const saveDrawing = () => {
+    const D = window.OdiDraw;
+    const id = drawingId;
+    const session = drawSession;
+    if (!id || !session) { exitDrawMode(); return; }
+    const strokes = session.strokes;
+    if (!strokes.length) {
+      // Se borró todo: el nodo vacío no pinta nada en el lienzo.
+      deleteItem(id);
+      exitDrawMode();
+      return;
+    }
+    const b = D.strokesBounds(strokes);
+    const pad = 6;
+    const x = Math.round(b.x - pad);
+    const y = Math.round(b.y - pad);
+    const w = Math.round(b.w + pad * 2);
+    const h = Math.round(b.h + pad * 2);
+    updateItem(id, {
+      strokes: D.translateStrokes(strokes, -x, -y),
+      x, y, w, h, vw: w, vh: h,
+      _startDrawing: false,
+    });
+    exitDrawMode();
+    window.playAudioTone && window.playAudioTone('click');
+  };
+
+  const discardDrawing = () => {
+    const id = drawingId;
+    const it = id ? (canvasesLiveRef.current[currentId].items || []).find(i => i.id === id) : null;
+    // Un nodo recién creado que se descarta sin un solo trazo no debe quedarse
+    // como una caja invisible en medio del lienzo.
+    if (it && it.type === 'draw' && !(it.strokes || []).length) deleteItem(id);
+    exitDrawMode();
+  };
+
+  // Un nodo de dibujo recién soltado abre el modo por su cuenta.
+  useEffectCanvas(() => {
+    if (drawingId) return;
+    const pend = (current.items || []).find(i => i.type === 'draw' && i._startDrawing);
+    if (pend) enterDrawMode(pend.id);
+    // eslint-disable-next-line
+  }, [current.items, drawingId]);
+
+  // Si el nodo que se estaba dibujando desaparece (deshacer, borrado desde
+  // otro sitio), el modo se cierra solo en vez de quedarse pintando en el aire.
+  useEffectCanvas(() => {
+    if (!drawingId) return;
+    if (!(current.items || []).some(i => i.id === drawingId)) exitDrawMode();
+    // eslint-disable-next-line
+  }, [current.items, drawingId]);
 
   const updateConnector = useCallbackCanvas((connId, patch) => {
     skipHistory.current = true;
@@ -3945,8 +4121,23 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
         return nextCanvases;
       });
     },
+    // Modo dibujo (lo consume la barra contextual)
+    drawingId,
+    enterDrawMode,
+    saveDrawing,
+    discardDrawing,
+    drawTool, setDrawTool,
+    drawColor, setDrawColor: recolorStroke,
+    drawWidth, setDrawWidth,
+    drawPressureMode, setDrawPressureMode,
+    drawUndo, drawRedo,
+    canDrawUndo: !!(drawSession && drawSession.past.length),
+    canDrawRedo: !!(drawSession && drawSession.future.length),
+    selectedStrokeId,
+    deleteSelectedStroke,
   // eslint-disable-next-line
-  }), [currentId, canvases, editingChild, selected, croppingId]);
+  }), [currentId, canvases, editingChild, selected, croppingId,
+       drawingId, drawSession, drawTool, drawColor, drawWidth, drawPressureMode, selectedStrokeId]);
 
   // ───── Breadcrumbs ─────
   const crumbs = useMemoCanvas(() => {
@@ -4492,7 +4683,9 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
                     zIndex: (selected === item.id || selectedIds.includes(item.id))
                       ? (item.type === 'frame' ? 1.5 : 100)
                       : (item.type === 'frame' ? 1 : 2),
-                    opacity: matches ? 1 : 0.18,
+                    // El nodo que se está dibujando lo pinta la capa de dibujo:
+                    // dejarlo visible aquí lo mostraría dos veces, uno bajo el velo.
+                    opacity: drawingId === item.id ? 0 : (matches ? 1 : 0.18),
                     transition: item._dragging ? 'none' : 'opacity 200ms ease',
                     pointerEvents: 'auto',
                   }}
@@ -4503,6 +4696,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
                   }}
                   onDoubleClick={(e)=>{
                     if (item.type === 'doc') { e.stopPropagation(); setDocOpen({ id: item.id }); return; }
+                    if (item.type === 'draw') { e.stopPropagation(); enterDrawMode(item.id); return; }
                     if (item.type === 'board') return;
                     if (['note','comment','todo','column','link','board','bigtitle','frame'].includes(item.type)) {
                       e.stopPropagation();
@@ -4655,6 +4849,28 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
             {/* Connector toolbar moved to left sidebar (rendered above) */}
           </div>
         </div>
+
+        {/* Capa de dibujo a mano: va fuera de .canvas-surface para poder velar
+            todo el lienzo, y repite su misma transformación para que los
+            trazos queden clavados sobre los nodos. */}
+        {drawingId && drawSession && (
+          <window.DrawOverlay
+            strokes={drawSession.strokes}
+            tool={drawTool}
+            color={drawColor}
+            width={drawWidth}
+            pressureMode={drawPressureMode}
+            scale={scale}
+            pan={pan}
+            bounds={bounds}
+            theme={theme}
+            selectedStrokeId={selectedStrokeId}
+            onCommitStroke={commitStroke}
+            onEraseStroke={eraseStroke}
+            onMoveStroke={moveStroke}
+            onSelectStroke={setSelectedStrokeId}
+          />
+        )}
 
         {/* Mini-search */}
         <div className="mini-search" onMouseDown={(e)=>e.stopPropagation()}>

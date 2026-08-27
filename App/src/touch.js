@@ -239,9 +239,12 @@
   // Controles que el navegador debe manejar él mismo: si les bloqueamos el
   // toque no reciben el foco, no sale el teclado y no se puede colocar el
   // cursor dentro de un texto en edición.
+  // La capa de dibujo se maneja sola con eventos de puntero (que sí traen la
+  // presión del lápiz). Si el puente la tocara, cada trazo se convertiría en
+  // un arrastre de nodo.
   const NATIVE_SELECTOR =
     'input, textarea, select, option, [contenteditable="true"], [contenteditable=""], ' +
-    'audio, video, iframe, [data-native-touch]';
+    'audio, video, iframe, .draw-layer, [data-native-touch]';
 
   const MOVE_THRESHOLD = 5;    // px antes de considerar que es un arrastre
   const LONG_PRESS_MS = 520;   // mantener pulsado = clic derecho

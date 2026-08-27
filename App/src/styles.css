@@ -4556,3 +4556,46 @@ html[data-mobile="1"] .odi-graph-btn span:not(.material-symbols-rounded) { displ
 /* El cursor cuenta lo que se puede hacer: sobre un nodo, agarrarlo. */
 .odi-gnode { cursor: grab; }
 .odi-gnode:active { cursor: grabbing; }
+
+/* ══════════════════════════════════════════════════════════════════
+   Nodo de dibujo a mano alzada
+   ══════════════════════════════════════════════════════════════════ */
+
+/* El nodo en el lienzo: no es una tarjeta, es tinta sobre el fondo. */
+.draw-card { position: relative; pointer-events: none; }
+.draw-card svg { pointer-events: none; }
+.draw-empty {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 6px; width: 100%; height: 100%;
+  border: 1.5px dashed var(--line-soft); border-radius: 6px;
+  color: var(--text-soft); font-size: 11px; font-weight: 600; text-align: center;
+  background: color-mix(in srgb, var(--paper) 55%, transparent);
+}
+.draw-empty .material-symbols-rounded { font-size: 26px; opacity: 0.65; }
+
+/* La capa del modo dibujo: cubre el lienzo entero, por debajo de la barra
+   contextual (z-index 70) para que sus botones sigan siendo pulsables. */
+.draw-layer {
+  position: absolute; inset: 0;
+  z-index: 60;
+  touch-action: none;              /* el dedo dibuja, no desplaza la página */
+  overscroll-behavior: contain;
+  user-select: none; -webkit-user-select: none;
+}
+.draw-dim {
+  position: absolute; inset: 0;
+  background: rgba(255, 255, 255, 0.72);
+  animation: draw-veil-in 160ms var(--e-out);
+}
+[data-theme="dark"] .draw-dim { background: rgba(20, 19, 20, 0.68); }
+@keyframes draw-veil-in { from { opacity: 0; } to { opacity: 1; } }
+
+.draw-strokes { position: absolute; top: 0; left: 0; pointer-events: none; }
+.draw-live { position: absolute; top: 0; left: 0; pointer-events: none; }
+
+/* El cursor lo pone el componente; esto solo evita el parpadeo del texto. */
+.draw-layer * { -webkit-user-drag: none; }
+
+/* Guardar destaca sobre el resto de la barra: es el final del camino. */
+.ctx-btn-primary { background: var(--olive-l); color: var(--ink); }
+.ctx-btn-primary:hover { background: color-mix(in srgb, var(--olive) 26%, transparent); }
