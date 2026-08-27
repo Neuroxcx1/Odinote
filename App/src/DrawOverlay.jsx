@@ -251,7 +251,7 @@ function DrawOverlay({
     return (
       <g key={s.id}>
         {g.mode === 'fill' ? (
-          <path d={g.d} fill={s.color} stroke="none"/>
+          <path d={g.d} fill={s.color} stroke="none" fillRule="nonzero"/>
         ) : (
           <path d={g.d} fill="none" stroke={s.color} strokeWidth={g.width}
                 strokeLinecap="round" strokeLinejoin="round"/>

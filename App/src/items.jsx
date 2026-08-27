@@ -4254,7 +4254,7 @@ function DrawItem({ item }) {
           const g = D.strokeGeometry(s);
           if (!g) return null;
           return g.mode === 'fill'
-            ? <path key={s.id} d={g.d} fill={s.color} stroke="none"/>
+            ? <path key={s.id} d={g.d} fill={s.color} stroke="none" fillRule="nonzero"/>
             : <path key={s.id} d={g.d} fill="none" stroke={s.color} strokeWidth={g.width}
                     strokeLinecap="round" strokeLinejoin="round"/>;
         })}

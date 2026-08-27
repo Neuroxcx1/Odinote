@@ -2004,6 +2004,11 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
   const enterDrawMode = (itemId) => {
     const it = (canvasesLiveRef.current[currentId].items || []).find(i => i.id === itemId);
     if (!it || it.type !== 'draw') return;
+    // La marca de "ábreme al nacer" se gasta AQUÍ, no al guardar. Se guarda en
+    // disco con el resto del nodo, así que si la sesión terminaba por un
+    // reinicio en vez de por Guardar, la marca sobrevivía y ese nodo volvía a
+    // robarle el modo dibujo al siguiente que se creara.
+    if (it._startDrawing) updateItemSilent(itemId, { _startDrawing: false });
     setSelected(itemId);
     setEditing(null);
     setSelectedStrokeId(null);
@@ -2115,9 +2120,14 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
   };
 
   // Un nodo de dibujo recién soltado abre el modo por su cuenta.
+  //
+  // Se exige también `_new`, que el lienzo apaga a los 300 ms de crear un nodo
+  // y por tanto solo vale dentro de esta sesión. Sin eso, un nodo que se quedó
+  // a medias (se recargó la página antes de guardar) conservaba la marca en
+  // disco y le robaba el modo dibujo al siguiente nodo que se creara.
   useEffectCanvas(() => {
     if (drawingId) return;
-    const pend = (current.items || []).find(i => i.type === 'draw' && i._startDrawing);
+    const pend = (current.items || []).find(i => i.type === 'draw' && i._startDrawing && i._new);
     if (pend) enterDrawMode(pend.id);
     // eslint-disable-next-line
   }, [current.items, drawingId]);

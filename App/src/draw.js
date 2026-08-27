@@ -41,12 +41,18 @@
     return clampFactor(MAX_F - speed * 0.35);
   }
 
-  // Suavizado exponencial: sin esto el grosor tiembla en cada muestra y el
-  // trazo sale con nudos.
+  // Suavizado exponencial más un tope de cuánto puede cambiar el grosor de un
+  // punto al siguiente. Sin el tope, entre dos puntos alejados (la
+  // simplificación deja pocos) el borde daba un escalón visible, y un trazo
+  // grueso parecía montado con piezas rectas.
+  const MAX_STEP = 0.07;
   function smoothFactor(prev, next, weight) {
     if (prev == null) return next;
-    const w = weight == null ? 0.35 : weight;
-    return prev + (next - prev) * w;
+    const w = weight == null ? 0.22 : weight;
+    const target = prev + (next - prev) * w;
+    if (target - prev > MAX_STEP) return prev + MAX_STEP;
+    if (prev - target > MAX_STEP) return prev - MAX_STEP;
+    return target;
   }
 
   // Devuelve el factor de grosor para un punto nuevo, según el modo.
@@ -161,12 +167,49 @@
     return d + ` L ${n2(last[0])} ${n2(last[1])}`;
   }
 
-  // Contorno de un trazo de grosor variable: se recorre la línea por un lado
-  // con el borde a la izquierda y se vuelve por el otro, y se rellena.
+  // Anillo cerrado dibujado con curvas: cada vértice se convierte en el punto
+  // de control de una cuadrática que pasa por los puntos medios. Es lo que
+  // quita las esquinas — con segmentos rectos el contorno se ve facetado, y en
+  // un trazo grueso eso parece hecho de cuadrados.
+  function smoothRing(ring) {
+    const n = ring.length;
+    if (n < 3) return '';
+    const midX = (a, b) => (a[0] + b[0]) / 2;
+    const midY = (a, b) => (a[1] + b[1]) / 2;
+    let d = `M ${n2(midX(ring[n - 1], ring[0]))} ${n2(midY(ring[n - 1], ring[0]))}`;
+    for (let i = 0; i < n; i++) {
+      const cur = ring[i];
+      const nxt = ring[(i + 1) % n];
+      d += ` Q ${n2(cur[0])} ${n2(cur[1])} ${n2(midX(cur, nxt))} ${n2(midY(cur, nxt))}`;
+    }
+    return d + ' Z';
+  }
+
+  // Media circunferencia para rematar una punta. Se parte del vector normal
+  // que corresponda y se gira media vuelta: girar la normal izquierda -90°
+  // da justo la dirección de avance, así que el arco pasa por delante de la
+  // punta en vez de morderla.
+  const CAP_STEPS = 10;
+  function capPoints(center, normal, steps) {
+    const out = [];
+    for (let i = 1; i < steps; i++) {
+      const a = -Math.PI * (i / steps);
+      const cos = Math.cos(a), sin = Math.sin(a);
+      out.push([
+        center[0] + normal[0] * cos - normal[1] * sin,
+        center[1] + normal[0] * sin + normal[1] * cos,
+      ]);
+    }
+    return out;
+  }
+
+  // Contorno de un trazo de grosor variable: se va por un lado, se remata la
+  // punta en redondo, se vuelve por el otro y se remata el principio igual.
   function ribbonPath(pts, width) {
     const half = width / 2;
     const left = [];
     const right = [];
+    const halves = [];
     for (let i = 0; i < pts.length; i++) {
       const prev = pts[i - 1] || pts[i];
       const next = pts[i + 1] || pts[i];
@@ -175,14 +218,18 @@
       const len = Math.hypot(dx, dy);
       if (len < 0.0001) { dx = 1; dy = 0; } else { dx /= len; dy /= len; }
       const h = half * (pts[i][2] == null ? 1 : pts[i][2]);
+      halves.push(h);
       left.push([pts[i][0] - dy * h, pts[i][1] + dx * h]);
       right.push([pts[i][0] + dy * h, pts[i][1] - dx * h]);
     }
-    right.reverse();
-    const ring = left.concat(right);
-    let d = `M ${n2(ring[0][0])} ${n2(ring[0][1])}`;
-    for (let i = 1; i < ring.length; i++) d += ` L ${n2(ring[i][0])} ${n2(ring[i][1])}`;
-    return d + ' Z';
+    const last = pts.length - 1;
+    const endNormal = [left[last][0] - pts[last][0], left[last][1] - pts[last][1]];
+    const startNormal = [right[0][0] - pts[0][0], right[0][1] - pts[0][1]];
+    const ring = left
+      .concat(capPoints([pts[last][0], pts[last][1]], endNormal, CAP_STEPS))
+      .concat(right.slice().reverse())
+      .concat(capPoints([pts[0][0], pts[0][1]], startNormal, CAP_STEPS));
+    return smoothRing(ring);
   }
 
   // Devuelve { d, fill } (grosor variable) o { d, stroke } (grosor constante).

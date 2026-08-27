@@ -4596,6 +4596,12 @@ html[data-mobile="1"] .odi-graph-btn span:not(.material-symbols-rounded) { displ
 /* El cursor lo pone el componente; esto solo evita el parpadeo del texto. */
 .draw-layer * { -webkit-user-drag: none; }
 
-/* Guardar destaca sobre el resto de la barra: es el final del camino. */
-.ctx-btn-primary { background: var(--olive-l); color: var(--ink); }
-.ctx-btn-primary:hover { background: color-mix(in srgb, var(--olive) 26%, transparent); }
+/* Guardar destaca sobre el resto de la barra: es el final del camino.
+   Los dos temas se pintan a mano: --olive-l no cambia en oscuro, así que
+   heredarlo dejaba un botón verde pálido con el texto casi invisible. */
+.ctx-btn-primary { background: var(--olive, #90B968); color: #FFFFFF; }
+.ctx-btn-primary .material-symbols-rounded { color: #FFFFFF; }
+.ctx-btn-primary:hover { background: #7FA85A; }
+[data-theme="dark"] .ctx-btn-primary { background: #4C6B39; color: #E8F5DC; }
+[data-theme="dark"] .ctx-btn-primary .material-symbols-rounded { color: #E8F5DC; }
+[data-theme="dark"] .ctx-btn-primary:hover { background: #5B7F44; }

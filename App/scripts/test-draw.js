@@ -104,7 +104,21 @@ const check = (nombre, ok, extra) => {
   const g2 = OdiDraw.strokeGeometry(variable);
   check('un trazo de grosor variable se pinta como contorno relleno', g2.mode === 'fill');
   check('el contorno se cierra', g2.d.trim().endsWith('Z'));
-  check('el contorno tiene ida y vuelta', (g2.d.match(/L /g) || []).length >= 5);
+  // Lo que hacía que un trazo grueso pareciera hecho de cuadrados: el contorno
+  // se trazaba con rectas. Ahora es todo curvas, sin una sola recta.
+  check('el contorno es todo curvas, sin segmentos rectos',
+    (g2.d.match(/Q /g) || []).length >= 10 && !/ L /.test(g2.d),
+    `${(g2.d.match(/Q /g) || []).length} curvas`);
+
+  // Las puntas se rematan en redondo: el contorno tiene que salirse por delante
+  // del último punto, no cortarse en seco sobre él.
+  const recta = { id: 'd', width: 10, pts: [[0, 0, 1], [100, 0, 1], [200, 0, 0.6]] };
+  const nums = OdiDraw.ribbonPath(recta.pts, recta.width)
+    .match(/-?\d+(\.\d+)?/g).map(Number);
+  let maxX = -Infinity, minX = Infinity;
+  for (let i = 0; i < nums.length; i += 2) { maxX = Math.max(maxX, nums[i]); minX = Math.min(minX, nums[i]); }
+  check('la punta final sobresale, no se corta en seco', maxX > 200.5, `llega a x=${maxX.toFixed(1)}`);
+  check('el arranque también va redondeado', minX < -0.5, `empieza en x=${minX.toFixed(1)}`);
 
   check('un trazo sin puntos no produce dibujo', OdiDraw.strokeGeometry({ id: 'c', pts: [] }) === null);
 }
