@@ -47,7 +47,7 @@ try {
 
 // Marcador de build: si la consola no muestra esta versión, el navegador está
 // sirviendo JS cacheado (subir ?v= en index.html invalida la caché)
-window.ODINOTE_BUILD = 'v96';
+window.ODINOTE_BUILD = 'v97';
 console.log('[ODINOTE] Código cargado: ' + window.ODINOTE_BUILD);
 
 // Global shortcuts configuration
@@ -3558,7 +3558,7 @@ function App() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <span className="material-symbols-rounded" style={{ fontSize: '24px', color: 'var(--olive, #6A8546)' }}>group_add</span>
                   <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '700', color: 'var(--ink, #1A1A1A)' }}>
-                    {window.t('Unirse a Puesto de Trabajo', 'Join Workspace')}
+                    {window.t('Unirme a una sesión', 'Join a session')}
                   </h3>
                 </div>
                 <button className="icon-btn lift" onClick={() => setJoiningModalOpen(false)}>
@@ -3568,17 +3568,33 @@ function App() {
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                 <div>
+                  {/* Pedía el formato viejo (odi-tok-xxxx-xxxx), que ya no
+                      existe: los códigos de sesión son seis letras. Quien
+                      llegaba aquí con el código de un amigo no entendía qué
+                      escribir. */}
                   <label style={{ display: 'block', fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-soft, #595459)', marginBottom: '6px' }}>
-                    {window.t('Token del Canvas (Ej: odi-tok-...)', 'Canvas Token (E.g. odi-tok-...)')}
+                    {window.t('Código de la sesión (6 letras)', 'Session code (6 letters)')}
                   </label>
                   <input
                     ref={tokenInputRef}
                     type="text"
-                    placeholder="odi-tok-xxxx-xxxx"
+                    autoFocus
+                    maxLength={8}
+                    placeholder="ABC123"
+                    onInput={(e) => { e.target.value = e.target.value.toUpperCase(); }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && e.target.value.trim() && !salaOcupada) {
+                        entraSalaEnVivo(e.target.value.trim());
+                      }
+                    }}
                     style={{
                       width: '100%',
-                      padding: '10px 12px',
-                      fontSize: '14px',
+                      padding: '12px',
+                      fontSize: '22px',
+                      fontWeight: 800,
+                      letterSpacing: '0.18em',
+                      textAlign: 'center',
+                      fontFamily: 'var(--font-mono, monospace)',
                       borderRadius: '8px',
                       border: '1.5px solid var(--line-soft, #E5E1DD)',
                       background: 'var(--bg-card, #FFFFFF)',
@@ -3588,9 +3604,15 @@ function App() {
                   />
                 </div>
 
-                <div style={{ padding: '12px', background: 'rgba(106, 133, 70, 0.08)', borderRadius: '8px', fontSize: '12px', color: 'var(--text-soft)' }}>
-                  {window.t('Al unirte, este puesto de trabajo aparecerá en tu menú principal al lado de tus proyectos locales.', 'Upon joining, this workspace will appear on your main menu next to your local projects.')}
+                <div style={{ padding: '12px', background: 'rgba(106, 133, 70, 0.08)', borderRadius: '8px', fontSize: '12px', color: 'var(--text-soft)', lineHeight: 1.45 }}>
+                  {window.t(
+                    'Pídele el código a quien abrió la sesión: lo ve en su botón de compartir. No necesitas cuenta de Google para entrar.',
+                    'Ask whoever opened the session for the code: they see it under their share button. You need no Google account to join.'
+                  )}
                 </div>
+                {salaError && (
+                  <p style={{ margin: 0, fontSize: '12px', color: 'var(--wine, #E6544F)', lineHeight: 1.4 }}>{salaError}</p>
+                )}
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '20px', borderTop: '1px solid var(--line-soft)', paddingTop: '12px' }}>

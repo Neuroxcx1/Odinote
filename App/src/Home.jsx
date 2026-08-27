@@ -110,8 +110,11 @@ function Home({ lang, setLang, theme, setTheme, onOpenProject, projects, onCreat
           cursor: 'pointer',
           transition: 'all 120ms'
         }}>
-          <span className="material-symbols-rounded" style={{ fontSize: 18 }}>group_add</span>
-          <span>{window.t('Unirse a Puesto', 'Join Workspace')}</span>
+          {/* "Puesto de trabajo" era el nombre viejo de lo de Drive. Quien
+              busca entrar con el código de un amigo no lo reconocía como el
+              botón que estaba buscando. */}
+          <span className="material-symbols-rounded" style={{ fontSize: 18 }}>sensors</span>
+          <span>{window.t('Unirme a una sesión', 'Join a session')}</span>
         </button>
 
         <nav className="ms-nav">
