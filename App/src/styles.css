@@ -1873,6 +1873,32 @@ body.odi-busy iframe { pointer-events: none !important; }
   z-index: 70;
   width: 76px;
   animation: ctx-slide-in 180ms var(--e-out);
+  /* En una ventana baja, las barras largas (la de formato de texto tiene
+     dieciséis botones) se salían por debajo de la pantalla y no había manera
+     de llegar a las últimas opciones. Ahora se desplaza por dentro.
+     El móvil no entra aquí: allí la barra es horizontal y ya se desplaza a lo
+     ancho, y su regla está más abajo en este archivo. */
+  max-height: calc(100vh - 112px);
+  max-height: calc(100dvh - 112px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  /* Una barra de desplazamiento fina: la normal se comería la etiqueta de los
+     botones, que solo tienen 76 px de ancho. */
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-soft) transparent;
+}
+.ctx-side::-webkit-scrollbar { width: 6px; }
+.ctx-side::-webkit-scrollbar-thumb { background: var(--line-soft); border-radius: 3px; }
+.ctx-side::-webkit-scrollbar-track { background: transparent; }
+
+/* Los paneles que se abren al lado tienen el mismo problema: el de iconos o el
+   de emojis no cabe en una pantalla baja. */
+.ctx-popout {
+  max-height: calc(100vh - 112px);
+  max-height: calc(100dvh - 112px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
 }
 @keyframes ctx-slide-in {
   from { opacity: 0; transform: translateX(-6px); }
