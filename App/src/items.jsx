@@ -1786,6 +1786,21 @@ function BoardItem({ item, lang, onUpdate, onOpenBoard, editing, getNestedItems,
 
   const cardRef = React.useRef(null);
   const lastCalculatedH = React.useRef(item.h);
+  // El título del tablero pasó de <textarea> a un editable con formato,
+  // igual que el título grande: así puede llevar un enlace a otro nodo
+  // (Enlazar necesita seleccionar texto de verdad, y un textarea no lo
+  // permite), y el color/negrita/cursiva siguen siendo propiedades del
+  // nodo entero —no por selección—, para que el pie del tablero no acabe
+  // con dos tamaños de letra distintos en dos palabras.
+  const titleRef = React.useRef(null);
+  const boardTitleText = pickLang(item.content, lang);
+  React.useEffect(() => {
+    if (!titleRef.current) return;
+    const sano = window.repairEscapedMarkup ? window.repairEscapedMarkup(boardTitleText || '') : (boardTitleText || '');
+    if (titleRef.current.innerHTML !== sano) titleRef.current.innerHTML = sano;
+    if (sano !== (boardTitleText || '')) onUpdate({ content: { es: sano, en: sano } });
+  }, [item.id, boardTitleText]);
+
   // null hasta el primer efecto: se calibra con las medidas REALES del pie.
   // (Antes se estimaba con un -60 fijo que no coincidía con el pie medido —
   // sobre todo con títulos de dos líneas — y el nodo crecía ~12px en cada arranque.)
@@ -1975,56 +1990,48 @@ function BoardItem({ item, lang, onUpdate, onOpenBoard, editing, getNestedItems,
           onDoubleClick={(e)=>{ e.stopPropagation(); onStartEdit && onStartEdit(item.id); }}
         >
           <span className="material-symbols-rounded board-foot-icon">{item.icon || 'dashboard'}</span>
-          {item.showTitle !== false && (editing ? (
-            <textarea
-              className="board-title-edit"
-              autoFocus
-              value={pickLang(item.content, lang)}
-              onChange={(e)=>{
-                onUpdate({ content: { es: e.target.value, en: e.target.value } });
-                e.target.style.height = 'auto';
-                e.target.style.height = e.target.scrollHeight + 'px';
+          {item.showTitle !== false && (
+            <div
+              ref={titleRef}
+              className="board-foot-title"
+              contentEditable={editing}
+              suppressContentEditableWarning
+              data-placeholder={window.t('Tablero', 'Board')}
+              onInput={()=>{
+                if (!titleRef.current) return;
+                onUpdate({ content: { es: titleRef.current.innerHTML, en: titleRef.current.innerHTML } });
               }}
-              ref={(el) => {
-                if (el) {
-                  el.style.height = 'auto';
-                  el.style.height = el.scrollHeight + 'px';
+              onClick={(e)=>{ if (editing) e.stopPropagation(); }}
+              onMouseDown={(e)=>{ if (editing) e.stopPropagation(); }}
+              onFocus={()=>{
+                if (item._new && titleRef.current) {
+                  const r = document.createRange();
+                  r.selectNodeContents(titleRef.current);
+                  const s = window.getSelection();
+                  s.removeAllRanges();
+                  s.addRange(r);
                 }
               }}
-              onClick={(e)=>e.stopPropagation()}
-              onMouseDown={(e)=>e.stopPropagation()}
-              onFocus={(e)=>{ if (item._new) e.target.select(); }}
-              onBlur={(e)=>{
-                const val = e.target.value.trim();
-                const defaultName = window.t('Nuevo tablero', 'New board');
-                const finalName = val || defaultName;
-                onUpdate({
-                  content: { es: finalName, en: finalName },
-                  _editing: false
-                });
+              onBlur={()=>{
+                const val = (titleRef.current?.textContent || '').trim();
+                if (!val) {
+                  const defaultName = window.t('Nuevo tablero', 'New board');
+                  onUpdate({ content: { es: defaultName, en: defaultName }, _editing: false });
+                } else {
+                  onUpdate({ _editing: false });
+                }
               }}
-              onKeyDown={(e)=>{ if (e.key==='Enter') { e.preventDefault(); e.target.blur(); } }}
-              rows={1}
+              onKeyDown={(e)=>{ if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur(); } }}
               style={{
-                resize: 'none',
-                overflowY: 'hidden',
-                height: 'auto',
-                display: 'block',
-                width: '100%',
-                background: 'transparent',
-                border: 'none',
+                flex: 1, minWidth: 0, cursor: 'text',
+                fontWeight: item.bold === false ? 500 : 700,
+                fontStyle: item.italic ? 'italic' : 'normal',
+                textDecoration: [item.underline && 'underline', item.strike && 'line-through'].filter(Boolean).join(' ') || 'none',
+                color: item.textColor && item.textColor !== 'inherit' ? item.textColor : 'inherit',
                 outline: 'none',
-                fontFamily: 'inherit',
-                fontWeight: '700',
-                color: 'inherit',
-                padding: 0
               }}
             />
-          ) : (
-            <div className="board-foot-title">
-              {pickLang(item.content, lang) || (window.t('Tablero', 'Board'))}
-            </div>
-          ))}
+          )}
           <span className="board-count">{nestedItems.length}</span>
         </div>
         {item.showCaption && (

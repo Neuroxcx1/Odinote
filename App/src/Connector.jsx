@@ -471,10 +471,26 @@ function Connector({ conn, items, selected, selectedIds, onSelect, onUpdate, onD
     angleEnd = cn >= 2 ? Math.atan2(cleanV[cn-1].y - cleanV[cn-2].y, cleanV[cn-1].x - cleanV[cn-2].x) : 0;
     angleStart = cn >= 2 ? Math.atan2(cleanV[0].y - cleanV[1].y, cleanV[0].x - cleanV[1].x) : 0;
   } else {
-    // Control point from the CENTERS (stable). Edges point TOWARD the control point so the
-    // dotted "covered" segment and the curve line up at the node edge. (Lógica original.)
-    qx = (cA.x + cB.x) / 2 + bend.x;
-    qy = (cA.y + cB.y) / 2 + bend.y;
+    // Punto de control del arco.
+    //
+    // Antes se sacaba del punto medio de los CENTROS. Con dos nodos de tamano
+    // muy distinto eso no es el medio de la linea que se ve: el borde del nodo
+    // grande queda lejisimos de su centro y el del pequeno casi encima, asi que
+    // el medio de los centros se corre hacia el nodo pequeno y el tirador
+    // aparecia pegado a el. Con nodos muy juntos era descarado.
+    //
+    // Ahora se afina en dos pasadas: con el medio de los centros se averiguan
+    // los bordes, y con el medio de esos BORDES —que si es el medio del tramo
+    // visible— se vuelven a calcular. Dos pasadas bastan; la tercera ya no
+    // mueve nada apreciable.
+    let qBase = { x: (cA.x + cB.x) / 2, y: (cA.y + cB.y) / 2 };
+    for (let pasada = 0; pasada < 2; pasada++) {
+      const bA = A.item ? edgeIntersect(A.item, qBase.x, qBase.y) : cA;
+      const bB = B.item ? edgeIntersect(B.item, qBase.x, qBase.y) : cB;
+      qBase = { x: (bA.x + bB.x) / 2, y: (bA.y + bB.y) / 2 };
+    }
+    qx = qBase.x + bend.x;
+    qy = qBase.y + bend.y;
     eA = A.item ? edgeIntersect(A.item, qx, qy) : cA;
     eB = B.item ? edgeIntersect(B.item, qx, qy) : cB;
     p1 = moveToward(eA, { x: qx, y: qy }, GAP);

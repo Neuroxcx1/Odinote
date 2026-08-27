@@ -380,7 +380,7 @@ function duplicateCanvasState(state, origId, newId) {
 // Zoom con el que se abre un lienzo que aún no tiene cámara guardada.
 const defaultScale = () => (window.odiIsMobile && window.odiIsMobile()) ? 0.7 : 1;
 
-function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn, setCanvases: setExtCanvases, updateAvailable, onUpdateClick, volume, onChangeVolume, onSettingsClick, vaultPath, userProfile, onUserClick, projects, setProjects, onSharingClick, onManualSync, isSyncingDrive, needsDriveAuth, driveReachable, jumpTarget, onSearchClick, onGoToNode, onGraphClick }) {
+function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn, setCanvases: setExtCanvases, updateAvailable, onUpdateClick, volume, onChangeVolume, onSettingsClick, vaultPath, userProfile, onUserClick, projects, setProjects, onSharingClick, onManualSync, isSyncingDrive, needsDriveAuth, driveReachable, jumpTarget, onSearchClick, onGoToNode, onGraphClick, initialTrail, onTrailChange }) {
   const currentProject = projects ? projects.find(p => p.id === projectId) : null;
   const [canvases, _setCanvases] = useStateCanvas(() => canvasesIn || JSON.parse(JSON.stringify(window.INITIAL_CANVASES)));
   // Stable ref to App's setter — avoids the infinite loop caused by it being a dep on every render
@@ -426,7 +426,30 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
     });
   };
 
-  const [stack, setStack] = useStateCanvas([projectId]);
+  // Se vuelve al tablero donde estabas, no al lienzo raiz. El rastro guardado
+  // se valida antes de usarlo: si borraste uno de esos tableros entre sesiones,
+  // se entra hasta el ultimo que siga existiendo en vez de fallar.
+  const [stack, setStack] = useStateCanvas(() => {
+    const guardado = Array.isArray(initialTrail) ? initialTrail : null;
+    if (!guardado || guardado[0] !== projectId) return [projectId];
+    const base = canvasesIn || {};
+    const valido = [projectId];
+    for (let i = 1; i < guardado.length; i++) {
+      const cid = guardado[i];
+      const padre = base[valido[valido.length - 1]];
+      const existe = base[cid] && padre && (padre.items || []).some(it => it.canvasId === cid);
+      if (!existe) break;
+      valido.push(cid);
+    }
+    return valido;
+  });
+
+  // Se avisa hacia arriba para que el rastro se guarde con el resto del estado.
+  const onTrailChangeRef = useRefCanvas(onTrailChange);
+  onTrailChangeRef.current = onTrailChange;
+  useEffectCanvas(() => {
+    if (onTrailChangeRef.current) onTrailChangeRef.current(stack);
+  }, [stack]);
   const [transition, setTransition] = useStateCanvas(null);
 
   const currentId = stack[stack.length - 1];
@@ -4787,7 +4810,11 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
         const it = selectedItem;
         if (!it) return null;
         const isEditingMapTitle = it.type === 'map' && it._editingTitle;
-        const isEditingTextNode = editing && editing === selected && ['note','comment','bigtitle','frame','todo'].includes(it.type);
+        // 'board' entró aquí porque, al empezar a escribir su título, el menú
+        // contextual normal se ocultaba (se oculta siempre que editing===selected)
+        // y esta barra de texto tampoco lo cubría: el panel de la izquierda
+        // desaparecía entero mientras se cambiaba el nombre del tablero.
+        const isEditingTextNode = editing && editing === selected && ['note','comment','bigtitle','frame','todo','board'].includes(it.type);
         if (!isEditingTextNode && !isEditingMapTitle) return null;
         return (
           <window.TextFormatSidebar

@@ -11,6 +11,7 @@ function TextFormatSidebar({ item, lang, onUpdate, onClose, variant, noCodeQuote
   const isFrame = item.type === 'frame';
   const isMap = item.type === 'map';
   const isTodo = item.type === 'todo';
+  const isBoard = item.type === 'board';
   // Estos tipos guardan el formato como propiedades del nodo en vez de HTML, así
   // que NUNCA deben llegar a execCommand (findEditor haría fallback al primer
   // editor de nota del documento y formatearía un nodo ajeno).
@@ -18,7 +19,14 @@ function TextFormatSidebar({ item, lang, onUpdate, onClose, variant, noCodeQuote
   // El to-do ya NO está en esa lista: sus tareas son texto con formato, así que
   // la negrita y el resto se aplican a lo seleccionado como en una nota. Antes
   // eran propiedades de la fila entera y por eso teñían la línea completa.
-  const isCustomPropType = isBigTitle || isFrame || isMap;
+  // El tablero se trata como el título grande: color/negrita/cursiva son
+  // propiedades del NODO entero, no de la selección —un pie de tablero con
+  // dos tamaños de letra en dos palabras se vería mal—, pero sin alineación,
+  // que ahí no significa nada (es una barra icono+texto+contador, no un bloque).
+  const isCustomPropType = isBigTitle || isFrame || isMap || isBoard;
+  // Ambos guardan el color en el mismo campo (item.textColor); frame y map
+  // usan uno propio (item.titleColor) porque su titulo vive aparte del cuerpo.
+  const usaTextColor = isBigTitle || isBoard;
 
   // ── To-do: el formato se aplica a la TAREA enfocada; si no hay ninguna
   // enfocada, se aplica a todas las tareas del nodo. ──
@@ -70,6 +78,17 @@ function TextFormatSidebar({ item, lang, onUpdate, onClose, variant, noCodeQuote
         alignCenter: (item.align || 'center') === 'center',
         alignRight: (item.align || 'center') === 'right',
         alignJustify: (item.align || 'center') === 'justify',
+      };
+    }
+    // El tablero también guarda su formato como propiedades: su título es un
+    // campo de texto plano, no HTML editable, así que B/I/S/U valen para el
+    // título entero. Se lee igual que el del Título grande.
+    if (item.type === 'board') {
+      return {
+        bold: item.bold !== false,
+        italic: !!item.italic,
+        strike: !!item.strike,
+        underline: !!item.underline,
       };
     }
     if (item.type === 'frame' || item.type === 'map') {
@@ -158,13 +177,13 @@ function TextFormatSidebar({ item, lang, onUpdate, onClose, variant, noCodeQuote
         <div className="ctx-letter" style={{
           fontWeight: 800,
           fontSize: 14,
-          color: isBigTitle ? (item.textColor || '#1A1A1A') : ((isFrame || isMap) ? (item.titleColor || '#1A1A1A') : '#E6544F'),
-          background: isCustomPropType && (isBigTitle ? item.textColor : item.titleColor) && (isBigTitle ? item.textColor : item.titleColor) !== 'inherit' ? 'none' : 'linear-gradient(90deg, #1A1A1A, #E6544F, #90B968)',
-          WebkitBackgroundClip: isCustomPropType && (isBigTitle ? item.textColor : item.titleColor) && (isBigTitle ? item.textColor : item.titleColor) !== 'inherit' ? 'none' : 'text',
-          WebkitTextFillColor: isCustomPropType && (isBigTitle ? item.textColor : item.titleColor) && (isBigTitle ? item.textColor : item.titleColor) !== 'inherit' ? 'none' : 'transparent',
-          backgroundClip: isCustomPropType && (isBigTitle ? item.textColor : item.titleColor) && (isBigTitle ? item.textColor : item.titleColor) !== 'inherit' ? 'none' : 'text',
+          color: usaTextColor ? (item.textColor || '#1A1A1A') : ((isFrame || isMap) ? (item.titleColor || '#1A1A1A') : '#E6544F'),
+          background: isCustomPropType && (usaTextColor ? item.textColor : item.titleColor) && (usaTextColor ? item.textColor : item.titleColor) !== 'inherit' ? 'none' : 'linear-gradient(90deg, #1A1A1A, #E6544F, #90B968)',
+          WebkitBackgroundClip: isCustomPropType && (usaTextColor ? item.textColor : item.titleColor) && (usaTextColor ? item.textColor : item.titleColor) !== 'inherit' ? 'none' : 'text',
+          WebkitTextFillColor: isCustomPropType && (usaTextColor ? item.textColor : item.titleColor) && (usaTextColor ? item.textColor : item.titleColor) !== 'inherit' ? 'none' : 'transparent',
+          backgroundClip: isCustomPropType && (usaTextColor ? item.textColor : item.titleColor) && (usaTextColor ? item.textColor : item.titleColor) !== 'inherit' ? 'none' : 'text',
         }}>
-          {isCustomPropType && (isBigTitle ? item.textColor : item.titleColor) && (isBigTitle ? item.textColor : item.titleColor) !== 'inherit' ? <span style={{color: isBigTitle ? item.textColor : item.titleColor}}>A</span> : 'A'}
+          {isCustomPropType && (usaTextColor ? item.textColor : item.titleColor) && (usaTextColor ? item.textColor : item.titleColor) !== 'inherit' ? <span style={{color: usaTextColor ? item.textColor : item.titleColor}}>A</span> : 'A'}
         </div>
         <span>{lang==='es'?'Color':'Color'}</span>
       </button>
@@ -190,26 +209,26 @@ function TextFormatSidebar({ item, lang, onUpdate, onClose, variant, noCodeQuote
         </>
       )}
 
-      {(!isCustomPropType || isBigTitle) && (
+      {(!isCustomPropType || isBigTitle || isBoard) && (
         <>
           {/* En el título y en las tareas, B/I/S/U son toggles de propiedad
               (texto plano); en las notas usan execCommand por selección. */}
-          <button className={`ctx-btn ${shown.bold ? 'active' : ''}`} onClick={()=> isBigTitle ? onUpdate({ bold: item.bold === false }) : exec('bold')}>
+          <button className={`ctx-btn ${shown.bold ? 'active' : ''}`} onClick={()=> (isBigTitle || isBoard) ? onUpdate({ bold: item.bold === false }) : exec('bold')}>
             <div className="ctx-letter" style={{fontWeight: 800}}>B</div>
             <span>{lang==='es'?'Negrita':'Bold'}</span>
           </button>
 
-          <button className={`ctx-btn ${shown.italic ? 'active' : ''}`} onClick={()=> isBigTitle ? onUpdate({ italic: !item.italic }) : exec('italic')}>
+          <button className={`ctx-btn ${shown.italic ? 'active' : ''}`} onClick={()=> (isBigTitle || isBoard) ? onUpdate({ italic: !item.italic }) : exec('italic')}>
             <div className="ctx-letter" style={{fontStyle: 'italic', fontWeight: 700}}>I</div>
             <span>{lang==='es'?'Cursiva':'Italic'}</span>
           </button>
 
-          <button className={`ctx-btn ${shown.strike ? 'active' : ''}`} onClick={()=> isBigTitle ? onUpdate({ strike: !item.strike }) : exec('strikeThrough')}>
+          <button className={`ctx-btn ${shown.strike ? 'active' : ''}`} onClick={()=> (isBigTitle || isBoard) ? onUpdate({ strike: !item.strike }) : exec('strikeThrough')}>
             <div className="ctx-letter" style={{textDecoration: 'line-through', fontWeight: 700}}>S</div>
             <span>{lang==='es'?'Tachado':'Strike'}</span>
           </button>
 
-          <button className={`ctx-btn ${shown.underline ? 'active' : ''}`} onClick={()=> isBigTitle ? onUpdate({ underline: !item.underline }) : exec('underline')}>
+          <button className={`ctx-btn ${shown.underline ? 'active' : ''}`} onClick={()=> (isBigTitle || isBoard) ? onUpdate({ underline: !item.underline }) : exec('underline')}>
             <div className="ctx-letter" style={{textDecoration: 'underline', fontWeight: 700}}>U</div>
             <span>{lang==='es'?'Subrayado':'Underline'}</span>
           </button>
@@ -217,7 +236,7 @@ function TextFormatSidebar({ item, lang, onUpdate, onClose, variant, noCodeQuote
       )}
 
       {/* Alineación: no aplica a las tareas (y evitaría caer en execCommand) */}
-      {!isTodo && (isCustomPropType || !isCaption) && (
+      {!isTodo && !isBoard && (isCustomPropType || !isCaption) && (
         <>
           <div className="ctx-sep-h"/>
 
@@ -399,7 +418,7 @@ function TextFormatSidebar({ item, lang, onUpdate, onClose, variant, noCodeQuote
                 className="text-color-swatch"
                 style={{background: c, border: c === '#FFFFFF' ? '1.5px solid var(--line-soft)' : '1.5px solid var(--line)'}}
                 onClick={()=>{
-                  if (isBigTitle) {
+                  if (usaTextColor) {
                     onUpdate({ textColor: c });
                   } else if (isFrame || isMap) {
                     onUpdate({ titleColor: c });
@@ -422,7 +441,7 @@ function TextFormatSidebar({ item, lang, onUpdate, onClose, variant, noCodeQuote
                 // que si no seguirian tiniendo la linea completa.
                 exec('removeFormat');
                 applyTodoStyle({ color: null, bold: false, italic: false, underline: false, strike: false });
-              } else if (isBigTitle) {
+              } else if (usaTextColor) {
                 onUpdate({ textColor: 'inherit' });
               } else if (isFrame || isMap) {
                 onUpdate({ titleColor: 'inherit' });
