@@ -47,7 +47,7 @@ try {
 
 // Marcador de build: si la consola no muestra esta versión, el navegador está
 // sirviendo JS cacheado (subir ?v= en index.html invalida la caché)
-window.ODINOTE_BUILD = 'v83';
+window.ODINOTE_BUILD = 'v84';
 console.log('[ODINOTE] Código cargado: ' + window.ODINOTE_BUILD);
 
 // Global shortcuts configuration
@@ -1746,6 +1746,10 @@ function App() {
     showToast(window.t('Subiendo el proyecto a Google Drive...', 'Uploading the project to Google Drive...'));
     uploadToGoogleDriveReal({ ...target, isPublic: true, shareToken: nextToken }, canvases, userProfile.accessToken)
       .then(folderId => {
+        // Cuántos lo consiguen y cuántos no. Sin esto, que alguien no pueda
+        // poner su espacio online solo se sabe si se molesta en escribir a
+        // GitHub — y casi nadie lo hace.
+        window.odiTrack && window.odiTrack('poner_online', { resultado: folderId ? 'ok' : 'fallo' });
         if (folderId) {
           setProjects(p => p.map(x => x.id === projectId ? { ...x, isPublic: true, shareToken: nextToken } : x));
           showToast(window.t(`"${projectNameString(target.name)}" ya está online, guardado en tu Google Drive (carpeta Odinote).`, `"${projectNameString(target.name)}" is now online, saved to your Google Drive (Odinote folder).`));

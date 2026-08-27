@@ -118,17 +118,21 @@ function DrawOverlay({
   };
 
   // ── Puntero ──
-  const addSample = (e) => {
+  const addSample = (e, isLast) => {
     const cur = drawingRef.current;
     if (!cur) return;
-    const p = toCanvas(e);
-    const sample = { x: p.x, y: p.y, t: e.timeStamp, pressure: e.pressure };
-    // Un lápiz de verdad manda presión; el ratón no, y entonces manda la
-    // velocidad. 'auto' decide por aparato en cada trazo.
+    const raw = toCanvas(e);
+    const sample = { x: raw.x, y: raw.y, t: e.timeStamp, pressure: e.pressure };
+    // El grosor se mide sobre el puntero de verdad (la velocidad real de la
+    // mano), pero la línea se dibuja sobre el punto estabilizado.
     const f = D.factorFor(cur.mode, sample, cur.lastSample, cur.lastFactor);
+    cur.smooth = D.stabilize(cur.smooth, raw);
+    // Al levantar el dedo el trazo termina donde está el puntero de verdad: el
+    // estabilizador va un poco por detrás y si no, la línea se quedaría corta.
+    const p = isLast ? raw : cur.smooth;
     // Puntos demasiado juntos no aportan forma y sí bytes.
     const last = cur.pts[cur.pts.length - 1];
-    if (last && Math.hypot(p.x - last[0], p.y - last[1]) * viewRef.current.scale < 1) {
+    if (!isLast && last && Math.hypot(p.x - last[0], p.y - last[1]) * viewRef.current.scale < 1) {
       cur.lastSample = sample;
       return;
     }
@@ -183,6 +187,7 @@ function DrawOverlay({
       pts: [],
       lastSample: null,
       lastFactor: null,
+      smooth: null,      // posición estabilizada, la que de verdad se dibuja
     };
     sizeLive();
     addSample(e);
@@ -229,6 +234,7 @@ function DrawOverlay({
       return;
     }
     const cur = drawingRef.current;
+    if (cur && cur.pts.length) addSample(e, true);
     drawingRef.current = null;
     clearLive();
     if (!cur) return;

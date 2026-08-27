@@ -93,6 +93,41 @@ const check = (nombre, ok, extra) => {
   check('con ratón, la velocidad cambia el grosor', lento > rapido, `${lento.toFixed(2)} vs ${rapido.toFixed(2)}`);
 }
 
+// ── Estabilizador ──
+{
+  // Una línea recta con temblor: el estabilizador tiene que dejarla mucho más
+  // cerca de la recta ideal de lo que llegó.
+  const semilla = (() => { let s = 7; return () => (s = (s * 1103515245 + 12345) % 2147483648) / 2147483648 - 0.5; })();
+  const crudo = [];
+  for (let i = 0; i <= 200; i++) crudo.push({ x: i, y: semilla() * 5 });
+
+  const desvio = (lista) => lista.reduce((m, p) => Math.max(m, Math.abs(p.y)), 0);
+  let sm = null;
+  const suave = crudo.map(p => (sm = OdiDraw.stabilize(sm, p)));
+
+  check('el estabilizador aplana el temblor de la mano',
+    desvio(suave.slice(8)) < desvio(crudo) / 2,
+    `de ±${desvio(crudo).toFixed(2)} px a ±${desvio(suave.slice(8)).toFixed(2)} px`);
+  // Va unos pocos píxeles por detrás: es el precio del suavizado, y en la
+  // aplicación el último punto se clava en el puntero real al levantar el dedo.
+  check('el retraso es de unos pocos píxeles, no se descuelga',
+    Math.abs(suave[suave.length - 1].x - crudo[crudo.length - 1].x) < 4,
+    `x final ${suave[suave.length - 1].x.toFixed(1)} vs ${crudo[crudo.length - 1].x}`);
+  check('el primer punto es exactamente donde se pulsó',
+    suave[0].x === crudo[0].x && suave[0].y === crudo[0].y);
+
+  // Un giro de verdad SÍ se tiene que seguir: suavizar no puede comerse la forma.
+  let sm2 = null;
+  const esquina = [];
+  for (let i = 0; i <= 30; i++) esquina.push({ x: i, y: 0 });
+  for (let i = 1; i <= 30; i++) esquina.push({ x: 30, y: i });
+  const trazado = esquina.map(p => (sm2 = OdiDraw.stabilize(sm2, p)));
+  const fin = trazado[trazado.length - 1];
+  check('un giro real se sigue: suavizar no se come la forma',
+    Math.abs(fin.x - 30) < 1 && Math.abs(fin.y - 30) < 4,
+    `acaba en (${fin.x.toFixed(1)}, ${fin.y.toFixed(1)}) y el puntero en (30, 30)`);
+}
+
 // ── Trazado SVG ──
 {
   const uniforme = { id: 'a', width: 4, pts: [[0, 0, 1], [10, 10, 1], [20, 0, 1]] };

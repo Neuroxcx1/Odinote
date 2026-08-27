@@ -22,8 +22,31 @@
   // El lápiz da presión de verdad (0..1). El ratón no: siempre manda 0.5, así
   // que ahí el grosor sale de lo rápido que se mueva la mano. Trazo lento =
   // línea gorda, trazo rápido = línea fina, que es como se comporta la tinta.
-  const MIN_F = 0.35;
-  const MAX_F = 1.15;
+  const MIN_F = 0.5;
+  const MAX_F = 1.12;
+
+  // ── Estabilizador de la mano ──
+  //
+  // El puntero llega con todo el temblor de la muñeca, y una raya larga salía
+  // ondulada. Aquí el punto que se dibuja PERSIGUE al puntero en vez de saltar
+  // a él: se queda un poco por detrás y llega en un par de muestras, que es lo
+  // que hace que la línea salga limpia sin que se note retraso al dibujar.
+  // Es el mismo truco que usa cualquier programa de dibujo.
+  // Se persigue DOS veces: un punto intermedio persigue al puntero y el que se
+  // dibuja persigue a ese. Con una sola pasada el temblor apenas bajaba un
+  // tercio; encadenando dos se corta de verdad sin añadir apenas retraso.
+  const CHASE = 0.42;
+  function stabilize(prev, raw, k) {
+    if (!prev) return { x: raw.x, y: raw.y, x1: raw.x, y1: raw.y };
+    const w = k == null ? CHASE : k;
+    const x1 = prev.x1 + (raw.x - prev.x1) * w;
+    const y1 = prev.y1 + (raw.y - prev.y1) * w;
+    return {
+      x: prev.x + (x1 - prev.x) * w,
+      y: prev.y + (y1 - prev.y) * w,
+      x1, y1,
+    };
+  }
 
   function clampFactor(f) {
     return Math.max(MIN_F, Math.min(MAX_F, f));
@@ -38,7 +61,7 @@
   // velocidad en píxeles por milisegundo; ~0.5 px/ms es un trazo tranquilo
   function factorFromSpeed(speed) {
     if (!isFinite(speed) || speed < 0) return 1;
-    return clampFactor(MAX_F - speed * 0.35);
+    return clampFactor(MAX_F - speed * 0.26);
   }
 
   // Suavizado exponencial más un tope de cuánto puede cambiar el grosor de un
@@ -302,7 +325,7 @@
 
   const OdiDraw = {
     MIN_F, MAX_F,
-    factorFromPressure, factorFromSpeed, factorFor, smoothFactor,
+    factorFromPressure, factorFromSpeed, factorFor, smoothFactor, stabilize, CHASE,
     simplify, finishStroke, roundPts,
     scaleStrokes,
     smoothPath, ribbonPath, strokeGeometry, isUniform,

@@ -117,6 +117,9 @@ function randomHex() {
 }
 
 function makeNewItem(type, x, y, w, h, lang) {
+  // Toda creación de nodo pasa por aquí, sea desde la barra, el menú del botón
+  // derecho o pegando: es el único sitio donde contarlo una vez y sin repetir.
+  window.odiTrack && window.odiTrack('nodo_creado', { tipo: type });
   const id = `it-${Date.now()}-${Math.floor(Math.random()*9999)}`;
   const base = { id, x, y, _new: true };
   const defaultSize = (defW, defH) => ({ w: Math.max(80, w || defW), h: Math.max(40, h || defH) });
@@ -2101,6 +2104,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
     const y = Math.round(b.y - pad);
     const w = Math.round(b.w + pad * 2);
     const h = Math.round(b.h + pad * 2);
+    window.odiTrack && window.odiTrack('dibujo_guardado', { trazos: strokes.length });
     updateItem(id, {
       strokes: D.translateStrokes(strokes, -x, -y),
       x, y, w, h, vw: w, vh: h,
@@ -4010,6 +4014,9 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
 
   // ───── Nested board open ─────
   const openBoard = (canvasId, fromItemId) => {
+    // La profundidad dice si la gente llega a usar los tableros dentro de
+    // tableros, que es lo que diferencia a Odinote de lo demás.
+    window.odiTrack && window.odiTrack('tablero_abierto', { profundidad: stack.length });
     if (!canvases[canvasId]) {
       let fromItem = current.items.find(i => i.id === fromItemId);
       if (!fromItem) {
