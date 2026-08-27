@@ -21,7 +21,7 @@
     <link rel="icon" type="image/png" href="./Icon/Icon.png" />
     <link rel="stylesheet" href="./lib/fonts.css" />
     <link rel="stylesheet" href="./lib/github.min.css" />
-    <link rel="stylesheet" href="./src/styles.css?v=82" />
+    <link rel="stylesheet" href="./src/styles.css?v=83" />
     
     <!-- Google Analytics (GA4).
          Se envía a DOS propiedades a propósito:
@@ -29,14 +29,47 @@
           · G-YT66TPQGQE — el flujo que Firebase creó junto al proyecto (es el
             measurementId de firebaseConfig). La tarjeta "Estadísticas" de la
             consola de Firebase lee SOLO este segundo flujo: como la app nunca
-            le enviaba nada, el panel salía vacío aunque hubiera visitas. -->
-    <script async src="https://www.googletagmanager.com/gtag/js?id=G-2HTKF0DZCW"></script>
+            le enviaba nada, el panel salía vacío aunque hubiera visitas.
+
+         Escritorio y web se contaban juntos y no había forma de separarlos: la
+         aplicación de escritorio sirve esta misma página desde un servidor
+         local, así que para Analytics era una visita web más. Ahora cada visita
+         dice de dónde viene.
+
+         Y quien ejecute el código en su propio equipo (o un clon del
+         repositorio) no envía NADA: el identificador está a la vista de
+         cualquiera porque viaja dentro de esta página, así que lo que evita que
+         ensucie las cuentas es no dispararlo fuera de las dos versiones
+         oficiales. -->
     <script>
+      window.ODINOTE_PLATFORM = (function () {
+        // El puente de Electron solo existe dentro del programa de escritorio.
+        if (window.electronAPI) return 'desktop';
+        var h = (location.hostname || '').toLowerCase();
+        if (h === 'odinote-web.vercel.app') return 'web';
+        return 'dev';   // localhost, un fork, o el servidor de pruebas
+      })();
+
       window.dataLayer = window.dataLayer || [];
       function gtag(){dataLayer.push(arguments);}
-      gtag('js', new Date());
-      gtag('config', 'G-2HTKF0DZCW');
-      gtag('config', 'G-YT66TPQGQE');
+
+      if (window.ODINOTE_PLATFORM !== 'dev') {
+        var _gaTag = document.createElement('script');
+        _gaTag.async = true;
+        _gaTag.src = 'https://www.googletagmanager.com/gtag/js?id=G-2HTKF0DZCW';
+        document.head.appendChild(_gaTag);
+
+        gtag('js', new Date());
+        // Propiedad de usuario: es lo que permite separar escritorio de web en
+        // los informes (hay que darla de alta como dimensión personalizada en
+        // GA4 con el nombre odi_platform para que aparezca en los paneles).
+        gtag('set', 'user_properties', { odi_platform: window.ODINOTE_PLATFORM });
+        var _gaCfg = { odi_platform: window.ODINOTE_PLATFORM };
+        gtag('config', 'G-2HTKF0DZCW', _gaCfg);
+        gtag('config', 'G-YT66TPQGQE', _gaCfg);
+      } else {
+        console.log('[ODINOTE] Estadísticas desactivadas: esta copia no es la web oficial ni el programa instalado.');
+      }
     </script>
 
     <!-- Pantalla de carga: CSS puro, se muestra al instante (antes de que Babel
@@ -156,24 +189,24 @@
 
     <!-- Antes que nada: marca <html data-mobile/data-touch> (de lo que cuelga
          todo el CSS responsive) y traduce gestos táctiles a eventos de ratón. -->
-    <script src="./src/touch.js?v=82"></script>
-    <script src="./src/search.js?v=82"></script>
-    <script src="./src/links.js?v=82"></script>
-    <script src="./src/graph.js?v=82"></script>
-    <script src="./src/drive.js?v=82"></script>
-    <script src="./src/draw.js?v=82"></script>
-    <script type="text/babel" data-presets="react" src="./src/data.js?v=82"></script>
-    <script type="text/babel" data-presets="react" src="./src/items.jsx?v=82"></script>
-    <script type="text/babel" data-presets="react" src="./src/Connector.jsx?v=82"></script>
-    <script type="text/babel" data-presets="react" src="./src/Topbar.jsx?v=82"></script>
-    <script type="text/babel" data-presets="react" src="./src/ContextSidebar.jsx?v=82"></script>
-    <script type="text/babel" data-presets="react" src="./src/TextFormatSidebar.jsx?v=82"></script>
-    <script type="text/babel" data-presets="react" src="./src/DocModal.jsx?v=82"></script>
-    <script type="text/babel" data-presets="react" src="./src/SearchPalette.jsx?v=82"></script>
-    <script type="text/babel" data-presets="react" src="./src/GraphView.jsx?v=82"></script>
-    <script type="text/babel" data-presets="react" src="./src/Home.jsx?v=82"></script>
-    <script type="text/babel" data-presets="react" src="./src/DrawOverlay.jsx?v=82"></script>
-    <script type="text/babel" data-presets="react" src="./src/Canvas.jsx?v=82"></script>
-    <script type="text/babel" data-presets="react" src="./src/app.jsx?v=82"></script>
+    <script src="./src/touch.js?v=83"></script>
+    <script src="./src/search.js?v=83"></script>
+    <script src="./src/links.js?v=83"></script>
+    <script src="./src/graph.js?v=83"></script>
+    <script src="./src/drive.js?v=83"></script>
+    <script src="./src/draw.js?v=83"></script>
+    <script type="text/babel" data-presets="react" src="./src/data.js?v=83"></script>
+    <script type="text/babel" data-presets="react" src="./src/items.jsx?v=83"></script>
+    <script type="text/babel" data-presets="react" src="./src/Connector.jsx?v=83"></script>
+    <script type="text/babel" data-presets="react" src="./src/Topbar.jsx?v=83"></script>
+    <script type="text/babel" data-presets="react" src="./src/ContextSidebar.jsx?v=83"></script>
+    <script type="text/babel" data-presets="react" src="./src/TextFormatSidebar.jsx?v=83"></script>
+    <script type="text/babel" data-presets="react" src="./src/DocModal.jsx?v=83"></script>
+    <script type="text/babel" data-presets="react" src="./src/SearchPalette.jsx?v=83"></script>
+    <script type="text/babel" data-presets="react" src="./src/GraphView.jsx?v=83"></script>
+    <script type="text/babel" data-presets="react" src="./src/Home.jsx?v=83"></script>
+    <script type="text/babel" data-presets="react" src="./src/DrawOverlay.jsx?v=83"></script>
+    <script type="text/babel" data-presets="react" src="./src/Canvas.jsx?v=83"></script>
+    <script type="text/babel" data-presets="react" src="./src/app.jsx?v=83"></script>
   </body>
 </html>
