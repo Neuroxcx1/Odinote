@@ -47,7 +47,7 @@ try {
 
 // Marcador de build: si la consola no muestra esta versión, el navegador está
 // sirviendo JS cacheado (subir ?v= en index.html invalida la caché)
-window.ODINOTE_BUILD = 'v93';
+window.ODINOTE_BUILD = 'v94';
 console.log('[ODINOTE] Código cargado: ' + window.ODINOTE_BUILD);
 
 // Global shortcuts configuration
@@ -446,7 +446,7 @@ function App() {
       localStorage.setItem('odinote.google_profile', JSON.stringify(next));
       return next;
     });
-    showToast(window.t('El acceso a Drive caducó: pulsa el botón ↻ para renovarlo con un clic.', 'Drive access expired: press the ↻ button to renew it with one click.'), 'error');
+    showToast(window.t('El acceso a Drive venció: presiona el botón ↻ para renovarlo con un clic.', 'Drive access expired: press the ↻ button to renew it with one click.'), 'error');
   };
 
   // Renovar ANTES de que caduque, no después. El permiso dura una hora; a los 50
@@ -1421,7 +1421,7 @@ function App() {
             // ya indica el estado de forma permanente y silenciosa
             if (now - lastAlert > 300000) {
               window.lastDriveScopeAlertTime = now;
-              showToast(window.t('El acceso a Drive caducó: pulsa ↻ para renovarlo con un clic.', 'Drive access expired: press ↻ to renew it with one click.'), 'error');
+              showToast(window.t('El acceso a Drive venció: presiona ↻ para renovarlo con un clic.', 'Drive access expired: press ↻ to renew it with one click.'), 'error');
             }
             return;
           }
@@ -2675,7 +2675,7 @@ function App() {
                     </div>
                     {[
                       { id: 'undo', desc: window.t('Deshacer acción', 'Undo action'),
-                        help: window.t('Deshace el último cambio. Los cambios seguidos se agrupan, para que no haya que pulsarlo veinte veces al borrar una frase.', 'Undoes the last change. Rapid edits are grouped, so deleting a sentence is one step, not twenty.') },
+                        help: window.t('Deshace el último cambio. Los cambios seguidos se agrupan, para no tener que presionarlo veinte veces al borrar una frase.', 'Undoes the last change. Rapid edits are grouped, so deleting a sentence is one step, not twenty.') },
                       { id: 'redo', desc: window.t('Rehacer acción', 'Redo action'),
                         help: window.t('Vuelve a aplicar lo que acabas de deshacer.', 'Re-applies what you just undid.') },
                       { id: 'duplicate', desc: window.t('Duplicar nodo', 'Duplicate selected node'),
@@ -2707,7 +2707,7 @@ function App() {
                               fontFamily: 'var(--font-mono, monospace)'
                             }}
                           >
-                            {isListening ? window.t('Pulsa teclas...', 'Press keys...') : cfg.label || 'None'}
+                            {isListening ? window.t('Presiona las teclas...', 'Press keys...') : cfg.label || 'None'}
                           </button>
                         </div>
                       );
@@ -2733,7 +2733,7 @@ function App() {
                       { keys: ['F12', 'Ctrl+Shift+I'], desc: window.t('Consola de depuración', 'Toggle DevTools'),
                         help: window.t('Abre las herramientas de desarrollo del navegador. Útil solo para diagnosticar fallos: si algo va mal, aquí aparece el motivo.', 'Opens the browser developer tools. Only useful for diagnosing problems: if something breaks, the reason shows up here.') },
                       { keys: ['Ctrl', 'Botón Central'], desc: window.t('Paneo de cámara global', 'Global camera panning'),
-                        help: window.t('Mueve el lienzo arrastrando con la rueda pulsada, sin tocar ningún nodo por el camino.', 'Moves the canvas by dragging with the wheel pressed, without touching any node along the way.') },
+                        help: window.t('Mueve el lienzo arrastrando con la rueda presionada, sin tocar ningún nodo por el camino.', 'Moves the canvas by dragging with the wheel pressed, without touching any node along the way.') },
                       { keys: ['Shift', 'Click'], desc: window.t('Selección múltiple individual', 'Toggle item selection'),
                         help: window.t('Añade o quita un nodo de la selección sin perder los que ya tenías elegidos.', 'Adds or removes one node from the selection without losing the ones already picked.') },
                       { keys: ['Shift', 'Arrastrar'], desc: window.t('Seleccionar por recuadro', 'Box selection'),
@@ -2747,7 +2747,7 @@ function App() {
                       { keys: ['Doble Clic'], desc: window.t('Editar texto / Renombrar', 'Edit text / Rename'),
                         help: window.t('Entra a editar el nodo. En pantallas táctiles NO se usa: ahí se edita con el botón "Editar" de la barra del nodo, porque dos toques seguidos son lo que uno hace al arrastrar.', 'Enters edit mode. NOT used on touch screens: there you edit with the "Edit" button on the node bar, since two quick taps is what dragging looks like.') },
                       { keys: ['Clic Derecho'], desc: window.t('Creación rápida / Opciones', 'Quick-create / Options'),
-                        help: window.t('Sobre el lienzo vacío abre el menú de crear nodos. Sobre un texto seleccionado ofrece cortar, copiar, pegar y enlazar. Con el dedo equivale a mantener pulsado.', 'On empty canvas it opens the create menu. On selected text it offers cut, copy, paste and link. With a finger, press and hold does the same.') },
+                        help: window.t('Sobre el lienzo vacío abre el menú de crear nodos. Sobre un texto seleccionado ofrece cortar, copiar, pegar y enlazar. Con el dedo equivale a dejar el dedo puesto.', 'On empty canvas it opens the create menu. On selected text it offers cut, copy, paste and link. With a finger, press and hold does the same.') },
                       { keys: ['Tab', 'Enter'], desc: window.t('Navegar y editar celdas (Tablas)', 'Navigate and edit cells (Tables)'),
                         help: window.t('Dentro de una tabla, Tab salta a la celda siguiente y Enter entra a editarla, como en una hoja de cálculo.', 'Inside a table, Tab moves to the next cell and Enter starts editing it, like a spreadsheet.') },
                       { keys: ['Supr', 'Backspace'], desc: window.t('Eliminar elemento', 'Delete item'),
@@ -2825,9 +2825,13 @@ function App() {
                 {!waitingForWebLogin ? (
                   <>
                     <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-soft, #595459)', lineHeight: '1.5' }}>
+                      {/* Ya no es cierto que haga falta cuenta para colaborar:
+                          las sesiones en vivo funcionan sin ninguna. Decir lo
+                          contrario espantaba a quien solo quería entrar con un
+                          código. Google hace falta únicamente para Drive. */}
                       {window.t(
-                        'Para invitar colaboradores, unirte a proyectos compartidos y sincronizar tus lienzos en la nube, debes iniciar sesión con tu cuenta de Google real.',
-                        'To invite collaborators, join shared projects, and sync your canvases in the cloud, you must sign in with your real Google account.'
+                        'Google solo hace falta para guardar tus lienzos en tu Google Drive y llevarlos entre computadores. Para trabajar en vivo con alguien no necesitas cuenta: basta con el código de la sesión.',
+                        'Google is only needed to keep your canvases in your own Google Drive and carry them between machines. Working live with someone needs no account at all: the session code is enough.'
                       )}
                     </p>
 
@@ -3047,7 +3051,7 @@ function App() {
                   <>
                     <p style={{ margin: '0 0 12px 0', fontSize: '11.5px', color: 'var(--text-soft)', lineHeight: 1.45 }}>
                       {window.t(
-                        'Comparte un código y veréis el mismo lienzo a la vez, cada uno con su cursor de color. Los cambios viajan directos entre vuestros equipos, sin pasar por ningún servidor.',
+                        'Comparte un código y los dos verán el mismo lienzo a la vez, cada quien con su cursor de color. Los cambios viajan directo entre sus computadores, sin pasar por ningún servidor.',
                         'Share a code and you will both see the same canvas at once, each with a coloured cursor. Changes travel straight between your machines, through no server.'
                       )}
                     </p>
@@ -3108,7 +3112,7 @@ function App() {
                         onClick={() => {
                           const asunto = window.t('Te invito a mi lienzo de Odinote', 'Join my Odinote canvas');
                           const cuerpo = window.t(
-                            `Abre Odinote (https://odinote-web.vercel.app), entra en cualquier proyecto, pulsa el botón de compartir y elige "Unirme con un código".\n\nEl código es: ${salaCodigo}\n\nTe estaré esperando.`,
+                            `Abre Odinote (https://odinote-web.vercel.app), entra en cualquier proyecto, presiona el botón de compartir y elige "Unirme con un código".\n\nEl código es: ${salaCodigo}\n\nAhí te espero.`,
                             `Open Odinote (https://odinote-web.vercel.app), go into any project, press the share button and choose "Join with a code".\n\nThe code is: ${salaCodigo}\n\nI'll be waiting.`
                           );
                           const destino = (inviteEmail || '').trim();

@@ -3,7 +3,7 @@
 //
 // Dos personas trabajando sobre el mismo lienzo. Firebase se usa SOLO para
 // que se encuentren: cada uno deja ahí su dirección de red, se leen, y a
-// partir de ese momento hablan directamente entre sus dos ordenadores. Ni el
+// partir de ese momento hablan directamente entre sus dos computadores. Ni el
 // texto de una nota ni un dibujo pasan por ningún servidor.
 //
 // La forma es de estrella: quien abre la sala es el centro y los demás se

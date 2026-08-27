@@ -97,7 +97,7 @@
   // de la aplicación son .jsx que Babel traduce en el navegador y tardan un
   // rato largo en arrancar. Si se avisaba a ciegas a los 1,2 segundos, la
   // versión salía en blanco justo en el evento más importante — y en un
-  // ordenador lento el aviso llegaba antes que la propia aplicación.
+  // computador lento el aviso llegaba antes que la propia aplicación.
   let esperas = 0;
   (function esperaALaApp() {
     if (window.ODINOTE_BUILD) { anunciaApertura(); return; }
