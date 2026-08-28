@@ -579,13 +579,22 @@ function ProjectCard({ project, lang, t, onOpen, onDelete, onRenameClick, onRest
 
   return (
     <div
-      className="ms-project-card"
+      /* Un proyecto al que te invitaron se marca en ámbar: es de otra persona,
+         vive en su equipo y desaparece cuando cierra la sesión. Sin esa señal
+         se confunde con los propios y da un susto al no encontrarlo luego. */
+      className={`ms-project-card ${project.invitado ? 'es-invitado' : ''}`}
       onClick={isTrash ? undefined : onOpen}
       onContextMenu={handleContextMenu}
       style={{position:'relative'}}
     >
       <div className="ms-project-cover" style={{ background: project.cover }}>
         <div className="ms-project-emoji">{renderProjectIcon(project.emoji)}</div>
+        {project.invitado && (
+          <div className="ms-invitado-chip" title={window.t('Es de otra persona: lo ves mientras dure su sesión', 'Someone else\'s: you see it while their session lasts')}>
+            <span className="material-symbols-rounded">group</span>
+            <span>{window.t('Invitado', 'Guest')}</span>
+          </div>
+        )}
         <div className="ms-card-actions" onClick={(e)=>e.stopPropagation()}>
           {isTrash ? (
             <>

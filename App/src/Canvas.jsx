@@ -544,6 +544,26 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
         ultimoEnviadoRef.current = mezcla;
         return mezcla;
       });
+      // El proyecto del anfitrión entra en la lista de quien se une, marcado
+      // como prestado. Sin esto, sus lienzos quedaban sueltos en la memoria:
+      // al recargar no había forma de volver a ellos y la persona aterrizaba
+      // en su propio proyecto vacío sin entender qué había pasado.
+      if (m.raiz && setProjects) {
+        setProjects(prev => {
+          if (prev.some(p => p.id === m.raiz)) {
+            return prev.map(p => p.id === m.raiz ? { ...p, invitado: true, deleted: false } : p);
+          }
+          const meta = m.proyecto || {};
+          return [{
+            id: m.raiz,
+            name: meta.name || { es: 'Proyecto compartido', en: 'Shared project' },
+            emoji: meta.emoji || '🤝',
+            cover: meta.cover || 'linear-gradient(135deg, #F7DA84 0%, #F0C24B 100%)',
+            starred: false,
+            invitado: true,
+          }, ...prev];
+        });
+      }
       // Y hay que ir a SU tablero: el invitado seguía mirando el suyo, que no
       // existe en el proyecto del anfitrión, así que veía un lienzo vacío.
       if (m.raiz) setStack([m.raiz]);
@@ -582,8 +602,28 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
         console.error('[SALA]', err);
         showToastCanvas(window.t('Error en la sesión en vivo: ' + err.message, 'Live session error: ' + err.message), 'error');
       },
-      // Lo que se le manda a quien entra: el proyecto tal y como está ahora.
-      pideProyecto: () => ({ canvases: canvasesLiveRef.current, raiz: projectId }),
+      // Lo que se le manda a quien entra: SOLO el proyecto compartido.
+      //
+      // Antes se enviaba el estado entero, que incluye todos los demás
+      // proyectos de quien invita. Compartir un tablero no puede significar
+      // entregar el resto de tus cosas a quien tenga el código.
+      pideProyecto: () => {
+        const todo = canvasesLiveRef.current;
+        const solo = {};
+        const visita = (id) => {
+          const c = todo[id];
+          if (!c || solo[id]) return;
+          solo[id] = c;
+          (c.items || []).forEach(it => { if (it.canvasId) visita(it.canvasId); });
+        };
+        visita(projectId);
+        const proy = projects ? projects.find(p => p.id === projectId) : null;
+        return {
+          canvases: solo,
+          raiz: projectId,
+          proyecto: proy ? { id: proy.id, name: proy.name, emoji: proy.emoji, cover: proy.cover } : null,
+        };
+      },
     };
     const s = modo === 'abrir'
       ? await window.OdiRealtime.abreSala({ nombre, callbacks })

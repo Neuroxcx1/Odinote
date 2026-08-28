@@ -4920,3 +4920,24 @@ html[data-touch="1"] .ms-grid-list .ms-card-actions { opacity: 1; }
   .odi-share-pill span:not(.material-symbols-rounded) { display: none; }
   .odi-share-pill { padding: 7px 9px; }
 }
+
+/* ── Un proyecto al que te invitaron ──
+   Ámbar en todo el borde, para que no se confunda con los tuyos: vive en el
+   equipo de otra persona y deja de estar cuando esa persona cierra la sesión.
+   Si pareciera propio, su desaparición sería un susto en vez de algo esperado. */
+.ms-project-card.es-invitado {
+  border-color: var(--yellow, #F7DA84);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--yellow, #F7DA84) 45%, transparent), var(--pop-sm);
+}
+.ms-invitado-chip {
+  position: absolute; left: 8px; top: 8px; z-index: 3;
+  display: flex; align-items: center; gap: 4px;
+  padding: 3px 8px 3px 6px;
+  border-radius: 999px;
+  background: var(--yellow, #F7DA84);
+  border: 1.5px solid var(--line);
+  color: #1A1A1A;
+  font-size: 10.5px; font-weight: 800;
+  box-shadow: 1px 1px 0 var(--line);
+}
+.ms-invitado-chip .material-symbols-rounded { font-size: 13px; }

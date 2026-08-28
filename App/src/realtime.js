@@ -96,6 +96,7 @@
   function creaSesion({ db, miUid, codigo, esAnfitrion, yo, callbacks }) {
     const cb = callbacks || {};
     const pares = new Map();      // uid -> { pc, canal }
+    const pendientes = new Map(); // uid -> candidatos que llegaron antes de tiempo
     const roster = new Map();     // uid -> { uid, nombre, color, anfitrion }
     let cerrada = false;
     const desuscribir = [];
@@ -161,6 +162,17 @@
       };
       canal.onmessage = (ev) => recibe(uid, ev.data);
       canal.onclose = () => {
+        // Solo si el canal que se cierra sigue siendo el de esta persona.
+        //
+        // Al volver a entrar con el mismo código se abre una conexión nueva
+        // mientras la vieja aún agoniza; cuando la vieja se cerraba, este
+        // aviso llegaba tarde y borraba la ENTRADA NUEVA. A partir de ahí el
+        // anfitrión no podía mandarle nada: ni el proyecto ni los cambios. La
+        // persona veía "conectado con éxito", se quedaba en su propio lienzo,
+        // y todo lo que tocaba se perdía. Era el mismo fallo detrás de los dos
+        // síntomas.
+        const actual = pares.get(uid);
+        if (!actual || actual.canal !== canal) return;
         pares.delete(uid);
         roster.delete(uid);
         cb.onEstado && cb.onEstado('desconectado', uid);
@@ -183,24 +195,104 @@
       } catch (e) {}
     }
 
+    // Papeles ya atendidos, para no repetirlos cuando el repaso los vuelva a ver.
+    const atendidas = new Set();
+    const intentos = new Map();   // id -> cuántas veces se ha intentado
+    const enCurso = new Set();    // ids que se están atendiendo ahora mismo
+
+    // Papeles de intentos ANTERIORES, tirados antes de empezar.
+    //
+    // Una respuesta vieja aplicada a una conexión nueva revienta ("wrong
+    // state"), y como ahora los fallos se reintentan, se quedaba dando vueltas
+    // para siempre y arrastraba con ella a la respuesta buena. Cada intento
+    // empieza con la mesa limpia.
+    async function tiraLoViejo() {
+      try {
+        const q = await senales.where('para', '==', miUid).get();
+        if (q.empty) return;
+        const lote = db.batch();
+        q.forEach(d => lote.delete(d.ref));
+        await lote.commit();
+      } catch (e) {}
+    }
+
+    async function atiende(doc) {
+      if (cerrada || atendidas.has(doc.id) || enCurso.has(doc.id)) return;
+      // Se aparta ANTES de empezar, no después.
+      //
+      // El aviso en vivo y el repaso periódico pueden ver el mismo papel casi
+      // a la vez. Marcándolo solo al terminar, los dos pasaban el control y lo
+      // atendían por duplicado: dos ofertas contestadas, dos conexiones
+      // abiertas para la misma persona, la segunda matando a la primera, y la
+      // respuesta buena llegando a una conexión que ya estaba cerrada
+      // ("wrong state: stable"). De ahí que volver a entrar nunca funcionara.
+      enCurso.add(doc.id);
+      try {
+        await manejaSenal(doc.data());
+      } catch (e) {
+        enCurso.delete(doc.id);
+        // Tres intentos y a la basura: un papel que nunca se puede atender
+        // (una respuesta de otra conexión, por ejemplo) no puede quedarse
+        // atascando la cola de los que sí sirven.
+        const n = (intentos.get(doc.id) || 0) + 1;
+        intentos.set(doc.id, n);
+        if (n >= 3) {
+          console.warn('[SALA] señal descartada tras 3 intentos', e);
+          atendidas.add(doc.id);
+          doc.ref.delete().catch(() => {});
+          return;
+        }
+        // Se deja el papel donde está: el repaso volverá a intentarlo.
+        //
+        // Antes se borraba pasara lo que pasara. Si la escritura de la
+        // respuesta fallaba —y la conexión con Firebase se corta sola cada
+        // tanto— la oferta desaparecía y nadie volvía a intentarlo nunca: el
+        // invitado se quedaba esperando para siempre. Eso era exactamente lo
+        // que pasaba al volver a entrar.
+        console.warn('[SALA] no se pudo atender una señal, se reintentará', e);
+        return;
+      }
+      atendidas.add(doc.id);
+      doc.ref.delete().catch(() => {});
+    }
+
     function escuchaSenales() {
       const off = senales.where('para', '==', miUid).onSnapshot(async (snap) => {
         for (const cambio of snap.docChanges()) {
-          if (cambio.type !== 'added' || cerrada) continue;
-          const d = cambio.doc.data();
-          try { await manejaSenal(d); } catch (e) { console.warn('[SALA] señal ignorada', e); }
-          cambio.doc.ref.delete().catch(() => {});
+          if (cambio.type !== 'added') continue;
+          await atiende(cambio.doc);
         }
       }, (err) => {
         cb.onError && cb.onError(err);
       });
       desuscribir.push(off);
+
+      // Repaso periódico: red de seguridad para lo que el aviso en vivo no
+      // trajo — porque falló al atenderlo, o porque la conexión con Firebase
+      // se cayó y volvió sin avisar de lo ocurrido mientras tanto.
+      const repaso = setInterval(async () => {
+        if (cerrada) return;
+        try {
+          const q = await senales.where('para', '==', miUid).get();
+          for (const doc of q.docs) await atiende(doc);
+        } catch (e) {}
+      }, 4000);
+      desuscribir.push(() => clearInterval(repaso));
     }
 
     async function manejaSenal(d) {
       const otro = d.de;
 
       if (d.tipo === 'oferta' && esAnfitrion) {
+        // Si esta persona ya tenía una conexión, se cierra antes de abrirle
+        // otra. Dejar la vieja viva era lo que provocaba la carrera de arriba.
+        const previo = pares.get(otro);
+        if (previo) {
+          try { previo.canal && previo.canal.close(); } catch (e) {}
+          try { previo.pc && previo.pc.close(); } catch (e) {}
+          pares.delete(otro);
+          pendientes.delete(otro);
+        }
         anota(otro, {});
         const pc = creaPar({ db, sala: codigo, miUid, otroUid: otro, esAnfitrion: true,
           onCanal: (c) => preparaCanal(otro, c),
@@ -214,20 +306,58 @@
           carga: JSON.stringify({ type: respuesta.type, sdp: respuesta.sdp }),
           creadaEn: Date.now(),
         });
+        // Ya hay descripción remota: los candidatos que se adelantaron entran.
+        await sueltaPendientes(otro);
         return;
       }
 
       if (d.tipo === 'respuesta' && !esAnfitrion) {
         const par = pares.get(otro);
-        if (par && par.pc) await par.pc.setRemoteDescription(JSON.parse(d.carga));
+        if (par && par.pc) {
+          await par.pc.setRemoteDescription(JSON.parse(d.carga));
+          await sueltaPendientes(otro);
+        }
         return;
       }
 
       if (d.tipo === 'candidato') {
-        const par = pares.get(otro);
-        if (par && par.pc) {
-          try { await par.pc.addIceCandidate(JSON.parse(d.carga)); } catch (e) {}
-        }
+        await agregaCandidato(otro, JSON.parse(d.carga));
+      }
+    }
+
+    // ── Candidatos de red que llegan antes de tiempo ──
+    //
+    // Cada lado va anunciando por dónde se le puede alcanzar, y esos avisos
+    // viajan por Firebase en paralelo con la oferta y la respuesta. Es normal
+    // que alguno llegue ANTES de que este lado sepa con quién está hablando, y
+    // el navegador los rechaza si todavía no hay descripción remota.
+    //
+    // Antes se descartaban en silencio. En la primera conexión daba igual
+    // porque llegaban tarde y sobraban; al volver a entrar llegaban de golpe
+    // y se perdían los buenos, así que la conexión moría en "failed" — y la
+    // persona veía que entraba pero no pasaba nada. Ahora se guardan y se
+    // entregan en cuanto hay a quién.
+    async function agregaCandidato(uid, candidato) {
+      const par = pares.get(uid);
+      if (!par || !par.pc) {
+        pendientes.set(uid, (pendientes.get(uid) || []).concat([candidato]));
+        return;
+      }
+      if (!par.pc.remoteDescription) {
+        pendientes.set(uid, (pendientes.get(uid) || []).concat([candidato]));
+        return;
+      }
+      try { await par.pc.addIceCandidate(candidato); } catch (e) {}
+    }
+
+    async function sueltaPendientes(uid) {
+      const cola = pendientes.get(uid);
+      if (!cola || !cola.length) return;
+      pendientes.delete(uid);
+      const par = pares.get(uid);
+      if (!par || !par.pc) return;
+      for (const c of cola) {
+        try { await par.pc.addIceCandidate(c); } catch (e) {}
       }
     }
 
@@ -268,7 +398,7 @@
 
     return {
       codigo, miUid, esAnfitrion,
-      escuchaSenales, arrancaComoInvitado, anota, lista,
+      escuchaSenales, arrancaComoInvitado, anota, lista, tiraLoViejo,
       envia, enviaA, cierra,
       cuantos: () => pares.size,
       // Para poder decir qué está pasando cuando alguien reporta que "no le
@@ -300,6 +430,8 @@
       callbacks,
     });
     sesion.anota(miUid, { nombre: nombre || 'Anfitrión', anfitrion: true });
+    // Mesa limpia: papeles de intentos anteriores fuera antes de escuchar.
+    await sesion.tiraLoViejo();
     sesion.escuchaSenales();
     callbacks && callbacks.onParticipantes && callbacks.onParticipantes(sesion.lista());
     return sesion;
@@ -322,8 +454,33 @@
       callbacks,
     });
     sesion.anota(miUid, { nombre: nombre || 'Invitado' });
+    // Mesa limpia: papeles de intentos anteriores fuera antes de escuchar.
+    await sesion.tiraLoViejo();
     sesion.escuchaSenales();
     await sesion.arrancaComoInvitado(uidAnfitrion);
+
+    // No se dice "conectado" hasta que el canal esté abierto de verdad.
+    //
+    // Antes esto terminaba en cuanto se dejaba la oferta escrita en Firebase,
+    // que es solo el primer paso: si el apretón de manos fallaba después, la
+    // aplicación ya había anunciado el éxito y la persona se quedaba mirando
+    // su propio lienzo sin entender por qué no pasaba nada.
+    await new Promise((listo, falla) => {
+      const limite = setTimeout(() => {
+        sesion.cierra();
+        falla(new Error('sin-respuesta'));
+      }, 25000);
+      const mira = setInterval(() => {
+        const d = sesion.diagnostico();
+        if (d.some(p => p.canal === 'open')) {
+          clearInterval(mira); clearTimeout(limite); listo();
+        } else if (d.some(p => p.conexion === 'failed')) {
+          clearInterval(mira); clearTimeout(limite);
+          sesion.cierra();
+          falla(new Error('no-se-pudo-conectar'));
+        }
+      }, 250);
+    });
     return sesion;
   }
 
