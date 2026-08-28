@@ -8,8 +8,9 @@
 //
 // Todo esto se apaga solo cuando la copia no es la web oficial ni el programa
 // instalado (window.ODINOTE_PLATFORM === 'dev'), así que quien trabaje sobre
-// el código no envía nada ni ensucia las cuentas. Y se apaga también para
-// quien lo pida en Ajustes y para la cuenta del autor (ver `excluido`).
+// el código no envía nada ni ensucia las cuentas. Y se apaga también para la
+// cuenta del autor, para que sus propias pruebas no se cuenten como uso real
+// (ver `excluido`).
 // =====================================================
 (function () {
   'use strict';
@@ -17,15 +18,14 @@
   // ── Quién NO se cuenta ──
   //
   // El uso del propio autor ensucia sus cifras: abre la aplicación veinte veces
-  // al día para probar cosas, y eso no es un usuario. Se excluye por dos vías,
-  // porque cubren casos distintos:
+  // al día para probar cosas, y eso no es un usuario. Solo se excluye A ÉL,
+  // reconociendo su cuenta; el uso de todos los demás se cuenta como siempre,
+  // que es de lo que sirven las estadísticas.
   //
-  //   · La cuenta — vale en cualquier equipo donde inicie sesión, incluso en
-  //     uno recién instalado.
-  //   · Un interruptor local (Ajustes) — vale para una copia concreta aunque
-  //     no haya sesión iniciada, y de paso es una opción legítima para
-  //     cualquiera que no quiera aparecer en las cuentas. Se respeta a todo
-  //     el mundo, no solo al autor.
+  // Por eso esto NO es un interruptor en Ajustes. Se llegó a poner uno a la
+  // vista de todos y se quitó a propósito: una opción de "no me cuentes"
+  // ofrecida a todo el mundo vacía justo el dato que hace falta para saber si
+  // la aplicación se usa. Lo que se mide son cuántos y qué, nunca quién.
   const SIN_ESTADISTICAS = 'odinote.sin_estadisticas';
 
   // El correo del autor no se escribe aquí: este archivo está a la vista de
@@ -59,6 +59,14 @@
       return false;   // sin localStorage (ventana privada), se cuenta como siempre
     }
   }
+  // Palanca manual, sin botón en ninguna parte: sirve para dejar fuera un
+  // equipo concreto del autor donde no vaya a iniciar sesión (una máquina de
+  // pruebas, por ejemplo). Se escribe desde la consola del navegador:
+  //
+  //     odiPonSinEstadisticas(true)
+  //
+  // Que exista no cambia nada para nadie más: quien no sepa que está aquí —o
+  // sea, todo el mundo— se sigue contando igual.
   window.odiSinEstadisticas = excluido;
   window.odiPonSinEstadisticas = (si) => {
     try { localStorage.setItem(SIN_ESTADISTICAS, si ? '1' : '0'); } catch (e) {}

@@ -47,7 +47,7 @@ try {
 
 // Marcador de build: si la consola no muestra esta versión, el navegador está
 // sirviendo JS cacheado (subir ?v= en index.html invalida la caché)
-window.ODINOTE_BUILD = 'v125';
+window.ODINOTE_BUILD = 'v126';
 console.log('[ODINOTE] Código cargado: ' + window.ODINOTE_BUILD);
 
 // Global shortcuts configuration
@@ -237,12 +237,6 @@ function App() {
   const [updateProgress, setUpdateProgress] = useStateApp(0);
   const [contextMenu, setContextMenu] = useStateApp(null);
   const [settingsOpen, setSettingsOpen] = useStateApp(false);
-  // Se lee del módulo de medición, que es quien manda: así el interruptor sale
-  // ya apagado si la cuenta que ha iniciado sesión es la del autor, sin que
-  // haya que tocarlo a mano en cada equipo.
-  const [sinEstadisticas, setSinEstadisticas] = useStateApp(
-    () => !!(window.odiSinEstadisticas && window.odiSinEstadisticas())
-  );
   const [showTouchDiag, setShowTouchDiag] = useStateApp(false);
   // Explicación del atajo señalado. Va en un elemento aparte con posición fija
   // porque la lista de atajos está dentro de un contenedor con scroll, y ahí
@@ -2874,45 +2868,6 @@ function App() {
             )}
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', overflowY: 'auto' }}>
-              {/* ── Contar o no contar esta copia ──
-                  Nació para que el uso del autor no ensuciara sus propias
-                  cifras —abre la aplicación veinte veces al día para probar
-                  cosas, y eso no es un usuario— pero se deja a la vista de
-                  todos: si se le puede dar a alguien la opción de no aparecer
-                  en las cuentas, se le da. Lo que se mide son cuántos y qué,
-                  nunca quién, y aun así hay quien prefiere no estar. */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <div style={{ fontWeight: '600', fontSize: '14px', color: 'var(--wine, #7B2D26)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <span className="material-symbols-rounded" style={{ fontSize: '18px' }}>bar_chart</span>
-                  <span>{window.t('Estadísticas de uso', 'Usage statistics')}</span>
-                </div>
-                <p style={{ fontSize: '12.5px', color: 'var(--text-soft, #595459)', margin: 0, lineHeight: '1.5' }}>
-                  {window.t(
-                    'Odinote cuenta cuánta gente la usa y qué partes se usan. Nunca viaja tu nombre, ni tu correo, ni el contenido de una nota. Si prefieres no aparecer en esas cuentas, apágalo aquí.',
-                    'Odinote counts how many people use it and which parts get used. Your name, your email and your notes never travel. If you would rather not appear in those counts, turn it off here.'
-                  )}
-                </p>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', fontSize: '13px', fontWeight: 600 }}>
-                  <input
-                    type="checkbox"
-                    checked={!sinEstadisticas}
-                    onChange={(e) => {
-                      const contar = e.target.checked;
-                      window.odiPonSinEstadisticas && window.odiPonSinEstadisticas(!contar);
-                      setSinEstadisticas(!contar);
-                      window.playAudioTone && window.playAudioTone('click');
-                    }}
-                    style={{ width: 16, height: 16, accentColor: 'var(--olive, #6A8546)', cursor: 'pointer' }}
-                  />
-                  <span>{window.t('Contar esta copia en las estadísticas', 'Count this copy in the statistics')}</span>
-                </label>
-                {sinEstadisticas && (
-                  <p style={{ fontSize: '11.5px', color: 'var(--text-soft)', margin: 0 }}>
-                    {window.t('Esta copia no envía nada.', 'This copy sends nothing.')}
-                  </p>
-                )}
-              </div>
-
               {/* Sección Corrector Ortográfico */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 <div style={{ fontWeight: '600', fontSize: '14px', color: 'var(--wine, #7B2D26)', display: 'flex', alignItems: 'center', gap: '6px' }}>
