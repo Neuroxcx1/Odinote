@@ -850,6 +850,8 @@
         // anfitrión puede dejarla vacía él solo.
         await barreSenales();
         try { await db.collection('salas').doc(codigo).delete(); } catch (e) {}
+        // Recogida y guardada: ya no hay nada que recoger de esta la próxima vez.
+        olvidaSala(codigo);
       }
       cb.onEstado && cb.onEstado('cerrada', null);
     }
@@ -965,6 +967,61 @@
   }
 
   // ── API pública ──
+  // ── Las salas que dejé abiertas la última vez ──
+  //
+  // Al cerrar la sesión como es debido, el anfitrión vacía sus señales y borra
+  // la sala. El problema es la otra forma de terminar: cerrar el portátil de
+  // golpe, quedarse sin batería, que se caiga el programa. Ahí no se ejecuta
+  // nada y la sala se queda para siempre.
+  //
+  // No se puede barrer buscando: pedir la LISTA de salas está prohibido a
+  // propósito, porque poder enumerarlas convertiría el código de seis letras en
+  // algo que no es una llave. Pero no hace falta buscar — sí sé cuáles son las
+  // MÍAS, si me las apunto. Así que se guardan aquí al abrirlas y, la próxima
+  // vez que esta persona abra una sesión, se recogen los platos de la anterior.
+  //
+  // Es lo mismo que hace una política de caducidad en el servidor, pero sin
+  // tener que ir a configurar nada a ninguna consola.
+  const MIS_SALAS = 'odinote.salas_abiertas';
+
+  function apuntaSala(codigo) {
+    try {
+      const previas = JSON.parse(localStorage.getItem(MIS_SALAS) || '[]');
+      if (previas.indexOf(codigo) === -1) previas.push(codigo);
+      localStorage.setItem(MIS_SALAS, JSON.stringify(previas.slice(-20)));
+    } catch (e) {}
+  }
+
+  function olvidaSala(codigo) {
+    try {
+      const previas = JSON.parse(localStorage.getItem(MIS_SALAS) || '[]');
+      localStorage.setItem(MIS_SALAS, JSON.stringify(previas.filter(c => c !== codigo)));
+    } catch (e) {}
+  }
+
+  async function recogeLoDeAyer(db, miUid) {
+    let previas = [];
+    try { previas = JSON.parse(localStorage.getItem(MIS_SALAS) || '[]'); } catch (e) {}
+    if (!previas.length) return;
+    for (const codigo of previas) {
+      try {
+        const senales = db.collection('salas').doc(codigo).collection('senales');
+        const q = await senales.get();
+        if (!q.empty) {
+          const lote = db.batch();
+          q.forEach(d => lote.delete(d.ref));
+          await lote.commit();
+        }
+        await db.collection('salas').doc(codigo).delete();
+      } catch (e) {
+        // Puede fallar legítimamente: si aquella sesión fue anónima, hoy el
+        // identificador es otro y las reglas ya no me dejan tocarla. Se olvida
+        // igual — insistir cada vez que se abre una sala sería peor.
+      }
+    }
+    try { localStorage.removeItem(MIS_SALAS); } catch (e) {}
+  }
+
   async function abreSala({ nombre, rol, callbacks }) {
     if (!disponible()) throw new Error('sin-soporte');
     const db = window.firebase.firestore();
@@ -975,6 +1032,12 @@
     // Y ahora sí: un bloqueador de anuncios corta Firebase y las sesiones no
     // pueden ni empezar. Se detecta sin hacer esperar a nadie 25 segundos.
     if (!(await compruebaPaso(db))) throw new Error('bloqueador');
+
+    // Antes de abrir la de hoy, se recogen las que quedaron de otras veces.
+    // Va sin `await` a propósito: es limpieza de fondo y nadie tiene que
+    // esperarla para empezar a trabajar.
+    recogeLoDeAyer(db, miUid);
+
     const codigo = nuevoCodigo(6);
 
     await db.collection('salas').doc(codigo).set({
@@ -983,6 +1046,7 @@
       expiraEn: caduca(VIDA_SALA),
       version: 1,
     });
+    apuntaSala(codigo);
 
     const sesion = creaSesion({
       db, miUid, codigo, esAnfitrion: true,

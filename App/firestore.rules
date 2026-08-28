@@ -26,25 +26,29 @@
 // restricciones, cualquiera podría escribir basura hasta agotarla y dejar sin
 // servicio a quien sí lo esté usando.
 //
-// ── Y una cosa más que hay que hacer UNA vez en la consola ──
+// ── Sobre la basura que se acumula (no hay que hacer nada) ──
 //
-// Firestore → Base de datos → pestaña "Tiempo de actividad" (TTL), y crear dos
-// políticas, las dos sobre el campo `expiraEn`:
+// Las salas se limpian solas, por dos caminos y sin tocar ninguna consola:
 //
-//     Grupo de colecciones: salas     → campo: expiraEn
-//     Grupo de colecciones: senales   → campo: expiraEn
+//   · Al terminar la sesión, el anfitrión vacía las señales y borra la sala.
+//     Primero las señales: borrar un documento en Firestore NO borra sus
+//     subcolecciones, y si se hace al revés se quedan vivas y huérfanas (en la
+//     consola se reconocen porque el nombre sale en cursiva). Y son ellas las
+//     que ocupan: cada señal lleva hasta 8 KB y la sala entera son 150 bytes.
 //
-// Sin ellas no se rompe nada, pero las salas que nadie cierra —porque se cerró
-// el portátil de golpe, o se fue la luz— se quedan ahí para siempre. El
-// programa no puede barrerlas por su cuenta: `list` está prohibido justo
-// arriba a propósito, porque poder enumerar las salas convertiría el código de
-// seis letras en algo que no es una llave. El servidor sí las ve todas.
+//   · Si la sesión no termina bien —el portátil que se cierra de golpe, la
+//     batería que se acaba—, esa sala queda suelta. No se puede barrer
+//     buscándola, porque `list` está prohibido aquí arriba a propósito: poder
+//     enumerar las salas convertiría el código de seis letras en algo que no es
+//     una llave. Pero cada uno se apunta las suyas al abrirlas, así que la
+//     próxima vez que esa persona abra una sesión recoge lo de la anterior.
 //
-// Las DOS políticas hacen falta, no solo la de salas: borrar un documento en
-// Firestore NO borra sus subcolecciones, así que tirar una sala deja sus
-// señales vivas y huérfanas. En la consola se reconocen porque el nombre del
-// documento sale en cursiva. Y son ellas las que ocupan: cada señal lleva
-// hasta 8 KB, mientras que la sala entera son ciento cincuenta bytes.
+// El campo `expiraEn` que llevan las salas y las señales es la red por debajo
+// de todo eso, para el caso de que alguien no vuelva nunca a abrir una sesión.
+// Se activa creando dos políticas de caducidad en la consola de Google Cloud
+// (Databases → tu base de datos → Time-to-live → Create Policy), una para el
+// grupo `salas` y otra para `senales`, las dos sobre el campo `expiraEn`. Es
+// opcional: sin ellas no se rompe nada y la limpieza de arriba cubre lo normal.
 // =====================================================
 rules_version = '2';
 
