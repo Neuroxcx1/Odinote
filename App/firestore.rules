@@ -25,6 +25,26 @@
 // Por qué está tan cerrado: el plan gratuito tiene una cuota diaria. Sin estas
 // restricciones, cualquiera podría escribir basura hasta agotarla y dejar sin
 // servicio a quien sí lo esté usando.
+//
+// ── Y una cosa más que hay que hacer UNA vez en la consola ──
+//
+// Firestore → Base de datos → pestaña "Tiempo de actividad" (TTL), y crear dos
+// políticas, las dos sobre el campo `expiraEn`:
+//
+//     Grupo de colecciones: salas     → campo: expiraEn
+//     Grupo de colecciones: senales   → campo: expiraEn
+//
+// Sin ellas no se rompe nada, pero las salas que nadie cierra —porque se cerró
+// el portátil de golpe, o se fue la luz— se quedan ahí para siempre. El
+// programa no puede barrerlas por su cuenta: `list` está prohibido justo
+// arriba a propósito, porque poder enumerar las salas convertiría el código de
+// seis letras en algo que no es una llave. El servidor sí las ve todas.
+//
+// Las DOS políticas hacen falta, no solo la de salas: borrar un documento en
+// Firestore NO borra sus subcolecciones, así que tirar una sala deja sus
+// señales vivas y huérfanas. En la consola se reconocen porque el nombre del
+// documento sale en cursiva. Y son ellas las que ocupan: cada señal lleva
+// hasta 8 KB, mientras que la sala entera son ciento cincuenta bytes.
 // =====================================================
 rules_version = '2';
 
@@ -57,7 +77,7 @@ service cloud.firestore {
 
       allow create: if conSesion()
         && codigo.size() >= 6 && codigo.size() <= 32
-        && request.resource.data.keys().hasOnly(['anfitrion', 'creadaEn', 'version'])
+        && request.resource.data.keys().hasOnly(['anfitrion', 'creadaEn', 'expiraEn', 'version'])
         && request.resource.data.anfitrion == request.auth.uid;
 
       // Solo quien abrió la sala puede cerrarla.
@@ -74,7 +94,7 @@ service cloud.firestore {
 
         allow create: if conSesion()
           && request.resource.data.de == request.auth.uid
-          && request.resource.data.keys().hasOnly(['de', 'para', 'tipo', 'carga', 'creadaEn'])
+          && request.resource.data.keys().hasOnly(['de', 'para', 'tipo', 'carga', 'creadaEn', 'expiraEn'])
           && request.resource.data.tipo in ['oferta', 'respuesta', 'candidato']
           && request.resource.data.carga is string
           && request.resource.data.carga.size() < 8000;

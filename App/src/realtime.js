@@ -113,6 +113,27 @@
     '#D88040', '#3CA59E', '#DDAF2C', '#E58AB8',
   ];
 
+  // ── Fecha de caducidad, para que el servidor barra lo que quede suelto ──
+  //
+  // Una sala que nadie cierra —el anfitrión cierra el portátil de golpe, se va
+  // la luz, se acaba la batería— se quedaría ahí para siempre, y con ella sus
+  // señales, que son las que pesan de verdad.
+  //
+  // El programa NO puede barrerlas por su cuenta: las reglas prohíben a
+  // propósito pedir la lista de salas, porque si se pudiera enumerar, el código
+  // de seis letras dejaría de ser una llave — bastaría con mirar cuáles hay.
+  // Así que la limpieza la hace el servidor, que sí las ve todas, guiándose por
+  // este campo (política de caducidad en la consola de Firebase).
+  //
+  // Tiene que ser una marca de tiempo de Firestore, no un número: la política
+  // solo entiende el tipo "fecha y hora" e ignora cualquier otra cosa.
+  const VIDA_SALA = 24 * 60 * 60 * 1000;   // un día: nadie tiene una sesión más larga
+  const VIDA_SENAL = 60 * 60 * 1000;       // una hora: el apretón de manos son segundos
+
+  function caduca(ms) {
+    return window.firebase.firestore.Timestamp.fromMillis(Date.now() + ms);
+  }
+
   const ALFABETO = '23456789BCDFGHJKLMNPQRSTVWXYZ';   // sin vocales ni letras que se confundan
   function nuevoCodigo(largo) {
     const n = largo || 6;
@@ -154,6 +175,7 @@
         // conversación que tiene abierta ahora o de una de hace diez minutos.
         carga: JSON.stringify({ ...ev.candidate.toJSON(), intento: (etiqueta && etiqueta()) || null }),
         creadaEn: Date.now(),
+        expiraEn: caduca(VIDA_SENAL),
       }).catch(() => {});
     };
 
@@ -643,6 +665,7 @@
           // la única forma que tiene el otro de reconocerla como suya.
           carga: JSON.stringify({ type: respuesta.type, sdp: respuesta.sdp, intento: carga.intento || null }),
           creadaEn: Date.now(),
+          expiraEn: caduca(VIDA_SENAL),
         });
         apunta(`contestada la oferta de ${String(otro).slice(0, 6)}`);
         // Ya hay descripción remota: los candidatos que se adelantaron entran.
@@ -790,6 +813,7 @@
         de: miUid, para: uidAnfitrion, tipo: 'oferta',
         carga: JSON.stringify({ type: oferta.type, sdp: oferta.sdp, intento: miIntento }),
         creadaEn: Date.now(),
+        expiraEn: caduca(VIDA_SENAL),
       });
     }
 
@@ -812,9 +836,41 @@
       desuscribir.forEach(f => { try { f(); } catch (e) {} });
       await limpiaMisSenales();
       if (esAnfitrion) {
+        // Primero los papeles, DESPUÉS la sala.
+        //
+        // Firestore no borra en cascada: tirar el documento de la sala deja su
+        // subcolección de señales viva y huérfana para siempre — en la consola
+        // se reconocen porque el nombre sale en cursiva, documentos que no
+        // existen pero que siguen guardando cosas dentro. Y son justo las que
+        // pesan: cada señal lleva hasta 8 KB de descripción de red y una
+        // sesión genera decenas. La sala en sí son ciento cincuenta bytes.
+        //
+        // En esta topología de estrella toda señal es anfitrión↔invitado, así
+        // que entre `de:yo` y `para:yo` está TODO lo que hay en la sala: el
+        // anfitrión puede dejarla vacía él solo.
+        await barreSenales();
         try { await db.collection('salas').doc(codigo).delete(); } catch (e) {}
       }
       cb.onEstado && cb.onEstado('cerrada', null);
+    }
+
+    // Vacía la subcolección de la sala. En lotes, porque `batch` admite 500
+    // operaciones y una sesión larga con varios reintentos puede pasar de ahí.
+    async function barreSenales() {
+      try {
+        const q = await senales.get();
+        if (q.empty) return;
+        let lote = db.batch();
+        let n = 0;
+        for (const doc of q.docs) {
+          lote.delete(doc.ref);
+          if (++n % 400 === 0) { await lote.commit(); lote = db.batch(); }
+        }
+        if (n % 400 !== 0) await lote.commit();
+      } catch (e) {
+        // Si alguna no se deja borrar, la política de caducidad del servidor
+        // acabará con ella de todas formas.
+      }
     }
 
     return {
@@ -924,6 +980,7 @@
     await db.collection('salas').doc(codigo).set({
       anfitrion: miUid,
       creadaEn: Date.now(),
+      expiraEn: caduca(VIDA_SALA),
       version: 1,
     });
 
