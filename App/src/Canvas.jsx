@@ -481,9 +481,22 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
   // (estoy en la de otro). Es estado y no una lectura de sesionRef porque de
   // esto cuelga cómo se pinta el botón de compartir, y un ref no repinta nada.
   const [enSala, setEnSala] = useStateCanvas(null);
+  // Qué lienzos son de otra persona. Al terminar la sesión se devuelven: no se
+  // guardan en el disco de quien fue de visita ni se quedan en su menú.
+  const prestadosRef = useRefCanvas(null);   // { raiz, ids:Set }
+  const avisoCorteRef = useRefCanvas(0);
+  // 'reconectando' mientras se intenta volver, null el resto del tiempo. Se
+  // pinta arriba: durante un corte hay que saber que lo que escribes no está
+  // llegando a nadie, o lo escribes igual y se pierde.
+  const [corte, setCorte] = useStateCanvas(null);
 
   const aplicaRemoto = useCallbackCanvas((ops) => {
     if (!ops || !ops.length) return;
+    // Un tablero que crea el anfitrión mientras estás dentro también es suyo:
+    // se apunta igual que los del volcado inicial, o al salir se quedaría aquí.
+    if (prestadosRef.current) {
+      ops.forEach(op => { if (op.o === 'lienzo+' && op.c) prestadosRef.current.ids.add(op.c); });
+    }
     aplicandoRemotoRef.current = true;
     skipHistory.current = true;
     _setCanvases(prev => {
@@ -606,6 +619,13 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
       // el que se guarda.
       aplicandoRemotoRef.current = true;
       skipHistory.current = true;
+      // Se apunta QUÉ es prestado, para poder devolverlo entero al terminar.
+      // Sin esta lista no había forma de distinguir sus lienzos de los míos, y
+      // por eso se quedaban aquí para siempre.
+      const prestados = prestadosRef.current || { raiz: null, ids: new Set() };
+      prestados.raiz = m.raiz || prestados.raiz;
+      Object.keys(m.canvases || {}).forEach(id => prestados.ids.add(id));
+      prestadosRef.current = prestados;
       _setCanvases(prev => {
         const mezcla = { ...prev, ...(m.canvases || {}) };
         ultimoEnviadoRef.current = mezcla;
@@ -645,6 +665,39 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
 
   const showToastCanvas = (msg, tipo) => { window.showToast && window.showToast(msg, tipo); };
 
+  // ── Devolver lo prestado ──
+  //
+  // Al terminar la sesión, el proyecto de la otra persona se va de aquí: de la
+  // pantalla, del menú y del disco. Antes se quedaba todo —sus notas, sus
+  // imágenes— y encima seguías DENTRO de él, mirando un lienzo que ya no se
+  // actualizaba y que no había forma de volver a conectar. Parecía tuyo y no
+  // lo era; al día siguiente seguía en el menú, muerto.
+  //
+  // Se te saca al menú, que es lo honesto: la visita se ha terminado.
+  const sueltaPrestado = useCallbackCanvas((motivo) => {
+    const prestado = prestadosRef.current;
+    prestadosRef.current = null;
+    if (!prestado || !prestado.ids.size) return;
+
+    skipHistory.current = true;
+    aplicandoRemotoRef.current = true;
+    _setCanvases(prev => {
+      const limpio = {};
+      Object.keys(prev).forEach(id => { if (!prestado.ids.has(id)) limpio[id] = prev[id]; });
+      ultimoEnviadoRef.current = limpio;
+      return limpio;
+    });
+    if (prestado.raiz && setProjects) {
+      setProjects(prev => prev.filter(p => p.id !== prestado.raiz));
+    }
+    showToastCanvas(motivo || window.t(
+      'La sesión ha terminado. El proyecto era de la otra persona, así que no se queda aquí.',
+      'The session ended. The project belonged to the other person, so it does not stay here.'
+    ), 'error');
+    // Al menú: el lienzo que estabas viendo acaba de dejar de existir.
+    setTimeout(() => { onHome && onHome(); }, 60);
+  }, [onHome, setProjects]);
+
   const desconectaSesion = useCallbackCanvas(async () => {
     const s = sesionRef.current;
     sesionRef.current = null;
@@ -655,8 +708,12 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
     miRolRef.current = 'editor';
     setMiRol('editor');
     setEnSala(null);
+    setCorte(null);
+    // Salir por la puerta también devuelve lo prestado. Si no, bastaba con
+    // pulsar "Salir de la sesión" para quedarse el proyecto de otro.
+    sueltaPrestado();
     if (s) await s.cierra();
-  }, []);
+  }, [sueltaPrestado]);
 
   const conectaSesion = useCallbackCanvas(async ({ modo, codigo, nombre, rol, onProgreso }) => {
     if (sesionRef.current) await desconectaSesion();
@@ -666,8 +723,41 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
       onParticipantes: (lista) => setParticipantes(lista),
       onEstado: (estado, uid) => {
         if (estado === 'conectado') {
-          showToastCanvas(window.t('Alguien se ha unido a la sesión.', 'Someone joined the session.'));
-        } else if (estado === 'desconectado' || estado === 'failed') {
+          // "Alguien se ha unido" solo lo dice quien tiene la sala. Al invitado
+          // le salía al entrar ÉL, avisándole de su propia llegada.
+          setCorte(null);
+          if (modo === 'abrir') showToastCanvas(window.t('Alguien se ha unido a la sesión.', 'Someone joined the session.'));
+          return;
+        }
+
+        if (estado === 'reconectando') {
+          // Se avisa, pero sin gritar cada dos segundos: el aviso es para que
+          // no parezca que el programa se ha colgado, no para castigar.
+          setCorte('reconectando');
+          const ahora = Date.now();
+          if (ahora - avisoCorteRef.current > 8000) {
+            avisoCorteRef.current = ahora;
+            showToastCanvas(window.t('Se cortó la conexión. Reintentando…', 'Connection dropped. Retrying…'), 'error');
+          }
+          return;
+        }
+
+        // Fin del camino: o el anfitrión terminó la sesión, o después de varios
+        // intentos no se ha podido volver. En los dos casos la visita acabó.
+        if (estado === 'terminada' || estado === 'perdida') {
+          setCorte(null);
+          const razon = estado === 'terminada'
+            ? window.t('El anfitrión ha terminado la sesión.', 'The host ended the session.')
+            : window.t('No se pudo recuperar la conexión con el anfitrión.', 'Could not get the connection back to the host.');
+          // Primero se devuelve lo prestado (con el motivo de verdad) y luego
+          // se cuelga: al revés, colgar ya lo devuelve y el aviso saldría con
+          // el texto genérico, sin decir qué ha pasado.
+          sueltaPrestado(razon);
+          desconectaSesion();
+          return;
+        }
+
+        if (estado === 'desconectado' || estado === 'failed') {
           setCursoresAjenos(prev => { const n = { ...prev }; delete n[uid]; return n; });
         }
       },
@@ -5016,18 +5106,30 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
           Sin un cartel, un lienzo donde lo que tocas vuelve a su sitio parece
           un programa roto. Va arriba y en el centro, donde se mira al no
           entender qué está pasando, y no tapa ninguna herramienta. */}
-      {miRol === 'lector' && (
+      {(miRol === 'lector' || corte === 'reconectando') && (
         <div style={{
           position: 'fixed', top: 'calc(8px + env(safe-area-inset-top, 0px))', left: '50%',
           transform: 'translateX(-50%)', zIndex: 9000,
           display: 'flex', alignItems: 'center', gap: '6px',
           padding: '5px 12px', borderRadius: '999px',
-          background: 'var(--wine, #E6544F)', color: 'white',
+          background: corte === 'reconectando' ? 'var(--yellow, #F7DA84)' : 'var(--wine, #E6544F)',
+          color: corte === 'reconectando' ? '#1A1A1A' : 'white',
           fontSize: '11.5px', fontWeight: 700, boxShadow: 'var(--pop-sm)',
           pointerEvents: 'none', whiteSpace: 'nowrap',
         }}>
-          <span className="material-symbols-rounded" style={{ fontSize: 15 }}>visibility</span>
-          <span>{window.t('Solo lectura', 'Read only')}</span>
+          <span className="material-symbols-rounded" style={{
+            fontSize: 15,
+            animation: corte === 'reconectando' ? 'spin 1.5s linear infinite' : undefined,
+          }}>
+            {corte === 'reconectando' ? 'progress_activity' : 'visibility'}
+          </span>
+          <span>
+            {corte === 'reconectando'
+              // Lo importante no es que se haya cortado, es que lo que escribas
+              // ahora mismo no lo está viendo nadie.
+              ? window.t('Reconectando… lo que hagas ahora no se está enviando', 'Reconnecting… what you do now is not being sent')
+              : window.t('Solo lectura', 'Read only')}
+          </span>
         </div>
       )}
 

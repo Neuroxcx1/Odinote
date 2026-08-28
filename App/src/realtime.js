@@ -185,6 +185,9 @@
     const intentoDe = new Map();  // uid -> etiqueta del intento en curso
     const ofertaDe = new Map();   // uid -> cuándo se escribió su última oferta
     let miIntento = null;         // la etiqueta de MI intento (siendo invitado)
+    let anfitrionUid = null;      // a quién llamo (siendo invitado)
+    let reintentos = 0;           // llamadas seguidas sin conseguir entrar
+    let reintentoT = null;
     // Qué papel recibe quien entre a partir de ahora. Lo cambia el anfitrión
     // antes de dar el código, para invitar a alguien ya como lector.
     let rolNuevos = 'editor';
@@ -366,6 +369,10 @@
       pares.set(uid, par);
 
       canal.onopen = () => {
+        // Entró: la cuenta de reintentos vuelve a cero, y si había uno
+        // programado se anula.
+        reintentos = 0;
+        if (reintentoT) { clearTimeout(reintentoT); reintentoT = null; }
         cb.onEstado && cb.onEstado('conectado', uid);
         if (esAnfitrion) {
           // Quien entra recibe primero la foto completa del proyecto y luego
@@ -397,6 +404,11 @@
         if (esAnfitrion) {
           envia({ t: 'quienes', lista: lista() }, null);
           cb.onParticipantes && cb.onParticipantes(lista());
+        } else {
+          // Se ha caído el que me daba de comer. No se da la sesión por
+          // perdida: se vuelve a llamar (y ahí se averigua si la sala sigue
+          // abierta o es que el anfitrión terminó).
+          programaReintento();
         }
       };
     }
@@ -696,7 +708,62 @@
       }
     }
 
+    // ── Volver a llamar cuando se corta ──
+    //
+    // Hasta ahora no había NADA de esto: en cuanto la conexión se rompía —un
+    // microcorte de wifi, el móvil cambiando de antena, el portátil durmiendo
+    // dos segundos— la sesión se acababa para siempre y había que pedir el
+    // código otra vez. De ahí la sensación de que "se desconecta todo el rato":
+    // no es que se desconectara más de lo normal, es que ninguna desconexión
+    // se arreglaba sola.
+    //
+    // Vuelve a llamar con esperas crecientes, y antes de cada intento mira si
+    // la sala sigue abierta. Eso distingue las dos cosas que se veían igual:
+    // el anfitrión terminó (la sala ya no está: no hay nada que reintentar) o
+    // se cayó la red (la sala sigue ahí: se insiste).
+    const ESPERAS = [1200, 2500, 5000, 9000, 15000];
+
+    function anunciaCaida(motivo) {
+      if (reintentoT) { clearTimeout(reintentoT); reintentoT = null; }
+      cb.onEstado && cb.onEstado(motivo, anfitrionUid);
+    }
+
+    function programaReintento() {
+      if (cerrada || esAnfitrion || reintentoT || !anfitrionUid) return;
+      if (reintentos >= ESPERAS.length) { anunciaCaida('perdida'); return; }
+      const espera = ESPERAS[reintentos++];
+      cb.onEstado && cb.onEstado('reconectando', anfitrionUid);
+      apunta(`conexión perdida; reintento ${reintentos} en ${espera}ms`);
+      reintentoT = setTimeout(async () => {
+        reintentoT = null;
+        if (cerrada) return;
+        try {
+          const sala = await db.collection('salas').doc(codigo).get();
+          if (!sala.exists) { apunta('la sala ya no existe: el anfitrión terminó'); anunciaCaida('terminada'); return; }
+          const previo = pares.get(anfitrionUid);
+          if (previo) {
+            try { previo.canal && previo.canal.close(); } catch (e) {}
+            try { previo.pc && previo.pc.close(); } catch (e) {}
+            pares.delete(anfitrionUid);
+            pendientes.delete(anfitrionUid);
+          }
+          await limpiaMisSenales();
+          await arrancaComoInvitado(anfitrionUid);
+          // Si en quince segundos no abre, se vuelve a intentar.
+          setTimeout(() => {
+            if (cerrada) return;
+            const p = pares.get(anfitrionUid);
+            if (!p || !p.canal || p.canal.readyState !== 'open') programaReintento();
+          }, 15000);
+        } catch (e) {
+          apunta('reintento fallido: ' + (e && e.message));
+          programaReintento();
+        }
+      }, espera);
+    }
+
     async function arrancaComoInvitado(uidAnfitrion) {
+      anfitrionUid = uidAnfitrion;
       anota(uidAnfitrion, { anfitrion: true });
       // Etiqueta nueva en cada intento: lo que conteste el anfitrión a partir
       // de ahora se reconoce por ella, y lo de antes se ignora.
@@ -704,7 +771,13 @@
       const pc = creaPar({ db, sala: codigo, miUid, otroUid: uidAnfitrion, esAnfitrion: false,
         etiqueta: () => miIntento,
         onCanal: (c) => preparaCanal(uidAnfitrion, c),
-        onEstado: (uid, est) => cb.onEstado && cb.onEstado(est, uid) });
+        onEstado: (uid, est) => {
+          cb.onEstado && cb.onEstado(est, uid);
+          // `failed` es definitivo: el navegador ya ha dejado de intentarlo por
+          // su cuenta. Sin mirarlo aquí había que esperar a que se cerrara el
+          // canal, y a veces no se cierra nunca: se queda mudo y abierto.
+          if (est === 'failed') programaReintento();
+        } });
       // Conservando lo que ya hubiera: quien invita crea el canal DENTRO de
       // creaPar, o sea que preparaCanal ya ha guardado el canal aquí antes de
       // llegar a esta línea. Escribir `{ pc }` a secas lo borraba, y entonces
@@ -730,6 +803,8 @@
     async function cierra() {
       if (cerrada) return;
       cerrada = true;
+      // Colgar a propósito no puede disparar el reintento automático.
+      if (reintentoT) { clearTimeout(reintentoT); reintentoT = null; }
       envia({ t: 'adios' }, null);
       pares.forEach(p => { try { p.canal && p.canal.close(); } catch (e) {} try { p.pc && p.pc.close(); } catch (e) {} });
       pares.clear();

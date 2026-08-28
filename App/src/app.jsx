@@ -47,7 +47,7 @@ try {
 
 // Marcador de build: si la consola no muestra esta versión, el navegador está
 // sirviendo JS cacheado (subir ?v= en index.html invalida la caché)
-window.ODINOTE_BUILD = 'v115';
+window.ODINOTE_BUILD = 'v116';
 console.log('[ODINOTE] Código cargado: ' + window.ODINOTE_BUILD);
 
 // Global shortcuts configuration
@@ -150,6 +150,40 @@ function cleanCanvases(canvases) {
     }
   }
   return next;
+}
+
+// Lo prestado no se queda.
+//
+// Al entrar en la sesión de alguien, su proyecto se copia entero aquí para
+// poder verlo — y hasta ahora se quedaba: en el menú para siempre y en el
+// disco, con las notas y las imágenes de otra persona. Al abrir Odinote al día
+// siguiente seguía ahí, muerto, sin forma de volver a entrar.
+//
+// Al terminar la sesión se limpia en caliente; esto es la red de seguridad
+// para cuando el programa se cierra de golpe en mitad de una. Si vuelves a
+// necesitarlo, pides el código otra vez: es de quien lo abrió, no tuyo.
+function olvidaPrestados(state) {
+  if (!state || !Array.isArray(state.projects)) return state;
+  const prestados = state.projects.filter(p => p && p.invitado);
+  if (!prestados.length) return state;
+
+  const fuera = new Set();
+  const canvases = state.canvases || {};
+  const visita = (id) => {
+    const c = canvases[id];
+    if (!c || fuera.has(id)) return;
+    fuera.add(id);
+    (c.items || []).forEach(it => { if (it.canvasId) visita(it.canvasId); });
+  };
+  prestados.forEach(p => visita(p.id));
+
+  const limpios = {};
+  Object.keys(canvases).forEach(id => { if (!fuera.has(id)) limpios[id] = canvases[id]; });
+
+  const proyectos = state.projects.filter(p => !(p && p.invitado));
+  // Y si se cerró estando dentro del prestado, no se puede volver a abrir ahí.
+  const vista = (state.view && fuera.has(state.view.projectId)) ? { name: 'home' } : state.view;
+  return { ...state, projects: proyectos, canvases: limpios, view: vista };
 }
 
 // Migrate old templates for web version or vault
@@ -1097,7 +1131,7 @@ function App() {
         setVaultPath(savedVault);
         window.electronAPI.readVault(savedVault).then(vaultState => {
           if (vaultState) {
-            const migrated = migrateTemplates(vaultState);
+            const migrated = olvidaPrestados(migrateTemplates(vaultState));
             ignoreNextPersistRef.current = true;
             if (migrated.view) setView(migrated.view);
             if (migrated.lang) setLang(migrated.lang);
@@ -1115,7 +1149,7 @@ function App() {
           // load fallback from browser IndexedDB
           loadStateFromDB().then(dbState => {
             if (dbState) {
-              const migrated = migrateTemplates(dbState);
+              const migrated = olvidaPrestados(migrateTemplates(dbState));
               ignoreNextPersistRef.current = true;
               if (migrated.view) setView(migrated.view);
               if (migrated.lang) setLang(migrated.lang);
@@ -1129,7 +1163,7 @@ function App() {
       } else {
         loadStateFromDB().then(dbState => {
           if (dbState) {
-            const migrated = migrateTemplates(dbState);
+            const migrated = olvidaPrestados(migrateTemplates(dbState));
             ignoreNextPersistRef.current = true;
             if (migrated.view) setView(migrated.view);
             if (migrated.lang) setLang(migrated.lang);
@@ -1142,7 +1176,7 @@ function App() {
               const raw = localStorage.getItem(STORE_KEY);
               if (raw) {
                 const localState = JSON.parse(raw);
-                const migrated = migrateTemplates(localState);
+                const migrated = olvidaPrestados(migrateTemplates(localState));
                 ignoreNextPersistRef.current = true;
                 if (migrated.view) setView(migrated.view);
                 if (migrated.lang) setLang(migrated.lang);
@@ -1767,7 +1801,7 @@ function App() {
     try {
       const vaultState = await window.electronAPI.readVault(path);
       if (vaultState) {
-        const migrated = migrateTemplates(vaultState);
+        const migrated = olvidaPrestados(migrateTemplates(vaultState));
         ignoreNextPersistRef.current = true;
         if (migrated.view) setView(migrated.view);
         if (migrated.lang) setLang(migrated.lang);
@@ -1796,7 +1830,7 @@ function App() {
     // Reload original browser IndexedDB state
     loadStateFromDB().then(dbState => {
       if (dbState) {
-        const migrated = migrateTemplates(dbState);
+        const migrated = olvidaPrestados(migrateTemplates(dbState));
         ignoreNextPersistRef.current = true;
         if (migrated.view) setView(migrated.view);
         if (migrated.lang) setLang(migrated.lang);
