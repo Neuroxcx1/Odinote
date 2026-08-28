@@ -274,10 +274,15 @@
   // dirección, sale una franja abajo con lo que pasó en el último gesto, que
   // se puede leer o fotografiar sin salir de donde está el fallo.
   //
-  // Solo en el servidor de pruebas: en la versión publicada esto no existe.
+  // Va aparte de `?odidebug=1`, con su propio `?odidebug=2`: el registro
+  // remoto conviene tenerlo siempre a mano mientras se prueba en el móvil,
+  // pero una franja negra tapando el borde de abajo estorba en cuanto lo que
+  // se está probando ya no es el táctil.
+  const verCinta = /[?&]odidebug=2\b/.test(location.search);
+
   let cinta = null;
   function pintaDiag(texto) {
-    if (!isLocalDev) return;
+    if (!verCinta) return;
     if (!cinta) {
       cinta = document.createElement('div');
       cinta.style.cssText = [
@@ -545,12 +550,31 @@
         const dx = Math.abs(t.clientX - drag.startX);
         const dy = Math.abs(t.clientY - drag.startY);
         const el = drag.scrollerFuera;
-        const haciaArriba = t.clientY < drag.startY;
-        const cuerda = !el ? false : (haciaArriba
+
+        // Hay que mirar POR QUÉ EJE se desplaza esa zona, no dar por hecho que
+        // es vertical. El raíl de herramientas es una columna y se desplaza
+        // hacia arriba y abajo; la barra del nodo que se está editando es una
+        // fila y se desplaza a los lados. Mirando solo el eje vertical, un
+        // dedo yendo a la derecha sobre esa barra se tomaba por "sacar algo de
+        // aquí" y se le bloqueaba el desplazamiento: no había forma de llegar
+        // a las opciones que quedaban fuera de la pantalla.
+        const puedeY = !!el && el.scrollHeight - el.clientHeight > 4;
+        const puedeX = !!el && el.scrollWidth - el.clientWidth > 4;
+        const vertical = dy > dx * 1.6;
+        const horizontal = dx > dy * 1.6;
+
+        const cuerdaY = () => (t.clientY < drag.startY)
           ? el.scrollTop < el.scrollHeight - el.clientHeight - 1
-          : el.scrollTop > 1);
-        // Claramente vertical Y con sitio para desplazarse: era un scroll.
-        if (dy > dx * 1.6 && cuerda) {
+          : el.scrollTop > 1;
+        const cuerdaX = () => (t.clientX < drag.startX)
+          ? el.scrollLeft < el.scrollWidth - el.clientWidth - 1
+          : el.scrollLeft > 1;
+
+        // Va por el eje en el que esa zona se desplaza, y aún le queda sitio
+        // hacia ese lado: es un desplazamiento, nos apartamos.
+        const esScroll = (vertical && puedeY && cuerdaY()) ||
+                         (horizontal && puedeX && cuerdaX());
+        if (esScroll) {
           if (diag) { diag.outcome = 'se apartó (era scroll)'; publishDiag(); }
           drag = null;
           return;

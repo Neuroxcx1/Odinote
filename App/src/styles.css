@@ -4062,6 +4062,28 @@ html[data-mobile="1"] .ctx-side .ctx-sep {
   width: 1.5px; height: 28px; margin: 0 2px; flex: 0 0 auto;
 }
 
+/* Los desplegables de esa barra (grosor, color, presión…), justo encima de
+   ella y a lo ancho.
+   En vertical no tenían ninguna regla propia, así que se quedaban con la de
+   escritorio —`top: 96px; left: 100px`— y aparecían arriba a la izquierda,
+   tapando el buscador y lejísimos del botón que los abría. Aquí abajo la barra
+   ya no está donde el escritorio la pone, y el desplegable tiene que seguirla.
+
+   `fixed` y no `absolute` a propósito: la barra recorta lo que se salga de
+   ella (`overflow-x: auto`), y un hijo `absolute` quedaría cortado por arriba.
+   Un `fixed` se cuelga del viewport y se libra de ese recorte. */
+html[data-mobile="1"][data-orient="portrait"] .ctx-popout {
+  position: fixed;
+  top: auto;
+  left: max(8px, env(safe-area-inset-left));
+  right: max(76px, env(safe-area-inset-right));
+  bottom: calc(170px + env(safe-area-inset-bottom));  /* barra: 98 de abajo + 64 de alto + 8 de aire */
+  width: auto;
+  max-height: 46dvh;
+  overflow-y: auto;
+  z-index: 130;              /* la barra está en 120 */
+}
+
 /* ── Modales y menús a tamaño de pulgar ──────────────────────────────── */
 html[data-mobile="1"] .modal {
   width: min(440px, calc(100vw - 20px));
