@@ -47,7 +47,7 @@ try {
 
 // Marcador de build: si la consola no muestra esta versión, el navegador está
 // sirviendo JS cacheado (subir ?v= en index.html invalida la caché)
-window.ODINOTE_BUILD = 'v116';
+window.ODINOTE_BUILD = 'v117';
 console.log('[ODINOTE] Código cargado: ' + window.ODINOTE_BUILD);
 
 // Global shortcuts configuration
@@ -1602,6 +1602,10 @@ function App() {
       ignoreNextPersistRef.current = false;
       return;
     }
+    // Ahora mismo nadie enciende esta bandera: la encendía el escuchador de
+    // Firestore que se quitó por peligroso. Se queda puesta a propósito, porque
+    // es justo el freno que necesitará lo que venga a sustituirlo — un cambio
+    // que llega de fuera no debe rebotar de vuelta como si fuera tuyo.
     if (isIncomingRemoteChangeRef.current) {
       isIncomingRemoteChangeRef.current = false;
       return;
@@ -1631,28 +1635,29 @@ function App() {
         console.error('[SAVE] Local save failed:', err);
       }
 
-      // 2. Sincronización en la nube (Firestore) para proyectos públicos
-      if (firestoreDB && userProfile && view.projectId) {
-        const activeProj = projects.find(p => p.id === view.projectId);
-        if (activeProj && (activeProj.isPublic || activeProj.isRemote)) {
-          try {
-            await firestoreDB.collection('workspaces').doc(view.projectId).set({
-              id: view.projectId,
-              name: activeProj.name,
-              emoji: activeProj.emoji || '',
-              cover: activeProj.cover || '',
-              isPublic: true,
-              shareToken: activeProj.shareToken || '',
-              collaborators: activeProj.collaborators || [],
-              canvases: canvases,
-              updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-              lastEditedBy: userProfile.email
-            }, { merge: true });
-          } catch (err) {
-            console.error('Failed to sync to Firestore:', err);
-          }
-        }
-      }
+      // 2. Aquí subía el proyecto a Firestore (colección `workspaces`).
+      //
+      // QUITADO, y no por limpieza: hacía dos cosas graves.
+      //
+      // Mandaba `canvases` ENTERO —todos tus proyectos, también los privados—
+      // metido en un documento con el nombre de UNO solo, el que estuvieras
+      // compartiendo. Cualquiera invitado a ese proyecto podía leer el resto
+      // de tu trabajo. Compartir un tablero no puede significar entregar todo
+      // lo demás.
+      //
+      // Y su pareja, el escuchador que había más abajo, hacía lo simétrico al
+      // recibirlo: `setCanvases(data.canvases)`, o sea sustituir el estado
+      // entero por lo que trajera el documento. Eso borra del disco todos los
+      // proyectos que no vinieran dentro.
+      //
+      // Hoy las reglas de firestore.rules no dejan escribir fuera de `salas`,
+      // así que esto fallaba en silencio; pero unas reglas viejas publicadas
+      // en el servidor bastaban para armarlo. No se deja una cosa así apoyada
+      // en que la puerta de al lado siga cerrada.
+      //
+      // Lo que viene a sustituirlo se diseña al revés: un documento POR
+      // proyecto con solo los lienzos de ese proyecto, y al recibir se fusiona
+      // con OdiSync (nodo a nodo, como las sesiones en vivo) en lugar de pisar.
 
       // 3. Sincronización real con Google Drive si está habilitado
       if (userProfile && view.projectId) {
@@ -1728,49 +1733,25 @@ function App() {
     return () => clearTimeout(id);
   }, [view, lang, theme, projects, canvases, loading, vaultPath]);
 
-  // Sincronización remota (Firestore -> Local) en tiempo real
-  useEffectApp(() => {
-    if (!firestoreDB || !userProfile || !view.projectId) return;
-
-    const activeProj = projects.find(p => p.id === view.projectId);
-    if (!activeProj || (!activeProj.isPublic && !activeProj.isRemote)) return;
-
-    // Escuchador en tiempo real
-    const unsubscribe = firestoreDB.collection('workspaces').doc(view.projectId).onSnapshot((doc) => {
-      if (!doc.exists) return;
-      
-      const data = doc.data();
-      // Si el último que editó el documento no fui yo, aplicamos los cambios
-      if (data && data.lastEditedBy !== userProfile.email) {
-        // Marcamos que es un cambio remoto entrante para evitar que el loop local intente guardarlo de nuevo
-        isIncomingRemoteChangeRef.current = true;
-        
-        if (data.canvases) {
-          setCanvases(cleanCanvases(data.canvases));
-        }
-        
-        // También actualizamos los metadatos del proyecto localmente
-        setProjects(prev => prev.map(p => {
-          if (p.id === view.projectId) {
-            return {
-              ...p,
-              name: data.name || p.name,
-              emoji: data.emoji || p.emoji,
-              cover: data.cover || p.cover,
-              collaborators: data.collaborators || p.collaborators
-            };
-          }
-          return p;
-        }));
-      }
-    }, (error) => {
-      console.error('Error listening to firestore updates:', error);
-    });
-
-    return () => {
-      unsubscribe();
-    };
-  }, [view.projectId, userProfile, projects]);
+  // Aquí escuchaba Firestore para traer los cambios del otro en tiempo real.
+  //
+  // QUITADO junto con la escritura que lo alimentaba (ver el punto 2 del
+  // guardado, más arriba). La línea del delito era esta:
+  //
+  //     if (data.canvases) setCanvases(cleanCanvases(data.canvases));
+  //
+  // `setCanvases` sustituye el estado ENTERO, y el estado entero son todos tus
+  // proyectos. Aplicar ahí un documento que solo contiene los lienzos de UNO
+  // borra todos los demás — y cuatrocientos milisegundos después el guardado
+  // automático escribe ese estado vacío en el disco. Un solo mensaje del otro
+  // lado y se acabó.
+  //
+  // No basta con colar un merge aquí: el problema es de forma. Lo que lo
+  // sustituya tiene que (1) subir solo los lienzos del proyecto compartido y
+  // (2) al recibir, calcular qué cambió respecto a la última versión vista y
+  // aplicar SOLO eso, con OdiSync, igual que las sesiones en vivo. Así dos
+  // personas tocando cosas distintas no se borran el trabajo, y lo que no
+  // viene en el documento sencillamente no se toca.
 
   // Flush immediately on tab close / window unload so no pending change is lost
   useEffectApp(() => {
