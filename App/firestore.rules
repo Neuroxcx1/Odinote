@@ -3,12 +3,24 @@
 //
 // Pegar en: consola de Firebase → Firestore → pestaña "Reglas" → Publicar.
 //
-// Firestore aquí NO guarda ni una nota, ni un tablero, ni un dibujo. Todo eso
-// sigue viviendo en el equipo de cada persona y, si lo pone online, en SU
-// Google Drive. Lo único que pasa por aquí es el apretón de manos: las
-// direcciones que dos Odinote necesitan intercambiar para encontrarse y
-// hablarse directamente. En cuanto se encuentran, esos papelitos se borran y
-// el trabajo va de ordenador a ordenador sin tocar ningún servidor.
+// Aquí pasan dos cosas muy distintas, y conviene no confundirlas:
+//
+//   salas/     — el apretón de manos de las sesiones en vivo. Solo direcciones
+//                de red para que dos Odinote se encuentren; en cuanto lo hacen,
+//                esos papelitos se borran y el trabajo va de ordenador a
+//                ordenador sin tocar ningún servidor. Aquí NO hay ni una nota.
+//
+//   proyectos/ — el modo instantáneo, que está APAGADO de fábrica y se
+//                enciende proyecto por proyecto. Este sí guarda el contenido:
+//                el texto de las notas y dónde está cada una. Es lo que permite
+//                que dos personas trabajen a la vez sin que ninguna tenga que
+//                estar de anfitrión. Las imágenes y los audios NO entran aquí:
+//                siguen en el Drive de quien comparte, y de ellos solo viaja
+//                la dirección.
+//
+// Quien no encienda ese interruptor no manda ni un byte de contenido a este
+// servidor: sus notas viven en su equipo y, si pone el proyecto online, en SU
+// Google Drive.
 //
 // Por qué está tan cerrado: el plan gratuito tiene una cuota diaria. Sin estas
 // restricciones, cualquiera podría escribir basura hasta agotarla y dejar sin
@@ -81,6 +93,51 @@ service cloud.firestore {
           && (resource.data.de == request.auth.uid
               || resource.data.para == request.auth.uid);
       }
+    }
+
+    // ── Proyectos en modo instantáneo ──
+    //
+    // Un documento por proyecto, con los lienzos de ESE proyecto y de ninguno
+    // más. Esto último no es un detalle de estilo: la versión anterior de este
+    // código subía todos los proyectos de una persona dentro del documento del
+    // que estaba compartiendo, así que invitar a alguien a un tablero le
+    // entregaba el resto del trabajo. Un proyecto, un documento.
+    //
+    // Quién puede entrar: quien lo creó, y las cuentas de correo que ese dueño
+    // haya apuntado —las mismas a las que compartió la carpeta en su Drive—.
+    // Se comprueba contra el correo del token de Google, que no se puede
+    // falsear desde el navegador.
+    match /proyectos/{proyecto} {
+
+      function dueno() {
+        return request.auth != null && resource.data.dueno == request.auth.uid;
+      }
+
+      // `in` sobre una lista que podría no existir revienta la regla entera y
+      // deja fuera hasta al dueño; de ahí el rodeo con un valor por defecto.
+      function invitado() {
+        return request.auth != null
+          && request.auth.token.email != null
+          && request.auth.token.email in resource.data.get('correos', []);
+      }
+
+      allow get: if dueno() || invitado();
+
+      // Nadie puede pedir la lista de proyectos que hay: se entra sabiendo cuál.
+      allow list: if false;
+
+      allow create: if request.auth != null
+        && request.resource.data.dueno == request.auth.uid
+        && request.resource.data.keys().hasOnly(
+             ['dueno', 'correos', 'lienzos', 'raiz', 'porUid', 'actualizadoEn', 'version']);
+
+      // Un invitado puede escribir —de eso se trata, de editar sin el dueño
+      // delante— pero no puede quedarse con el proyecto ni cambiar quién entra.
+      allow update: if (dueno() || invitado())
+        && request.resource.data.dueno == resource.data.dueno
+        && (dueno() || request.resource.data.get('correos', []) == resource.data.get('correos', []));
+
+      allow delete: if dueno();
     }
   }
 }

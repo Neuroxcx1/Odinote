@@ -745,6 +745,16 @@ const CREDENCIALES = leeCredenciales();
 const GOOGLE_CLIENT_ID = CREDENCIALES ? CREDENCIALES.client_id : null;
 const GOOGLE_CLIENT_SECRET = CREDENCIALES ? CREDENCIALES.client_secret : null;
 const GOOGLE_SCOPES = [
+  // `openid` no pide ni un permiso más de los que ya se piden: lo que hace es
+  // que Google devuelva, además del permiso para Drive, un CARNET firmado
+  // (id_token) que demuestra de quién es esta sesión.
+  //
+  // Hace falta para el modo instantáneo. Las reglas del servidor tienen que
+  // poder comprobar que quien escribe en un proyecto es alguien invitado a él,
+  // y para eso necesitan un correo que no se pueda falsear desde el programa.
+  // La versión web ya lo tenía por entrar con Firebase; el escritorio, con su
+  // flujo propio, se identificaba solo ante Drive y ante nadie más.
+  'openid',
   'https://www.googleapis.com/auth/drive.file',
   'https://www.googleapis.com/auth/userinfo.email',
   'https://www.googleapis.com/auth/userinfo.profile',
@@ -990,6 +1000,11 @@ function startAuthServer() {
             email: perfil.email || '',
             picture: perfil.picture || '',
             accessToken: tok.access_token,
+            // El carnet firmado, para que el escritorio pueda identificarse
+            // también ante Firebase (ver `openid` arriba). Si Google no lo
+            // manda, no pasa nada: todo lo demás sigue funcionando igual y
+            // solo se queda fuera el modo instantáneo.
+            idToken: tok.id_token || null,
             // Con esto la aplicación sabe si puede renovar sola o si tendrá que
             // volver a pedir la sesión cuando caduque.
             puedeRenovar: guardado,

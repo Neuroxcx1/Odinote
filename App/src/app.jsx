@@ -47,7 +47,7 @@ try {
 
 // Marcador de build: si la consola no muestra esta versión, el navegador está
 // sirviendo JS cacheado (subir ?v= en index.html invalida la caché)
-window.ODINOTE_BUILD = 'v117';
+window.ODINOTE_BUILD = 'v118';
 console.log('[ODINOTE] Código cargado: ' + window.ODINOTE_BUILD);
 
 // Global shortcuts configuration
@@ -334,8 +334,20 @@ function App() {
     if (window.electronAPI && window.electronAPI.onGoogleSigninCompleted) {
       const unsubscribe = window.electronAPI.onGoogleSigninCompleted((profile) => {
         if (window._odiEsperaLogin) { clearTimeout(window._odiEsperaLogin); window._odiEsperaLogin = null; }
-        setUserProfile(profile);
-        localStorage.setItem('odinote.google_profile', JSON.stringify(profile));
+        // Identificarse también ante Firebase, no solo ante Drive.
+        //
+        // El escritorio tiene su propio flujo de Google y terminaba con un
+        // permiso para Drive y nada más: ante Firebase seguía siendo un
+        // desconocido —una sesión anónima, sin correo—. Con el carnet firmado
+        // que ahora pide main.js se cierra ese hueco, que es lo que permite a
+        // las reglas del servidor comprobar si a esta persona la invitaron al
+        // proyecto. La web ya lo tenía por entrar con Firebase directamente.
+        identificaEnFirebase(profile.idToken);
+        // El carnet no se guarda en el disco: caduca en una hora y no hace
+        // falta para nada más.
+        const { idToken, ...paraGuardar } = profile;
+        setUserProfile(paraGuardar);
+        localStorage.setItem('odinote.google_profile', JSON.stringify(paraGuardar));
         setWaitingForWebLogin(false);
         setUserModalOpen(false);
         showToast(window.t('¡Sesión iniciada con éxito mediante Google!', 'Successfully signed in with Google!'));
@@ -343,6 +355,22 @@ function App() {
       return unsubscribe;
     }
   }, []);
+
+  // Cambiar la sesión anónima de Firebase por la de verdad, usando el carnet
+  // firmado que devuelve Google. Si algo falla no se rompe nada: Drive y las
+  // sesiones en vivo por código siguen igual, y lo único que se queda fuera es
+  // el modo instantáneo, que necesita saber quién eres para dejarte escribir.
+  const identificaEnFirebase = async (idToken) => {
+    if (!idToken || typeof firebase === 'undefined' || !firebase.auth) return false;
+    try {
+      const credencial = firebase.auth.GoogleAuthProvider.credential(idToken);
+      await firebase.auth().signInWithCredential(credencial);
+      return true;
+    } catch (err) {
+      console.warn('[FIREBASE] no se pudo identificar con el carnet de Google:', err && err.message);
+      return false;
+    }
+  };
 
   // Comprueba que el token de Drive siga vivo (expira ~1 hora después del login).
   // Devuelve { ok, status, reason } para distinguir token caducado (401) de
@@ -913,6 +941,12 @@ function App() {
 
   const ignoreNextPersistRef = React.useRef(false);
   const isIncomingRemoteChangeRef = React.useRef(false);
+  // Modo instantáneo. `acordado` es la última foto que quedó en común con el
+  // servidor, la haya mandado yo o la haya recibido: comparando contra ella se
+  // sabe si hay algo nuevo que subir, y un cambio que llega del otro lado no
+  // rebota de vuelta hacia él para siempre.
+  const acordadoNubeRef = React.useRef(null);
+  const ultimaSubidaNubeRef = React.useRef(0);
 
   const CURRENT_VERSION = '1.0.7'; // debe coincidir con package.json
 
@@ -1658,6 +1692,46 @@ function App() {
       // Lo que viene a sustituirlo se diseña al revés: un documento POR
       // proyecto con solo los lienzos de ese proyecto, y al recibir se fusiona
       // con OdiSync (nodo a nodo, como las sesiones en vivo) en lugar de pisar.
+      //
+      // 2 bis. Modo instantáneo (apagado de fábrica, se enciende por proyecto).
+      if (firestoreDB && window.OdiNube && view.projectId) {
+        const activeProj = projects.find(p => p.id === view.projectId);
+        const yo = firebase.auth().currentUser;
+        if (activeProj && activeProj.sincroInstantanea && yo && userProfile) {
+          const ahora = Date.now();
+          const lienzos = window.OdiNube.soloDelProyecto(canvases, view.projectId);
+          if (!window.OdiNube.cabe(lienzos)) {
+            // Pasarse del mega no da un aviso suave: da un error que tira la
+            // subida entera. Mejor decirlo una vez y seguir guardando en Drive.
+            const ultimo = window._odiAvisoTope || 0;
+            if (ahora - ultimo > 300000) {
+              window._odiAvisoTope = ahora;
+              showToast(window.t(
+                'Este proyecto es demasiado grande para la sincronización instantánea. Se sigue guardando en tu Drive.',
+                'This project is too large for instant sync. It is still being saved to your Drive.'
+              ), 'error');
+            }
+          } else if (window.OdiNube.hayQueSubir(lienzos, acordadoNubeRef.current) &&
+                     ahora - ultimaSubidaNubeRef.current > 2000) {
+            // Espaciado a dos segundos: el plan gratuito son 20.000 escrituras
+            // al día entre todo el mundo, y arrastrar un nodo genera cambios a
+            // sesenta por segundo. Sin este freno se agota la cuota en minutos.
+            ultimaSubidaNubeRef.current = ahora;
+            const acordado = lienzos;
+            firestoreDB.collection('proyectos').doc(view.projectId).set({
+              dueno: yo.uid,
+              correos: window.OdiNube.correosDe(activeProj, userProfile.email),
+              raiz: view.projectId,
+              lienzos,
+              porUid: yo.uid,
+              actualizadoEn: firebase.firestore.FieldValue.serverTimestamp(),
+              version: 1,
+            }, { merge: true })
+              .then(() => { acordadoNubeRef.current = acordado; })
+              .catch(err => console.warn('[NUBE] no se pudo subir:', err && err.message));
+          }
+        }
+      }
 
       // 3. Sincronización real con Google Drive si está habilitado
       if (userProfile && view.projectId) {
@@ -1752,6 +1826,42 @@ function App() {
   // aplicar SOLO eso, con OdiSync, igual que las sesiones en vivo. Así dos
   // personas tocando cosas distintas no se borran el trabajo, y lo que no
   // viene en el documento sencillamente no se toca.
+  //
+  // Eso es exactamente lo que hace lo de abajo, con la fusión en src/nube.js.
+  useEffectApp(() => {
+    if (!firestoreDB || !window.OdiNube || !view.projectId) return;
+    const activeProj = projects.find(p => p.id === view.projectId);
+    if (!activeProj || !activeProj.sincroInstantanea) return;
+    const yo = firebase.auth().currentUser;
+    if (!yo) return;
+
+    const off = firestoreDB.collection('proyectos').doc(view.projectId).onSnapshot((doc) => {
+      if (!doc.exists) return;
+      const data = doc.data();
+      if (!data || !data.lienzos) return;
+      // Lo que acabo de mandar yo vuelve rebotado: no se aplica.
+      if (data.porUid === yo.uid) { acordadoNubeRef.current = data.lienzos; return; }
+
+      setCanvases(prev => {
+        const r = window.OdiNube.fusiona({
+          locales: prev,
+          ultimoRemoto: acordadoNubeRef.current,
+          remoto: data.lienzos,
+          raiz: view.projectId,
+        });
+        // Se apunta la foto del otro lado ANTES de nada: es contra ella contra
+        // la que se comparará la próxima, y también lo que evita que este
+        // mismo cambio salga ahora de vuelta hacia quien lo mandó.
+        acordadoNubeRef.current = data.lienzos;
+        return r.cambio ? r.lienzos : prev;
+      });
+    }, (err) => {
+      // Lo más probable es que las reglas no estén publicadas todavía.
+      console.warn('[NUBE] no se pudo escuchar el proyecto:', err && err.message);
+    });
+
+    return () => off();
+  }, [view.projectId, projects, userProfile]);
 
   // Flush immediately on tab close / window unload so no pending change is lost
   useEffectApp(() => {
@@ -3726,6 +3836,70 @@ function App() {
                     >
                       {window.t('Poner Offline', 'Take Offline')}
                     </button>
+                  </div>
+
+                  {/* ── Sincronización instantánea ──
+                      Apagada de fábrica y a propósito. Con ella, el texto y las
+                      posiciones de las notas se guardan en el servidor de
+                      Odinote para que los cambios lleguen al instante sin que
+                      nadie tenga que estar de anfitrión. Quien no la encienda
+                      no manda ni un byte de contenido a ningún servidor, y por
+                      eso lo que dice el interruptor está escrito sin rodeos:
+                      quien acepta esto merece saber exactamente qué acepta. */}
+                  <div style={{
+                    border: '1.5px solid ' + (project.sincroInstantanea ? 'var(--brand-green, #90B968)' : 'var(--line-soft, #D5D1CD)'),
+                    borderRadius: '8px', padding: '12px',
+                    background: project.sincroInstantanea ? 'rgba(144, 185, 104, 0.08)' : 'transparent',
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <span className="material-symbols-rounded" style={{
+                        fontSize: 20, color: project.sincroInstantanea ? 'var(--brand-green, #90B968)' : 'var(--text-soft)',
+                      }}>bolt</span>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <strong style={{ fontSize: '12.5px' }}>{window.t('Sincronización instantánea', 'Instant sync')}</strong>
+                        <div style={{ fontSize: '11px', color: 'var(--text-soft)', lineHeight: 1.4 }}>
+                          {window.t(
+                            'Los cambios llegan al momento, sin que nadie tenga que abrir una sesión.',
+                            'Changes arrive at once, with nobody having to open a session.'
+                          )}
+                        </div>
+                      </div>
+                      <button
+                        className="btn lift"
+                        onClick={() => {
+                          if (project.sincroInstantanea) {
+                            setProjects(prev => prev.map(p => p.id === project.id ? { ...p, sincroInstantanea: false } : p));
+                            window.playAudioTone && window.playAudioTone('click');
+                            return;
+                          }
+                          window.customConfirm(window.t(
+                            '¿Encender la sincronización instantánea para este proyecto?\n\n· El TEXTO de las notas y dónde está cada una se guardan en el servidor de Odinote, no solo en tu Drive. Es lo que permite que los cambios lleguen al instante.\n· Las imágenes y los audios NO: esos siguen en tu Google Drive.\n· Solo pueden verlo las cuentas a las que ya compartiste el proyecto.\n· Puedes apagarla cuando quieras.\n\nEl resto de tus proyectos no se ven afectados.',
+                            'Turn on instant sync for this project?\n\n· The TEXT of the notes and where each one sits are stored on Odinote\'s server, not only in your Drive. That is what makes changes arrive at once.\n· Images and audio are NOT: those stay in your Google Drive.\n· Only the accounts you already shared the project with can see it.\n· You can turn it off whenever you like.\n\nYour other projects are not affected.'
+                          )).then((acepta) => {
+                            if (!acepta) return;
+                            setProjects(prev => prev.map(p => p.id === project.id ? { ...p, sincroInstantanea: true } : p));
+                            window.playAudioTone && window.playAudioTone('click');
+                          });
+                        }}
+                        style={{
+                          padding: '6px 12px', fontSize: '11px', fontWeight: 700, borderRadius: '6px',
+                          cursor: 'pointer', flexShrink: 0,
+                          border: '1.5px solid ' + (project.sincroInstantanea ? 'var(--wine)' : 'var(--olive, #6A8546)'),
+                          background: project.sincroInstantanea ? 'transparent' : 'var(--olive, #6A8546)',
+                          color: project.sincroInstantanea ? 'var(--wine)' : 'white',
+                        }}
+                      >
+                        {project.sincroInstantanea ? window.t('Apagar', 'Turn off') : window.t('Encender', 'Turn on')}
+                      </button>
+                    </div>
+                    {project.sincroInstantanea && (
+                      <div style={{ marginTop: '8px', fontSize: '10.5px', color: 'var(--text-soft)', lineHeight: 1.4 }}>
+                        {window.t(
+                          'El texto de este proyecto se guarda en el servidor de Odinote. Las imágenes y los audios siguen solo en tu Drive.',
+                          'This project\'s text is stored on Odinote\'s server. Images and audio remain only in your Drive.'
+                        )}
+                      </div>
+                    )}
                   </div>
 
                   {/* Un proyecto puesto online con una versión vieja podía

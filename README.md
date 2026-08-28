@@ -55,6 +55,7 @@ Breadcrumbs always show where you are, so you never lose context and never run o
 | ↗ **Connectors** | Link any two nodes — curved or right-angle routing, labels and styles |
 | 🔒 **Offline & private** | No account required; data lives on your device |
 | ☁️ **Optional sync** | Put a workspace online and it syncs through **your own** Google Drive — no server of ours involved |
+| ⚡ **Instant sync** | Off by default, per project. Turn it on and note text and positions sync through our server so edits land at once, with nobody hosting — images stay in your Drive |
 | 🎨 **Themes & polish** | Dark mode, per-canvas backgrounds, snapping guides, interface sounds |
 | 🌍 **11 languages** | English, Spanish, French, German, Italian, Portuguese, Chinese, Japanese, Korean, Arabic, Russian |
 | 💾 **Own your data** | Local vault folders with real media files, plus JSON export/import |
@@ -82,7 +83,7 @@ Build a Windows executable with `npm run build:exe`, or an installer with `npm r
 
 ## Tech
 
-Electron + React, with JSX transpiled in the browser — no bundler, no build step for the web version. Google Drive integration uses Google's official APIs directly from your device; sign-in uses Firebase Authentication for accounts only. Your note content never touches a server we control.
+Electron + React, with JSX transpiled in the browser — no bundler, no build step for the web version. Google Drive integration uses Google's official APIs directly from your device; sign-in uses Firebase Authentication for accounts only. Your note content never touches a server we control, with one opt-in exception: if you switch on **Instant sync** for a project, that project's note text and layout are stored on our Firestore so collaborators see edits immediately. It is off unless you turn it on, it is per project, and images and audio always stay in your own Drive.
 
 ### Building from source
 
