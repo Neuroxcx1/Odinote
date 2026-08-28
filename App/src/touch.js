@@ -463,6 +463,9 @@
       // larga, por ejemplo— la desplazamos nosotros: dedo en vertical =
       // desplazar su contenido, en horizontal = arrastrar el nodo.
       scroller: inCanvas ? scroller : null,
+      // El de fuera se guarda aparte: hace falta para saber si al raíl le
+      // queda cuerda hacia donde va el dedo antes de dar el gesto por scroll.
+      scrollerFuera: inCanvas ? null : scroller,
       axisDecided: false,
       scrolling: false,
     };
@@ -517,10 +520,50 @@
       }
     }
 
-    // Era un desplazamiento de una zona con scroll: nos apartamos del todo.
+    // ── Zona con scroll fuera del lienzo: ¿desplazarla o sacar algo de ella? ──
+    //
+    // Aquí estaba el fallo de "no puedo arrastrar en el móvil", y no era en los
+    // nodos: era en el RAÍL DE HERRAMIENTAS. El raíl es una columna con scroll
+    // propio, así que todo gesto que empezara sobre él se marcaba como
+    // "esperemos, quizá quiere desplazarlo", y en cuanto el dedo se movía un
+    // pelo el puente se apartaba del todo — sin haber disparado nunca el
+    // `mousedown`. Los toques sueltos sí llegaban (por eso los botones del raíl
+    // respondían), pero sacar una herramienta hacia el lienzo para crear un
+    // nodo era literalmente imposible con el dedo.
+    //
+    // El diagnóstico lo cantaba: «sobre div.tool-icon | puente SÍ | movs 1 |
+    // en curso» — un movimiento, y a partir de ahí nada más.
+    //
+    // Ahora se decide por el eje, igual que ya se hacía dentro del lienzo:
+    // hacia arriba o abajo se desplaza el raíl; hacia el lienzo se saca la
+    // herramienta. Y el `mousedown` se dispara en ese momento, en el punto
+    // donde empezó el dedo, para que el arrastre nazca de donde debe.
     if (drag.deferred) {
-      if (drag.moved) drag = null;
-      return;
+      if (!drag.moved) return;
+      if (!drag.axisDecided) {
+        drag.axisDecided = true;
+        const dx = Math.abs(t.clientX - drag.startX);
+        const dy = Math.abs(t.clientY - drag.startY);
+        const el = drag.scrollerFuera;
+        const haciaArriba = t.clientY < drag.startY;
+        const cuerda = !el ? false : (haciaArriba
+          ? el.scrollTop < el.scrollHeight - el.clientHeight - 1
+          : el.scrollTop > 1);
+        // Claramente vertical Y con sitio para desplazarse: era un scroll.
+        if (dy > dx * 1.6 && cuerda) {
+          if (diag) { diag.outcome = 'se apartó (era scroll)'; publishDiag(); }
+          drag = null;
+          return;
+        }
+        // No lo era: empieza el arrastre de verdad, desde el punto de origen.
+        drag.deferred = false;
+        swallowCompatMouse();
+        fireMouse('mousedown', {
+          clientX: drag.startX, clientY: drag.startY,
+          screenX: drag.startX, screenY: drag.startY,
+        }, drag.target, 1);
+        if (diag) { diag.outcome = 'ARRASTRE desde zona con scroll'; publishDiag(); }
+      }
     }
 
     // Nota larga (u otra zona con scroll) dentro del lienzo: en cuanto se sabe
