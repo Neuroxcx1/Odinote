@@ -4908,6 +4908,20 @@ html[data-touch="1"] .ms-grid-list .ms-card-actions { opacity: 1; }
 .odi-share-pill.online:hover { background: #7FA85A; }
 [data-theme="dark"] .odi-share-pill.online { background: #5B7F44; }
 
+/* Estás DENTRO de la sesión de otra persona: ámbar, el mismo que marca los
+   proyectos prestados en el menú.
+   Antes esto salía gris de "sin publicar", que es lo que menos se parece a lo
+   que pasa: un invitado no está desconectado, está en el lienzo de alguien y
+   lo que escribe lo está viendo esa persona. Verde tampoco vale — ese es el
+   del anfitrión, el dueño de lo que hay en pantalla. */
+.odi-share-pill.invitado {
+  background: var(--yellow, #F7DA84);
+  color: #1A1A1A;
+  border-color: var(--line);
+}
+.odi-share-pill.invitado .material-symbols-rounded { color: #1A1A1A; }
+.odi-share-pill.invitado:hover { background: #F3CE63; }
+
 /* Publicado pero Drive no responde: hay que mirarlo, no ignorarlo. */
 .odi-share-pill.caido {
   background: color-mix(in srgb, var(--wine) 14%, transparent);

@@ -455,10 +455,14 @@ function Topbar({
             onClick={() => { onEstadoCompartir(); window.playAudioTone && window.playAudioTone('click'); }}
           >
             <span className="material-symbols-rounded">
-              {estadoCompartir === 'offline' ? 'cloud_off' : estadoCompartir === 'caido' ? 'cloud_alert' : 'cloud_done'}
+              {estadoCompartir === 'invitado' ? 'sensors'
+                : estadoCompartir === 'offline' ? 'cloud_off'
+                : estadoCompartir === 'caido' ? 'cloud_alert'
+                : 'cloud_done'}
             </span>
             <span>
-              {estadoCompartir === 'offline' ? window.t('Compartir', 'Share')
+              {estadoCompartir === 'invitado' ? window.t('Invitado', 'Guest')
+                : estadoCompartir === 'offline' ? window.t('Compartir', 'Share')
                 : estadoCompartir === 'caido' ? window.t('Sin conexión', 'Disconnected')
                 : window.t('Online', 'Online')}
             </span>

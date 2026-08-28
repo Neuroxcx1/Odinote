@@ -18,6 +18,7 @@
 //   { t:'quienes',  lista:[...] }      quién hay, de qué color y con qué papel
 //   { t:'proyecto', canvases, raiz }   el volcado inicial para quien entra
 //   { t:'expulsado' }                  el anfitrión te ha sacado de la sala
+//   { t:'trozo',    id, i, n, d }      un pedazo de cualquiera de los de arriba
 //   { t:'adios' }
 // =====================================================
 (function () {
@@ -57,6 +58,37 @@
     if (!ficha) return false;
     if (ficha.anfitrion) return true;
     return ficha.rol !== 'lector';
+  }
+
+  // ── Partir y recomponer un mensaje grande ──
+  //
+  // Sueltas aquí fuera, y probadas de ida y vuelta en scripts/test-sala.js: el
+  // fallo que arreglan (imágenes que no llegaban a nadie) es de los que solo
+  // se ven con dos personas y una foto, y eso no se puede probar a mano cada
+  // vez que se toca este archivo.
+  function parteEnTrozos(texto, tamano, id) {
+    const n = Math.max(1, Math.ceil(texto.length / tamano));
+    const out = [];
+    for (let i = 0; i < n; i++) {
+      out.push({ t: 'trozo', id, i, n, d: texto.slice(i * tamano, (i + 1) * tamano) });
+    }
+    return out;
+  }
+
+  // Devuelve el mensaje entero cuando ya no falta ningún pedazo, y null
+  // mientras tanto. `montones` es un Map que lleva el que recibe.
+  function juntaTrozos(montones, m) {
+    if (!m || m.t !== 'trozo' || !m.id || !(m.n > 0)) return null;
+    let monton = montones.get(m.id);
+    if (!monton) { monton = { partes: new Array(m.n), faltan: m.n }; montones.set(m.id, monton); }
+    if (m.i < 0 || m.i >= monton.partes.length) return null;
+    if (monton.partes[m.i] === undefined) {
+      monton.partes[m.i] = m.d;
+      monton.faltan--;
+    }
+    if (monton.faltan > 0) return null;
+    montones.delete(m.id);
+    return monton.partes.join('');
   }
 
   // Pone los papeles del apretón de manos en el orden en que se escribieron y
@@ -184,10 +216,85 @@
       return (r && r.rol) || 'editor';
     }
 
+    // ── Mandar por el canal: en trozos y por turnos ──
+    //
+    // Un canal de datos NO acepta un mensaje de cualquier tamaño: por encima
+    // del límite de la conexión (256 KB en el mejor caso, bastante menos en
+    // algunos móviles) `send` lanza, y aquí eso se tragaba en un catch vacío.
+    //
+    // Y lo que más pesa es justo lo que la gente comparte: una imagen pegada
+    // viaja como `data:image/png;base64,…`, que son megas. Resultado: cada uno
+    // veía sus propias imágenes y nadie veía las de los demás — un lienzo
+    // compartido donde lo compartido eran los recuadros vacíos. Peor todavía,
+    // pasarse del límite puede cerrar el canal entero, y a partir de ahí no
+    // llegaba NADA: por eso la pantalla del anfitrión se quedaba clavada en un
+    // estado viejo mientras el otro seguía trabajando tan tranquilo.
+    //
+    // Ahora todo lo grande se parte, y cada persona tiene su cola con un solo
+    // hilo vaciándola. La cola no es un lujo: sin ella, un movimiento de nota
+    // enviado mientras se está partiendo una imagen se colaría por delante y
+    // llegaría antes que el nodo al que se refiere.
+    const TROZO = 16 * 1024;        // caracteres por trozo; cabe en cualquier canal
+    const TOPE_BUZON = 1024 * 1024; // si el buzón de salida pasa de aquí, se espera
+    let contadorEnvios = 0;
+
+    // Espera a que el canal tenga sitio. Mandar tres megas de golpe llena la
+    // memoria del navegador y en un móvil eso es una pestaña muerta.
+    function esperaSitio(canal) {
+      if (canal.bufferedAmount < TOPE_BUZON) return null;
+      return new Promise(sigue => {
+        const t = setInterval(() => {
+          if (canal.readyState !== 'open' || canal.bufferedAmount < TOPE_BUZON) {
+            clearInterval(t); sigue();
+          }
+        }, 30);
+      });
+    }
+
+    async function bombea(par) {
+      if (par.bombeando) return;
+      par.bombeando = true;
+      try {
+        while (par.cola && par.cola.length) {
+          const canal = par.canal;
+          if (!canal || canal.readyState !== 'open') { par.cola.length = 0; break; }
+          const texto = par.cola.shift();
+
+          if (texto.length <= TROZO) {
+            const sitio = esperaSitio(canal);
+            if (sitio) await sitio;
+            try { canal.send(texto); } catch (e) { break; }
+            continue;
+          }
+
+          const id = 'e' + (++contadorEnvios) + Math.random().toString(36).slice(2, 7);
+          for (const trozo of parteEnTrozos(texto, TROZO, id)) {
+            if (canal.readyState !== 'open') break;
+            const sitio = esperaSitio(canal);
+            if (sitio) await sitio;
+            try { canal.send(JSON.stringify(trozo)); } catch (e) { break; }
+          }
+        }
+      } finally {
+        par.bombeando = false;
+      }
+    }
+
     function enviaA(uid, mensaje) {
       const p = pares.get(uid);
       if (!p || !p.canal || p.canal.readyState !== 'open') return false;
-      try { p.canal.send(JSON.stringify(mensaje)); return true; } catch (e) { return false; }
+      if (!p.cola) p.cola = [];
+      // Un cursor que llega tarde no vale nada.
+      //
+      // Si hay cola —por ejemplo, una imagen de tres megas en marcha—, guardar
+      // veinte posiciones del ratón solo sirve para que luego el puntero del
+      // otro salga disparado repitiendo un recorrido de hace medio minuto.
+      if (mensaje && mensaje.t === 'cursor' && p.cola.length) return true;
+      let texto;
+      try { texto = JSON.stringify(mensaje); } catch (e) { return false; }
+      p.cola.push(texto);
+      bombea(p);
+      return true;
     }
 
     function envia(mensaje, excepto) {
@@ -196,10 +303,30 @@
       return n;
     }
 
+    // ── Y recomponer lo que llega partido ──
+    //
+    // Los trozos de un mismo mensaje llegan en orden (el canal es ordenado),
+    // pero pueden venir intercalados con los de otro, así que cada montón se
+    // guarda por su etiqueta hasta estar completo.
+    function juntaTrozo(par, m) {
+      if (!par.montones) par.montones = new Map();
+      return juntaTrozos(par.montones, m);
+    }
+
     function recibe(deUid, texto) {
       let m;
       try { m = JSON.parse(texto); } catch (e) { return; }
       if (!m || !m.t) return;
+
+      // Un pedazo de algo más grande: se aparta hasta tener el mensaje entero
+      // y entonces se atiende como si hubiera llegado de una pieza.
+      if (m.t === 'trozo') {
+        const par = pares.get(deUid);
+        if (!par) return;
+        const entero = juntaTrozo(par, m);
+        if (entero) recibe(deUid, entero);
+        return;
+      }
 
       if (esAnfitrion) {
         // Un lector no escribe, y eso se decide AQUÍ.
@@ -826,7 +953,7 @@
     disponible, abreSala, entraSala, nuevoCodigo,
     ROLES, COLORES, SERVIDORES_HIELO,
     // Sueltas y comprobables desde `scripts/test-sala.js`.
-    puedeEditar, ordenaYFiltra,
+    puedeEditar, ordenaYFiltra, parteEnTrozos, juntaTrozos,
   };
   if (typeof window !== 'undefined') window.OdiRealtime = OdiRealtime;
   if (typeof module !== 'undefined' && module.exports) module.exports = OdiRealtime;

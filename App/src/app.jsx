@@ -47,7 +47,7 @@ try {
 
 // Marcador de build: si la consola no muestra esta versión, el navegador está
 // sirviendo JS cacheado (subir ?v= en index.html invalida la caché)
-window.ODINOTE_BUILD = 'v114';
+window.ODINOTE_BUILD = 'v115';
 console.log('[ODINOTE] Código cargado: ' + window.ODINOTE_BUILD);
 
 // Global shortcuts configuration
@@ -3334,38 +3334,40 @@ function App() {
                   compartir pareciera roto. Online y Drive son la misma
                   decisión, tomada una sola vez y en un solo sitio. */}
 
-              {/* ── 1. Entrar donde me han invitado ── */}
-              <div style={{
-                border: '1.5px solid var(--line-soft, #D5D1CD)', borderRadius: '10px',
-                padding: '14px', marginBottom: '14px', background: 'var(--bg-card, #FFFFFF)',
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                  <span className="material-symbols-rounded" style={{ fontSize: 20, color: 'var(--text-soft)' }}>group_add</span>
-                  <strong style={{ fontSize: '13.5px' }}>{window.t('Entrar en la sesión de alguien', 'Join someone\'s session')}</strong>
+              {/* ── 1. Entrar donde me han invitado ──
+                  Desaparece del todo si ya estás dentro de una sesión. Dejarlo
+                  ahí apagado, diciendo "ya estás en una sesión", era una caja
+                  entera de la ventana ocupada en contarte algo que ya sabías. */}
+              {!salaCodigo && (
+                <div style={{
+                  border: '1.5px solid var(--line-soft, #D5D1CD)', borderRadius: '10px',
+                  padding: '14px', marginBottom: '14px', background: 'var(--bg-card, #FFFFFF)',
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <span className="material-symbols-rounded" style={{ fontSize: 20, color: 'var(--text-soft)' }}>group_add</span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <strong style={{ fontSize: '13.5px' }}>{window.t('Entrar en la sesión de alguien', 'Join someone\'s session')}</strong>
+                      <div style={{ fontSize: '11px', color: 'var(--text-soft)' }}>
+                        {window.t('Solo el código de seis letras. Nada más.', 'Just the six-letter code. Nothing else.')}
+                      </div>
+                    </div>
+                    <button
+                      className="btn lift"
+                      disabled={salaOcupada}
+                      onClick={() => { setSalaError(null); setJoiningModalOpen(true); }}
+                      style={{
+                        padding: '8px 12px', borderRadius: '8px', flexShrink: 0,
+                        background: 'transparent', color: 'var(--ink)',
+                        border: '1.5px solid var(--olive, #6A8546)',
+                        fontWeight: 700, fontSize: '12px', cursor: 'pointer',
+                        opacity: salaOcupada ? 0.5 : 1,
+                      }}
+                    >
+                      {window.t('Unirme', 'Join')}
+                    </button>
+                  </div>
                 </div>
-                <p style={{ margin: '0 0 10px 0', fontSize: '11.5px', color: 'var(--text-soft)', lineHeight: 1.45 }}>
-                  {window.t(
-                    'Solo necesitas el código de seis letras que te den. No hace falta cuenta de Google, ni Drive, ni tener nada guardado.',
-                    'All you need is the six-letter code they give you. No Google account, no Drive, nothing saved beforehand.'
-                  )}
-                </p>
-                <button
-                  className="btn lift"
-                  disabled={salaOcupada || !!salaCodigo}
-                  onClick={() => { setSalaError(null); setJoiningModalOpen(true); }}
-                  style={{
-                    width: '100%', padding: '9px 12px', borderRadius: '8px',
-                    background: 'transparent', color: 'var(--ink)',
-                    border: '1.5px solid var(--olive, #6A8546)',
-                    fontWeight: 700, fontSize: '12.5px', cursor: 'pointer',
-                    opacity: (salaOcupada || salaCodigo) ? 0.5 : 1,
-                  }}
-                >
-                  {salaCodigo
-                    ? window.t('Ya estás en una sesión', 'You are already in a session')
-                    : window.t('Unirme con un código', 'Join with a code')}
-                </button>
-              </div>
+              )}
 
               {/* ── 2. Abrir este escritorio a los demás ── */}
               <div style={{
@@ -3542,73 +3544,21 @@ function App() {
                       </button>
                     </div>
 
-                    {salaAnfitrion && (
-                      <>
-                        {/* Mandar el código por correo. Odinote no tiene servidor
-                            que envíe correos —y montar uno sería un gasto fijo por
-                            una línea de texto—, así que se abre el programa de
-                            correo de la persona con todo escrito. Sale de su
-                            cuenta de siempre, que además es lo que hace que al
-                            otro no le llegue a spam. */}
-                        <div style={{ display: 'flex', gap: '6px', marginTop: '10px' }}>
-                          <input
-                            type="email"
-                            value={inviteEmail}
-                            onChange={(e) => setInviteEmail(e.target.value)}
-                            placeholder={window.t('correo de tu compañero', 'your teammate\'s email')}
-                            style={{ flex: 1, padding: '7px 10px', fontSize: '12px', border: '1.5px solid var(--line-soft, #D5D1CD)', borderRadius: '6px', background: 'var(--bg-card, #FFFFFF)', color: 'var(--ink, #1A1A1A)' }}
-                          />
-                          <button
-                            className="btn lift"
-                            onClick={() => {
-                              const asunto = window.t('Te invito a mi lienzo de Odinote', 'Join my Odinote canvas');
-                              const cuerpo = window.t(
-                                `Abre Odinote (https://odinote-web.vercel.app), entra en cualquier proyecto, presiona el botón de compartir y elige "Unirme con un código".\n\nEl código es: ${salaCodigo}\n\nAhí te espero.`,
-                                `Open Odinote (https://odinote-web.vercel.app), go into any project, press the share button and choose "Join with a code".\n\nThe code is: ${salaCodigo}\n\nI'll be waiting.`
-                              );
-                              const destino = (inviteEmail || '').trim();
-                              window.open(`mailto:${encodeURIComponent(destino)}?subject=${encodeURIComponent(asunto)}&body=${encodeURIComponent(cuerpo)}`, '_self');
-                              window.odiTrack && window.odiTrack('sala_invitacion_correo', {});
-                            }}
-                            style={{ padding: '7px 12px', fontSize: '11.5px', background: 'var(--olive)', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '4px' }}
-                          >
-                            <span className="material-symbols-rounded" style={{ fontSize: 14 }}>mail</span>
-                            <span>{window.t('Invitar', 'Invite')}</span>
-                          </button>
-                        </div>
+                    {/* Aquí vivían dos cosas más: mandar el código por correo
+                        y elegir el papel del PRÓXIMO que entrara.
 
-                        {/* El papel del próximo que entre, cambiable en
-                            caliente: casi nunca se invita a todo el mundo con
-                            el mismo permiso. */}
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '10px', flexWrap: 'wrap' }}>
-                          <span style={{ fontSize: '10.5px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-soft)' }}>
-                            {window.t('El próximo entrará como', 'The next one joins as')}
-                          </span>
-                          {[
-                            { id: 'editor', texto: window.t('Editor', 'Editor') },
-                            { id: 'lector', texto: window.t('Solo lectura', 'Read only') },
-                          ].map(op => (
-                            <button
-                              key={op.id}
-                              className="btn"
-                              onClick={() => {
-                                setSalaRolNuevos(op.id);
-                                window.__odiVivo && window.__odiVivo.ponRolNuevos(op.id);
-                                window.playAudioTone && window.playAudioTone('click');
-                              }}
-                              style={{
-                                padding: '3px 9px', borderRadius: '999px', cursor: 'pointer', fontSize: '11px', fontWeight: 700,
-                                border: '1.5px solid ' + (salaRolNuevos === op.id ? 'var(--olive, #6A8546)' : 'var(--line-soft, #D5D1CD)'),
-                                background: salaRolNuevos === op.id ? 'rgba(106, 133, 70, 0.14)' : 'transparent',
-                                color: 'var(--ink)',
-                              }}
-                            >
-                              {op.texto}
-                            </button>
-                          ))}
-                        </div>
-                      </>
-                    )}
+                        El correo era un mailto que se parecía como una gota de
+                        agua al de "Colaboradores Invitados" de más abajo —misma
+                        casilla, mismo botón verde "Invitar"— y hacía algo
+                        completamente distinto. Dos invitaciones idénticas a la
+                        vista no dan opciones, dan dudas. Para pasar seis letras
+                        ya está el botón de copiar, que es lo que hace todo el
+                        mundo de todas formas.
+
+                        Y lo del papel del próximo sobraba: cuando entra, ahí
+                        abajo está su nombre y se le cambia en un clic, sabiendo
+                        ya quién es. Decidirlo a ciegas antes era una fila más
+                        de letras mayúsculas para el mismo resultado. */}
 
                     {/* ── Quién hay dentro AHORA MISMO ──
                         Ojo, esta lista no es la de abajo. Abajo están las
@@ -3654,14 +3604,42 @@ function App() {
                                 </span>
                               ) : salaAnfitrion ? (
                                 <>
-                                  <select
-                                    value={rol}
-                                    onChange={(e) => cambiaRolEnSala(persona.uid, e.target.value)}
-                                    style={{ fontSize: '11px', padding: '3px', borderRadius: '4px', border: '1px solid var(--line-soft)', background: 'var(--bg-card)', color: 'var(--ink)' }}
-                                  >
-                                    <option value="editor">{window.t('Editor', 'Editor')}</option>
-                                    <option value="lector">{window.t('Solo lectura', 'Read only')}</option>
-                                  </select>
+                                  {/* Un interruptor de dos posiciones, no un
+                                      desplegable. El <select> lo dibuja el
+                                      sistema operativo con su propia tipografía
+                                      y su propio menú gris: entre botones
+                                      redondeados y hechos a mano cantaba como
+                                      una pieza de otro programa. Y para dos
+                                      opciones, un desplegable son dos clics y
+                                      un menú que tapa la lista; así es uno. */}
+                                  <div style={{
+                                    display: 'flex', borderRadius: '999px', overflow: 'hidden',
+                                    border: '1.5px solid var(--line-soft, #D5D1CD)', flexShrink: 0,
+                                  }}>
+                                    {[
+                                      { id: 'editor', icono: 'edit', texto: window.t('Editor', 'Editor') },
+                                      { id: 'lector', icono: 'visibility', texto: window.t('Lector', 'Reader') },
+                                    ].map(op => (
+                                      <button
+                                        key={op.id}
+                                        className="btn"
+                                        title={op.id === 'editor'
+                                          ? window.t('Puede cambiar el lienzo', 'Can change the canvas')
+                                          : window.t('Solo puede mirar', 'Can only look')}
+                                        onClick={() => { if (rol !== op.id) cambiaRolEnSala(persona.uid, op.id); }}
+                                        style={{
+                                          display: 'flex', alignItems: 'center', gap: '3px',
+                                          padding: '3px 9px', border: 'none', cursor: 'pointer',
+                                          fontSize: '10.5px', fontWeight: 700,
+                                          background: rol === op.id ? 'var(--olive, #6A8546)' : 'transparent',
+                                          color: rol === op.id ? '#FFFFFF' : 'var(--text-soft)',
+                                        }}
+                                      >
+                                        <span className="material-symbols-rounded" style={{ fontSize: 13 }}>{op.icono}</span>
+                                        <span>{op.texto}</span>
+                                      </button>
+                                    ))}
+                                  </div>
                                   <button
                                     className="icon-btn danger"
                                     title={window.t('Sacar de la sesión', 'Remove from session')}

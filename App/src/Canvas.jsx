@@ -477,6 +477,10 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
   const miRolRef = useRefCanvas('editor');
   miRolRef.current = miRol;
   const avisoLecturaRef = useRefCanvas(0);
+  // Dónde estoy: null (en lo mío), 'anfitrion' (abrí yo la sala) o 'invitado'
+  // (estoy en la de otro). Es estado y no una lectura de sesionRef porque de
+  // esto cuelga cómo se pinta el botón de compartir, y un ref no repinta nada.
+  const [enSala, setEnSala] = useStateCanvas(null);
 
   const aplicaRemoto = useCallbackCanvas((ops) => {
     if (!ops || !ops.length) return;
@@ -524,8 +528,17 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
     // Durante un arrastre se dejan pasar los cambios igual: son 50 bytes por
     // fotograma y es justo lo que hace que el otro vea el nodo moverse.
     const ops = window.OdiSync.diff(ultimoEnviadoRef.current || {}, canvases);
-    ultimoEnviadoRef.current = canvases;
-    if (ops.length) s.envia({ t: 'ops', ops }, null);
+    if (!ops.length) { ultimoEnviadoRef.current = canvases; return; }
+
+    // Lo que no llegó a nadie NO se da por enviado.
+    //
+    // Antes se marcaba como enviado pasara lo que pasara, así que un cambio
+    // hecho en el medio segundo en que el canal aún no está abierto —o justo
+    // mientras se recupera— desaparecía para siempre: quedaba en la pantalla
+    // de quien lo hizo y en ninguna otra, y ya nada volvía a mencionarlo.
+    // Dejando la marca donde está, el siguiente cambio lo arrastra consigo.
+    const llegaron = s.envia({ t: 'ops', ops }, null);
+    if (llegaron > 0 || s.cuantos() === 0) ultimoEnviadoRef.current = canvases;
   }, [canvases]);
 
   // El puntero se manda aparte y con cuentagotas: 20 veces por segundo basta
@@ -641,6 +654,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
     // dejaría el lienzo de uno mismo bloqueado después de colgar.
     miRolRef.current = 'editor';
     setMiRol('editor');
+    setEnSala(null);
     if (s) await s.cierra();
   }, []);
 
@@ -677,6 +691,14 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
         };
         visita(projectId);
         const proy = projects ? projects.find(p => p.id === projectId) : null;
+        // Este volcado es el punto de partida: a partir de aquí solo viajan
+        // las diferencias contra ÉL.
+        //
+        // Sin esta línea, la marca de "lo último enviado" seguía siendo la de
+        // antes de que entrara nadie, y el primer cambio que hiciera el
+        // anfitrión —mover una nota— salía acompañado del proyecto entero
+        // otra vez, imágenes incluidas. Megas por cada empujón de ratón.
+        ultimoEnviadoRef.current = todo;
         return {
           canvases: solo,
           raiz: projectId,
@@ -692,6 +714,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
     // el anfitrión le dirá enseguida si en realidad viene de lector.
     miRolRef.current = 'editor';
     setMiRol('editor');
+    setEnSala(s.esAnfitrion ? 'anfitrion' : 'invitado');
     setParticipantes(s.lista());
     ultimoEnviadoRef.current = canvasesLiveRef.current;
     return { codigo: s.codigo };
@@ -4720,9 +4743,19 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
           if (!currentProject) return {};
           const publicado = !!currentProject.isPublic;
           const caido = publicado && driveReachable === false;
+          // Estar de invitado en la sala de otro manda sobre todo lo demás.
+          //
+          // Antes ese caso caía en "offline" y el botón salía gris, que es lo
+          // que menos se parece a lo que está pasando: no estás desconectado,
+          // estás dentro del lienzo de otra persona y lo que escribes lo está
+          // viendo ella. Ámbar, como los proyectos prestados del menú; el
+          // verde se queda para quien es el dueño de lo que hay en pantalla.
+          const invitado = enSala === 'invitado';
           return {
-            estadoCompartir: !publicado ? 'offline' : caido ? 'caido' : 'online',
-            estadoTitulo: !publicado
+            estadoCompartir: invitado ? 'invitado' : !publicado ? 'offline' : caido ? 'caido' : 'online',
+            estadoTitulo: invitado
+              ? window.t('Estás en la sesión de otra persona. Haz clic para ver quién hay o salir.', 'You are in someone else\'s session. Click to see who is there or leave.')
+              : !publicado
               ? window.t('Solo en este equipo. Haz clic para compartirlo o trabajar en vivo con alguien.', 'Only on this device. Click to share it or work live with someone.')
               : caido
                 ? window.t('Publicado en tu Google Drive, pero ahora no hay conexión: los cambios se guardan aquí y se subirán al reconectar.', 'Published to your Google Drive, but there is no connection right now: changes are saved here and will upload once reconnected.')

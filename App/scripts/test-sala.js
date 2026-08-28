@@ -104,6 +104,73 @@ const check = (nombre, ok, extra) => {
   check('un papel sin fecha va el primero y no estorba', orden.join(',') === 'a,b', orden.join(','));
 }
 
+// ── Partir y recomponer mensajes grandes ──
+//
+// Esto es lo que hace que una imagen pegada llegue al otro. Antes se mandaba
+// entera de un golpe, el canal la rechazaba por tamaño, y el error se perdía
+// en un catch vacío: cada uno veía sus imágenes y nadie las de los demás.
+{
+  const junta = (trozos) => {
+    const montones = new Map();
+    let entero = null;
+    trozos.forEach(t => { const r = R.juntaTrozos(montones, t); if (r) entero = r; });
+    return { entero, sobra: montones.size };
+  };
+
+  // Una "imagen": el mismo tipo de cadena larga que produce un data:base64.
+  const imagen = JSON.stringify({ t: 'ops', ops: [{ o: 'nodo+', nodo: {
+    id: 'n1', type: 'image', src: 'data:image/png;base64,' + 'QUJD'.repeat(200000),
+  } }] });
+  const trozos = R.parteEnTrozos(imagen, 16 * 1024, 'x1');
+
+  check('una imagen se parte en muchos trozos', trozos.length > 40, trozos.length + ' trozos');
+  check('ningún trozo pasa del tamaño pedido', trozos.every(t => t.d.length <= 16 * 1024));
+  check('todos los trozos dicen cuántos son y cuál es',
+    trozos.every((t, i) => t.i === i && t.n === trozos.length && t.id === 'x1'));
+
+  const r1 = junta(trozos);
+  check('recomponiéndolos sale exactamente lo que entró', r1.entero === imagen);
+  check('y no queda basura guardada al terminar', r1.sobra === 0);
+
+  // El canal es ordenado, pero un trozo repetido (un reintento) no puede
+  // contar dos veces ni dejar el montón a medias para siempre.
+  const conRepetido = [trozos[0], trozos[0]].concat(trozos.slice(1));
+  check('un trozo repetido no rompe el montaje', junta(conRepetido).entero === imagen);
+}
+
+{
+  // Dos mensajes a la vez: sus trozos pueden venir intercalados y cada montón
+  // tiene que armarse por su cuenta.
+  const a = 'aaaa'.repeat(3000);
+  const b = 'bbbb'.repeat(3000);
+  const ta = R.parteEnTrozos(a, 1000, 'A');
+  const tb = R.parteEnTrozos(b, 1000, 'B');
+  const mezclados = [];
+  for (let i = 0; i < Math.max(ta.length, tb.length); i++) {
+    if (ta[i]) mezclados.push(ta[i]);
+    if (tb[i]) mezclados.push(tb[i]);
+  }
+  const montones = new Map();
+  const salidas = [];
+  mezclados.forEach(t => { const r = R.juntaTrozos(montones, t); if (r) salidas.push(r); });
+  check('dos mensajes intercalados se recomponen los dos, sin mezclarse',
+    salidas.length === 2 && salidas.indexOf(a) >= 0 && salidas.indexOf(b) >= 0);
+  check('y tampoco queda nada colgando', montones.size === 0);
+}
+
+{
+  // Un mensaje que cabe de sobra sigue siendo un solo trozo, y uno vacío no
+  // puede producir cero trozos (el otro lado se quedaría esperando).
+  check('lo pequeño va en un solo trozo', R.parteEnTrozos('hola', 16000, 'z').length === 1);
+  check('lo vacío también va en un trozo', R.parteEnTrozos('', 16000, 'z').length === 1);
+  const montones = new Map();
+  check('y se recompone igual', R.juntaTrozos(montones, R.parteEnTrozos('hola', 16000, 'z')[0]) === 'hola');
+  check('basura por trozo no revienta',
+    R.juntaTrozos(new Map(), null) === null &&
+    R.juntaTrozos(new Map(), { t: 'ops' }) === null &&
+    R.juntaTrozos(new Map(), { t: 'trozo', id: 'q', i: 5, n: 2, d: 'x' }) === null);
+}
+
 // ── Los papeles que se reparten ──
 {
   check('solo hay dos papeles, editor y lector',
