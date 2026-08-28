@@ -8,16 +8,68 @@
 //
 // Todo esto se apaga solo cuando la copia no es la web oficial ni el programa
 // instalado (window.ODINOTE_PLATFORM === 'dev'), así que quien trabaje sobre
-// el código no envía nada ni ensucia las cuentas.
+// el código no envía nada ni ensucia las cuentas. Y se apaga también para
+// quien lo pida en Ajustes y para la cuenta del autor (ver `excluido`).
 // =====================================================
 (function () {
   'use strict';
+
+  // ── Quién NO se cuenta ──
+  //
+  // El uso del propio autor ensucia sus cifras: abre la aplicación veinte veces
+  // al día para probar cosas, y eso no es un usuario. Se excluye por dos vías,
+  // porque cubren casos distintos:
+  //
+  //   · La cuenta — vale en cualquier equipo donde inicie sesión, incluso en
+  //     uno recién instalado.
+  //   · Un interruptor local (Ajustes) — vale para una copia concreta aunque
+  //     no haya sesión iniciada, y de paso es una opción legítima para
+  //     cualquiera que no quiera aparecer en las cuentas. Se respeta a todo
+  //     el mundo, no solo al autor.
+  const SIN_ESTADISTICAS = 'odinote.sin_estadisticas';
+
+  // El correo del autor no se escribe aquí: este archivo está a la vista de
+  // cualquiera en GitHub y publicar una dirección es regalársela a los
+  // rastreadores de spam. Se guarda su huella, que sirve para reconocerlo sin
+  // decir cuál es. No es un candado —no protege nada— y por eso basta con una
+  // huella corta y rápida (FNV-1a de 32 bits).
+  const HUELLA_AUTOR = '5ffb0317';
+
+  function huella(texto) {
+    let h = 0x811c9dc5;
+    for (let i = 0; i < texto.length; i++) {
+      h ^= texto.charCodeAt(i);
+      h = (h + ((h << 1) + (h << 4) + (h << 7) + (h << 8) + (h << 24))) >>> 0;
+    }
+    return h.toString(16);
+  }
+
+  function excluido() {
+    try {
+      if (localStorage.getItem(SIN_ESTADISTICAS) === '1') return true;
+      const perfil = JSON.parse(localStorage.getItem('odinote.google_profile') || 'null');
+      const correo = perfil && perfil.email;
+      if (!correo) return false;
+      if (huella(String(correo).trim().toLowerCase()) !== HUELLA_AUTOR) return false;
+      // Reconocido: se deja apuntado para que siga valiendo aunque después
+      // cierre la sesión en este equipo.
+      localStorage.setItem(SIN_ESTADISTICAS, '1');
+      return true;
+    } catch (e) {
+      return false;   // sin localStorage (ventana privada), se cuenta como siempre
+    }
+  }
+  window.odiSinEstadisticas = excluido;
+  window.odiPonSinEstadisticas = (si) => {
+    try { localStorage.setItem(SIN_ESTADISTICAS, si ? '1' : '0'); } catch (e) {}
+  };
 
   const activo = () =>
     typeof window !== 'undefined' &&
     window.ODINOTE_PLATFORM &&
     window.ODINOTE_PLATFORM !== 'dev' &&
-    typeof window.gtag === 'function';
+    typeof window.gtag === 'function' &&
+    !excluido();
 
   function odiTrack(nombre, params) {
     if (!activo()) return;
