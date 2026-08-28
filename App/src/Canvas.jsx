@@ -5304,16 +5304,31 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
                     </div>
                   )}
                   {/* Con el dedo: arrastrar desde CUALQUIER punto del nodo.
-                      Un calendario o una tabla son una rejilla de controles
-                      pequeños, y al tocarlos el dedo caía siempre en una
-                      casilla en vez de en el nodo: había que acertarle al
-                      borde para poder moverlo. Con el nodo ya elegido, esta
-                      lámina invisible se lleva el arrastre; un toque limpio
-                      sobre ella entra a editar, que es lo que se quería hacer
-                      al tocar dentro. Se aparta sola mientras se edita. */}
+                      Esta lámina existía solo para calendarios y tablas, y el
+                      problema era de todos los nodos. Midiéndolo sobre un nodo
+                      normal, el 45% de su superficie NO lo arrastraba: los
+                      tiradores de tamaño se llevaban el 38% de los toques y los
+                      de conexión otro 7%. En táctil esos tiradores crecen para
+                      poder acertarles con el dedo, y crecen hacia DENTRO: sobre
+                      un nodo de 120x32 en pantalla —lo normal al 40% de zoom—
+                      se comen casi todo el interior. De ahí lo de "no importa
+                      lo que haga, no puedo arrastrarlos": a veces caías en el
+                      trozo bueno y a veces no, sin nada que lo explicara.
+
+                      La regla ahora es una y se entiende sola: dentro del nodo
+                      se mueve, y para cambiar el tamaño o tirar de un conector
+                      se usa la mitad de fuera del tirador, que sobresale del
+                      borde. La lámina va por encima de ellos (ver el z-index en
+                      styles.css) justo para eso.
+
+                      Un toque limpio sin arrastrar entra a editar, pero solo en
+                      los nodos donde eso significaba algo desde siempre; en los
+                      demás no hace nada, que es lo correcto sobre un nodo que
+                      ya está seleccionado. El doble toque no se pierde: la
+                      lámina no lo escucha, así que sube al nodo como siempre y
+                      un tablero se sigue abriendo con dos toques. */}
                   {window.odiIsTouch && window.odiIsTouch() &&
-                   selected === item.id && !isEditing && croppingId !== item.id &&
-                   ['calendar', 'table', 'todo', 'column', 'map'].includes(item.type) && (
+                   selected === item.id && !isEditing && croppingId !== item.id && (
                     <div
                       className="item-drag-shield"
                       onMouseDown={(e) => {
@@ -5325,7 +5340,10 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
                         const alSoltar = () => {
                           window.removeEventListener('mousemove', alMover);
                           window.removeEventListener('mouseup', alSoltar);
-                          if (!movido) setEditing(item.id);
+                          if (movido) return;
+                          if (['calendar', 'table', 'todo', 'column', 'map', 'note', 'document', 'title', 'comment'].includes(item.type)) {
+                            setEditing(item.id);
+                          }
                         };
                         window.addEventListener('mousemove', alMover);
                         window.addEventListener('mouseup', alSoltar);
@@ -5487,19 +5505,38 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
           )}
         </div>
 
-        {/* Place hint */}
-        {activeTool && (
-          <div className="place-hint">
-            <span className="material-symbols-rounded" style={{fontSize:15}}>
-              {activeTool === 'line' ? 'arrow_outward' : 'ads_click'}
-            </span>
-            {activeTool === 'line'
-              ? (window.t('Arrastra de un nodo a otro', 'Drag from one node to another'))
-              : (window.t(`Arrastra para dibujar · clic simple para tamaño por defecto`, `Drag to size · single click for default`))
-            }
-            <span className="esc">esc</span>
-          </div>
-        )}
+        {/* Place hint
+            Con el dedo decía "clic simple" y ofrecía una tecla `esc` — en un
+            teléfono no hay ni una cosa ni la otra, así que el cartel explicaba
+            el gesto en un idioma que ese aparato no habla y encima dejaba a la
+            vista una salida que no se podía usar. Mismo cartel, dicho como
+            corresponde, y la tecla se convierte en un botón de verdad. */}
+        {activeTool && (() => {
+          const dedo = !!(window.odiIsTouch && window.odiIsTouch());
+          return (
+            <div className="place-hint">
+              <span className="material-symbols-rounded" style={{fontSize:15}}>
+                {activeTool === 'line' ? 'arrow_outward' : 'ads_click'}
+              </span>
+              {activeTool === 'line'
+                ? (window.t('Arrastra de un nodo a otro', 'Drag from one node to another'))
+                : dedo
+                  ? (window.t('Arrastra para darle tamaño · un toque para el normal', 'Drag to size · one tap for the normal size'))
+                  : (window.t('Arrastra para dibujar · clic simple para tamaño por defecto', 'Drag to size · single click for default'))
+              }
+              {dedo ? (
+                <button
+                  className="esc como-boton"
+                  onClick={() => { setActiveTool(null); window.playAudioTone && window.playAudioTone('click'); }}
+                >
+                  {window.t('Cancelar', 'Cancel')}
+                </button>
+              ) : (
+                <span className="esc">esc</span>
+              )}
+            </div>
+          );
+        })()}
 
         {/* Status pills */}
         <div className="status-bar">

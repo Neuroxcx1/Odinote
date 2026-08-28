@@ -947,6 +947,15 @@ a, button, select, input[type="submit"], input[type="button"], [role="button"],
 /* Place hint */
 .place-hint { position: absolute; top: 56px; left: 50%; transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 7px 13px; font-size: 12.5px; font-weight: 600; border-radius: 2px; box-shadow: var(--pop-sm); z-index: 41; display: flex; align-items: center; gap: 8px; border: 1.5px solid var(--line); }
 .place-hint .esc { font-family: var(--font-mono); font-size: 10px; padding: 1px 5px; background: rgba(255,255,255,0.15); border-radius: 2px; }
+/* La misma pastilla, pero pulsable: con el dedo no hay tecla esc que valga y
+   la única salida era acertarle a la X del raíl. */
+.place-hint .esc.como-boton {
+  font-family: inherit; font-weight: 700; font-size: 11px;
+  padding: 4px 10px; border: 0; border-radius: 999px;
+  background: rgba(255,255,255,0.22); color: inherit;
+  cursor: pointer; margin-left: 2px;
+}
+.place-hint .esc.como-boton:active { background: rgba(255,255,255,0.35); }
 
 /* Drag-create preview rectangle */
 .drag-preview { position: absolute; border: 1.5px dashed var(--olive); background: color-mix(in srgb, var(--olive) 8%, transparent); border-radius: 2px; pointer-events: none; z-index: 50; }
@@ -4270,6 +4279,25 @@ html[data-touch="1"] .connect-handle::before {
   top: -8px; left: -8px; right: -8px; bottom: -8px;
   pointer-events: auto;
 }
+
+/* Un tirador invisible seguía cazando el dedo.
+   Los puntos de conexión están a opacity 0 mientras el nodo no está elegido
+   —sin ratón no hay :hover que los encienda— pero conservaban
+   `pointer-events: auto`. Resultado: cuatro trampas de casi 40px que no se ven
+   en cada nodo, y un arrastre que unas veces movía el nodo y otras empezaba
+   una flecha, sin nada en pantalla que explicara la diferencia. Si no se ve,
+   no se toca. */
+html[data-touch="1"] .item:not(.selected) > .anchors > .connect-handle,
+html[data-touch="1"] .col-child-wrap:not(.selected) > .anchors > .connect-handle {
+  pointer-events: none;
+}
+
+/* La lámina de arrastre, por encima de los tiradores.
+   Los de tamaño están en z-index 10 y la lámina en 9, así que hasta ahora
+   ganaban ellos: la lámina existía y aun así el dedo caía en un tirador. Por
+   encima, el interior del nodo es siempre para moverlo y a los tiradores les
+   queda su mitad de fuera, que es la que sobresale del borde y la que se ve. */
+html[data-touch="1"] .item-drag-shield { z-index: 12; }
 
 /* ── Orientación horizontal: el raíl derecho se queda, pero la barra
       superior se encoge para no comerse el poco alto disponible. ─────── */
