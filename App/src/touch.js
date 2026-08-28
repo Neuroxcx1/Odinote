@@ -266,6 +266,33 @@
     const c = (el.className && el.className.toString ? el.className.toString() : '').trim().split(/\s+/)[0];
     return el.tagName.toLowerCase() + (c ? '.' + c : '');
   };
+  // El mismo diagnóstico, pero A LA VISTA en la pantalla del teléfono.
+  //
+  // Estaba escondido detrás de tocar la etiqueta de versión en Ajustes, y por
+  // eso nunca se leía: cuando algo no funciona con el dedo, lo último que se
+  // hace es irse a Ajustes a buscar un texto. Ahora, con ?odidebug=1 en la
+  // dirección, sale una franja abajo con lo que pasó en el último gesto, que
+  // se puede leer o fotografiar sin salir de donde está el fallo.
+  //
+  // Solo en el servidor de pruebas: en la versión publicada esto no existe.
+  let cinta = null;
+  function pintaDiag(texto) {
+    if (!isLocalDev) return;
+    if (!cinta) {
+      cinta = document.createElement('div');
+      cinta.style.cssText = [
+        'position:fixed', 'left:4px', 'right:4px', 'bottom:4px', 'z-index:999999',
+        'background:rgba(20,18,20,.92)', 'color:#EDEBED', 'padding:6px 8px',
+        'border-radius:8px', 'font:600 10px/1.35 ui-monospace,monospace',
+        'pointer-events:none',   // jamás debe estorbar al gesto que mide
+        'white-space:pre-wrap', 'word-break:break-word',
+      ].join(';');
+      (document.body || document.documentElement).appendChild(cinta);
+    }
+    cinta.textContent = 'táctil=' + (isCoarse() ? 'sí' : 'NO') +
+      ' movil=' + (isMobile() ? 'sí' : 'no') + '\n' + texto;
+  }
+
   const publishDiag = () => {
     if (!diag) return;
     window.odiTouchDiag =
@@ -274,6 +301,7 @@
       ' | movs ' + diag.moves +
       ' | cancelable ' + (diag.moves ? (diag.cancelable ? 'sí' : 'NO') : '-') +
       ' | ' + diag.outcome;
+    pintaDiag(window.odiTouchDiag);
   };
 
   function closestEl(el, selector) {
@@ -585,5 +613,14 @@
   }
 
   document.addEventListener('touchend', endTouch, { capture: true, passive: false });
-  document.addEventListener('touchcancel', () => { abortDrag(); lastTap = null; }, { capture: true, passive: false });
+  // `touchcancel` lo dispara el navegador cuando decide quedarse él con el
+  // gesto (lo toma por un desplazamiento, o el sistema abre algo encima). Se
+  // deja anotado porque es una de las pocas cosas que pasan en un teléfono de
+  // verdad y nunca en uno emulado: si el arrastre muere aquí, el diagnóstico lo
+  // dice con todas las letras en vez de dejar un "no funciona" sin causa.
+  document.addEventListener('touchcancel', () => {
+    if (diag && drag) { diag.outcome = 'CANCELADO por el navegador'; publishDiag(); }
+    abortDrag();
+    lastTap = null;
+  }, { capture: true, passive: false });
 })();
