@@ -471,6 +471,12 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
   const aplicandoRemotoRef = useRefCanvas(false);
   const [cursoresAjenos, setCursoresAjenos] = useStateCanvas({});   // uid -> {x, y, lienzo, color, nombre}
   const [participantes, setParticipantes] = useStateCanvas([]);
+  // Qué puedo hacer YO en la sala en la que estoy: 'editor' o 'lector'. Lo
+  // decide quien la abrió y puede cambiarlo en cualquier momento.
+  const [miRol, setMiRol] = useStateCanvas('editor');
+  const miRolRef = useRefCanvas('editor');
+  miRolRef.current = miRol;
+  const avisoLecturaRef = useRefCanvas(0);
 
   const aplicaRemoto = useCallbackCanvas((ops) => {
     if (!ops || !ops.length) return;
@@ -490,6 +496,31 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
     if (!s) { ultimoEnviadoRef.current = canvases; return; }
     if (aplicandoRemotoRef.current) { aplicandoRemotoRef.current = false; return; }
     if (ultimoEnviadoRef.current === canvases) return;
+
+    // Solo lectura: el cambio se deshace en el sitio.
+    //
+    // El anfitrión ya tira lo que le llegue de un lector, así que dejarlo
+    // editar en su pantalla sería peor que impedírselo: vería su trabajo
+    // durante horas y no existiría para nadie más. Aquí vuelve atrás al
+    // instante, con un aviso que explica por qué.
+    if (miRolRef.current === 'lector') {
+      const previo = ultimoEnviadoRef.current;
+      if (previo && previo !== canvases) {
+        aplicandoRemotoRef.current = true;
+        skipHistory.current = true;
+        _setCanvases(previo);
+        const ahora = Date.now();
+        if (ahora - avisoLecturaRef.current > 4000) {
+          avisoLecturaRef.current = ahora;
+          showToastCanvas(window.t(
+            'Estás en esta sesión como lector: puedes verlo todo, pero no cambiarlo.',
+            'You are in this session as a reader: you can see everything, but not change it.'
+          ), 'error');
+        }
+      }
+      return;
+    }
+
     // Durante un arrastre se dejan pasar los cambios igual: son 50 bytes por
     // fotograma y es justo lo que hace que el otro vea el nodo moverse.
     const ops = window.OdiSync.diff(ultimoEnviadoRef.current || {}, canvases);
@@ -527,7 +558,30 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
       return;
     }
 
-    if (m.t === 'quienes') { setParticipantes(m.lista || []); return; }
+    if (m.t === 'quienes') {
+      const lista = m.lista || [];
+      setParticipantes(lista);
+      // Y de paso, mi propio papel: si el anfitrión acaba de pasarme a lector
+      // (o al revés), hay que enterarse en el momento, no al intentar mover
+      // algo y ver que no se mueve.
+      const s = sesionRef.current;
+      const yo = s ? lista.find(p => p.uid === s.miUid) : null;
+      if (yo && yo.rol && yo.rol !== miRolRef.current) {
+        miRolRef.current = yo.rol;
+        setMiRol(yo.rol);
+        showToastCanvas(yo.rol === 'lector'
+          ? window.t('El anfitrión te ha puesto como lector: puedes ver el lienzo, pero no cambiarlo.', 'The host made you a reader: you can see the canvas, but not change it.')
+          : window.t('El anfitrión te ha dado permiso para editar.', 'The host gave you permission to edit.'));
+      }
+      return;
+    }
+
+    if (m.t === 'expulsado') {
+      // Se avisa ANTES de cortar, para que no parezca que se ha caído la red.
+      showToastCanvas(window.t('El anfitrión te ha sacado de la sesión.', 'The host removed you from the session.'), 'error');
+      desconectaSesion();
+      return;
+    }
 
     if (m.t === 'proyecto') {
       // Quien acaba de entrar recibe el proyecto entero una sola vez y a
@@ -583,13 +637,18 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
     sesionRef.current = null;
     setParticipantes([]);
     setCursoresAjenos({});
+    // Fuera de la sala se vuelve a mandar en lo propio: quedarse en "lector"
+    // dejaría el lienzo de uno mismo bloqueado después de colgar.
+    miRolRef.current = 'editor';
+    setMiRol('editor');
     if (s) await s.cierra();
   }, []);
 
-  const conectaSesion = useCallbackCanvas(async ({ modo, codigo, nombre }) => {
+  const conectaSesion = useCallbackCanvas(async ({ modo, codigo, nombre, rol, onProgreso }) => {
     if (sesionRef.current) await desconectaSesion();
     const callbacks = {
       onMensaje: recibeMensaje,
+      onProgreso,
       onParticipantes: (lista) => setParticipantes(lista),
       onEstado: (estado, uid) => {
         if (estado === 'conectado') {
@@ -626,9 +685,14 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
       },
     };
     const s = modo === 'abrir'
-      ? await window.OdiRealtime.abreSala({ nombre, callbacks })
+      ? await window.OdiRealtime.abreSala({ nombre, rol, callbacks })
       : await window.OdiRealtime.entraSala({ codigo, nombre, callbacks });
     sesionRef.current = s;
+    // Quien abre la sala manda en ella; quien entra empieza pudiendo editar y
+    // el anfitrión le dirá enseguida si en realidad viene de lector.
+    miRolRef.current = 'editor';
+    setMiRol('editor');
+    setParticipantes(s.lista());
     ultimoEnviadoRef.current = canvasesLiveRef.current;
     return { codigo: s.codigo };
   }, [recibeMensaje, desconectaSesion, projectId]);
@@ -643,9 +707,36 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
       codigo: () => sesionRef.current && sesionRef.current.codigo,
       participantes: () => participantes,
       diagnostico: () => sesionRef.current && sesionRef.current.diagnostico(),
+      // Mando de la sala. Todo esto solo hace algo si esta es la máquina que
+      // la abrió; en la del invitado devuelve `false` y no pasa nada más.
+      soyAnfitrion: () => !!(sesionRef.current && sesionRef.current.esAnfitrion),
+      miUid: () => sesionRef.current && sesionRef.current.miUid,
+      miRol: () => miRolRef.current,
+      ponRol: (uid, r) => sesionRef.current && sesionRef.current.ponRol(uid, r),
+      expulsa: (uid) => sesionRef.current && sesionRef.current.expulsa(uid),
+      // Papel que recibirá el PRÓXIMO que entre. Se decide antes de dar el
+      // código, que es el momento en que uno sabe a quién se lo está dando.
+      rolNuevos: () => (sesionRef.current ? sesionRef.current.rolNuevos() : 'editor'),
+      ponRolNuevos: (r) => sesionRef.current && sesionRef.current.ponRolNuevos(r),
     };
     return () => { delete window.__odiVivo; };
   }, [conectaSesion, desconectaSesion, participantes]);
+
+  // Al cerrar el lienzo, se cuelga.
+  //
+  // Antes no: volver al menú desmontaba esta pantalla pero dejaba la sesión
+  // viva y sin dueño, escuchando en Firebase y contestando ofertas. Quien
+  // intentara entrar con ese código se conectaba a un fantasma que jamás le
+  // iba a mandar el proyecto — y lo veía como "me uní pero no pasa nada".
+  //
+  // Efecto aparte y con lista de dependencias vacía a propósito: el de arriba
+  // se rehace cada vez que cambia la lista de participantes, y colgar ahí
+  // cortaría la sesión cada vez que entra alguien.
+  useEffectCanvas(() => () => {
+    const s = sesionRef.current;
+    sesionRef.current = null;
+    if (s) { try { s.cierra(); } catch (e) {} }
+  }, []);
 
   // Un cursor que lleva diez segundos sin moverse es alguien que se fue sin
   // avisar (cerró el portátil, se cayó el wifi): se retira solo.
@@ -4887,6 +4978,25 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
           />
         );
       })()}
+
+      {/* Estás mirando, no editando.
+          Sin un cartel, un lienzo donde lo que tocas vuelve a su sitio parece
+          un programa roto. Va arriba y en el centro, donde se mira al no
+          entender qué está pasando, y no tapa ninguna herramienta. */}
+      {miRol === 'lector' && (
+        <div style={{
+          position: 'fixed', top: 'calc(8px + env(safe-area-inset-top, 0px))', left: '50%',
+          transform: 'translateX(-50%)', zIndex: 9000,
+          display: 'flex', alignItems: 'center', gap: '6px',
+          padding: '5px 12px', borderRadius: '999px',
+          background: 'var(--wine, #E6544F)', color: 'white',
+          fontSize: '11.5px', fontWeight: 700, boxShadow: 'var(--pop-sm)',
+          pointerEvents: 'none', whiteSpace: 'nowrap',
+        }}>
+          <span className="material-symbols-rounded" style={{ fontSize: 15 }}>visibility</span>
+          <span>{window.t('Solo lectura', 'Read only')}</span>
+        </div>
+      )}
 
       <div
         ref={surfaceRef}

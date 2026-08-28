@@ -67,9 +67,19 @@ service cloud.firestore {
           && request.resource.data.carga is string
           && request.resource.data.carga.size() < 8000;
 
-        // Cada cual limpia lo suyo cuando la conexión ya está hecha.
+        // Cada cual limpia lo suyo cuando la conexión ya está hecha, y también
+        // lo que le hayan dejado a él.
+        //
+        // Lo segundo faltaba, y no era un detalle: quien recibe un papel es
+        // quien sabe que ya no sirve, pero no podía tirarlo. Al segundo intento
+        // de entrar en la misma sala seguían ahí la oferta y la respuesta del
+        // primero, y una respuesta vieja NO da error —es válida, solo que de
+        // otra conversación—, así que se aceptaba y la conexión buena moría en
+        // silencio. En el móvil eso se veía como "la otra persona no respondió
+        // a tiempo" durante veinticinco segundos.
         allow delete: if conSesion()
-          && resource.data.de == request.auth.uid;
+          && (resource.data.de == request.auth.uid
+              || resource.data.para == request.auth.uid);
       }
     }
   }
