@@ -411,11 +411,43 @@
     };
   }
 
+  // ── ¿Deja el navegador hablar con Firebase? ──
+  //
+  // Los bloqueadores de anuncios (el de Opera y Brave de serie, uBlock, y los
+  // filtros de muchos routers) cortan firestore.googleapis.com por venir de un
+  // dominio de Google. La aplicación entera funciona igual, pero las sesiones
+  // en vivo no: es por ahí por donde los dos equipos se dicen dónde están.
+  //
+  // Sin esta comprobación el síntoma era desesperante — "conectando…" durante
+  // veinticinco segundos y un fallo sin explicación — y no hay forma de que a
+  // nadie se le ocurra que la culpa es de su bloqueador.
+  async function compruebaPaso(db) {
+    try {
+      // Un nombre corriente: Firestore RESERVA los identificadores que empiezan
+      // y acaban con doble guion bajo, y rechaza la consulta con
+      // "invalid-argument" — que aquí se leía como "hay un bloqueador" y
+      // acusaba al navegador de algo que no estaba haciendo.
+      await db.collection('salas').doc('PRUEBADEPASO').get();
+      return true;
+    } catch (e) {
+      // Solo cuenta como bloqueo lo que huele a red cortada. Un permiso
+      // denegado o un argumento inválido son otra cosa y no deben confundirse.
+      return !(e && (e.code === 'unavailable' || e.code === 'internal' ||
+                     String(e.message || '').includes('network')));
+    }
+  }
+
   // ── API pública ──
   async function abreSala({ nombre, callbacks }) {
     if (!disponible()) throw new Error('sin-soporte');
     const db = window.firebase.firestore();
+    // La sesión PRIMERO: las reglas exigen estar identificado para leer nada,
+    // así que comprobar el paso antes de eso daba "bloqueador" siempre, incluso
+    // sin bloqueador ninguno.
     const miUid = await identifica();
+    // Y ahora sí: un bloqueador de anuncios corta Firebase y las sesiones no
+    // pueden ni empezar. Se detecta sin hacer esperar a nadie 25 segundos.
+    if (!(await compruebaPaso(db))) throw new Error('bloqueador');
     const codigo = nuevoCodigo(6);
 
     await db.collection('salas').doc(codigo).set({
@@ -440,7 +472,13 @@
   async function entraSala({ codigo, nombre, callbacks }) {
     if (!disponible()) throw new Error('sin-soporte');
     const db = window.firebase.firestore();
+    // La sesión PRIMERO: las reglas exigen estar identificado para leer nada,
+    // así que comprobar el paso antes de eso daba "bloqueador" siempre, incluso
+    // sin bloqueador ninguno.
     const miUid = await identifica();
+    // Y ahora sí: un bloqueador de anuncios corta Firebase y las sesiones no
+    // pueden ni empezar. Se detecta sin hacer esperar a nadie 25 segundos.
+    if (!(await compruebaPaso(db))) throw new Error('bloqueador');
     const limpio = String(codigo || '').trim().toUpperCase();
 
     const doc = await db.collection('salas').doc(limpio).get();

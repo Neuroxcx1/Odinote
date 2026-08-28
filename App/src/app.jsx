@@ -47,7 +47,7 @@ try {
 
 // Marcador de build: si la consola no muestra esta versión, el navegador está
 // sirviendo JS cacheado (subir ?v= en index.html invalida la caché)
-window.ODINOTE_BUILD = 'v110';
+window.ODINOTE_BUILD = 'v113';
 console.log('[ODINOTE] Código cargado: ' + window.ODINOTE_BUILD);
 
 // Global shortcuts configuration
@@ -588,9 +588,14 @@ function App() {
       window.odiTrack && window.odiTrack('sala_abierta', {});
     } catch (err) {
       console.error('[SALA] no se pudo abrir', err);
-      setSalaError(err.message === 'sin-soporte'
-        ? window.t('Este navegador no admite las sesiones en vivo.', 'This browser does not support live sessions.')
-        : window.t('No se pudo abrir la sala: ' + err.message, 'Could not open the room: ' + err.message));
+      const porQue = {
+        'sin-soporte': window.t('Este navegador no admite las sesiones en vivo.', 'This browser does not support live sessions.'),
+        'bloqueador': window.t(
+          'Tu navegador está bloqueando la conexión con Firebase, y es por ahí por donde los dos equipos se encuentran. Suele ser el bloqueador de anuncios (Opera y Brave lo traen de serie): desactívalo para este sitio y vuelve a intentarlo.',
+          'Your browser is blocking the connection to Firebase, which is how the two machines find each other. It is usually the ad blocker (Opera and Brave ship one): turn it off for this site and try again.'
+        ),
+      };
+      setSalaError(porQue[err.message] || window.t('No se pudo abrir la sala: ' + err.message, 'Could not open the room: ' + err.message));
       window.odiTrack && window.odiTrack('sala_abierta_fallo', { motivo: String(err.message).slice(0, 60) });
     } finally {
       setSalaOcupada(false);
@@ -652,6 +657,22 @@ function App() {
         'sala-no-existe': window.t('Ese código no corresponde a ninguna sesión abierta.', 'That code does not match any open session.'),
         'es-tu-propia-sala': window.t('Ese es tu propio código: dáselo a la otra persona.', 'That is your own code: give it to the other person.'),
         'sin-soporte': window.t('Este navegador no admite las sesiones en vivo.', 'This browser does not support live sessions.'),
+        // El bloqueador de anuncios corta firestore.googleapis.com por venir de
+        // un dominio de Google, y sin ese paso los dos equipos no pueden ni
+        // decirse dónde están. Es la causa más común y la más difícil de
+        // adivinar por tu cuenta.
+        'bloqueador': window.t(
+          'Tu navegador está bloqueando la conexión con Firebase, y es por ahí por donde los dos equipos se encuentran. Suele ser el bloqueador de anuncios (Opera y Brave lo traen de serie): desactívalo para este sitio y vuelve a intentarlo.',
+          'Your browser is blocking the connection to Firebase, which is how the two machines find each other. It is usually the ad blocker (Opera and Brave ship one): turn it off for this site and try again.'
+        ),
+        'sin-respuesta': window.t(
+          'La otra persona no respondió a tiempo. Comprueba que su sesión sigue abierta y que ninguno de los dos tiene un bloqueador cortando Firebase.',
+          'The other side did not answer in time. Check their session is still open and that neither of you has a blocker cutting off Firebase.'
+        ),
+        'no-se-pudo-conectar': window.t(
+          'Vuestras redes no se pudieron conectar directamente. Si alguno está con datos móviles, probad los dos por wifi.',
+          'Your networks could not reach each other directly. If either of you is on mobile data, try both on wi-fi.'
+        ),
       };
       setSalaError(motivos[err.message] || window.t('No se pudo conectar: ' + err.message, 'Could not connect: ' + err.message));
       window.odiTrack && window.odiTrack('sala_unido_fallo', { motivo: String(err.message).slice(0, 60) });
@@ -1883,6 +1904,29 @@ function App() {
       showToast(window.t('Google Drive no está autorizado, el proyecto se queda offline. Cierra e inicia sesión de nuevo.', 'Google Drive is not authorized, the project stays offline. Sign out and sign in again.'), 'error');
       return;
     }
+    // Poner online ES guardarlo en tu Drive. Eran dos interruptores separados y
+    // eso no tenía sentido: sin Drive, un invitado ve la estructura pero no las
+    // imágenes ni los audios, porque esos archivos no salen de tu disco. Ahora
+    // es una sola decisión, con la advertencia delante y no escondida.
+    const aviso = window.t(
+      'Al poner este proyecto online se guarda en TU Google Drive, en la carpeta "Odinote".\n\n' +
+      '· Las imágenes y audios ocupan espacio de tus 15 GB gratuitos de Google.\n' +
+      '· Es lo que permite que quien invites vea las imágenes, y no solo los recuadros.\n' +
+      '· Puedes ponerlo offline cuando quieras: se deja de subir y lo que ya está sigue en tu Drive.\n\n' +
+      '¿Seguimos?',
+      'Putting this project online saves it in YOUR Google Drive, in the "Odinote" folder.\n\n' +
+      '· Images and audio take space from your 15 GB of free Google storage.\n' +
+      '· It is what lets the people you invite see the images, not just empty frames.\n' +
+      '· You can take it offline whenever you like: nothing more is uploaded and what is there stays in your Drive.\n\n' +
+      'Go ahead?'
+    );
+    window.customConfirm(aviso).then((acepta) => {
+      if (!acepta) return;
+      ponOnlineDeVerdad(projectId, target);
+    });
+  };
+
+  const ponOnlineDeVerdad = (projectId, target) => {
     const nextToken = `odi-tok-${Math.random().toString(36).substr(2, 9)}-${Math.random().toString(36).substr(2, 9)}`;
     showToast(window.t('Subiendo el proyecto a Google Drive...', 'Uploading the project to Google Drive...'));
     uploadToGoogleDriveReal({ ...target, isPublic: true, shareToken: nextToken }, canvases, userProfile.accessToken)
@@ -1892,7 +1936,8 @@ function App() {
         // GitHub — y casi nadie lo hace.
         window.odiTrack && window.odiTrack('poner_online', { resultado: folderId ? 'ok' : 'fallo' });
         if (folderId) {
-          setProjects(p => p.map(x => x.id === projectId ? { ...x, isPublic: true, shareToken: nextToken } : x));
+          // Online y Drive van juntos: es lo que se acaba de aceptar.
+          setProjects(p => p.map(x => x.id === projectId ? { ...x, isPublic: true, useGoogleDrive: true, shareToken: nextToken } : x));
           showToast(window.t(`"${projectNameString(target.name)}" ya está online, guardado en tu Google Drive (carpeta Odinote).`, `"${projectNameString(target.name)}" is now online, saved to your Google Drive (Odinote folder).`));
         } else {
           showToast(window.t('No se pudo subir a Google Drive: el proyecto se queda offline.', 'Could not upload to Google Drive: the project stays offline.'), 'error');
