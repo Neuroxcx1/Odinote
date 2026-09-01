@@ -141,7 +141,12 @@ exports.kofi97941138ba45a559b3e4 = functions
       return res.status(429).send('Demasiadas peticiones');
     }
 
-    const esperado = process.env.KOFI_TOKEN;
+    // El `trim()` no es cosmético. El token se guarda a mano, y guardarlo desde
+    // un archivo de texto arrastra un salto de línea al final que no se ve por
+    // ninguna parte. Sin esto, el token guardado y el que manda Ko-fi no serían
+    // iguales, todos los avisos se rechazarían con un 401, y en la consola no
+    // habría ni una pista de por qué: se vería un token correcto.
+    const esperado = (process.env.KOFI_TOKEN || '').trim();
     if (!esperado) {
       // Desplegada sin el secreto. Mejor gritarlo en el registro que aceptar
       // cualquier aviso que llegue.
