@@ -47,7 +47,7 @@ try {
 
 // Marcador de build: si la consola no muestra esta versión, el navegador está
 // sirviendo JS cacheado (subir ?v= en index.html invalida la caché)
-window.ODINOTE_BUILD = 'v131';
+window.ODINOTE_BUILD = 'corona-140';
 console.log('[ODINOTE] Código cargado: ' + window.ODINOTE_BUILD);
 
 // Global shortcuts configuration
@@ -415,6 +415,9 @@ function App() {
     try {
       const credencial = firebase.auth.GoogleAuthProvider.credential(idToken);
       await firebase.auth().signInWithCredential(credencial);
+      // Queda escrito en el registro: sin esto, cuando falla la corona o el
+      // modo instantáneo no hay forma de saber si el problema fue aquí.
+      console.log('[FIREBASE] identificado como', (firebase.auth().currentUser || {}).email || '(sin correo)');
       return true;
     } catch (err) {
       console.warn('[FIREBASE] no se pudo identificar con el carnet de Google:', err && err.message);
@@ -604,8 +607,19 @@ function App() {
         if (typeof firebase === 'undefined' || !firebase.auth) return;
         const actual = firebase.auth().currentUser;
         if (actual && !actual.isAnonymous) return;   // ya identificado
+        console.log('[FIREBASE] al arrancar no hay sesión de Google; pidiendo carnet nuevo…');
         const r = await api.googleRefreshAccess();
-        if (!vivo || !r || !r.ok || !r.idToken) return;
+        if (!vivo) return;
+        if (!r || !r.ok) {
+          console.warn('[FIREBASE] el refresco falló:', (r && r.reason) || 'sin respuesta');
+          return;
+        }
+        if (!r.idToken) {
+          // Google solo devuelve carnet en el refresco si el permiso guardado
+          // se pidió con `openid`. Uno anterior a ese cambio no lo trae.
+          console.warn('[FIREBASE] el refresco no trajo carnet: hay que volver a iniciar sesión una vez.');
+          return;
+        }
         await identificaEnFirebase(r.idToken);
       } catch (e) {}
     }, 2500);
