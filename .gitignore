@@ -37,3 +37,8 @@ Website/
 # la protección de GitHub bloquea la subida, y así se pueden cambiar sin
 # reescribir el historial. Copia google-oauth.example.json para crearlo.
 App/google-oauth.json
+
+# Firebase CLI
+.firebase/
+firebase-debug.log
+firebase-debug.*.log

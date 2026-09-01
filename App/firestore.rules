@@ -163,5 +163,27 @@ service cloud.firestore {
 
       allow delete: if dueno();
     }
+
+    // ── Quién ha invitado a un café ──
+    //
+    // Un documento por patrocinador, y el nombre del documento es su correo en
+    // minúsculas. Lo escribe SOLO el programa que recibe los avisos de Ko-fi
+    // (`functions/index.js`), que al vivir dentro de Firebase entra como
+    // administrador y no pasa por estas reglas. Desde la app no se puede
+    // escribir aquí de ninguna manera: si se pudiera, cualquiera se apuntaría
+    // solo y la corona no significaría nada.
+    //
+    // Y leer, cada uno lo suyo y nada más. `get` contra el correo del token de
+    // Google, que el navegador no puede falsear, y `list` prohibido: sin eso,
+    // cualquiera podría descargarse la lista de correos de la gente que ha
+    // pagado, que es justo el tipo de dato que no debe poder pedirse entero.
+    match /patrocinadores/{correo} {
+      allow get: if request.auth != null
+        && request.auth.token.email != null
+        && request.auth.token.email.lower() == correo;
+
+      allow list: if false;
+      allow write: if false;
+    }
   }
 }

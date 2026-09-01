@@ -1,0 +1,17 @@
+{
+  "name": "odinote-functions",
+  "description": "Recibe los avisos de pago de Ko-fi y apunta al patrocinador en Firestore.",
+  "private": true,
+  "main": "index.js",
+  "engines": {
+    "node": "20"
+  },
+  "scripts": {
+    "deploy": "firebase deploy --only functions",
+    "logs": "firebase functions:log --only kofi"
+  },
+  "dependencies": {
+    "firebase-admin": "^12.6.0",
+    "firebase-functions": "^6.1.0"
+  }
+}

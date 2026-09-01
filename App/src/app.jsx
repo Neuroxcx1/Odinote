@@ -259,6 +259,13 @@ function App() {
     const savedProfile = localStorage.getItem('odinote.google_profile');
     return savedProfile ? JSON.parse(savedProfile) : null;
   });
+  // Si esta cuenta ha invitado a un café. Arranca con lo que se supo la última
+  // vez (ver `patrocinio.js`) para que la corona salga ya pintada en el primer
+  // fotograma: consultarlo desde cero en cada arranque la haría aparecer medio
+  // segundo tarde, y ese parpadeo se ve mas que la corona.
+  const [esPatrocinador, setEsPatrocinador] = useStateApp(() => {
+    try { return !!(window.Patrocinio && window.Patrocinio.activo()); } catch (err) { return false; }
+  });
   const [userModalOpen, setUserModalOpen] = useStateApp(false);
   const [loginError, setLoginError] = useStateApp(null);
   const [waitingForWebLogin, setWaitingForWebLogin] = useStateApp(false);
@@ -287,6 +294,49 @@ function App() {
     window.playAudioTone && window.playAudioTone('click');
   };
   window.showToast = showToast;
+
+  // ── La corona de quien ha invitado a un café ──
+  //
+  // Se espera a `onAuthStateChanged` en vez de consultar directamente porque
+  // al arrancar la sesión de Firebase tarda un instante en restaurarse, y una
+  // consulta lanzada antes de eso va sin correo y vuelve con un "no" que
+  // apagaría la corona de alguien que sí ha pagado.
+  useEffectApp(() => {
+    if (!window.Patrocinio) return;
+
+    if (!userProfile) {
+      // Al cerrar sesión la corona se va con la cuenta, no se queda en el
+      // equipo: si no, el siguiente que entrase en este ordenador la heredaría.
+      setEsPatrocinador(false);
+      window.Patrocinio.olvida();
+      return;
+    }
+
+    if (typeof firebase === 'undefined' || !firebase.auth) return;
+
+    let vivo = true;
+    const suelta = firebase.auth().onAuthStateChanged(() => {
+      window.Patrocinio.comprueba().then((si) => {
+        if (!vivo) return;
+        setEsPatrocinador(si);
+        if (si && window.Patrocinio.esNuevo()) {
+          window.Patrocinio.marcaAvisado();
+          showToast(window.t(
+            '👑 Gracias por el café. Tus cosméticos de patrocinador ya están activos.',
+            '👑 Thanks for the coffee. Your supporter cosmetics are now active.'
+          ));
+        }
+      });
+    });
+
+    return () => { vivo = false; suelta(); };
+  }, [userProfile && userProfile.email]);
+
+  // El cursor dorado se aplica desde la hoja de estilos colgando de este
+  // atributo, para no tener que repetir la regla en cada componente.
+  useEffectApp(() => {
+    try { document.body.dataset.patrocinador = esPatrocinador ? '1' : '0'; } catch (err) {}
+  }, [esPatrocinador]);
 
   React.useEffect(() => {
     if (toast) {
@@ -2607,6 +2657,7 @@ function App() {
       onUpdateClick={handleUpdateClick}
       onSettingsClick={() => setSettingsOpen(true)}
       userProfile={userProfile}
+      esPatrocinador={esPatrocinador}
       onUserClick={() => setUserModalOpen(true)}
       onJoinProjectClick={() => setJoiningModalOpen(true)}
       onTogglePublic={togglePublicProject}
@@ -2648,6 +2699,7 @@ function App() {
       onSettingsClick={() => setSettingsOpen(true)}
       vaultPath={vaultPath}
       userProfile={userProfile}
+      esPatrocinador={esPatrocinador}
       onUserClick={() => setUserModalOpen(true)}
       projects={projects}
       setProjects={setProjects}

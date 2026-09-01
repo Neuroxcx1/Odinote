@@ -49,7 +49,7 @@ function Topbar({
   volume, onChangeVolume,
   onEstadoCompartir, estadoCompartir, estadoTitulo,
   onSettingsClick,
-  userProfile, onUserClick,
+  userProfile, esPatrocinador, onUserClick,
   onManualSync,
   isSyncingDrive,
   needsDriveAuth,
@@ -510,6 +510,7 @@ function Topbar({
           style={{ marginRight: '4px', position: 'relative' }}
         >
           <span className="material-symbols-rounded" style={{ color: userProfile ? 'var(--brand-green, #90B968)' : 'inherit' }}>person</span>
+          {userProfile && esPatrocinador && <window.Corona />}
           {!userProfile && (
             <span style={{
               position: 'absolute',

@@ -51,7 +51,7 @@ function renderProjectIcon(icon) {
 }
 window.renderProjectIcon = renderProjectIcon;
 
-function Home({ lang, setLang, theme, setTheme, onOpenProject, projects, onCreate, onDelete, onRename, onRestore, onPurge, onToggleStar, onExport, onImport, vaultPath, onOpenVault, onCloseVault, updateAvailable, onUpdateClick, onSettingsClick, userProfile, onUserClick, onJoinProjectClick, onTogglePublic, onManualSync, isSyncingDrive, needsDriveAuth }) {
+function Home({ lang, setLang, theme, setTheme, onOpenProject, projects, onCreate, onDelete, onRename, onRestore, onPurge, onToggleStar, onExport, onImport, vaultPath, onOpenVault, onCloseVault, updateAvailable, onUpdateClick, onSettingsClick, userProfile, esPatrocinador, onUserClick, onJoinProjectClick, onTogglePublic, onManualSync, isSyncingDrive, needsDriveAuth }) {
   const t = window.TRANSLATIONS[lang];
   const [query, setQuery] = useStateHome('');
   const [modal, setModal] = useStateHome(false);
@@ -305,6 +305,7 @@ function Home({ lang, setLang, theme, setTheme, onOpenProject, projects, onCreat
               style={{ marginRight: '6px', position: 'relative' }}
             >
               <span className="material-symbols-rounded" style={{ color: userProfile ? 'var(--brand-green, #90B968)' : 'inherit' }}>person</span>
+              {userProfile && esPatrocinador && <window.Corona />}
               {!userProfile && (
                 <span style={{
                   position: 'absolute',
