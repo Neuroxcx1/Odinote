@@ -17,6 +17,12 @@
 // de que pueda escribir en `patrocinadores` cuando las reglas se lo prohíben a
 // todo el mundo — el SDK de administrador no pasa por las reglas.
 //
+// Se usa la API de primera generación (`firebase-functions/v1`) por una razón
+// práctica: su dirección es predecible y se puede escribir de antemano en las
+// instrucciones y en el panel de Ko-fi. Las funciones de segunda generación
+// llevan un trozo aleatorio en la dirección que solo se conoce después de
+// desplegarlas.
+//
 // ── Cómo se pone en marcha (una vez y ya está) ──
 //
 //   1. npm --prefix functions install
@@ -28,17 +34,11 @@
 //      https://us-central1-odinote-firebase.cloudfunctions.net/kofi
 // =====================================================
 
-const { onRequest } = require('firebase-functions/v1/https');
-const { defineSecret } = require('firebase-functions/params');
+const functions = require('firebase-functions/v1');
 const admin = require('firebase-admin');
 const crypto = require('crypto');
 
 admin.initializeApp();
-
-// El token que Ko-fi manda dentro de cada aviso para demostrar que el aviso es
-// suyo y no de un gracioso. Se guarda en el almacén de secretos de Google, no
-// en este archivo: el repositorio es público y aquí quedaría a la vista.
-const KOFI_TOKEN = defineSecret('KOFI_TOKEN');
 
 // Comparar dos textos secretos con `===` tarda más cuanto más se parecen, y
 // esa diferencia de tiempo, medida muchas veces, deja adivinar el token letra
@@ -69,11 +69,41 @@ function normalizaCorreo(valor) {
   return limpio;
 }
 
-exports.kofi = onRequest(
-  { region: 'us-central1', secrets: [KOFI_TOKEN] },
-  async (req, res) => {
+exports.kofi = functions
+  .region('us-central1')
+  .runWith({
+    // El token que Ko-fi manda dentro de cada aviso para demostrar que el
+    // aviso es suyo y no de un gracioso. Se guarda en el almacén de secretos
+    // de Google, no en este archivo: el repositorio es público y aquí quedaría
+    // a la vista. Llega como variable de entorno.
+    secrets: ['KOFI_TOKEN'],
+
+    // El freno de mano de la factura, y no es adorno.
+    //
+    // El plan de pago por uso no tiene tope: si alguien descubriera esta
+    // dirección y la llamara un millón de veces, cada llamada sería un gasto.
+    // Con este tope, como mucho hay tres copias de la función corriendo a la
+    // vez; el resto de llamadas esperan o se caen, que es exactamente lo que
+    // se quiere. Los avisos de Ko-fi legítimos son unos pocos al mes y les
+    // sobra de largo.
+    maxInstances: 3,
+
+    // Lo que hace esto es leer un mensaje corto y escribir una línea. Con la
+    // memoria mínima va sobrado, y es lo que menos cuesta por llamada.
+    memory: '128MB',
+    timeoutSeconds: 30,
+  })
+  .https.onRequest(async (req, res) => {
     if (req.method !== 'POST') {
       return res.status(405).send('Solo POST');
+    }
+
+    const esperado = process.env.KOFI_TOKEN;
+    if (!esperado) {
+      // Desplegada sin el secreto. Mejor gritarlo en el registro que aceptar
+      // cualquier aviso que llegue.
+      console.error('[kofi] Falta el secreto KOFI_TOKEN. Ejecuta: firebase functions:secrets:set KOFI_TOKEN');
+      return res.status(500).send('Sin configurar');
     }
 
     // Ko-fi manda un formulario con un único campo, `data`, y dentro de ese
@@ -92,7 +122,7 @@ exports.kofi = onRequest(
       return res.status(400).send('Datos ilegibles');
     }
 
-    if (!mismoToken(pago.verification_token, KOFI_TOKEN.value())) {
+    if (!mismoToken(pago.verification_token, esperado)) {
       console.error('[kofi] Token de verificación incorrecto. Aviso rechazado.');
       return res.status(401).send('No autorizado');
     }
@@ -119,17 +149,19 @@ exports.kofi = onRequest(
     };
 
     try {
-      const ref = admin.firestore().collection('patrocinadores').doc(correo);
+      const db = admin.firestore();
+      const ref = db.collection('patrocinadores').doc(correo);
       // Una transacción y no un `set(..., { merge: true })` a secas, porque
       // hay que respetar el `desde` original y para eso hay que leer antes.
       // Ko-fi reintenta los avisos que no contesta a tiempo, así que este
       // camino se recorre a veces dos veces con el mismo pago; escrito así,
       // repetirlo no cambia nada.
-      await admin.firestore().runTransaction(async (tx) => {
+      await db.runTransaction(async (tx) => {
         const previo = await tx.get(ref);
         if (previo.exists) {
-          delete ficha.desde;
-          tx.update(ref, ficha);
+          const actualizacion = Object.assign({}, ficha);
+          delete actualizacion.desde;
+          tx.update(ref, actualizacion);
         } else {
           tx.set(ref, ficha);
         }
@@ -143,5 +175,4 @@ exports.kofi = onRequest(
     }
 
     return res.status(200).send('OK');
-  }
-);
+  });

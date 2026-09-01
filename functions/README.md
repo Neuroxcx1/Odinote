@@ -13,15 +13,43 @@ están `App/` y `functions/`), no dentro de `App/`.
 ## 1. Activar el plan Blaze en Firebase
 
 Google no deja tener un programa como este en el plan gratuito, así que hay que
-poner una tarjeta. **El gasto real va a ser 0 €**: regalan dos millones de
-avisos al mes y aquí van a llegar unas decenas. La tarjeta es un requisito
-suyo, no un cobro.
+poner una tarjeta.
+
+**Qué es "pago por uso":** no es una cuota. La parte gratuita **no desaparece**
+al pasar a Blaze; sigue siendo gratis lo mismo que antes, y solo se paga por lo
+que se gaste **por encima** de ese regalo mensual. Lo que regalan cada mes:
+
+| | Regalado al mes | Lo que va a gastar esto |
+|---|---|---|
+| Llamadas a la función | 2.000.000 | unas decenas |
+| Escrituras en Firestore | 20.000 al día | una por donación |
+
+O sea: el gasto va a ser **0 €**, o unos céntimos por el espacio donde Google
+guarda la función. La tarjeta es un requisito suyo, no un cobro.
 
 1. Consola de Firebase → rueda dentada (arriba a la izquierda) → **Uso y facturación**
 2. Pestaña **Detalles y configuración** → **Modificar el plan** → **Blaze**
-3. Cuando lo pida, poner un **presupuesto de 1 €** y activar los avisos por
-   correo. Así, si algún día algo se desmadrara, llegaría un aviso mucho antes
-   de que hubiera un cobro de verdad.
+3. Poner un **presupuesto de 1 €** con avisos por correo.
+
+**Y aquí una advertencia que hay que decir clara:** ese presupuesto es una
+**alarma, no un freno**. Google avisa cuando se pasa, pero no corta el
+servicio ni deja de cobrar. Un presupuesto no es un límite de gasto.
+
+El freno de verdad está en el código, no en la consola: la función lleva
+`maxInstances: 3` (ver `index.js`). Eso significa que, aunque alguien
+descubriera la dirección y la llamara un millón de veces, como mucho habría
+tres copias corriendo a la vez y el resto de llamadas se quedarían fuera. Es lo
+que acota la factura en el peor caso.
+
+**Si no te fías de poner la tarjeta**, no la pongas: no es obligatorio para
+nada de Odinote. Hay dos alternativas y las dos funcionan:
+
+- **A mano.** Cuando alguien done, Ko-fi te avisa por correo; apuntas su correo
+  en Firestore (ver más abajo, "Cuando el correo de Ko-fi no es el de su
+  Google"). Son treinta segundos por donación y no cuesta nada.
+- **En Vercel.** Gratis y sin tarjeta, pero entonces sí hay que generar la
+  llave privada de la pantalla "Cuentas de servicio" y pegarla en el panel de
+  Vercel. Más pasos y un secreto más que cuidar.
 
 ## 2. Instalar las herramientas
 
