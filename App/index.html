@@ -45,8 +45,21 @@
       window.ODINOTE_PLATFORM = (function () {
         // El puente de Electron solo existe dentro del programa de escritorio.
         if (window.electronAPI) return 'desktop';
+        //
+        // Las DOS direcciones oficiales, y esto no es por si acaso:
+        //
+        //   · neuroxcx1.github.io  — donde vive de verdad la aplicación web.
+        //     El botón "Pruébalo en tu navegador" de la página de promoción
+        //     lleva a neuroxcx1.github.io/Odinote/App/index.html.
+        //   · odinote-web.vercel.app — la página de promoción, por si algún
+        //     día se sirve la aplicación también desde ahí.
+        //
+        // Aquí faltaba la primera, que es la que usa todo el mundo, así que la
+        // versión web caía en 'dev' y no enviaba absolutamente nada. En los
+        // informes salía como si nadie usara Odinote en el navegador: todos los
+        // eventos propios eran de escritorio y ni un solo app_abierta_web.
         var h = (location.hostname || '').toLowerCase();
-        if (h === 'odinote-web.vercel.app') return 'web';
+        if (h === 'neuroxcx1.github.io' || h === 'odinote-web.vercel.app') return 'web';
         return 'dev';   // localhost, un fork, o el servidor de pruebas
       })();
 
