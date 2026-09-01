@@ -32,10 +32,22 @@
 
   var CLAVE = 'odinote.patrocinio.v1';
 
-  // Cada cuánto se vuelve a preguntar. Un día: lo bastante seguido para que la
-  // corona aparezca el mismo día del pago, y lo bastante espaciado para no
-  // gastar la cuota gratuita de Firestore preguntando lo que ya se sabe.
-  var VIGENCIA = 24 * 60 * 60 * 1000;
+  // Cada cuánto se vuelve a preguntar. Y no es el mismo plazo para un sí que
+  // para un no, a propósito:
+  //
+  //   · Un SÍ dura un día. Ya tiene la corona; volver a preguntar cada rato
+  //     no le aporta nada y solo gasta cuota.
+  //
+  //   · Un NO caduca en un cuarto de hora. Este es el caso que importa: quien
+  //     acaba de pagar. Si un no durase un día, alguien podría donar, abrir
+  //     Odinote ilusionado y no ver nada hasta el día siguiente, que es
+  //     exactamente el momento en el que peor sienta. Quince minutos es lo que
+  //     tarda en tomarse un café.
+  //
+  // Preguntar de más aquí no cuesta nada: es UNA lectura por persona cada
+  // cuarto de hora como mucho, contra las 50.000 diarias que Firestore regala.
+  var VIGENCIA_SI = 24 * 60 * 60 * 1000;
+  var VIGENCIA_NO = 15 * 60 * 1000;
 
   // Se busca el almacén y la sesión así, y no directamente, para que las
   // pruebas de `scripts/test-patrocinio.js` puedan poner los suyos. En el
@@ -159,9 +171,10 @@
     var cache = leeCache();
     var mismoDueno = !!cache && cache.correo === correo;
     var loSabido = mismoDueno && cache.activo === true;
+    var vigencia = loSabido ? VIGENCIA_SI : VIGENCIA_NO;
     var reciente = mismoDueno &&
                    typeof cache.comprobadoEn === 'number' &&
-                   (Date.now() - cache.comprobadoEn) < VIGENCIA;
+                   (Date.now() - cache.comprobadoEn) < vigencia;
 
     if (reciente && !opciones.forzar) {
       return Promise.resolve(loSabido);
@@ -195,7 +208,8 @@
 
   var Patrocinio = {
     CLAVE: CLAVE,
-    VIGENCIA: VIGENCIA,
+    VIGENCIA_SI: VIGENCIA_SI,
+    VIGENCIA_NO: VIGENCIA_NO,
     activo: activo,
     esNuevo: esNuevo,
     marcaAvisado: marcaAvisado,

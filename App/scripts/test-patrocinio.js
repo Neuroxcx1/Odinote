@@ -169,6 +169,35 @@ async function main() {
     check('pasado un día se vuelve a preguntar', global.firebase._consultas.n === 1);
   }
 
+  // ── El que acaba de pagar: un "no" caduca enseguida ──
+  //
+  // Si un no durase lo mismo que un sí, quien dona hoy podría no ver la corona
+  // hasta mañana. Es justo el momento en el que peor sienta, así que un no vale
+  // un cuarto de hora y no un día.
+  {
+    global.localStorage = almacenFalso(recuerdo('ana@gmail.com', false, 30 * 60 * 1000));
+    global.firebase = firebaseFalso({ correo: 'ana@gmail.com', existe: true });
+    check('un "no" de hace media hora se vuelve a preguntar (acaba de donar)',
+      (await P.comprueba()) === true);
+    check('y esta vez fue a la red', global.firebase._consultas.n === 1);
+  }
+
+  {
+    global.localStorage = almacenFalso(recuerdo('ana@gmail.com', false, 5 * 60 * 1000));
+    global.firebase = firebaseFalso({ correo: 'ana@gmail.com', existe: true });
+    check('un "no" de hace cinco minutos todavía vale, no se pregunta',
+      (await P.comprueba()) === false);
+    check('y no se tocó la red', global.firebase._consultas.n === 0);
+  }
+
+  {
+    global.localStorage = almacenFalso(recuerdo('ana@gmail.com', true, 30 * 60 * 1000));
+    global.firebase = firebaseFalso({ correo: 'ana@gmail.com', existe: true });
+    check('en cambio un "sí" de hace media hora NO se vuelve a preguntar',
+      (await P.comprueba()) === true);
+    check('quien ya tiene la corona no gasta cuota cada rato', global.firebase._consultas.n === 0);
+  }
+
   // ── Las gracias se dan una vez, no en cada arranque ──
   {
     global.localStorage = almacenFalso({});
