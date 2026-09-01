@@ -206,8 +206,66 @@
       });
   }
 
+  // ── Reclamar una donación hecha con otro correo ──
+  //
+  // En Ko-fi se paga con el correo de PayPal o de la tarjeta, que muy a menudo
+  // no es el de Google: un Hotmail de toda la vida, un Yahoo del instituto. Esa
+  // persona ha pagado y no ve nada, y no hay forma de que el programa lo
+  // adivine solo.
+  //
+  // Aquí lo demuestra: dice con qué correo pagó y cuánto, y el servidor —que es
+  // el único que puede leer la lista entera— comprueba si eso existe y está sin
+  // reclamar. Ver `functions/reclamacion.js`, donde está la decisión y sus
+  // pruebas.
+  //
+  // Esta dirección no está escondida ni tiene por qué estarlo: la llama esta
+  // misma aplicación, que es de código abierto. Lo que la protege es que exige
+  // una sesión de Google firmada, que desde el navegador no se puede falsificar.
+  var URL_RECLAMO = 'https://us-central1-odinote-firebase.cloudfunctions.net/reclamarPatrocinio';
+
+  function reclama(correo, importe) {
+    var auth = sesion();
+    var usuario = auth && auth.currentUser;
+    if (!usuario || usuario.isAnonymous) {
+      return Promise.resolve({ ok: false, motivo: 'sin-sesion' });
+    }
+
+    return usuario.getIdToken()
+      .then(function (token) {
+        return fetch(URL_RECLAMO, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + token,
+          },
+          body: JSON.stringify({ correo: correo, importe: importe }),
+        });
+      })
+      .then(function (respuesta) {
+        return respuesta.json()
+          .catch(function () { return {}; })
+          .then(function (cuerpo) {
+            return {
+              ok: respuesta.ok && cuerpo.ok === true,
+              motivo: cuerpo.motivo || (respuesta.ok ? null : 'error'),
+            };
+          });
+      })
+      .then(function (resultado) {
+        // Si salió bien se tira el recuerdo entero. La siguiente consulta va a
+        // Firestore de verdad y encuentra la corona recién concedida, en vez de
+        // contestar con el "no" que había guardado hace un momento.
+        if (resultado.ok) olvida();
+        return resultado;
+      })
+      .catch(function () {
+        return { ok: false, motivo: 'sin-conexion' };
+      });
+  }
+
   var Patrocinio = {
     CLAVE: CLAVE,
+    reclama: reclama,
     VIGENCIA_SI: VIGENCIA_SI,
     VIGENCIA_NO: VIGENCIA_NO,
     activo: activo,

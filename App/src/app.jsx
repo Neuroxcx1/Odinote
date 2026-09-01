@@ -47,7 +47,7 @@ try {
 
 // Marcador de build: si la consola no muestra esta versión, el navegador está
 // sirviendo JS cacheado (subir ?v= en index.html invalida la caché)
-window.ODINOTE_BUILD = 'v128';
+window.ODINOTE_BUILD = 'v129';
 console.log('[ODINOTE] Código cargado: ' + window.ODINOTE_BUILD);
 
 // Global shortcuts configuration
@@ -3416,6 +3416,12 @@ function App() {
                       {window.t('Renovar', 'Renew')}
                     </button>
                   </div>
+                )}
+
+                {/* Solo para quien todavia no tiene corona: al que ya la tiene
+                    no hay nada que preguntarle. */}
+                {!esPatrocinador && (
+                  <window.PanelReclamo onConcedida={() => setEsPatrocinador(true)} />
                 )}
 
                 <div style={{ borderTop: '1px solid var(--line-soft, #E5E1DD)', paddingTop: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>

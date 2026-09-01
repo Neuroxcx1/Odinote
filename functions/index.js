@@ -37,6 +37,7 @@
 const functions = require('firebase-functions/v1');
 const admin = require('firebase-admin');
 const crypto = require('crypto');
+const R = require('./reclamacion.js');
 
 admin.initializeApp();
 
@@ -191,6 +192,12 @@ exports.kofi97941138ba45a559b3e4 = functions
       origen: 'kofi',
       ultimoPago: ahora,
       ultimaTransaccion: typeof pago.kofi_transaction_id === 'string' ? pago.kofi_transaction_id : null,
+      // El importe se guarda con un único fin: poder comprobar una reclamación
+      // (ver `reclamacion.js`). Quien pagó con un correo distinto al de su
+      // Google demuestra que la donación es suya diciendo cuánto pagó. No se
+      // enseña en ninguna parte de la aplicación ni se usa para nada más.
+      importe: R.normalizaImporte(pago.amount),
+      moneda: typeof pago.currency === 'string' ? pago.currency.slice(0, 8) : null,
       // `desde` solo se escribe si el documento aún no existía. Así, quien
       // dona por segunda vez conserva la fecha de la primera.
       desde: ahora,
@@ -223,4 +230,130 @@ exports.kofi97941138ba45a559b3e4 = functions
     }
 
     return res.status(200).send('OK');
+  });
+
+// =====================================================
+// Reclamar una donación hecha con OTRO correo
+//
+// El caso: alguien paga en Ko-fi con su Hotmail y entra en Odinote con su
+// Google. Son dos correos y la corona no le llega. Aquí demuestra que esa
+// donación es suya diciendo con qué correo pagó y cuánto, y se le apunta
+// también su correo de Google.
+//
+// Esta dirección SÍ es pública, y no es un descuido: la llama la aplicación,
+// que es de código abierto, así que esconderla sería mentirse. Lo que la
+// protege es que exige una sesión de Google de verdad —un identificador
+// firmado por Google que el navegador no puede falsificar— y que la decisión
+// se toma en `reclamacion.js`, no aquí.
+// =====================================================
+
+// Contador propio, separado del de Ko-fi: son dos direcciones distintas y una
+// avalancha en una no debe cerrar la otra. Aquí el tope es más bajo porque
+// reclamar es algo que se hace una vez en la vida, no cada minuto.
+var ventanaRecInicio = Date.now();
+var ventanaRecCuenta = 0;
+
+function hayAvalanchaReclamos() {
+  var ahora = Date.now();
+  if (ahora - ventanaRecInicio > 60 * 1000) {
+    ventanaRecInicio = ahora;
+    ventanaRecCuenta = 0;
+  }
+  ventanaRecCuenta++;
+  return ventanaRecCuenta > 10;
+}
+
+exports.reclamarPatrocinio = functions
+  .region('us-central1')
+  .runWith({ maxInstances: 1, memory: '128MB', timeoutSeconds: 15 })
+  .https.onRequest(async (req, res) => {
+    // La aplicación se sirve desde varios sitios —github.io en la web, un
+    // servidor local dentro del programa de escritorio—, así que filtrar por
+    // origen aquí no serviría de nada. Lo que decide quién entra es la sesión
+    // de Google, no de dónde viene la petición.
+    res.set('Access-Control-Allow-Origin', '*');
+    res.set('Access-Control-Allow-Headers', 'Authorization, Content-Type');
+    res.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
+    res.set('Access-Control-Max-Age', '3600');
+
+    if (req.method === 'OPTIONS') return res.status(204).send('');
+    if (req.method !== 'POST') return res.status(405).json({ motivo: 'metodo' });
+
+    if (hayAvalanchaReclamos()) {
+      console.error('[reclamar] Demasiadas reclamaciones seguidas. Cortando.');
+      return res.status(429).json({ motivo: 'demasiadas' });
+    }
+
+    var cabecera = req.get('Authorization') || '';
+    var idToken = cabecera.indexOf('Bearer ') === 0 ? cabecera.slice(7) : '';
+    if (!idToken) return res.status(401).json({ motivo: 'sin-sesion' });
+
+    var sesion;
+    try {
+      sesion = await admin.auth().verifyIdToken(idToken);
+    } catch (err) {
+      console.warn('[reclamar] Identificador de sesión no válido.');
+      return res.status(401).json({ motivo: 'sin-sesion' });
+    }
+
+    var cuerpo = req.body || {};
+    var correoPedido = R.normalizaCorreo(cuerpo.correo);
+    if (!correoPedido) return res.status(400).json({ motivo: 'correo-invalido' });
+
+    var db = admin.firestore();
+    var refOrigen = db.collection('patrocinadores').doc(correoPedido);
+
+    var ficha = null;
+    try {
+      var doc = await refOrigen.get();
+      ficha = doc.exists ? doc.data() : null;
+    } catch (err) {
+      console.error('[reclamar] No se pudo leer la ficha:', err);
+      return res.status(500).json({ motivo: 'error' });
+    }
+
+    var veredicto = R.evalua(ficha, cuerpo.correo, cuerpo.importe, sesion.email);
+    if (!veredicto.ok) {
+      // A propósito NO se distingue por fuera entre "no existe" y "el importe
+      // no cuadra": decir cuál de las dos falla convertiría esto en una forma
+      // de averiguar quién ha donado. Por dentro sí queda anotado.
+      console.warn('[reclamar] Rechazada:', veredicto.motivo);
+      var publicos = ['ya-reclamado', 'es-el-mismo', 'sin-sesion', 'correo-invalido', 'importe-invalido'];
+      var motivo = publicos.indexOf(veredicto.motivo) !== -1 ? veredicto.motivo : 'no-cuadra';
+      return res.status(404).json({ motivo: motivo });
+    }
+
+    var ahora = admin.firestore.FieldValue.serverTimestamp();
+    var refDestino = db.collection('patrocinadores').doc(veredicto.mio);
+
+    try {
+      await db.runTransaction(async (tx) => {
+        // Se vuelve a leer dentro de la transacción: entre la lectura de
+        // arriba y este momento pueden pasar segundos, y en esos segundos otro
+        // podría haberla reclamado. Sin esto, dos personas a la vez se
+        // llevarían la misma donación.
+        var actual = await tx.get(refOrigen);
+        if (!actual.exists || actual.data().reclamadoPor) {
+          throw new Error('ya-reclamado');
+        }
+        tx.update(refOrigen, { reclamadoPor: veredicto.mio, reclamadoEn: ahora });
+        tx.set(refDestino, {
+          nivel: 'apoyo',
+          origen: 'reclamado',
+          nombre: actual.data().nombre || null,
+          reclamadoDe: veredicto.correo,
+          desde: ahora,
+          ultimoPago: ahora,
+        }, { merge: true });
+      });
+    } catch (err) {
+      if (err && err.message === 'ya-reclamado') {
+        return res.status(404).json({ motivo: 'ya-reclamado' });
+      }
+      console.error('[reclamar] No se pudo guardar:', err);
+      return res.status(500).json({ motivo: 'error' });
+    }
+
+    console.log('[reclamar] Donación de', veredicto.correo, 'reclamada por', veredicto.mio);
+    return res.status(200).json({ ok: true });
   });

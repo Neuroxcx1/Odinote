@@ -215,6 +215,19 @@ function Home({ lang, setLang, theme, setTheme, onOpenProject, projects, onCreat
             {window.t('Odinote es 100% gratuito. Si te ayuda en tus apuntes, considera hacernos una donación para apoyar el desarrollo independiente.', 'Odinote is 100% free. If it helps you with your notes, consider supporting independent development.')}
           </p>
 
+          {/* El correo con el que hay que donar, dicho en el momento justo:
+              justo antes de irse a Ko-fi. La corona se enciende comparando el
+              correo del pago con el de la sesion, y en Ko-fi se paga con el de
+              PayPal, que muchas veces es otro. Decirlo aqui evita casi todas
+              las reclamaciones posteriores; para las que queden esta el panel
+              de la ventana de perfil. */}
+          {userProfile && userProfile.email && !esPatrocinador && (
+            <div style={{ fontSize: '11px', lineHeight: 1.45, padding: '8px 10px', borderRadius: '6px', background: 'rgba(224, 168, 46, 0.12)', border: '1.5px solid rgba(224, 168, 46, 0.55)', color: 'var(--text, #1A1A1A)' }}>
+              {window.t('Dona con este correo y tu corona se activa sola:', 'Donate with this email and your crown turns on by itself:')}
+              <strong style={{ display: 'block', marginTop: '3px', wordBreak: 'break-all' }}>{userProfile.email}</strong>
+            </div>
+          )}
+
           <button
             className="ms-new-btn"
             style={{ width: '100%', padding: '8px 12px', fontSize: '13px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', background: 'var(--wine, #7B2D26)', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '500', marginTop: '2px' }}
