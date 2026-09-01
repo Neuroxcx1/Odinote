@@ -503,6 +503,7 @@ function Topbar({
         </div>
         {/* El estado "sincronizando" se muestra girando el botón ↻ (arriba), sin
             insertar texto que desplace toda la barra hacia la izquierda */}
+        {userProfile && esPatrocinador && <window.CoronaBoton />}
         <button
           className={`icon-btn lift user-profile-btn ${userProfile ? 'has-name' : 'no-name'}`}
           title={userProfile ? `${window.t('Perfil de', 'Profile of')} ${userProfile.name}` : window.t('Iniciar sesión con Google (Requerido para colaborar)', 'Sign in with Google (Required to collaborate)')}
@@ -510,7 +511,6 @@ function Topbar({
           style={{ marginRight: '4px', position: 'relative' }}
         >
           <span className="material-symbols-rounded" style={{ color: userProfile ? 'var(--brand-green, #90B968)' : 'inherit' }}>person</span>
-          {userProfile && esPatrocinador && <window.Corona />}
           {!userProfile && (
             <span style={{
               position: 'absolute',

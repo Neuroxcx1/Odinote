@@ -298,6 +298,7 @@ function Home({ lang, setLang, theme, setTheme, onOpenProject, projects, onCreat
                 </span>
               </button>
             )}
+            {userProfile && esPatrocinador && <window.CoronaBoton />}
             <button
               className={`icon-btn lift user-profile-btn ${userProfile ? 'has-name' : 'no-name'}`}
               title={userProfile ? `${window.t('Perfil de', 'Profile of')} ${userProfile.name}` : window.t('Iniciar sesión con Google (Requerido para colaborar)', 'Sign in with Google (Required to collaborate)')}
@@ -305,7 +306,6 @@ function Home({ lang, setLang, theme, setTheme, onOpenProject, projects, onCreat
               style={{ marginRight: '6px', position: 'relative' }}
             >
               <span className="material-symbols-rounded" style={{ color: userProfile ? 'var(--brand-green, #90B968)' : 'inherit' }}>person</span>
-              {userProfile && esPatrocinador && <window.Corona />}
               {!userProfile && (
                 <span style={{
                   position: 'absolute',

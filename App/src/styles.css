@@ -192,6 +192,47 @@ a, button, select, input[type="submit"], input[type="button"], [role="button"],
    `app.jsx`. Colgar el cursor de un atributo y no de una clase por elemento
    evita tener que repetir la regla en los treinta sitios de abajo. */
 
+/* El botón dorado de la barra. Solo lo ve quien tiene la corona. */
+.corona-btn {
+  position: relative;
+  border: 1.5px solid #C9962A !important;
+  background: linear-gradient(180deg, #FFF8E1 0%, #FBEBBF 100%) !important;
+  box-shadow: 2px 2px 0 #C9962A, 0 0 10px rgba(224, 168, 46, 0.45);
+  animation: corona-respira 3.2s ease-in-out infinite;
+}
+
+[data-theme="dark"] .corona-btn {
+  border-color: #8A6516 !important;
+  background: linear-gradient(180deg, #3B3221 0%, #2A2417 100%) !important;
+  box-shadow: 2px 2px 0 #8A6516, 0 0 12px rgba(224, 168, 46, 0.5);
+}
+
+.corona-btn:hover {
+  box-shadow: 2px 2px 0 #C9962A, 0 0 18px rgba(224, 168, 46, 0.85);
+}
+
+[data-theme="dark"] .corona-btn:hover {
+  box-shadow: 2px 2px 0 #8A6516, 0 0 20px rgba(224, 168, 46, 0.9);
+}
+
+/* Respira, no parpadea. Un parpadeo en una barra de herramientas se vuelve
+   insoportable a los diez minutos; esto se nota de reojo y no molesta. */
+@keyframes corona-respira {
+  0%, 100% { box-shadow: 2px 2px 0 #C9962A, 0 0 8px rgba(224, 168, 46, 0.35); }
+  50%      { box-shadow: 2px 2px 0 #C9962A, 0 0 16px rgba(224, 168, 46, 0.75); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .corona-btn { animation: none; }
+}
+
+.corona-dibujo {
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  filter: drop-shadow(0 1px 1.5px rgba(0, 0, 0, 0.4));
+}
+
 .corona-patrocinador {
   position: absolute;
   top: -3px;
