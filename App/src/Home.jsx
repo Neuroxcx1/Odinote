@@ -311,7 +311,7 @@ function Home({ lang, setLang, theme, setTheme, onOpenProject, projects, onCreat
                 </span>
               </button>
             )}
-            {userProfile && esPatrocinador && <window.CoronaBoton />}
+            <window.CoronaBoton activo={!!esPatrocinador} onAbrir={onUserClick} />
             <button
               className={`icon-btn lift user-profile-btn ${userProfile ? 'has-name' : 'no-name'}`}
               title={userProfile ? `${window.t('Perfil de', 'Profile of')} ${userProfile.name}` : window.t('Iniciar sesión con Google (Requerido para colaborar)', 'Sign in with Google (Required to collaborate)')}

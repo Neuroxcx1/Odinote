@@ -226,6 +226,37 @@ a, button, select, input[type="submit"], input[type="button"], [role="button"],
   .corona-btn { animation: none; }
 }
 
+/* Apagada: la corona en gris, pero con un halo dorado muy tenue alrededor.
+   Se ve siempre, también para quien no ha pagado, y a propósito: una corona
+   que solo existe cuando ya la tienes no le cuenta a nadie que exista. Así se
+   entiende de un vistazo que hay algo que conseguir, sin un cartel pidiendo
+   dinero. */
+.corona-btn.apagada {
+  border-color: var(--line-soft, #E5E1DD) !important;
+  background: var(--paper, #FFF) !important;
+  box-shadow: 2px 2px 0 var(--line-soft, #E5E1DD), 0 0 7px rgba(224, 168, 46, 0.28);
+  animation: none;
+  opacity: 0.92;
+}
+
+[data-theme="dark"] .corona-btn.apagada {
+  border-color: #4A474A !important;
+  background: #232123 !important;
+  box-shadow: 2px 2px 0 #4A474A, 0 0 8px rgba(224, 168, 46, 0.3);
+}
+
+/* Al pasar por encima se insinúa lo que se gana. */
+.corona-btn.apagada:hover,
+[data-theme="dark"] .corona-btn.apagada:hover {
+  box-shadow: 2px 2px 0 rgba(201, 150, 42, 0.6), 0 0 15px rgba(224, 168, 46, 0.6);
+  opacity: 1;
+}
+
+.corona-btn.apagada .corona-dibujo {
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.25));
+}
+
+
 .corona-dibujo {
   display: grid;
   place-items: center;

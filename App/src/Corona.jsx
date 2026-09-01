@@ -16,37 +16,43 @@
 // Quién la lleva se decide en `patrocinio.js`.
 // =====================================================
 
-window.Corona = function Corona({ size = 16, className = '', title, insignia = false }) {
+window.Corona = function Corona({ size = 16, className = '', title, insignia = false, apagada = false }) {
   // Como insignia va pegada a la esquina de otro botón (posición absoluta);
   // suelta se comporta como un elemento normal y la coloca quien la use.
   const clases = ['corona-dibujo', insignia ? 'corona-patrocinador' : '', className]
     .filter(Boolean).join(' ');
   const texto = title || window.t('Patrocinador de Odinote', 'Odinote supporter');
+  // Dos degradados con nombres distintos: si compartieran id, el primero que
+  // se pintara mandaria sobre el otro y la corona apagada saldria dorada.
+  const idTinta = apagada ? 'odi-corona-gris' : 'odi-corona-oro';
+  const tintas = apagada
+    ? { alto: '#B9B4B0', medio: '#8E8A8E', bajo: '#6E6A6E', borde: '#4A474A', piedra: '#E6E3E0' }
+    : { alto: '#F6D65C', medio: '#E0A82E', bajo: '#C1841B', borde: '#7A5310', piedra: '#FFF3C4' };
 
   return (
     <span className={clases} title={texto} aria-label={texto} style={{ width: size, height: size }}>
       <svg viewBox="0 0 24 24" width={size} height={size} fill="none" aria-hidden="true">
         <defs>
-          <linearGradient id="odi-corona-oro" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#F6D65C" />
-            <stop offset="55%" stopColor="#E0A82E" />
-            <stop offset="100%" stopColor="#C1841B" />
+          <linearGradient id={idTinta} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={tintas.alto} />
+            <stop offset="55%" stopColor={tintas.medio} />
+            <stop offset="100%" stopColor={tintas.bajo} />
           </linearGradient>
         </defs>
         {/* Cuerpo: los tres picos y la base, de una sola pieza para que el
             borde la recorra entera y no se vean costuras entre partes. */}
         <path
           d="M3 8.5 L7 12.5 L12 4.5 L17 12.5 L21 8.5 L19.4 18.5 L4.6 18.5 Z"
-          fill="url(#odi-corona-oro)"
-          stroke="#7A5310"
+          fill={'url(#' + idTinta + ')'}
+          stroke={tintas.borde}
           strokeWidth="1.4"
           strokeLinejoin="round"
         />
         {/* Las tres piedras. Puntos, no círculos con borde: a este tamaño un
             borde las convierte en manchas. */}
-        <circle cx="7" cy="12.2" r="1.15" fill="#FFF3C4" />
-        <circle cx="12" cy="9.3" r="1.15" fill="#FFF3C4" />
-        <circle cx="17" cy="12.2" r="1.15" fill="#FFF3C4" />
+        <circle cx="7" cy="12.2" r="1.15" fill={tintas.piedra} />
+        <circle cx="12" cy="9.3" r="1.15" fill={tintas.piedra} />
+        <circle cx="17" cy="12.2" r="1.15" fill={tintas.piedra} />
       </svg>
     </span>
   );
@@ -60,23 +66,34 @@ window.Corona = function Corona({ size = 16, className = '', title, insignia = f
 // de tres píxeles en una esquina no la ve nadie, y lo que se compra aquí es
 // precisamente que se vea. El brillo respira despacio en vez de parpadear —
 // un parpadeo en una barra de herramientas cansa a los diez minutos.
-window.CoronaBoton = function CoronaBoton({ size = 19 }) {
+window.CoronaBoton = function CoronaBoton({ activo = false, onAbrir, size = 19 }) {
   const gracias = window.t(
     'Gracias por invitar a un café. Tus cosméticos de patrocinador están activos.',
     'Thanks for the coffee. Your supporter cosmetics are active.'
   );
+  const invita = window.t(
+    'Apoya Odinote y consigue la corona y el cursor dorado',
+    'Support Odinote and get the crown and the golden cursor'
+  );
+  const texto = activo ? gracias : invita;
 
   return (
     <button
-      className="icon-btn lift corona-btn"
-      title={gracias}
-      aria-label={gracias}
+      className={'icon-btn lift corona-btn' + (activo ? '' : ' apagada')}
+      title={texto}
+      aria-label={texto}
       onClick={() => {
-        window.showToast && window.showToast('👑 ' + gracias);
         window.playAudioTone && window.playAudioTone('click');
+        if (activo) {
+          window.showToast && window.showToast('👑 ' + gracias);
+          return;
+        }
+        // Apagada, lleva a la ventana de perfil: ahí está tanto el enlace para
+        // apoyar como el panel para reclamar una donación ya hecha.
+        onAbrir && onAbrir();
       }}
     >
-      <window.Corona size={size} title={gracias} />
+      <window.Corona size={size} title={texto} apagada={!activo} />
     </button>
   );
 };
@@ -145,11 +162,14 @@ window.PanelReclamo = function PanelReclamo({ onConcedida }) {
       <button
         onClick={() => { setAbierto(true); window.playAudioTone && window.playAudioTone('click'); }}
         style={{
-          background: 'none', border: 'none', padding: '2px 0', cursor: 'pointer',
-          fontSize: '12px', color: 'var(--ink-3, #595459)', textDecoration: 'underline',
-          textAlign: 'left', alignSelf: 'flex-start',
+          display: 'flex', alignItems: 'center', gap: '7px',
+          background: 'rgba(224, 168, 46, 0.10)', cursor: 'pointer',
+          border: '1.5px solid rgba(224, 168, 46, 0.55)', borderRadius: '8px',
+          padding: '9px 12px', fontSize: '12.5px', fontWeight: 600,
+          color: 'var(--ink, #1A1A1A)', textAlign: 'left', width: '100%',
         }}
       >
+        <window.Corona size={15} apagada title="" />
         {window.t('¿Donaste y no ves tu corona?', 'Donated and cannot see your crown?')}
       </button>
     );
