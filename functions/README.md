@@ -35,11 +35,26 @@ guarda la función. La tarjeta es un requisito suyo, no un cobro.
 **alarma, no un freno**. Google avisa cuando se pasa, pero no corta el
 servicio ni deja de cobrar. Un presupuesto no es un límite de gasto.
 
-El freno de verdad está en el código, no en la consola: la función lleva
-`maxInstances: 3` (ver `index.js`). Eso significa que, aunque alguien
-descubriera la dirección y la llamara un millón de veces, como mucho habría
-tres copias corriendo a la vez y el resto de llamadas se quedarían fuera. Es lo
-que acota la factura en el peor caso.
+Los frenos de verdad están en el código, no en la consola (ver `index.js`), y
+son tres:
+
+- **`maxInstances: 1`** — una sola copia de la función corriendo, como máximo.
+  Por muchas llamadas que lleguen a la vez, se atienden de una en una.
+- **Corte por avalancha** — pasados 20 avisos en un minuto, se contesta 429 y
+  se corta **antes de tocar Firestore**. Esto importa más de lo que parece: la
+  base de datos es el recurso con la cuota más estrecha, así que un atacante
+  puede conseguir que la función se ejecute, pero no que escriba.
+- **128 MB y 10 segundos** — se paga por memoria y por tiempo, y aquí no hace
+  falta más.
+
+**Aun así, hay que decirlo claro: esto acota el gasto, no lo garantiza en cero.**
+Nada de lo que se escriba en el código puede impedir que Google cuente una
+llamada. Lo que sí se puede afirmar es que el peor caso imaginable queda en
+calderilla, y que llegaría el correo del presupuesto mucho antes.
+
+Si se quiere un tope duro de verdad, el único que existe está en Google Cloud
+Console → **IAM y administración → Cuotas**, bajando la cuota de invocaciones
+de Cloud Functions. Eso sí lo corta Google, no el código.
 
 **Si no te fías de poner la tarjeta**, no la pongas: no es obligatorio para
 nada de Odinote. Hay dos alternativas y las dos funcionan:

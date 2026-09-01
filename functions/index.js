@@ -69,6 +69,37 @@ function normalizaCorreo(valor) {
   return limpio;
 }
 
+// ── El cortafuegos de la avalancha ──
+//
+// Cuál es de verdad el recurso caro aquí: Firestore. Las llamadas a la función
+// van casi todas dentro de lo que Google regala, pero cada escritura y cada
+// lectura de la base de datos cuenta contra una cuota diaria mucho más
+// estrecha. Así que lo que hay que proteger no es la función: es la base.
+//
+// Este contador vive en la memoria de la copia que esté corriendo y no cuesta
+// nada —ni una lectura, ni una escritura—. Cuando llegan más avisos de los que
+// puede haber de verdad, se contesta y se corta ANTES de tocar Firestore. Un
+// atacante puede hacer que la función se ejecute; lo que no puede es hacer que
+// escriba.
+//
+// Que el contador se pierda al apagarse la copia no importa: apagarse ya es la
+// prueba de que no había avalancha. Y con `maxInstances: 1` hay una sola copia,
+// así que este contador las ve todas.
+const VENTANA = 60 * 1000;
+const TOPE_POR_VENTANA = 20;   // Ko-fi manda unos pocos al mes, no 20 al minuto
+let ventanaInicio = Date.now();
+let ventanaCuenta = 0;
+
+function hayAvalancha() {
+  const ahora = Date.now();
+  if (ahora - ventanaInicio > VENTANA) {
+    ventanaInicio = ahora;
+    ventanaCuenta = 0;
+  }
+  ventanaCuenta++;
+  return ventanaCuenta > TOPE_POR_VENTANA;
+}
+
 exports.kofi = functions
   .region('us-central1')
   .runWith({
@@ -82,20 +113,32 @@ exports.kofi = functions
     //
     // El plan de pago por uso no tiene tope: si alguien descubriera esta
     // dirección y la llamara un millón de veces, cada llamada sería un gasto.
-    // Con este tope, como mucho hay tres copias de la función corriendo a la
-    // vez; el resto de llamadas esperan o se caen, que es exactamente lo que
-    // se quiere. Los avisos de Ko-fi legítimos son unos pocos al mes y les
-    // sobra de largo.
-    maxInstances: 3,
+    // UNA sola copia como máximo. Es el freno más fuerte que se puede poner
+    // desde aquí: por muchas llamadas que lleguen a la vez, solo se atiende de
+    // una en una y las demás se quedan esperando o fuera. Los avisos legítimos
+    // de Ko-fi son unos pocos al mes, así que una copia sobra de largo, y a
+    // cambio el peor caso queda acotado por arriba.
+    maxInstances: 1,
 
     // Lo que hace esto es leer un mensaje corto y escribir una línea. Con la
-    // memoria mínima va sobrado, y es lo que menos cuesta por llamada.
+    // memoria mínima va sobrado, y es lo que menos cuesta por llamada. El
+    // tiempo máximo, corto por el mismo motivo: se paga por tiempo de ejecución
+    // y aquí nada legítimo tarda ni un segundo.
     memory: '128MB',
-    timeoutSeconds: 30,
+    timeoutSeconds: 10,
   })
   .https.onRequest(async (req, res) => {
     if (req.method !== 'POST') {
       return res.status(405).send('Solo POST');
+    }
+
+    // Lo primero de todo, antes de leer nada y antes de tocar la base.
+    if (hayAvalancha()) {
+      console.error('[kofi] Demasiados avisos seguidos. Cortando sin tocar Firestore.');
+      // 429 y no 500: es la respuesta que le dice a Ko-fi "ahora no, vuelve a
+      // intentarlo", así que un aviso legítimo que cayera justo en medio de una
+      // avalancha no se perdería.
+      return res.status(429).send('Demasiadas peticiones');
     }
 
     const esperado = process.env.KOFI_TOKEN;
