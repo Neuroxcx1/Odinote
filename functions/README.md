@@ -35,8 +35,17 @@ guarda la función. La tarjeta es un requisito suyo, no un cobro.
 **alarma, no un freno**. Google avisa cuando se pasa, pero no corta el
 servicio ni deja de cobrar. Un presupuesto no es un límite de gasto.
 
-Los frenos de verdad están en el código, no en la consola (ver `index.js`), y
-son tres:
+Los frenos de verdad están en el código, no en la consola (ver `index.js`).
+
+**El primero y con diferencia el más importante: la dirección es secreta.**
+La función no se llama `kofi`, se llama `kofi97941138ba45a559b3e4`. Eso no es
+manía: para que alguien pueda gastar dinero llamando a esta dirección, primero
+tiene que dar con ella, y hay 2^80 combinaciones. No se encuentra probando. La
+saben dos: Ko-fi y tú. **Por eso esta dirección no se pega en un foro, ni en
+una captura, ni en un mensaje de ayuda.** Si algún día se filtrase, se cambia
+el nombre en `index.js`, se vuelve a desplegar y la vieja deja de existir.
+
+Y detrás de eso, tres más:
 
 - **`maxInstances: 1`** — una sola copia de la función corriendo, como máximo.
   Por muchas llamadas que lleguen a la vez, se atienden de una en una.
@@ -47,14 +56,42 @@ son tres:
 - **128 MB y 10 segundos** — se paga por memoria y por tiempo, y aquí no hace
   falta más.
 
-**Aun así, hay que decirlo claro: esto acota el gasto, no lo garantiza en cero.**
-Nada de lo que se escriba en el código puede impedir que Google cuente una
-llamada. Lo que sí se puede afirmar es que el peor caso imaginable queda en
-calderilla, y que llegaría el correo del presupuesto mucho antes.
+### Lo que estos frenos SÍ garantizan
 
-Si se quiere un tope duro de verdad, el único que existe está en Google Cloud
-Console → **IAM y administración → Cuotas**, bajando la cuota de invocaciones
-de Cloud Functions. Eso sí lo corta Google, no el código.
+**Tu base de datos no la puede tocar nadie.** La comprobación del token de
+Ko-fi va antes que cualquier acceso a Firestore, así que quien no tenga el
+token no consigue ni una lectura ni una escritura. La cuota que de verdad se
+puede agotar es la de Firestore, y está fuera del alcance de un extraño.
+
+### Lo que NO garantizan, dicho claro
+
+**Apagarse solo al llegar al límite gratuito no se puede programar aquí, y
+conviene no hacerse ilusiones con eso.** Se le podría poner un contador que
+dejara de contestar pasadas X llamadas, pero sería teatro: Google cobra por
+llamada recibida, no por trabajo hecho, así que una función que contesta "no"
+al instante cuesta lo mismo que una que trabaja. Un contador así reduciría el
+tiempo de ejecución, no el número de llamadas, que es lo que se factura.
+
+Lo que sí acota el número de llamadas es `maxInstances: 1`: con una sola copia
+atendiendo de una en una, agotar los dos millones de llamadas gratuitas del
+mes exigiría a alguien varias horas seguidas de ataque **contra una dirección
+que no puede adivinar**.
+
+### El apagado de verdad, si algún día hiciera falta
+
+Un solo comando, y se acabó el gasto al instante:
+
+```bash
+firebase functions:delete kofi97941138ba45a559b3e4
+```
+
+Borrarla no rompe nada: quien ya esté en la lista conserva su corona, y lo
+único que se pierde es que los pagos nuevos se apunten solos.
+
+Y si se quiere un tope automático impuesto por Google y no por el código, está
+en Google Cloud Console → **IAM y administración → Cuotas**, filtrando por
+Cloud Functions. No todas las cuotas de esa pantalla se pueden bajar, así que
+hay que mirar cuáles admiten un límite menor.
 
 **Si no te fías de poner la tarjeta**, no la pongas: no es obligatorio para
 nada de Odinote. Hay dos alternativas y las dos funcionan:
@@ -115,7 +152,7 @@ seguridad de Firestore (que ahora incluyen la lista de patrocinadores).
 De vuelta en <https://ko-fi.com/manage/webhooks>, en **Webhook URL**, pegar:
 
 ```
-https://us-central1-odinote-firebase.cloudfunctions.net/kofi
+https://us-central1-odinote-firebase.cloudfunctions.net/kofi97941138ba45a559b3e4
 ```
 
 Y guardar.
@@ -130,7 +167,7 @@ Al pulsarlo:
 2. Si no aparece, mirar qué pasó:
 
 ```bash
-firebase functions:log --only kofi
+firebase functions:log --only kofi97941138ba45a559b3e4
 ```
 
 ---

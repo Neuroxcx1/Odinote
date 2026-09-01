@@ -8,7 +8,7 @@
   },
   "scripts": {
     "deploy": "firebase deploy --only functions",
-    "logs": "firebase functions:log --only kofi"
+    "logs": "firebase functions:log --only kofi97941138ba45a559b3e4"
   },
   "dependencies": {
     "firebase-admin": "^12.6.0",

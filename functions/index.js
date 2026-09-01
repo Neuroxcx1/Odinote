@@ -31,7 +31,7 @@
 //      Ko-fi cuando lo pida. No se queda escrito en ningún archivo.
 //   4. firebase deploy --only functions,firestore:rules
 //   5. En https://ko-fi.com/manage/webhooks, pegar como URL:
-//      https://us-central1-odinote-firebase.cloudfunctions.net/kofi
+//      https://us-central1-odinote-firebase.cloudfunctions.net/kofi97941138ba45a559b3e4
 // =====================================================
 
 const functions = require('firebase-functions/v1');
@@ -100,7 +100,7 @@ function hayAvalancha() {
   return ventanaCuenta > TOPE_POR_VENTANA;
 }
 
-exports.kofi = functions
+exports.kofi97941138ba45a559b3e4 = functions
   .region('us-central1')
   .runWith({
     // El token que Ko-fi manda dentro de cada aviso para demostrar que el
