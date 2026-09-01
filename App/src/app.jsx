@@ -47,7 +47,7 @@ try {
 
 // Marcador de build: si la consola no muestra esta versión, el navegador está
 // sirviendo JS cacheado (subir ?v= en index.html invalida la caché)
-window.ODINOTE_BUILD = 'v130';
+window.ODINOTE_BUILD = 'v131';
 console.log('[ODINOTE] Código cargado: ' + window.ODINOTE_BUILD);
 
 // Global shortcuts configuration
@@ -567,6 +567,10 @@ function App() {
     try {
       const r = await api.googleRefreshAccess();
       if (!r || !r.ok || !r.accessToken) return null;
+      // El refresco trae tambien un carnet firmado. Se aprovecha: el
+      // escritorio solo se identificaba ante Firebase al iniciar sesion, y
+      // ese carnet caduca en una hora y no se guarda en disco.
+      if (r.idToken) identificaEnFirebase(r.idToken);
       setUserProfile(prev => {
         const next = { ...(prev || {}), accessToken: r.accessToken };
         localStorage.setItem('odinote.google_profile', JSON.stringify(next));
@@ -577,6 +581,37 @@ function App() {
       return null;
     }
   };
+
+  // ── Recuperar la sesión de Firebase al arrancar (solo escritorio) ──
+  //
+  // Este era el agujero: el perfil de Google se guarda en el disco, así que
+  // al reabrir la aplicación parecía que seguías dentro. Ante Firebase no.
+  // Allí no había nadie —o peor, una sesión anónima de haberte unido alguna
+  // vez a una sala—, y todo lo que necesita saber quién eres se caía sin
+  // decir por qué: la corona, la reclamación, el modo instantáneo.
+  //
+  // Se espera un poco antes de mirar porque Firebase restaura su propia
+  // sesión al arrancar y tarda un instante; preguntar antes daría un falso
+  // negativo y pediría un carnet que no hacía falta.
+  useEffectApp(() => {
+    if (!userProfile) return;
+    const api = window.electronAPI;
+    if (!api || !api.googleRefreshAccess) return;
+
+    let vivo = true;
+    const espera = setTimeout(async () => {
+      try {
+        if (typeof firebase === 'undefined' || !firebase.auth) return;
+        const actual = firebase.auth().currentUser;
+        if (actual && !actual.isAnonymous) return;   // ya identificado
+        const r = await api.googleRefreshAccess();
+        if (!vivo || !r || !r.ok || !r.idToken) return;
+        await identificaEnFirebase(r.idToken);
+      } catch (e) {}
+    }, 2500);
+
+    return () => { vivo = false; clearTimeout(espera); };
+  }, [userProfile && userProfile.email]);
 
   // El token murió: primero se intenta renovar solo; si no se puede, se limpia
   // del perfil sin interrumpir con ventanas. El botón ↻ muestra un punto rojo y

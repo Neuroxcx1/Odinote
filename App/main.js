@@ -1094,7 +1094,11 @@ ipcMain.handle('google-refresh-access', async () => {
       grant_type: 'refresh_token',
     });
     logToFile('OAuth: permiso de Drive renovado en silencio.');
-    return { ok: true, accessToken: tok.access_token, expiresIn: tok.expires_in || 3600 };
+    // Se devuelve tambien el carnet firmado, no solo el permiso de Drive.
+    // Google lo incluye en el refresco porque entre los permisos va `openid`,
+    // y es lo unico con lo que la aplicacion puede volver a identificarse ante
+    // Firebase al arrancar sin pedirle nada a nadie.
+    return { ok: true, accessToken: tok.access_token, idToken: tok.id_token || null, expiresIn: tok.expires_in || 3600 };
   } catch (err) {
     logToFile(`OAuth: no se pudo renovar — ${err.message}`);
     // Si Google dice que el papel ya no vale (revocado, contraseña cambiada, o

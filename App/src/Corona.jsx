@@ -125,9 +125,14 @@ window.PanelReclamo = function PanelReclamo({ onConcedida }) {
     'es-el-mismo': window.t(
       'Ese es el correo con el que ya has entrado. Si hubiera una donación a su nombre, ya tendrías la corona.',
       'That is the email you signed in with. If there were a donation under it, you would already have the crown.'),
+    // Este mensaje salía antes como 'hay que iniciar sesión' a alguien que
+    // estaba viendo 'Conectado mediante Google' dos centímetros más arriba, lo
+    // cual es de locos. No es que no haya entrado: es que la sesión ante
+    // Firebase, que es otra cosa, se ha perdido. Ahora se dice lo que pasa y
+    // qué hacer.
     'sin-sesion': window.t(
-      'Hay que iniciar sesión con Google para poder vincularla.',
-      'You need to sign in with Google to link it.'),
+      'Odinote no consigue identificarte ante Google en este momento. Cierra sesión aquí abajo, vuelve a entrar y prueba otra vez.',
+      'Odinote cannot verify your Google identity right now. Sign out below, sign back in and try again.'),
     'correo-invalido': window.t('Ese correo no parece un correo.', 'That does not look like an email.'),
     'importe-invalido': window.t(
       'Escribe cuánto donaste, por ejemplo 5 o 3.50.',
