@@ -104,6 +104,7 @@ function ContextSidebar({
   const isFrame = item.type === 'frame';
   const isBigTitle = item.type === 'bigtitle';
   const isMap = item.type === 'map';
+  const isShape = item.type === 'shape';
   const isDraw = item.type === 'draw';
   const isCurrentlyCropping = isImage && callbacks?.croppingId === item.id;
   // Dibujando: la barra se convierte en la caja de herramientas del lápiz y
@@ -314,7 +315,7 @@ function ContextSidebar({
                 notas, títulos, comentarios, etc. muestra las opciones de texto).
                 Se omite en imagen (se edita con doble clic / recorte) y en nodos
                 sin edición de contenido (color, audio, archivo). */}
-            {!tableCell && onStartEdit && ['note','comment','bigtitle','todo','link','board','column','frame'].includes(item.type) && (
+            {!tableCell && onStartEdit && ['note','comment','bigtitle','todo','link','board','column','frame','shape'].includes(item.type) && (
               <button
                 className="ctx-btn"
                 onClick={()=>{ onStartEdit(); window.playAudioTone && window.playAudioTone('click'); }}
@@ -334,6 +335,17 @@ function ContextSidebar({
           >
             <div className="ctx-color-chip" style={{ background: isColor ? (item.hex || '#56B3A7') : resolveStickyColor(item.color || 'white'), border: '1.5px solid var(--line-soft)' }}/>
             <span>Color</span>
+          </button>
+        )}
+
+        {isShape && (
+          <button
+            className={`ctx-btn ${pane === 'figura' ? 'active' : ''}`}
+            onClick={()=>setPane(pane === 'figura' ? null : 'figura')}
+            title={window.t('Cambiar la forma', 'Change the shape')}
+          >
+            <span className="material-symbols-rounded">category</span>
+            <span>{window.t('Forma', 'Shape')}</span>
           </button>
         )}
 
@@ -1069,6 +1081,31 @@ function ContextSidebar({
               incluirTransparente={!!(isFrame || isBigTitle)}
               tam={26}
             />
+          </div>
+        </div>
+      )}
+
+      {pane === 'figura' && (
+        <div className="ctx-popout">
+          <div className="ctx-pop-section">
+            <div className="ctx-pop-title">{window.t('Forma', 'Shape')}</div>
+            {/* Las cuatro dibujadas de verdad, no con nombres: "rombo" y
+                "hexágono" hay que traducirlos en la cabeza, y un dibujo de
+                veintiocho píxeles no. */}
+            <div className="ctx-figura-grid">
+              {(window.FIGURAS || []).map(f => (
+                <button
+                  key={f}
+                  className={`ctx-figura-swatch ${(item.figura || 'circulo') === f ? 'active' : ''}`}
+                  onClick={()=>{ onUpdate({ figura: f }); window.playAudioTone && window.playAudioTone('click'); }}
+                  title={f}
+                >
+                  {window.FiguraSVG && (
+                    <window.FiguraSVG figura={f} w={34} h={26} relleno="var(--paper)" />
+                  )}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       )}

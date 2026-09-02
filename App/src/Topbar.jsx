@@ -30,7 +30,11 @@ function esMovil() {
     document.documentElement.getAttribute('data-mobile') === '1';
 }
 
+// Las de más van en el desplegable y no en la barra: en una pantalla de 1080
+// entran quince botones justos, y meter el dieciséis a la fuerza deja la barra
+// con desplazamiento, que es peor que un clic de más.
 const EXTRA_TOOLS = [
+  { id: 'shape',    icon: 'category',      label: 'tool_shape',    bg: '#E6544F', fg: 'white' },
   { id: 'calendar', icon: 'calendar_month',label: 'tool_calendar', bg: '#E6544F', fg: 'white' },
   { id: 'comment',  icon: 'forum',         label: 'tool_comment',  bg: '#90B968', fg: 'white' },
   { id: 'file',     icon: 'draft',         label: 'tool_file',     bg: '#E1DFE3', fg: '#1A1A1A' },

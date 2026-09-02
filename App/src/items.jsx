@@ -3981,6 +3981,141 @@ function FrameItem({ item, lang, editing, onUpdate, callbacks }) {
 }
 
 // ──────────────── BIG TITLE ( head heading ) ────────────────
+// ══════════════════════════════════════════════════════════
+// FIGURAS — círculo, rombo, píldora y hexágono, con texto dentro
+// ══════════════════════════════════════════════════════════
+//
+// Cuatro y no catorce. Son las que se usan para diagramar —un estado, una
+// decisión, una etiqueta, un paso— y con más formas la herramienta se convierte
+// en un catálogo donde hay que elegir antes de poder escribir.
+//
+// Dibujadas en SVG y no con `clip-path`: un recorte no deja borde, y en esta
+// aplicación todo lleva su línea de 1,5 px. Además el trazo no se deforma al
+// estirar el nodo, porque el viewBox va en píxeles reales del nodo y no en una
+// caja de 100x100 escalada.
+const FIGURAS = ['circulo', 'rombo', 'pildora', 'hexagono'];
+
+// Cuánto hay que meter el texto, en porcentaje, para que no se salga por los
+// lados en diagonal. Un rombo se estrecha muy deprisa hacia las puntas; una
+// píldora casi no se estrecha.
+const HUECO_FIGURA = {
+  circulo:  { x: 15, y: 13 },
+  rombo:    { x: 25, y: 22 },
+  pildora:  { x: 11, y: 8 },
+  hexagono: { x: 17, y: 9 },
+};
+
+// Blanco o tinta, según lo oscuro que sea el relleno. Un texto oscuro sobre un
+// fondo oscuro no se lee, y quien elige el color de la figura no tiene por qué
+// acordarse de cambiar también el del texto.
+function tintaLegible(hex) {
+  const m = /^#([0-9a-fA-F]{6})$/.exec(String(hex || '').trim());
+  if (!m) return 'var(--ink)';
+  const n = parseInt(m[1], 16);
+  const luz = 0.2126 * ((n >> 16) & 255) + 0.7152 * ((n >> 8) & 255) + 0.0722 * (n & 255);
+  return luz < 140 ? '#FFFFFF' : 'var(--ink)';
+}
+
+function FiguraSVG({ figura, w, h, relleno, grosor = 1.5 }) {
+  // El trazo se pinta centrado en el borde, así que sin este margen se vería la
+  // mitad de la línea cortada por el canto del nodo.
+  const m = grosor / 2 + 0.5;
+  const pintura = { fill: relleno, stroke: 'var(--line)', strokeWidth: grosor, strokeLinejoin: 'round' };
+  const ancho = Math.max(2 * m + 1, w);
+  const alto = Math.max(2 * m + 1, h);
+
+  let dibujo;
+  if (figura === 'rombo') {
+    dibujo = <polygon points={`${ancho / 2},${m} ${ancho - m},${alto / 2} ${ancho / 2},${alto - m} ${m},${alto / 2}`} style={pintura} />;
+  } else if (figura === 'pildora') {
+    dibujo = <rect x={m} y={m} width={ancho - 2 * m} height={alto - 2 * m} rx={Math.min(ancho, alto) / 2} style={pintura} />;
+  } else if (figura === 'hexagono') {
+    const q = Math.min(ancho * 0.24, alto * 0.5);
+    dibujo = <polygon points={`${q},${m} ${ancho - q},${m} ${ancho - m},${alto / 2} ${ancho - q},${alto - m} ${q},${alto - m} ${m},${alto / 2}`} style={pintura} />;
+  } else {
+    dibujo = <ellipse cx={ancho / 2} cy={alto / 2} rx={ancho / 2 - m} ry={alto / 2 - m} style={pintura} />;
+  }
+
+  return (
+    <svg viewBox={`0 0 ${ancho} ${alto}`} width="100%" height="100%" preserveAspectRatio="none" style={{ display: 'block' }}>
+      {dibujo}
+    </svg>
+  );
+}
+
+function ShapeItem({ item, lang, editing, onUpdate }) {
+  const figura = FIGURAS.indexOf(item.figura) !== -1 ? item.figura : 'circulo';
+  const w = Math.max(1, item.w || 200);
+  const h = Math.max(1, item.h || 160);
+  const relleno = window.resolveStickyColor ? window.resolveStickyColor(item.color || 'sage') : '#E8F0DA';
+  const texto = pickLang(item.content, lang);
+  const ref = React.useRef(null);
+  const hueco = HUECO_FIGURA[figura] || HUECO_FIGURA.circulo;
+
+  // Mismo trato que el título grande: se escribe en innerHTML y no en innerText,
+  // para que un enlace a otro nodo no se borre solo al guardar.
+  React.useEffect(() => {
+    if (!ref.current) return;
+    const sano = window.repairEscapedMarkup ? window.repairEscapedMarkup(texto || '') : (texto || '');
+    if (ref.current.innerHTML !== sano) ref.current.innerHTML = sano;
+  }, [item.id, texto]);
+
+  // Entrar a editar es poner el cursor dentro, no solo permitirlo: sin esto se
+  // podía hacer doble clic en la figura, ver la barra de formato aparecer, y
+  // escribir sin que apareciera una sola letra.
+  React.useEffect(() => {
+    if (!editing || !ref.current) return;
+    ref.current.focus();
+    const r = document.createRange();
+    r.selectNodeContents(ref.current);
+    r.collapse(false);
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(r);
+  }, [editing]);
+
+  const onInput = () => {
+    if (!ref.current) return;
+    onUpdate({ content: { es: ref.current.innerHTML, en: ref.current.innerHTML } });
+  };
+
+  const color = item.textColor && item.textColor !== 'inherit' ? item.textColor : tintaLegible(relleno);
+  const decoracion = [item.underline && 'underline', item.strike && 'line-through'].filter(Boolean).join(' ') || 'none';
+
+  return (
+    <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+      <FiguraSVG figura={figura} w={w} h={h} relleno={relleno} />
+      <div
+        ref={ref}
+        className="figura-texto"
+        contentEditable={editing}
+        suppressContentEditableWarning
+        onInput={onInput}
+        onMouseDown={(e) => editing && e.stopPropagation()}
+        onClick={(e) => editing && e.stopPropagation()}
+        data-placeholder={window.t('Escribe aquí…', 'Write here…')}
+        style={{
+          position: 'absolute',
+          left: hueco.x + '%', right: hueco.x + '%',
+          top: hueco.y + '%', bottom: hueco.y + '%',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          textAlign: item.align || 'center',
+          color: color,
+          fontWeight: item.bold === false ? 500 : 700,
+          fontStyle: item.italic ? 'italic' : 'normal',
+          textDecoration: decoracion,
+          fontSize: (15 * (item.textScale || 1)) + 'px',
+          lineHeight: 1.25,
+          overflow: 'hidden',
+          outline: 'none',
+          cursor: editing ? 'text' : 'move',
+          wordBreak: 'break-word',
+        }}
+      />
+    </div>
+  );
+}
+
 function BigTitleItem({ item, lang, editing, onUpdate }) {
   const text = pickLang(item.content, lang);
   const ref = React.useRef(null);
@@ -4358,6 +4493,7 @@ function ItemRenderer({ item, lang, editing, callbacks }) {
     case 'title':    return <TitleItem item={item} lang={lang}/>;
     case 'swatch':   return <SwatchItem item={item} lang={lang}/>;
     case 'frame':    return <FrameItem item={item} lang={lang} editing={editing} onUpdate={onUpdate} callbacks={cb}/>;
+    case 'shape':    return <ShapeItem item={item} lang={lang} editing={editing} onUpdate={onUpdate}/>;
     case 'bigtitle': return <BigTitleItem item={item} lang={lang} editing={editing} onUpdate={onUpdate}/>;
     case 'map':      return <MapItem item={item} lang={lang} editing={editing} onUpdate={onUpdate} onEndEdit={cb.endEdit} callbacks={cb}/>;
     case 'draw':     return <DrawItem item={item}/>;
@@ -4368,6 +4504,9 @@ function ItemRenderer({ item, lang, editing, callbacks }) {
 
 Object.assign(window, {
   ItemRenderer, COLOR_HEX_RESOLVED, STICKY_COLORS_NEW, BOARD_ICONS,
+  // La barra de la derecha pinta las mismas figuras para elegirlas, así que el
+  // dibujo vive en un solo sitio.
+  FIGURAS, FiguraSVG,
   CATEGORY_COLORS, CATEGORY_HEX,
   colorClass, pickLang, parseLink,
   FileViewerModal,

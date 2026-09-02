@@ -63,6 +63,7 @@ function defaultDims(type) {
     case 'color':    return { w: 220, h: 240 };
     case 'file':     return { w: 230, h: 150 };
     case 'frame':    return { w: 400, h: 400 };
+    case 'shape':    return { w: 200, h: 160 };
     case 'bigtitle': return { w: 300, h: 80 };
     case 'map':      return { w: 340, h: 280 };
     case 'draw':     return { w: 420, h: 300 };
@@ -173,6 +174,14 @@ function makeNewItem(type, x, y, w, h, lang) {
         titleColor: 'inherit',
         titleAlign: 'left',
         children: [] };
+    case 'shape':
+      // Nace en círculo, que es la forma que no significa nada por sí sola: un
+      // rombo ya dice "decisión" y un hexágono "proceso", y quien coloca la
+      // primera figura todavía no sabe qué va a escribir dentro.
+      return { ...base, type: 'shape', ...defaultSize(200, 160),
+        figura: 'circulo',
+        color: 'sage',
+        content: { es: '', en: '' } };
     case 'bigtitle':
       return { ...base, type: 'bigtitle', ...defaultSize(300, 80),
         color: 'transparent',
@@ -2699,7 +2708,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
           });
           setSelected(item.id);
           // auto-enter edit mode for text types
-          if (['note','comment','bigtitle'].includes(item.type) && !skipAutoEdit()) {
+          if (['note','comment','bigtitle','shape'].includes(item.type) && !skipAutoEdit()) {
             setTimeout(() => setEditing(item.id), 40);
           }
           if (item.type === 'doc') {
@@ -2833,7 +2842,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
     setSelected(item.id);
     setSelectedIds([]);
     if (item.type === 'doc') setTimeout(() => setDocOpen({ id: item.id }), 40);
-    else if (['note','comment','link','todo','board','column'].includes(item.type)) setTimeout(() => setEditing(item.id), 40);
+    else if (['note','comment','link','todo','board','column','shape'].includes(item.type)) setTimeout(() => setEditing(item.id), 40);
   };
 
   const selectAllItems = () => {
@@ -4765,7 +4774,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
         });
         setSelected(item.id);
         window.playAudioTone && window.playAudioTone('drop');
-        if (['note','comment','bigtitle'].includes(item.type) && !skipAutoEdit()) setTimeout(() => setEditing(item.id), 40);
+        if (['note','comment','bigtitle','shape'].includes(item.type) && !skipAutoEdit()) setTimeout(() => setEditing(item.id), 40);
         if (item.type === 'doc') setTimeout(() => setDocOpen({ id: item.id }), 40);
         if (['link','todo','board','column','map','frame'].includes(item.type)) setTimeout(() => setEditing(item.id), 40);
       }
@@ -5124,7 +5133,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
         // contextual normal se ocultaba (se oculta siempre que editing===selected)
         // y esta barra de texto tampoco lo cubría: el panel de la izquierda
         // desaparecía entero mientras se cambiaba el nombre del tablero.
-        const isEditingTextNode = editing && editing === selected && ['note','comment','bigtitle','frame','todo','board'].includes(it.type);
+        const isEditingTextNode = editing && editing === selected && ['note','comment','bigtitle','frame','todo','board','shape'].includes(it.type);
         if (!isEditingTextNode && !isEditingMapTitle) return null;
         return (
           <window.TextFormatSidebar
@@ -5290,7 +5299,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
                     if (item.type === 'doc') { e.stopPropagation(); setDocOpen({ id: item.id }); return; }
                     if (item.type === 'draw') { e.stopPropagation(); enterDrawMode(item.id); return; }
                     if (item.type === 'board') return;
-                    if (['note','comment','todo','column','link','board','bigtitle','frame'].includes(item.type)) {
+                    if (['note','comment','todo','column','link','board','bigtitle','frame','shape'].includes(item.type)) {
                       e.stopPropagation();
                       setSelected(item.id);
                       setSelectedIds([]);

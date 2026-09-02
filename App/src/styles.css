@@ -2942,6 +2942,39 @@ body.odi-busy iframe { pointer-events: none !important; }
 .cover-pick:hover { transform: translateY(-1px); }
 .cover-pick.active { outline: 2px solid var(--ink); outline-offset: 2px; }
 
+/* ── El texto de dentro de una figura ──
+   Sin fondo ni borde: el marco ya lo pone la figura. El aviso de que está vacía
+   se enseña como en las notas, con el atributo del propio elemento, para no
+   guardar un texto de mentira dentro del nodo. */
+.figura-texto:empty::before,
+.figura-texto:has(> br:only-child)::before {
+  content: attr(data-placeholder);
+  color: var(--ink-3, #8E8A8E);
+  opacity: 0.75;
+  pointer-events: none;
+}
+
+/* Las cuatro figuras para elegir, en la barra de la derecha. */
+.ctx-figura-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 6px;
+}
+.ctx-figura-swatch {
+  display: grid;
+  place-items: center;
+  padding: 6px;
+  border-radius: 7px;
+  cursor: pointer;
+  background: transparent;
+  border: 1.5px solid var(--line-soft);
+  transition: transform 120ms var(--e-out), border-color 120ms, background 120ms;
+}
+.ctx-figura-swatch:hover { border-color: var(--line); background: var(--paper); }
+.ctx-figura-swatch:active { transform: scale(0.95); }
+.ctx-figura-swatch.active { border-color: var(--wine); background: var(--paper); }
+.ctx-figura-swatch svg { width: 34px; height: 26px; }
+
 /* ── La barra de la portada ──
    Un arcoíris por el que se arrastra. Para una portada nadie busca "el
    #7B3FE4": busca "un poco más morado que ese", y eso se hace moviéndose, no
