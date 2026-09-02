@@ -45,12 +45,7 @@ function TextFormatSidebar({ item, lang, onUpdate, onClose, variant, noCodeQuote
   const [active, setActive] = React.useState({});
   const [colorOpen, setColorOpen] = React.useState(false);
 
-  const TEXT_COLORS = [
-    '#1A1A1A', '#595459', '#9A969A', '#FFFFFF',
-    '#E6544F', '#D88040', '#DDAF2C', '#90B968',
-    '#3CA59E', '#3D5A80', '#6C5FAF', '#955BA5',
-    '#993844', '#1F4D3F',
-  ];
+
 
   // ── Qué botones salen encendidos ──
   //
@@ -412,24 +407,22 @@ function TextFormatSidebar({ item, lang, onUpdate, onClose, variant, noCodeQuote
         <div className="ctx-pop-section">
           <div className="ctx-pop-title">{lang==='es'?'Color del texto':'Text color'}</div>
           <div className="text-color-grid">
-            {TEXT_COLORS.map(c => (
-              <button
-                key={c}
-                className="text-color-swatch"
-                style={{background: c, border: c === '#FFFFFF' ? '1.5px solid var(--line-soft)' : '1.5px solid var(--line)'}}
-                onClick={()=>{
-                  if (usaTextColor) {
-                    onUpdate({ textColor: c });
-                  } else if (isFrame || isMap) {
-                    onUpdate({ titleColor: c });
-                  } else {
-                    exec('foreColor', c);
-                  }
-                  setColorOpen(false);
-                }}
-                title={c}
-              />
-            ))}
+            <window.SelectorColor
+              valor={usaTextColor ? (item.textColor || '#1A1A1A') : ((isFrame || isMap) ? (item.titleColor || '#1A1A1A') : '#1A1A1A')}
+              onCambio={(c) => {
+                if (usaTextColor) {
+                  onUpdate({ textColor: c });
+                } else if (isFrame || isMap) {
+                  onUpdate({ titleColor: c });
+                } else {
+                  exec('foreColor', c);
+                }
+                // Con un color de la paleta se cierra, porque ya esta elegido.
+                // Con el selector libre no: la gente lo mueve y mira, y cerrar
+                // en el primer arrastre obligaria a abrirlo otra vez.
+                if ((window.COLORES_ODINOTE || []).indexOf(c) !== -1) setColorOpen(false);
+              }}
+            />
           </div>
           <button
             className="btn"

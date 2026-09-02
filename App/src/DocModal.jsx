@@ -7,16 +7,15 @@
 // Google Docs: pasos cortos en los tamaños de lectura y saltos grandes arriba,
 // donde un punto más o menos ya no se nota.
 const DOC_FONT_SIZES = [11, 12, 13, 14, 16, 18, 20, 24, 28, 32, 40, 48, 64, 80];
-const DOC_TEXT_COLORS = [
-  '#1A1A1A', '#595459', '#9A969A', '#FFFFFF',
-  '#E6544F', '#D88040', '#DDAF2C', '#90B968',
-  '#3CA59E', '#3D5A80', '#6C5FAF', '#955BA5',
-  '#993844', '#1F4D3F',
-];
-const DOC_MARK_COLORS = [
-  '#FFF3A3', '#FFD9A0', '#FFC7C2', '#E6D6FF',
-  '#CDE9FF', '#CFEFD6', '#E7E4EA', 'transparent',
-];
+// Cuatro y no catorce. Una fila de catorce circulos parecidos obliga a
+// comparar, y comparar cuesta mas que elegir; los cuatro cubren lo que se usa
+// casi siempre y el resto esta en el selector libre de aqui abajo, que ya
+// estaba. Son los mismos cuatro que en el resto de la aplicacion.
+// Con reserva escrita a mano: estas dos constantes se evaluan al cargar el
+// archivo, y basta con que alguien mueva una etiqueta <script> en index.html
+// para que ColorPicker.jsx llegue despues y esto reviente en el arranque.
+const DOC_TEXT_COLORS = window.COLORES_ODINOTE || ['#1A1A1A', '#E6544F', '#90B968', '#3D5A80'];
+const DOC_MARK_COLORS = (window.COLORES_ODINOTE_SUAVES || ['#FFF3A3', '#FFC7C2', '#CFEFD6', '#CDE9FF']).concat(['transparent']);
 // Tipografías. Se ofrecen familias, no fuentes sueltas: si el equipo no tiene
 // la primera, el navegador baja a la siguiente y el texto no acaba en una letra
 // cualquiera. La primera opción devuelve el documento a la letra del programa.

@@ -4965,7 +4965,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
         if (!conn) return null;
         const style = conn.style || 'solid';
         const shape = conn.shape || 'curve';
-        const CONN_COLORS = ['#1A1A1A','#595459','#E6544F','#90B968','#F7DA84','#3D5A80','#955BA5','#FFFFFF'];
+
         return (
           <div className="ctx-side" onMouseDown={(e)=>e.stopPropagation()}>
             <button className="ctx-close" onClick={()=>setSelectedConn(null)} title={window.t('Cerrar', 'Close')}>
@@ -4998,21 +4998,12 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
 
             <div className="ctx-sep-h"/>
 
-            <div style={{display:'grid', gridTemplateColumns:'repeat(4, 1fr)', gap: 4, padding: '4px 6px'}}>
-              {CONN_COLORS.map(c => (
-                <button
-                  key={c}
-                  onClick={()=>updateConnector(conn.id, { color: c, isColorExplicit: true })}
-                  style={{
-                    aspectRatio: 1,
-                    borderRadius: '50%',
-                    background: c,
-                    border: (conn.color || '#1A1A1A') === c ? '2px solid var(--wine)' : '1.5px solid var(--line-soft)',
-                    cursor: 'pointer',
-                  }}
-                  title={c}
-                />
-              ))}
+            <div style={{ padding: '4px 6px' }}>
+              <window.SelectorColor
+                valor={conn.color || '#1A1A1A'}
+                onCambio={(c) => updateConnector(conn.id, { color: c, isColorExplicit: true })}
+                tam={22}
+              />
             </div>
 
             <div className="ctx-sep-h"/>

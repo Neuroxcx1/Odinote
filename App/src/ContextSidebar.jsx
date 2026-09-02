@@ -1380,20 +1380,11 @@ function ContextSidebar({
                 ? window.t('Color de este trazo', 'This stroke’s colour')
                 : window.t('Color de la tinta', 'Ink colour')}
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px', marginTop: '6px' }}>
-              {DRAW_COLORS.map(c => (
-                <button
-                  key={c}
-                  className="text-color-swatch"
-                  style={{
-                    background: c,
-                    width: '24px', height: '24px', borderRadius: '50%', cursor: 'pointer',
-                    border: callbacks.drawColor === c ? '2.5px solid var(--wine)' : '1.5px solid var(--line-soft)',
-                  }}
-                  onClick={()=>callbacks.setDrawColor(c)}
-                  title={c}
-                />
-              ))}
+            <div style={{ marginTop: '6px' }}>
+              <window.SelectorColor
+                valor={callbacks.drawColor}
+                onCambio={(c) => callbacks.setDrawColor(c)}
+              />
             </div>
             <p style={{ margin: '8px 0 0', fontSize: 10.5, lineHeight: 1.35, color: 'var(--text-soft)' }}>
               {callbacks.selectedStrokeId
@@ -1466,22 +1457,13 @@ function ContextSidebar({
         <div className="ctx-popout">
           <div className="ctx-pop-section">
             <div className="ctx-pop-title">{window.t('Color de la tinta', 'Ink colour')}</div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px', marginTop: '6px' }}>
-              {DRAW_COLORS.map(c => (
-                <button
-                  key={c}
-                  className="text-color-swatch"
-                  style={{
-                    background: c,
-                    width: '24px', height: '24px', borderRadius: '50%', cursor: 'pointer',
-                    border: '1.5px solid var(--line-soft)',
-                  }}
-                  // Recolorea el dibujo entero: es lo que se espera de un nodo
-                  // ya guardado. Para teñir un solo trazo se entra a dibujar.
-                  onClick={()=>onUpdate({ strokes: (item.strokes || []).map(s => ({ ...s, color: c })) })}
-                  title={c}
-                />
-              ))}
+            <div style={{ marginTop: '6px' }}>
+              {/* Recolorea el dibujo entero: es lo que se espera de un nodo ya
+                  guardado. Para teñir un solo trazo se entra a dibujar. */}
+              <window.SelectorColor
+                valor={((item.strokes || [])[0] || {}).color || '#1A1A1A'}
+                onCambio={(c) => onUpdate({ strokes: (item.strokes || []).map(s => ({ ...s, color: c })) })}
+              />
             </div>
           </div>
         </div>
@@ -1491,30 +1473,11 @@ function ContextSidebar({
         <div className="ctx-popout">
           <div className="ctx-pop-section">
             <div className="ctx-pop-title">{window.t('Color del texto', 'Text color')}</div>
-            <div className="text-color-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px', marginTop: '6px' }}>
-              {[
-                '#1A1A1A', '#595459', '#9A969A', '#FFFFFF',
-                '#E6544F', '#D88040', '#DDAF2C', '#90B968',
-                '#3CA59E', '#3D5A80', '#6C5FAF', '#955BA5',
-                '#993844', '#1F4D3F'
-              ].map(c => (
-                <button
-                  key={c}
-                  className="text-color-swatch"
-                  style={{
-                    background: c,
-                    width: '24px',
-                    height: '24px',
-                    borderRadius: '4px',
-                    border: c === '#FFFFFF' ? '1.5px solid var(--line-soft)' : '1.5px solid var(--line)',
-                    cursor: 'pointer'
-                  }}
-                  onClick={()=>{
-                    onUpdate({ textColor: c });
-                  }}
-                  title={c}
-                />
-              ))}
+            <div className="text-color-grid" style={{ marginTop: '6px' }}>
+              <window.SelectorColor
+                valor={item.titleColor || item.textColor || '#1A1A1A'}
+                onCambio={(c) => onUpdate({ textColor: c })}
+              />
             </div>
             <button
               className="btn"
