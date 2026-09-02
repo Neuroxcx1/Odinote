@@ -108,21 +108,31 @@ function ContextSidebar({
 
   // ── "Abrir la carpeta del archivo" ──
   //
-  // Solo aparece si hay algo que abrir: una ruta apuntada al añadir el archivo
-  // (ver window.rutaDeArchivo en items.jsx) y un escritorio donde abrirla. En
-  // la versión web no sale nunca, y en los archivos que ya estaban dentro de
-  // una nota tampoco: de esos no hay ruta que sacar, porque nunca se guardó.
-  const puedeAbrirCarpeta = !!(item.rutaOrigen && window.electronAPI && window.electronAPI.mostrarEnCarpeta);
+  // Aparece cuando hay algún archivo de verdad al que llevar, y hay dos formas
+  // de tenerlo: la ruta de donde salió (se apunta al añadirlo, ver
+  // window.rutaDeArchivo en items.jsx) o la copia que la bóveda escribe en su
+  // carpeta `media`. El proceso principal prueba las dos y abre la primera que
+  // exista, así que aquí basta con saber que hay algo que probar.
+  //
+  // Un `src` que empieza por `data:` no cuenta: eso es el archivo metido dentro
+  // de la nota, que no existe en ninguna carpeta. Uno de internet tampoco.
+  const srcLocal = typeof item.src === 'string' && item.src.trim() &&
+    !item.src.startsWith('data:') && !/^https?:/.test(item.src);
+  const puedeAbrirCarpeta = !!((item.rutaOrigen || srcLocal) &&
+    window.electronAPI && window.electronAPI.mostrarEnCarpeta);
 
   const abreLaCarpeta = () => {
     window.playAudioTone && window.playAudioTone('click');
-    window.electronAPI.mostrarEnCarpeta(item.rutaOrigen).then((r) => {
+    window.electronAPI.mostrarEnCarpeta({ ruta: item.rutaOrigen, src: item.src }).then((r) => {
       if (r && r.ok) return;
       const motivo = r && r.motivo;
       window.showToast && window.showToast(
         motivo === 'no-esta'
-          ? window.t('El archivo ya no está en esa carpeta. Lo que ves aquí sigue guardado dentro de la nota.',
-                     'The file is not in that folder any more. What you see here is still saved inside the note.')
+          ? window.t('El archivo ya no está en esa carpeta. Lo que ves aquí sigue guardado en la nota.',
+                     'The file is not in that folder any more. What you see here is still saved in the note.')
+          : motivo === 'sin-ruta'
+          ? window.t('Este archivo vive dentro de la nota, no en una carpeta. Con una bóveda abierta, los que añadas se guardan también como archivos.',
+                     'This file lives inside the note, not in a folder. With a vault open, the ones you add are also saved as files.')
           : window.t('No se pudo abrir la carpeta.', 'The folder could not be opened.'),
         'error'
       );
@@ -365,7 +375,7 @@ function ContextSidebar({
           <button
             className="ctx-btn"
             onClick={abreLaCarpeta}
-            title={item.rutaOrigen}
+            title={item.rutaOrigen || window.t('Abrir la carpeta donde está el archivo', 'Open the folder where the file is')}
           >
             <span className="material-symbols-rounded">folder_open</span>
             <span>{window.t('Abrir la carpeta', 'Open the folder')}</span>

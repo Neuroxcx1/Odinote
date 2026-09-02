@@ -613,13 +613,68 @@ ipcMain.handle('remove-word-from-dictionary', async (event, word) => {
 // que ya no existe no falla, simplemente no hace nada, y entonces quien lo pulsa
 // no sabe si la aplicación está rota o si movió el archivo el mes pasado.
 //
+// Un nodo puede tener DOS sitios donde mirar, y hay que probar los dos:
+//
+//   1. La ruta de donde salió el archivo, si se apuntó al añadirlo. Es la buena:
+//      lleva a la carpeta de la persona, donde está el original.
+//   2. La copia de la bóveda. Cuando hay bóveda, la aplicación saca el archivo
+//      de dentro de la nota y lo escribe en `<bóveda>/media`, y el nodo se queda
+//      apuntando ahí con un `file:///` o con `media/loquesea.png`. Eso es un
+//      archivo de verdad en el disco, así que también se puede enseñar.
+//
+// Con lo primero se llega al original; con lo segundo, al menos a la copia. Sin
+// bóveda y sin ruta apuntada no hay nada que enseñar: el archivo vive dentro de
+// la nota y no existe como archivo en ninguna parte.
+//
 // Solo abre carpetas; no lee el archivo, ni lo copia, ni lo ejecuta.
-ipcMain.handle('mostrar-en-carpeta', async (event, ruta) => {
+function rutaDesdeSrc(src) {
+  if (typeof src !== 'string' || !src.trim()) return null;
+  if (src.startsWith('data:') || src.startsWith('http://') || src.startsWith('https://')) return null;
+
+  let candidato = src;
+  if (candidato.startsWith('file:///')) {
+    try {
+      candidato = decodeURIComponent(candidato.replace(/^file:\/\/\//, ''));
+    } catch (e) {
+      candidato = candidato.replace(/^file:\/\/\//, '');
+    }
+    return path.normalize(candidato);
+  }
+  // Rutas relativas a la bóveda: '/vault-media/media/x.png' y 'media/x.png'.
+  const relativa = candidato.startsWith('/vault-media/')
+    ? candidato.replace('/vault-media/', '')
+    : (candidato.startsWith('media/') ? candidato : null);
+  if (relativa && activeVaultPath) {
+    try {
+      return path.join(activeVaultPath, decodeURIComponent(relativa));
+    } catch (e) {
+      return path.join(activeVaultPath, relativa);
+    }
+  }
+  // Una ruta absoluta de Windows tal cual ('D:\\algo\\foto.png').
+  if (/^[a-zA-Z]:[\\/]/.test(candidato)) return path.normalize(candidato);
+  return null;
+}
+
+ipcMain.handle('mostrar-en-carpeta', async (event, datos) => {
   try {
-    if (typeof ruta !== 'string' || !ruta.trim()) return { ok: false, motivo: 'sin-ruta' };
-    if (!fs.existsSync(ruta)) return { ok: false, motivo: 'no-esta' };
-    shell.showItemInFolder(path.normalize(ruta));
-    return { ok: true };
+    // Se admite el texto suelto de la primera versión y el objeto de ahora.
+    const peticion = typeof datos === 'string' ? { ruta: datos } : (datos || {});
+    const candidatas = [peticion.ruta, rutaDesdeSrc(peticion.src)]
+      .filter(r => typeof r === 'string' && r.trim());
+
+    if (!candidatas.length) return { ok: false, motivo: 'sin-ruta' };
+
+    for (const candidata of candidatas) {
+      const limpia = path.normalize(candidata);
+      if (fs.existsSync(limpia)) {
+        logToFile(`mostrar-en-carpeta: ${limpia}`);
+        shell.showItemInFolder(limpia);
+        return { ok: true, ruta: limpia };
+      }
+    }
+    logToFile(`mostrar-en-carpeta: ninguna existe -> ${candidatas.join(' | ')}`);
+    return { ok: false, motivo: 'no-esta' };
   } catch (err) {
     logToFile(`mostrar-en-carpeta failed: ${err.message}`);
     return { ok: false, motivo: 'error' };

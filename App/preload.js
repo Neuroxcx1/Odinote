@@ -20,7 +20,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Enseñar en el explorador el archivo del que salió un nodo. Devuelve
   // { ok, motivo }: 'no-esta' cuando la ruta ya no existe, que es lo normal
   // cuando alguien mueve o borra el original meses después.
-  mostrarEnCarpeta: (ruta) => ipcRenderer.invoke('mostrar-en-carpeta', ruta),
+  mostrarEnCarpeta: (datos) => ipcRenderer.invoke('mostrar-en-carpeta', datos),
   fetchImageBase64: (url) => ipcRenderer.invoke('fetch-image-base64', url),
   downloadMediaToVault: (folderPath, url, fileName) => ipcRenderer.invoke('download-media-to-vault', { folderPath, url, fileName }),
   getCustomDictionaryWords: () => ipcRenderer.invoke('get-custom-dictionary-words'),
