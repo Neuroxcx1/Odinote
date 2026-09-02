@@ -117,11 +117,20 @@ function colorClass(c) {
   return map[c] || c || 'white';
 }
 
+// Saca el texto de un contenido guardado en varios idiomas y devuelve SIEMPRE
+// una cadena. Lo segundo es lo importante: el contenido que escribe la gente se
+// guarda como {es, en} y nada mas, aunque la interfaz tenga once idiomas. Con la
+// aplicacion en frances, `titulo[lang]` no existe, y cualquier reserva del tipo
+// `titulo[lang] || titulo` acaba devolviendo el objeto entero. React no sabe
+// pintar un objeto: lanza el error 31 y deja la pantalla en blanco.
 function pickLang(v, lang) {
   if (v == null) return '';
   if (typeof v === 'string') return v;
   return v[lang] || v.es || v.en || '';
 }
+// Se cuelga de window a proposito. Antes funcionaba solo porque Babel deja las
+// funciones sueltas en el ambito global, que es un accidente y no un contrato.
+window.pickLang = pickLang;
 
 // ──────────────── NOTE ────────────────
 // Rich text via contentEditable + execCommand (per-selection styling)

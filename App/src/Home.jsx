@@ -71,7 +71,7 @@ function Home({ lang, setLang, theme, setTheme, onOpenProject, projects, onCreat
     else list = list.filter(p => !p.deleted);
     if (query.trim()) {
       const q = query.toLowerCase();
-      list = list.filter(p => (p.name?.[lang] || p.name).toLowerCase().includes(q));
+      list = list.filter(p => window.pickLang(p.name, lang).toLowerCase().includes(q));
     }
     return list;
   }, [query, lang, projects, section]);
@@ -553,7 +553,7 @@ function RecentCard({ project, lang, t, onOpen, onDelete, onRenameClick, onToggl
       <div className="ms-recent-body">
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
           <div className="ms-recent-title" style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {project.name?.[lang] || project.name}
+            {window.pickLang(project.name, lang)}
           </div>
           {(project.isPublic || project.isRemote) ? (
             <div
@@ -577,7 +577,7 @@ function RecentCard({ project, lang, t, onOpen, onDelete, onRenameClick, onToggl
         <div className="ms-recent-meta">
           <span>{project.items} {t.items_count}</span>
           <span className="dot"/>
-          <span>{project.updated?.[lang] || project.updated || (window.t('recién', 'recent'))}</span>
+          <span>{window.pickLang(project.updated, lang) || (window.t('recién', 'recent'))}</span>
         </div>
       </div>
     </div>
@@ -642,7 +642,7 @@ function ProjectCard({ project, lang, t, onOpen, onDelete, onRenameClick, onRest
       <div className="ms-project-body">
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
           <div className="ms-project-title" style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {project.name?.[lang] || project.name}
+            {window.pickLang(project.name, lang)}
           </div>
           {(project.isPublic || project.isRemote) ? (
             <div
@@ -666,7 +666,7 @@ function ProjectCard({ project, lang, t, onOpen, onDelete, onRenameClick, onRest
         <div className="ms-project-meta">
           <span>{project.items} {t.items_count}</span>
           <span className="dot"/>
-          <span>{project.updated?.[lang] || project.updated || (window.t('recién', 'recent'))}</span>
+          <span>{window.pickLang(project.updated, lang) || (window.t('recién', 'recent'))}</span>
         </div>
       </div>
     </div>
@@ -766,7 +766,7 @@ function NewProjectModal({ lang, onClose, onCreate }) {
 }
 
 function RenameProjectModal({ project, lang, onClose, onSave, onTogglePublic, userProfile }) {
-  const [name, setName]     = useStateHome(project.name?.[lang] || project.name || '');
+  const [name, setName]     = useStateHome(window.pickLang(project.name, lang));
   const [emoji, setEmoji]   = useStateHome(project.emoji || EMOJI_PRESETS[0]);
   const [cover, setCover]   = useStateHome(project.cover || COVER_PRESETS[0]);
   // Derivado del proyecto real: poner Online es asíncrono (sube a Drive primero),

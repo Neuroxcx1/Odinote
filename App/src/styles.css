@@ -192,34 +192,55 @@ a, button, select, input[type="submit"], input[type="button"], [role="button"],
    `app.jsx`. Colgar el cursor de un atributo y no de una clase por elemento
    evita tener que repetir la regla en los treinta sitios de abajo. */
 
-/* El botón dorado de la barra. Solo lo ve quien tiene la corona. */
-.corona-btn {
+/* El boton dorado de la barra. Solo lo ve quien tiene la corona.
+
+   Mismo tratamiento que el boton de Apoyar —relleno, degradado en movimiento y
+   halo de color— pero en dorado. Antes era un boton palido con un brillo suave
+   y al lado del rojo de Apoyar parecia apagado; lo que se compra aqui es que se
+   vea, asi que tiene que competir de tu a tu con el boton mas llamativo de la
+   barra. */
+/* .icon-btn.corona-btn y no .corona-btn a secas: este bloque esta al
+   principio del archivo y .icon-btn setecientas lineas mas abajo. A igualdad
+   de especificidad gana la que va despues, asi que la sombra generica del
+   boton se comia el halo dorado y la corona encendida salia apagada. */
+.icon-btn.corona-btn {
   position: relative;
-  border: 1.5px solid #C9962A !important;
-  background: linear-gradient(180deg, #FFF8E1 0%, #FBEBBF 100%) !important;
-  box-shadow: 2px 2px 0 #C9962A, 0 0 10px rgba(224, 168, 46, 0.45);
-  animation: corona-respira 3.2s ease-in-out infinite;
+  border: 1.5px solid rgba(255, 255, 255, 0.3) !important;
+  background: linear-gradient(135deg, #E0A82E, #F6D65C, #C1841B, #E0A82E) !important;
+  background-size: 300% 100%;
+  animation: corona-brillo 6s ease infinite;
+  box-shadow: 0 4px 16px rgba(224, 168, 46, 0.45), 0 0 8px rgba(246, 214, 92, 0.2);
 }
 
-[data-theme="dark"] .corona-btn {
-  border-color: #8A6516 !important;
-  background: linear-gradient(180deg, #3B3221 0%, #2A2417 100%) !important;
-  box-shadow: 2px 2px 0 #8A6516, 0 0 12px rgba(224, 168, 46, 0.5);
+[data-theme="dark"] .icon-btn.corona-btn {
+  border-color: rgba(255, 255, 255, 0.22) !important;
+  box-shadow: 0 4px 18px rgba(224, 168, 46, 0.5), 0 0 10px rgba(246, 214, 92, 0.25);
 }
 
-.corona-btn:hover {
-  box-shadow: 2px 2px 0 #C9962A, 0 0 18px rgba(224, 168, 46, 0.85);
+.icon-btn.corona-btn:hover {
+  box-shadow: 0 6px 22px rgba(224, 168, 46, 0.65), 0 0 14px rgba(246, 214, 92, 0.35);
 }
 
-[data-theme="dark"] .corona-btn:hover {
-  box-shadow: 2px 2px 0 #8A6516, 0 0 20px rgba(224, 168, 46, 0.9);
+/* Sobre el relleno dorado, una corona dorada desaparece. Pasa a blanca, igual
+   que el texto del boton de Apoyar sobre su rojo, y las piedras se quedan en
+   oro claro para que la silueta siga leyendose. */
+.corona-btn:not(.apagada) .corona-dibujo svg path {
+  fill: #FFFFFF;
+  stroke: rgba(108, 72, 12, 0.5);
+}
+.corona-btn:not(.apagada) .corona-dibujo svg circle {
+  fill: #F0C64B;
+}
+.corona-btn:not(.apagada) .corona-dibujo {
+  filter: drop-shadow(0 1px 2px rgba(90, 60, 8, 0.45));
 }
 
-/* Respira, no parpadea. Un parpadeo en una barra de herramientas se vuelve
-   insoportable a los diez minutos; esto se nota de reojo y no molesta. */
-@keyframes corona-respira {
-  0%, 100% { box-shadow: 2px 2px 0 #C9962A, 0 0 8px rgba(224, 168, 46, 0.35); }
-  50%      { box-shadow: 2px 2px 0 #C9962A, 0 0 16px rgba(224, 168, 46, 0.75); }
+/* El degradado se mueve despacio, como el de Apoyar. Seis segundos: se percibe
+   sin llamar la atencion cada dos por tres. */
+@keyframes corona-brillo {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -231,23 +252,24 @@ a, button, select, input[type="submit"], input[type="button"], [role="button"],
    que solo existe cuando ya la tienes no le cuenta a nadie que exista. Así se
    entiende de un vistazo que hay algo que conseguir, sin un cartel pidiendo
    dinero. */
-.corona-btn.apagada {
+.icon-btn.corona-btn.apagada {
   border-color: var(--line-soft, #E5E1DD) !important;
   background: var(--paper, #FFF) !important;
+  background-image: none !important;
   box-shadow: 2px 2px 0 var(--line-soft, #E5E1DD), 0 0 7px rgba(224, 168, 46, 0.28);
   animation: none;
   opacity: 0.92;
 }
 
-[data-theme="dark"] .corona-btn.apagada {
+[data-theme="dark"] .icon-btn.corona-btn.apagada {
   border-color: #4A474A !important;
   background: #232123 !important;
   box-shadow: 2px 2px 0 #4A474A, 0 0 8px rgba(224, 168, 46, 0.3);
 }
 
 /* Al pasar por encima se insinúa lo que se gana. */
-.corona-btn.apagada:hover,
-[data-theme="dark"] .corona-btn.apagada:hover {
+.icon-btn.corona-btn.apagada:hover,
+[data-theme="dark"] .icon-btn.corona-btn.apagada:hover {
   box-shadow: 2px 2px 0 rgba(201, 150, 42, 0.6), 0 0 15px rgba(224, 168, 46, 0.6);
   opacity: 1;
 }

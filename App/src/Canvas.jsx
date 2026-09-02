@@ -4601,7 +4601,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
       const colorKey = window.colorClass(fromParent?.color || 'olive');
       out.push({
         id: cid,
-        label: proj ? (proj.name?.[lang] || proj.name) : window.pickLang(c.title, lang),
+        label: proj ? window.pickLang(proj.name, lang) : window.pickLang(c.title, lang),
         chipColor: idx === 0 ? 'var(--ink)' : window.COLOR_HEX_RESOLVED[colorKey],
       });
     });
