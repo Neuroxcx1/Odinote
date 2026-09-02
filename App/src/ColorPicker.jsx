@@ -79,11 +79,7 @@ window.SelectorColor = function SelectorColor({
   const paleta = colores || window.COLORES_ODINOTE;
 
   const [recientes, setRecientes] = useState(leeRecientes);
-  // Mientras se mueve la rueda del sistema el color se va aplicando para poder
-  // verlo sobre el nodo de verdad, pero no se da por bueno hasta Aceptar. Por
-  // eso hace falta recordar con qué se empezó: si se cierra sin aceptar, se
-  // devuelve lo que había.
-  const [eligiendo, setEligiendo] = useState(null);
+
 
   // ── Que no se pierda lo que hay seleccionado ──
   //
@@ -124,7 +120,6 @@ window.SelectorColor = function SelectorColor({
   const redondo = { width: tam + 'px', height: tam + 'px', borderRadius: '50%', cursor: 'pointer', padding: 0 };
 
   const elige = (c) => {
-    setEligiendo(null);
     setRecientes(apuntaReciente(c));
     devuelveSeleccion();
     onCambio(c);
@@ -196,12 +191,26 @@ window.SelectorColor = function SelectorColor({
             ref={entrada}
             type="color"
             value={/^#[0-9a-f]{6}$/i.test(valor || '') ? valor : '#1A1A1A'}
+            // Dos eventos y no uno, que es lo que resuelve esto:
+            //
+            //   `input` salta mientras se mueve la rueda. Ahi solo se muestra,
+            //   porque acertar un tono sin verlo aplicado es imposible.
+            //
+            //   `change` salta cuando se cierra la ventana del sistema. Ese es
+            //   el "ya esta": ahi el color se da por bueno y entra en los
+            //   recientes.
+            //
+            // Antes habia un boton de Aceptar aqui debajo y no podia funcionar:
+            // la ventana de color del sistema es una ventana aparte y tapa el
+            // panel entero, asi que el boton quedaba debajo de ella. Aceptar con
+            // el boton que esa ventana ya trae es lo unico que se puede pulsar.
+            onInput={(e) => {
+              devuelveSeleccion();
+              onCambio(e.target.value);
+            }}
             onChange={(e) => {
               const c = e.target.value;
-              // El primer movimiento guarda de dónde se venía, para poder
-              // deshacer si se cierra sin aceptar. Y en cada uno se apunta el
-              // color en curso: es el que hay que dar por bueno al aceptar.
-              setEligiendo(prev => (prev === null ? { previo: valor || '#1A1A1A', actual: c } : { ...prev, actual: c }));
+              setRecientes(apuntaReciente(c));
               devuelveSeleccion();
               onCambio(c);
             }}
@@ -249,46 +258,6 @@ window.SelectorColor = function SelectorColor({
         </div>
       )}
 
-      {/* ── Aceptar ──
-          Solo aparece mientras se está moviendo la rueda del sistema. El color ya
-          se está viendo aplicado —que es la única forma de acertar un tono—, así
-          que este botón no lo aplica: lo da por bueno y lo guarda en los
-          recientes. Cancelar devuelve lo que había antes de tocar nada. */}
-      {eligiendo && (
-        <div style={{
-          display: 'flex', gap: '6px', alignItems: 'center',
-          padding: '8px', borderRadius: '8px',
-          background: 'rgba(224, 168, 46, 0.10)',
-          border: '1.5px solid rgba(224, 168, 46, 0.45)',
-        }}>
-          <button
-            type="button"
-            className="btn"
-            style={{
-              flex: 1, padding: '6px 10px', borderRadius: '6px', border: 'none',
-              background: 'var(--olive, #6A8546)', color: '#FFF',
-              fontWeight: 700, fontSize: '11.5px', cursor: 'pointer',
-            }}
-            onMouseDown={sinRobarFoco}
-            onClick={() => elige(eligiendo.actual || valor)}
-          >
-            {window.t('Aceptar', 'Accept')}
-          </button>
-          <button
-            type="button"
-            className="btn"
-            style={{
-              padding: '6px 10px', borderRadius: '6px', fontSize: '11.5px', cursor: 'pointer',
-              border: '1.5px solid var(--line-soft)', background: 'transparent',
-              color: 'var(--ink-3, #595459)',
-            }}
-            onMouseDown={sinRobarFoco}
-            onClick={() => { const p = eligiendo.previo; setEligiendo(null); devuelveSeleccion(); onCambio(p); }}
-          >
-            {window.t('Cancelar', 'Cancel')}
-          </button>
-        </div>
-      )}
     </div>
   );
 };
