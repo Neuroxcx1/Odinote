@@ -508,7 +508,15 @@ function Connector({ conn, items, selected, selectedIds, onSelect, onUpdate, onD
     strokeColor = themeInk;
   }
   const isMultiSelected = selectedIds && selectedIds.includes(conn.id);
-  const sel = (selected || isMultiSelected) ? 'var(--wine)' : strokeColor;
+  // Seleccionar una flecha ya NO la repinta de vino. Antes se ponia toda roja
+  // —linea, punta y etiqueta— y con eso desaparecia el color que la persona
+  // habia elegido justo antes: elegias verde, la seleccionabas para seguir
+  // trabajando, y lo que veias era rojo.
+  //
+  // Lo que marca que esta seleccionada son los tiradores, que ya salen en vino
+  // y solo aparecen al seleccionarla, mas un trazo un poco mas grueso. Con eso
+  // basta, y el color se queda donde tiene que estar: en la flecha.
+  const sel = strokeColor;
   const bidir = !!conn.bidirectional;
   const label = conn.label || '';
 
@@ -862,7 +870,10 @@ function Connector({ conn, items, selected, selectedIds, onSelect, onUpdate, onD
         d={path}
         style={{ stroke: sel }}
         strokeDasharray={dashArray}
-        strokeWidth={selected ? 3 : 2}
+        // El unico rastro de la seleccion en la propia linea: un pelo mas
+        // gruesa. Vale tambien para la seleccion multiple, que antes solo se
+        // notaba por el color y ahora no tendria nada.
+        strokeWidth={(selected || isMultiSelected) ? 3 : 2}
       />
       {/* Arrowhead(s) */}
       <polygon className="arrowhead" points={arrowPts(p2.x, p2.y, angleEnd)} style={{ fill: sel }}/>

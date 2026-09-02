@@ -7,33 +7,41 @@
 // color que no estuviera en la lista, así que quien quería el azul de su marca
 // no lo tenía y punto.
 //
-// Ahora es al revés: cuatro colores buenos a mano y una quinta casilla que abre
-// el selector del sistema. Cuatro y no doce a propósito — una fila de doce
-// círculos parecidos obliga a comparar, y comparar cuesta más que elegir. Los
-// cuatro cubren lo que se usa el 90% de las veces y el resto está a un clic.
+// Ahora es al revés: unos pocos colores buenos a mano y una casilla que abre el
+// selector del sistema. Cuatro y no doce a propósito — una fila de doce
+// círculos parecidos obliga a comparar, y comparar cuesta más que elegir.
 //
 // La única excepción es el fondo del lienzo, que se queda con sus temas: ahí el
 // color no es una decisión de quien escribe, es la piel del programa.
+//
+// ── El orden de las cosas, que no es casual ──
+//
+// De arriba abajo: los últimos que se usaron, el botón de aceptar, los colores
+// de siempre, y ABAJO DEL TODO el arcoíris.
+//
+// El arcoíris va el último porque abre una ventana del sistema operativo, y esa
+// ventana se coloca junto a lo que la abrió y tapa lo que tenga debajo. Con el
+// arcoíris arriba, esa ventana caía encima del resto del panel y el botón de
+// aceptar quedaba escondido detrás de ella. Con el arcoíris abajo, la ventana
+// cae fuera del panel y todo lo demás se sigue viendo y se puede pulsar.
 // =====================================================
 
 // Los cuatro de trazo: tinta, vino, oliva y azul. Son los de la propia
-// aplicación, así que un tablero pintado con ellos sigue pareciendo Odinote.
+// aplicación, así que un tablero pintado con ellos sigue pareciendo Oddinote.
 window.COLORES_ODINOTE = ['#1A1A1A', '#E6544F', '#90B968', '#3D5A80'];
 
 // Los cuatro de subrayar. Van aparte porque un marcador tiene que dejar leer lo
 // que hay debajo: los de arriba tapan el texto y no valen aquí.
 window.COLORES_ODINOTE_SUAVES = ['#FFF3A3', '#FFC7C2', '#CFEFD6', '#CDE9FF'];
 
-// Y los cuatro de fondo de nodo. Tambien claros, y por lo mismo: encima de un
-// nodo se escribe, y sobre el negro o el vino de trazo no se lee nada.
-// El blanco va el primero. Sin el no habia forma de devolver una nota a su
-// aspecto normal: el mas claro era un crema y la nota se quedaba amarilleando
-// para siempre.
+// El blanco va el primero de los de fondo. Sin él no hay forma de devolver una
+// nota a su aspecto normal: el más claro sería un crema y la nota se quedaría
+// amarilleando para siempre.
 window.COLORES_ODINOTE_FONDO = ['#FFFFFF', '#F7DA84', '#FBDFDD', '#E8F0DA'];
 
-// Y los de una flecha: negro y blanco, nada mas. Sobre el lienzo claro se ve el
-// negro y sobre el oscuro el blanco, y con eso esta el 95% resuelto; el resto
-// esta en el arcoiris. Ademas su barra lateral es estrecha y no caben mas.
+// Y los de una flecha: negro y blanco, nada más. Sobre el lienzo claro se ve el
+// negro y sobre el oscuro el blanco, y con eso está casi todo resuelto; el resto
+// está en el arcoíris. Además su barra lateral es estrecha y no caben más.
 window.COLORES_ODINOTE_FLECHA = ['#1A1A1A', '#FFFFFF'];
 
 // ── Los últimos que se usaron ──
@@ -44,7 +52,7 @@ window.COLORES_ODINOTE_FLECHA = ['#1A1A1A', '#FFFFFF'];
 // acertar el mismo tono a ojo no se puede.
 //
 // Se guardan en el equipo y no en el proyecto: son una costumbre de quien
-// trabaja, no parte del tablero, y no tiene sentido que viajen a quien lo abra.
+// trabaja, no parte del tablero.
 const CLAVE_RECIENTES = 'odinote.colores.recientes';
 const MAX_RECIENTES = 6;
 
@@ -80,17 +88,26 @@ window.SelectorColor = function SelectorColor({
 
   const [recientes, setRecientes] = useState(leeRecientes);
 
+  // Mientras se mueve la rueda del sistema el color se va aplicando —es la única
+  // forma de acertar un tono— pero NO se da por bueno. De eso se encarga
+  // Aceptar, y por eso hay que recordar de dónde se venía.
+  //
+  // Que la rueda no dé nada por bueno arregla además el historial. Los
+  // navegadores avisan del cambio en cada movimiento del ratón, así que
+  // apuntarlo ahí llenaba la lista con seis tonos casi idénticos del mismo
+  // color: elegías un rojo y todo el historial se volvía rojo. Ahora un paseo
+  // entero por la rueda deja una sola entrada, la que se acepta.
+  const [eligiendo, setEligiendo] = useState(null);
 
   // ── Que no se pierda lo que hay seleccionado ──
   //
-  // Dos cosas distintas se lo llevan por delante. Pulsar una casilla le quita el
-  // foco al texto, y eso se evita cancelando el mousedown. Pero la rueda de
-  // color del sistema es una ventana aparte: al abrirse se lleva la seleccion
-  // entera y no hay forma de impedirlo, asi que hay que apuntarla antes y
-  // devolverla justo antes de aplicar el color.
+  // Dos cosas se lo llevan por delante. Pulsar una casilla le quita el foco al
+  // texto, y eso se evita cancelando el mousedown. Pero la rueda del sistema es
+  // una ventana aparte: al abrirse se lleva la selección entera y no hay forma
+  // de impedirlo, así que hay que apuntarla antes y devolverla justo antes de
+  // aplicar el color.
   //
-  // Sin esto, elegir un color y escribir despues salia del color de antes, que
-  // es exactamente lo que no espera nadie.
+  // Sin esto, elegir un color y escribir después salía del color de antes.
   const rango = useRef(null);
 
   const apuntaSeleccion = () => {
@@ -119,28 +136,96 @@ window.SelectorColor = function SelectorColor({
   const marco = (activo) => (activo ? '2.5px solid var(--wine)' : '1.5px solid var(--line-soft)');
   const redondo = { width: tam + 'px', height: tam + 'px', borderRadius: '50%', cursor: 'pointer', padding: 0 };
 
+  // Elegir de la paleta o de los recientes es inmediato: no hay nada que
+  // confirmar, ya se sabía qué color era antes de pulsarlo.
   const elige = (c) => {
+    setEligiendo(null);
     setRecientes(apuntaReciente(c));
     devuelveSeleccion();
     onCambio(c);
   };
 
+  // En fila con salto de línea, no en rejilla de ancho fijo. La barra lateral de
+  // un conector mide 86 píxeles: con columnas fijas el contenido se salía del
+  // panel y las casillas se apilaban de cualquier manera.
+  const enFila = { display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center' };
+
+  const enCurso = (c) => setEligiendo(prev => (
+    prev === null ? { previo: valor || '#1A1A1A', actual: c } : { ...prev, actual: c }
+  ));
+
   return (
     <div className="selector-color-caja" style={{ display: 'flex', flexDirection: 'column', gap: '7px' }}>
 
-      {/* En fila y con salto de linea, no en rejilla de ancho fijo. La barra
-          lateral de un conector mide 76 px: con una rejilla de cinco columnas
-          fijas el contenido se salia del panel y las casillas se apilaban de
-          cualquier manera. Asi se acomodan al sitio que haya, sea el que sea. */}
-      <div
-        className="selector-color"
-        style={{
-          display: 'flex',
-          flexWrap: 'wrap',
-          gap: '6px',
-          alignItems: 'center',
-        }}
-      >
+      {/* ── 1. Los últimos que usaste ── */}
+      {recientes.length > 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+          <div style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--ink-3, #8E8A8E)' }}>
+            {window.t('Los últimos que usaste', 'The last ones you used')}
+          </div>
+          <div className="selector-color-recientes" style={{ ...enFila, gap: '5px' }}>
+            {recientes.map(c => (
+              <button
+                key={c}
+                type="button"
+                style={{
+                  width: (tam - 5) + 'px', height: (tam - 5) + 'px', borderRadius: '50%',
+                  padding: 0, cursor: 'pointer', background: c,
+                  border: norm(c) === actual ? '2px solid var(--wine)' : '1.5px solid var(--line-soft)',
+                }}
+                onMouseDown={sinRobarFoco}
+                onClick={() => elige(c)}
+                title={window.t('Usado hace poco: ', 'Used recently: ') + c}
+                aria-label={c}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── 2. Aceptar ──
+          Aquí arriba y no al final: la ventana del sistema se abre junto al
+          arcoíris, que está abajo del todo, así que este botón se queda fuera de
+          su sombra y se puede pulsar sin tener que cerrar nada antes. El color ya
+          se está viendo aplicado; esto lo da por bueno y lo guarda. */}
+      {eligiendo && (
+        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            className="btn"
+            style={{
+              flex: '1 1 auto', padding: '7px 10px', borderRadius: '6px', border: 'none',
+              background: 'var(--olive, #6A8546)', color: '#FFF',
+              fontWeight: 700, fontSize: '11.5px', cursor: 'pointer',
+            }}
+            onMouseDown={sinRobarFoco}
+            onClick={() => elige(eligiendo.actual || valor)}
+          >
+            {window.t('Aceptar', 'Accept')}
+          </button>
+          <button
+            type="button"
+            className="btn"
+            style={{
+              flex: '0 0 auto', padding: '7px 9px', borderRadius: '6px', fontSize: '11.5px', cursor: 'pointer',
+              border: '1.5px solid var(--line-soft)', background: 'transparent',
+              color: 'var(--ink-3, #595459)',
+            }}
+            onMouseDown={sinRobarFoco}
+            onClick={() => {
+              const previo = eligiendo.previo;
+              setEligiendo(null);
+              devuelveSeleccion();
+              onCambio(previo);
+            }}
+          >
+            {window.t('Deshacer', 'Undo')}
+          </button>
+        </div>
+      )}
+
+      {/* ── 3. Los de siempre ── */}
+      <div className="selector-color" style={enFila}>
         {incluirTransparente && (
           <button
             type="button"
@@ -164,11 +249,14 @@ window.SelectorColor = function SelectorColor({
             aria-label={c}
           />
         ))}
+      </div>
 
-        {/* La quinta. Cuando hay un color de la paleta puesto se ve el arcoíris,
-            que es lo que dice "aquí hay más"; en cuanto se elige uno libre, la
-            casilla pasa a mostrarlo, porque si no no habría forma de saber cuál
-            está puesto. */}
+      {/* ── 4. El arcoíris, abajo del todo ──
+          Siempre arcoíris, tenga o no un color libre puesto: si mostrara el
+          color elegido se confundiría con una casilla más de la paleta y
+          dejaría de leerse como "aquí hay más". Que esté elegido se ve por el
+          aro, igual que en las demás. */}
+      <div style={enFila}>
         <button
           type="button"
           className="selector-color-libre"
@@ -176,10 +264,6 @@ window.SelectorColor = function SelectorColor({
             ...redondo,
             position: 'relative',
             border: marco(!enPaleta),
-            // Siempre el arcoiris, tenga o no un color libre puesto. Antes pasaba
-            // a mostrar el color elegido y entonces se confundia con una casilla
-            // mas de la paleta: dejaba de leerse como "aqui hay mas". Que este
-            // elegido se ve por el aro, igual que en las demas.
             background: 'conic-gradient(#E6544F, #DDAF2C, #90B968, #3CA59E, #3D5A80, #955BA5, #E6544F)',
           }}
           onMouseDown={sinRobarFoco}
@@ -187,33 +271,16 @@ window.SelectorColor = function SelectorColor({
           title={etiquetaLibre || window.t('Elegir otro color', 'Pick another colour')}
           aria-label={etiquetaLibre || window.t('Elegir otro color', 'Pick another colour')}
         >
+          {/* Se escuchan los dos avisos que da el navegador. Cuál de ellos llega,
+              y cuántas veces, cambia de un navegador a otro; lo único seguro es
+              que con los dos no se pierde ningún movimiento de la rueda. Ninguno
+              da el color por bueno: de eso se encarga Aceptar. */}
           <input
             ref={entrada}
             type="color"
             value={/^#[0-9a-f]{6}$/i.test(valor || '') ? valor : '#1A1A1A'}
-            // Dos eventos y no uno, que es lo que resuelve esto:
-            //
-            //   `input` salta mientras se mueve la rueda. Ahi solo se muestra,
-            //   porque acertar un tono sin verlo aplicado es imposible.
-            //
-            //   `change` salta cuando se cierra la ventana del sistema. Ese es
-            //   el "ya esta": ahi el color se da por bueno y entra en los
-            //   recientes.
-            //
-            // Antes habia un boton de Aceptar aqui debajo y no podia funcionar:
-            // la ventana de color del sistema es una ventana aparte y tapa el
-            // panel entero, asi que el boton quedaba debajo de ella. Aceptar con
-            // el boton que esa ventana ya trae es lo unico que se puede pulsar.
-            onInput={(e) => {
-              devuelveSeleccion();
-              onCambio(e.target.value);
-            }}
-            onChange={(e) => {
-              const c = e.target.value;
-              setRecientes(apuntaReciente(c));
-              devuelveSeleccion();
-              onCambio(c);
-            }}
+            onInput={(e) => { enCurso(e.target.value); devuelveSeleccion(); onCambio(e.target.value); }}
+            onChange={(e) => { enCurso(e.target.value); devuelveSeleccion(); onCambio(e.target.value); }}
             style={{
               position: 'absolute', inset: 0, width: '100%', height: '100%',
               opacity: 0, border: 'none', padding: 0, cursor: 'pointer',
@@ -223,41 +290,6 @@ window.SelectorColor = function SelectorColor({
           />
         </button>
       </div>
-
-      {/* ── Los últimos que se usaron ── */}
-      {recientes.length > 0 && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-          <div style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--ink-3, #8E8A8E)' }}>
-            {window.t('Los últimos que usaste', 'The last ones you used')}
-          </div>
-        <div
-          className="selector-color-recientes"
-          style={{
-            display: 'flex',
-            flexWrap: 'wrap',
-            gap: '5px',
-            alignItems: 'center',
-          }}
-        >
-          {recientes.map(c => (
-            <button
-              key={c}
-              type="button"
-              style={{
-                width: (tam - 5) + 'px', height: (tam - 5) + 'px', borderRadius: '50%',
-                padding: 0, cursor: 'pointer', background: c,
-                border: norm(c) === actual ? '2px solid var(--wine)' : '1.5px solid var(--line-soft)',
-              }}
-              onMouseDown={sinRobarFoco}
-              onClick={() => elige(c)}
-              title={window.t('Usado hace poco: ', 'Used recently: ') + c}
-              aria-label={c}
-            />
-          ))}
-          </div>
-        </div>
-      )}
-
     </div>
   );
 };
