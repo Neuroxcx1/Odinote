@@ -26,7 +26,10 @@ window.COLORES_ODINOTE_SUAVES = ['#FFF3A3', '#FFC7C2', '#CFEFD6', '#CDE9FF'];
 
 // Y los cuatro de fondo de nodo. Tambien claros, y por lo mismo: encima de un
 // nodo se escribe, y sobre el negro o el vino de trazo no se lee nada.
-window.COLORES_ODINOTE_FONDO = ['#FEF7E0', '#F7DA84', '#FBDFDD', '#E8F0DA'];
+// El blanco va el primero. Sin el no habia forma de devolver una nota a su
+// aspecto normal: el mas claro era un crema y la nota se quedaba amarilleando
+// para siempre.
+window.COLORES_ODINOTE_FONDO = ['#FFFFFF', '#F7DA84', '#FBDFDD', '#E8F0DA'];
 
 // ── Los últimos que se usaron ──
 //

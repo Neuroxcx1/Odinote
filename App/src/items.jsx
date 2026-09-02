@@ -3855,7 +3855,12 @@ function FileViewerModal({ fileItem, lang, onClose }) {
 
 function FrameItem({ item, lang, editing, onUpdate, callbacks }) {
   const text = pickLang(item.title, lang);
-  const cls = item.color === 'green' ? 'olive' : (item.color || 'transparent');
+  // Un marco pinta su fondo con una clase de CSS (`c-yellow`, `c-olive`), asi
+  // que un color libre no le llegaba: salia `c-#FFFFFF`, que no existe, y el
+  // marco se quedaba igual hiciera lo que hiciera. Cuando es libre se pinta en
+  // linea y la clase se queda en transparente para que no le pise el fondo.
+  const colorLibre = window.esColorLibre && window.esColorLibre(item.color) ? item.color : null;
+  const cls = colorLibre ? 'transparent' : (item.color === 'green' ? 'olive' : (item.color || 'transparent'));
   const align = item.titleAlign || 'left';
   const titleColor = item.titleColor || 'inherit';
   const titleSize = item.titleSize || 14;
@@ -3881,7 +3886,7 @@ function FrameItem({ item, lang, editing, onUpdate, callbacks }) {
   };
 
   return (
-    <div className={`frame-card c-${cls}`} style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', boxSizing: 'border-box' }}>
+    <div className={`frame-card c-${cls}`} style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', boxSizing: 'border-box', ...(colorLibre ? { background: colorLibre } : null) }}>
       <div 
         className="frame-header" 
         style={{ 

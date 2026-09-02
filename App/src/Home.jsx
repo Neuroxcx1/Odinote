@@ -568,6 +568,7 @@ function RecentCard({ project, lang, t, onOpen, onDelete, onRenameClick, onToggl
           </div>
           {(project.isPublic || project.isRemote) ? (
             <div
+              className="odi-nube"
               style={{ display: 'flex', alignItems: 'center', gap: '4px', color: 'var(--olive, #6A8546)', flexShrink: 0, cursor: 'pointer' }}
               title={window.t('Proyecto Online - Clic para copiar token', 'Online Project - Click to copy token')}
               onClick={(e) => {
@@ -580,7 +581,7 @@ function RecentCard({ project, lang, t, onOpen, onDelete, onRenameClick, onToggl
               <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--olive, #6A8546)', display: 'inline-block', boxShadow: '0 0 6px var(--olive, #6A8546)' }} />
             </div>
           ) : (
-            <div style={{ display: 'flex', alignItems: 'center', color: 'var(--line-soft, #A5A19C)', flexShrink: 0 }} title={window.t('Solo local', 'Local only')}>
+            <div className="odi-nube" style={{ display: 'flex', alignItems: 'center', color: 'var(--line-soft, #A5A19C)', flexShrink: 0 }} title={window.t('Solo local', 'Local only')}>
               <span className="material-symbols-rounded" style={{ fontSize: '18px' }}>cloud_off</span>
             </div>
           )}
@@ -657,6 +658,7 @@ function ProjectCard({ project, lang, t, onOpen, onDelete, onRenameClick, onRest
           </div>
           {(project.isPublic || project.isRemote) ? (
             <div
+              className="odi-nube"
               style={{ display: 'flex', alignItems: 'center', gap: '4px', color: 'var(--olive, #6A8546)', flexShrink: 0, cursor: 'pointer' }}
               title={window.t('Proyecto Online - Clic para copiar token', 'Online Project - Click to copy token')}
               onClick={(e) => {
@@ -669,7 +671,7 @@ function ProjectCard({ project, lang, t, onOpen, onDelete, onRenameClick, onRest
               <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--olive, #6A8546)', display: 'inline-block', boxShadow: '0 0 6px var(--olive, #6A8546)' }} />
             </div>
           ) : (
-            <div style={{ display: 'flex', alignItems: 'center', color: 'var(--line-soft, #A5A19C)', flexShrink: 0 }} title={window.t('Solo local', 'Local only')}>
+            <div className="odi-nube" style={{ display: 'flex', alignItems: 'center', color: 'var(--line-soft, #A5A19C)', flexShrink: 0 }} title={window.t('Solo local', 'Local only')}>
               <span className="material-symbols-rounded" style={{ fontSize: '18px' }}>cloud_off</span>
             </div>
           )}

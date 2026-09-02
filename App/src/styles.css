@@ -659,6 +659,24 @@ body[data-patrocinador="1"] .board-preview-item {
    lo tocabas, se perdia el hover, volvia a su sitio y otra vez: parpadeo. En
    cuadricula no pasa porque hay mas aire alrededor. */
 .ms-grid-list .ms-card-btn:hover { transform: none; }
+
+/* Y la fila entera tampoco salta. Ese `translate(-1px, -2px)` del hover mueve
+   la tarjeta fuera de debajo del raton cuando el cursor esta cerca de un borde:
+   se pierde el hover, vuelve a su sitio, y otra vez. En cuadricula casi no se
+   nota porque hay aire entre tarjetas; en lista, con filas de lado a lado y
+   pegadas, el raton pasa la mayor parte del tiempo cerca de un borde y el
+   parpadeo es constante. La sombra se queda: es la que dice donde estas. */
+.ms-grid-list .ms-project-card:hover { transform: none; }
+.ms-grid-list .ms-project-card:active { transform: none; }
+
+/* La nube al final del todo y los botones a su izquierda. Es el orden que se
+   espera: primero lo que se puede hacer, y el estado al borde. */
+.ms-grid-list .odi-nube {
+  position: absolute;
+  top: 50%;
+  right: 14px;
+  transform: translateY(-50%);
+}
 .ms-card-btn.danger:hover { color: var(--wine); }
 .ms-card-btn.on { color: #E0A82E; }
 .ms-card-btn.star-btn:hover, .ms-card-btn.star-btn.on { color: #E0A82E !important; }
@@ -5279,7 +5297,8 @@ html[data-touch="1"] .handle::before {
 .ms-grid-list .ms-project-card { position: relative; }
 .ms-grid-list .ms-card-actions {
   top: 50%;
-  right: 14px;
+  /* Hueco a la derecha para la nube, que va la ultima. */
+  right: 52px;
   transform: translateY(-50%);
   /* Fuera de la portada: la referencia pasa a ser la fila entera. */
   position: absolute;
