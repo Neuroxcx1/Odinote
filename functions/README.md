@@ -122,6 +122,32 @@ firebase login
 Se abre el navegador. Hay que entrar con **la misma cuenta que es dueña del
 proyecto odinote-firebase**.
 
+## ⚠️ Si algún día cambias el token de Ko-fi, lee esto
+
+Guardar el token **no basta**. La función se engancha a una **versión concreta**
+del secreto en el momento en que se despliega: si guardas una versión nueva y no
+vuelves a desplegar, la función sigue leyendo la vieja y rechaza todos los avisos
+con un 401, sin más pista que "token incorrecto".
+
+Costó una tarde entera de "lo he actualizado veinte veces y no funciona", y era
+esto: el token guardado era el bueno y la función miraba otro.
+
+**Por eso hay un solo comando que hace las dos cosas.** Úsalo siempre, nunca el
+`secrets:set` a secas:
+
+```bash
+npm --prefix functions run token
+```
+
+Para comprobar a qué versión está enganchada la función desplegada:
+
+```bash
+firebase functions:log --only kofi97941138ba45a559b3e4
+```
+
+y buscar `"secret":"KOFI_TOKEN","version":"N"`. Ese N tiene que ser el número más
+alto que salga en `firebase functions:secrets:get KOFI_TOKEN`.
+
 ## 4. Guardar el código secreto de Ko-fi
 
 El código está en <https://ko-fi.com/manage/webhooks>, en la caja

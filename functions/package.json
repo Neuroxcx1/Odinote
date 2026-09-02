@@ -8,7 +8,8 @@
   },
   "scripts": {
     "deploy": "firebase deploy --only functions",
-    "logs": "firebase functions:log --only kofi97941138ba45a559b3e4"
+    "logs": "firebase functions:log --only kofi97941138ba45a559b3e4",
+    "token": "firebase functions:secrets:set KOFI_TOKEN && firebase deploy --only functions"
   },
   "dependencies": {
     "firebase-admin": "^12.6.0",
