@@ -28,6 +28,85 @@ const COVER_PRESETS = [
   'linear-gradient(135deg, #FFFFFF 0%, #E6544F 100%)',
   'linear-gradient(135deg, #FFFFFF 0%, #F7DA84 100%)',
 ];
+
+// ── El color libre de una portada ──
+//
+// Los doce degradados se quedan: un degradado no se elige con una rueda, es una
+// pareja de colores ya escogida. Lo que faltaba era lo de siempre — doce nunca
+// son los colores de nadie, y quien tiene una marca, un juego o una manía la
+// quiere en la portada de su proyecto.
+//
+// Un color suelto se convierte en degradado del mismo tono, más oscuro abajo, y
+// no en un rectángulo plano: al lado de doce portadas con profundidad, una
+// plana se ve como un fallo y no como una elección.
+function oscurece(hex, factor) {
+  const m = /^#([0-9a-f]{6})$/i.exec(String(hex || '').trim());
+  if (!m) return hex;
+  const n = parseInt(m[1], 16);
+  const canal = (v) => Math.max(0, Math.min(255, Math.round(v * factor))).toString(16).padStart(2, '0');
+  return '#' + canal((n >> 16) & 255) + canal((n >> 8) & 255) + canal(n & 255);
+}
+
+function portadaDeColor(hex) {
+  return 'linear-gradient(135deg, ' + hex + ' 0%, ' + oscurece(hex, 0.55) + ' 100%)';
+}
+
+// De qué color es una portada hecha a mano. Los doce de la lista no cuentan:
+// ahí manda el recuadro con su aro, y marcar además una casilla del selector
+// diría que hay dos cosas elegidas.
+function colorDePortada(cover) {
+  if (!cover || COVER_PRESETS.indexOf(cover) !== -1) return '';
+  const m = String(cover).match(/#[0-9a-fA-F]{6}/);
+  return m ? m[0] : '';
+}
+
+// El mismo campo en las dos ventanas —crear y editar—, escrito una sola vez:
+// dos copias del mismo formulario acaban siempre con una arreglada y la otra no.
+function CampoPortada({ cover, onCambio }) {
+  return (
+    <div className="field">
+      <label>{window.t('Portada', 'Cover')}</label>
+      <div className="cover-row">
+        {COVER_PRESETS.map(c => (
+          <button
+            key={c}
+            className={`cover-pick ${cover === c ? 'active' : ''}`}
+            style={{ background: c, border: '1.5px solid var(--line)' }}
+            onClick={() => onCambio(c)}
+          />
+        ))}
+        {/* La portada hecha a mano se pone la última, entre las demás y con su
+            aro. Sin ella, elegir un color de abajo no se veía por ninguna parte:
+            ningún recuadro quedaba marcado, y el degradado que iba a salir no
+            aparecía hasta después de crear el proyecto. */}
+        {colorDePortada(cover) && (
+          <button
+            className="cover-pick active"
+            style={{ background: cover, border: '1.5px solid var(--line)' }}
+            title={window.t('Tu color', 'Your colour')}
+            onClick={() => onCambio(cover)}
+          />
+        )}
+      </div>
+      <div style={{ marginTop: '10px' }}>
+        <div style={{
+          fontSize: '10px', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase',
+          color: 'var(--ink-3, #8E8A8E)', marginBottom: '6px',
+        }}>
+          {window.t('Otro color', 'Another colour')}
+        </div>
+        <window.SelectorColor
+          valor={colorDePortada(cover)}
+          colores={window.COLORES_ODINOTE_FONDO}
+          compacto
+          tam={22}
+          etiquetaLibre={window.t('Elegir el color de la portada', 'Pick the cover colour')}
+          onCambio={(c) => onCambio(portadaDeColor(c))}
+        />
+      </div>
+    </div>
+  );
+}
 // Iconos de proyecto: Fluent Emoji 3D de Microsoft (licencia MIT, incluidos en
 // lib/project-icons — ver LICENSE.txt). Los proyectos antiguos con emojis o
 // nombres de Material Symbols se siguen mostrando tal cual.
@@ -748,19 +827,7 @@ function NewProjectModal({ lang, onClose, onCreate }) {
           </div>
         </div>
 
-        <div className="field">
-          <label>{window.t('Portada', 'Cover')}</label>
-          <div className="cover-row">
-            {COVER_PRESETS.map(c => (
-              <button
-                key={c}
-                className={`cover-pick ${cover===c?'active':''}`}
-                style={{background: c, border: '1.5px solid var(--line)'}}
-                onClick={()=>setCover(c)}
-              />
-            ))}
-          </div>
-        </div>
+        <CampoPortada cover={cover} onCambio={setCover} />
 
         <div className="modal-actions">
           <button className="btn btn-ghost" onClick={onClose}>{window.t('Cancelar', 'Cancel')}</button>
@@ -820,19 +887,7 @@ function RenameProjectModal({ project, lang, onClose, onSave, onTogglePublic, us
           </div>
         </div>
 
-        <div className="field">
-          <label>{window.t('Portada', 'Cover')}</label>
-          <div className="cover-row">
-            {COVER_PRESETS.map(c => (
-              <button
-                key={c}
-                className={`cover-pick ${cover===c?'active':''}`}
-                style={{background: c, border: '1.5px solid var(--line)'}}
-                onClick={()=>setCover(c)}
-              />
-            ))}
-          </div>
-        </div>
+        <CampoPortada cover={cover} onCambio={setCover} />
 
         {/* Cloud availability setting */}
         <div className="field" style={{ marginTop: '20px', borderTop: '1px solid var(--line-soft, #E5E1DD)', paddingTop: '16px' }}>

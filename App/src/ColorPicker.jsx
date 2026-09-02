@@ -263,18 +263,33 @@ window.SelectorColor = function SelectorColor({
   // sistema se abre junto al arcoíris, que está abajo, así que este botón se
   // queda fuera de su sombra y se puede pulsar sin cerrar nada antes. El color
   // ya se está viendo aplicado; esto lo da por bueno y lo guarda.
-  const confirmacion = () => (!eligiendo ? null : (
-    <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+  //
+  // `reservado` pinta la misma fila pero invisible y sin poder tocarse. Es para
+  // que el sitio esté guardado antes de hacer falta: cuando aparecía y
+  // desaparecía de verdad, todo lo que tenía debajo —los colores, la zona de
+  // prueba, los botones— pegaba un salto de treinta píxeles cada vez que se
+  // tocaba la rueda, y volvía a saltar al aceptar. Con la ventana quieta, el
+  // ojo puede seguir el color en lugar de perseguir los botones.
+  const confirmacion = (reservado) => (!eligiendo && !reservado ? null : (
+    <div
+      style={{
+        display: 'flex', gap: '6px', flexWrap: 'wrap',
+        visibility: eligiendo ? 'visible' : 'hidden',
+        pointerEvents: eligiendo ? 'auto' : 'none',
+      }}
+      aria-hidden={!eligiendo}
+    >
       <button
         type="button"
         className="btn"
+        tabIndex={eligiendo ? 0 : -1}
         style={{
           flex: '1 1 auto', padding: '7px 10px', borderRadius: '6px', border: 'none',
           background: acento || 'var(--olive, #6A8546)', color: acentoTexto || '#FFF',
           fontWeight: 700, fontSize: '11.5px', cursor: 'pointer',
         }}
         onMouseDown={sinRobarFoco}
-        onClick={() => elige(eligiendo.actual || valor)}
+        onClick={() => eligiendo && elige(eligiendo.actual || valor)}
       >
         {window.t('Aceptar', 'Accept')}
       </button>
@@ -286,8 +301,10 @@ window.SelectorColor = function SelectorColor({
           border: '1.5px solid var(--line-soft)', background: 'transparent',
           color: 'var(--ink-3, #595459)',
         }}
+        tabIndex={eligiendo ? 0 : -1}
         onMouseDown={sinRobarFoco}
         onClick={() => {
+          if (!eligiendo) return;
           const previo = eligiendo.previo;
           setEligiendo(null);
           devuelveSeleccion();
@@ -323,7 +340,7 @@ window.SelectorColor = function SelectorColor({
   if (compacto) {
     return (
       <div className="selector-color-caja" style={{ display: 'flex', flexDirection: 'column', gap: '7px' }}>
-        {confirmacion()}
+        {confirmacion(true)}
         <div className="selector-color" style={enFila}>
           {incluirTransparente && casillaNinguno()}
           {paleta.map(casillaPaleta)}

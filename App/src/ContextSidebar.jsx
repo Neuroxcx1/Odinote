@@ -43,7 +43,10 @@ const STICKY_PALETTE = [
   { key: 'dark',   hex: '#595459', label: 'Gris oscuro' },
 ];
 
-// Deep saturated palette for column header strips & boards
+// Los colores de las franjas de antes. Ya no se ofrecen —la franja se elige con
+// el selector de siempre, cuatro y el arcoíris— pero hay tableros y columnas
+// guardados con estos nombres, y sin esta lista se pintarían de blanco. Se queda
+// como diccionario de lo antiguo, no como paleta.
 const STRIP_PALETTE = [
   { key: 'navy',   hex: '#3D5A80' },
   { key: 'indigo', hex: '#6C5FAF' },
@@ -61,12 +64,13 @@ const STRIP_PALETTE = [
 function resolveStickyColor(key) {
   const found = STICKY_PALETTE.find(p => p.key === key);
   if (found) return found.hex;
-  return key && key.startsWith('#') ? key : '#FFFFFF';
-}
-function resolveStripColor(key) {
-  const found = STRIP_PALETTE.find(p => p.key === key);
-  if (found) return found.hex;
-  return key && key.startsWith('#') ? key : '#3D5A80';
+  if (key && key.startsWith('#')) return key;
+  // Y si no está, se mira en los nombres viejos de las franjas antes de
+  // rendirse. Quien tenga una columna guardada como 'navy' de hace meses la
+  // sigue viendo azul en lugar de descubrirla en blanco un día cualquiera.
+  const antiguo = STRIP_PALETTE.find(p => p.key === key);
+  if (antiguo) return antiguo.hex;
+  return '#FFFFFF';
 }
 
 function ContextSidebar({
@@ -1514,68 +1518,12 @@ function ContextSidebar({
   );
 }
 
-function ColorTabs({ item, onUpdate }) {
-  const [tab, setTab] = React.useState('bg');
-  return (
-    <div className="ctx-pop-section">
-      <div className="ctx-color-tabs">
-        <button
-          className={tab === 'bg' ? 'active' : ''}
-          onClick={()=>setTab('bg')}
-        >
-          <div className="tab-chip" style={{background: resolveStickyColor(item.bgColor || item.color || 'white'), border:'1.5px solid var(--line-soft)'}}/>
-          <span>Fondo</span>
-        </button>
-        <button
-          className={tab === 'strip' ? 'active' : ''}
-          onClick={()=>setTab('strip')}
-        >
-          <div className="tab-chip" style={{background: resolveStripColor(item.color || 'navy')}}/>
-          <span>Franja</span>
-        </button>
-      </div>
-
-      {tab === 'bg' && (
-        <div>
-          <div className="ctx-sticky-grid">
-            {STICKY_PALETTE.map(p => (
-              <button
-                key={p.key}
-                className={`ctx-sticky-swatch ${(item.bgColor || 'white') === p.key ? 'active' : ''}`}
-                style={{ background: p.hex, border: p.hex === '#FFFFFF' ? '1.5px solid var(--line-soft)' : '1.5px solid var(--line)' }}
-                onClick={()=>onUpdate({ bgColor: p.key })}
-                title={p.label}
-              />
-            ))}
-          </div>
-          <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1.5px solid var(--line-soft)' }}>
-            <div style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--ink-3)', marginBottom: '6px' }}>
-              {window.t('Otro color', 'Another colour')}
-            </div>
-            <window.SelectorColor
-              valor={window.esColorLibre && window.esColorLibre(item.bgColor) ? item.bgColor : ''}
-              onCambio={(c) => onUpdate({ bgColor: c })}
-              tam={22}
-            />
-          </div>
-        </div>
-      )}
-
-      {tab === 'strip' && (
-        <div className="ctx-strip-grid">
-          {STRIP_PALETTE.map(p => (
-            <button
-              key={p.key}
-              className={`ctx-strip-swatch ${(item.color || 'navy') === p.key ? 'active' : ''}`}
-              style={{ background: p.hex }}
-              onClick={()=>onUpdate({ color: p.key })}
-            />
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
+// Aquí vivía ColorTabs: dos pestañas, "Fondo" con trece colores y "Franja" con
+// once, cada una con su rejilla escrita a mano. Se quedó sin usar cuando el
+// color pasó a elegirse con el selector único —cuatro colores y el arcoíris,
+// igual en toda la aplicación— y llevaba tiempo aquí sin que nada la pintara.
+// Un componente que no se usa no es inofensivo: se lee como si fuera la manera
+// de hacer las cosas, y la siguiente pantalla se escribe copiándolo.
 
 function CommentComposer({ onSubmit, lang }) {
   const [draft, setDraft] = React.useState('');
@@ -1603,7 +1551,5 @@ function CommentComposer({ onSubmit, lang }) {
 
 window.ContextSidebar = ContextSidebar;
 window.STICKY_PALETTE = STICKY_PALETTE;
-window.STRIP_PALETTE = STRIP_PALETTE;
 window.resolveStickyColor = resolveStickyColor;
-window.resolveStripColor = resolveStripColor;
 window.EMOJI_OPTIONS = EMOJI_OPTIONS;
