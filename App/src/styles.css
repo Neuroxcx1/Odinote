@@ -311,6 +311,17 @@ a, button, select, input[type="submit"], input[type="button"], [role="button"],
   .corona-patrocinador { animation: none; }
 }
 
+/* El aro que gira mientras se comprueba una donación. La espera puede irse a
+   veinte segundos cuando la función del servidor lleva rato apagada, y una
+   pantalla quieta durante veinte segundos parece una pantalla rota. */
+.corona-girando {
+  animation: spin 900ms linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .corona-girando { animation: none; }
+}
+
 /* El cursor, en dorado en vez de en verde. Mismo dibujo que el normal: la
    gracia es que se note el color, no que cambie la forma y desoriente. */
 body[data-patrocinador="1"] {

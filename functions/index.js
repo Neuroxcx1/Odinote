@@ -202,10 +202,9 @@ exports.kofi97941138ba45a559b3e4 = functions
       origen: 'kofi',
       ultimoPago: ahora,
       ultimaTransaccion: typeof pago.kofi_transaction_id === 'string' ? pago.kofi_transaction_id : null,
-      // El importe se guarda con un único fin: poder comprobar una reclamación
-      // (ver `reclamacion.js`). Quien pagó con un correo distinto al de su
-      // Google demuestra que la donación es suya diciendo cuánto pagó. No se
-      // enseña en ninguna parte de la aplicación ni se usa para nada más.
+      // El importe se guarda como apunte de lo que pasó, no como contraseña:
+      // reclamar ya no lo pide (ver `reclamacion.js`). No se enseña en ninguna
+      // parte de la aplicación.
       importe: R.normalizaImporte(pago.amount),
       moneda: typeof pago.currency === 'string' ? pago.currency.slice(0, 8) : null,
       // `desde` solo se escribe si el documento aún no existía. Así, quien
@@ -246,9 +245,8 @@ exports.kofi97941138ba45a559b3e4 = functions
 // Reclamar una donación hecha con OTRO correo
 //
 // El caso: alguien paga en Ko-fi con su Hotmail y entra en Odinote con su
-// Google. Son dos correos y la corona no le llega. Aquí demuestra que esa
-// donación es suya diciendo con qué correo pagó y cuánto, y se le apunta
-// también su correo de Google.
+// Google. Son dos correos y la corona no le llega. Aquí dice con qué correo
+// pagó y se le apunta también su correo de Google.
 //
 // Esta dirección SÍ es pública, y no es un descuido: la llama la aplicación,
 // que es de código abierto, así que esconderla sería mentirse. Lo que la
@@ -258,8 +256,15 @@ exports.kofi97941138ba45a559b3e4 = functions
 // =====================================================
 
 // Contador propio, separado del de Ko-fi: son dos direcciones distintas y una
-// avalancha en una no debe cerrar la otra. Aquí el tope es más bajo porque
-// reclamar es algo que se hace una vez en la vida, no cada minuto.
+// avalancha en una no debe cerrar la otra.
+//
+// El tope subió de 10 a 40 por minuto cuando la aplicación pasó a comprobar
+// sola en cuanto se escribe el correo. Antes cada intento era un botón pulsado
+// a conciencia; ahora una persona que se equivoca al teclear y corrige puede
+// gastar tres o cuatro sin darse cuenta, y con el tope viejo el siguiente que
+// llegara —otra persona, en otro sitio— se comía un "demasiadas" que no había
+// provocado. Cada llamada es UNA lectura de Firestore, así que 40 al minuto
+// sigue siendo calderilla frente a las 50.000 diarias que Google regala.
 var ventanaRecInicio = Date.now();
 var ventanaRecCuenta = 0;
 
@@ -270,12 +275,29 @@ function hayAvalanchaReclamos() {
     ventanaRecCuenta = 0;
   }
   ventanaRecCuenta++;
-  return ventanaRecCuenta > 10;
+  return ventanaRecCuenta > 40;
 }
 
 exports.reclamarPatrocinio = functions
   .region('us-central1')
-  .runWith({ maxInstances: 1, memory: '128MB', timeoutSeconds: 15 })
+  .runWith({
+    maxInstances: 1,
+
+    // 512MB y no los 128 de antes, y no es por memoria: en las funciones de
+    // primera generación la CPU va atada al tamaño elegido —128MB dan 200MHz,
+    // 512MB dan 800— y aquí lo que se paga no es memoria, es el arranque en
+    // frío. Esta función se llama unas pocas veces al mes, así que la copia
+    // está apagada casi siempre y CADA reclamación se come ese arranque:
+    // cargar firebase-admin y verificar la firma de Google a 200MHz es lo que
+    // convierte una espera de tres segundos en una de veinte, con la persona
+    // delante mirando "Comprobando…" sin saber si aquello sigue vivo.
+    //
+    // Se factura por gigabyte y segundo, así que cuadruplicar la memoria de
+    // algo que corre un segundo al mes no se nota en la factura: Google regala
+    // 400.000 GB-segundo al mes y esto gasta menos de uno.
+    memory: '512MB',
+    timeoutSeconds: 15,
+  })
   .https.onRequest(async (req, res) => {
     // La aplicación se sirve desde varios sitios —github.io en la web, un
     // servidor local dentro del programa de escritorio—, así que filtrar por
@@ -294,6 +316,10 @@ exports.reclamarPatrocinio = functions
       return res.status(429).json({ motivo: 'demasiadas' });
     }
 
+    // Los tiempos de cada paso quedan en el registro. Sin esto, "tarda mucho"
+    // es lo único que se sabe, y no se puede arreglar lo que no se mide.
+    var t0 = Date.now();
+
     var cabecera = req.get('Authorization') || '';
     var idToken = cabecera.indexOf('Bearer ') === 0 ? cabecera.slice(7) : '';
     if (!idToken) return res.status(401).json({ motivo: 'sin-sesion' });
@@ -305,6 +331,7 @@ exports.reclamarPatrocinio = functions
       console.warn('[reclamar] Identificador de sesión no válido.');
       return res.status(401).json({ motivo: 'sin-sesion' });
     }
+    var tSesion = Date.now();
 
     var cuerpo = req.body || {};
     var correoPedido = R.normalizaCorreo(cuerpo.correo);
@@ -321,14 +348,19 @@ exports.reclamarPatrocinio = functions
       console.error('[reclamar] No se pudo leer la ficha:', err);
       return res.status(500).json({ motivo: 'error' });
     }
+    var tFicha = Date.now();
+    console.log('[reclamar] Tiempos: firma de Google', tSesion - t0, 'ms; lectura de la ficha', tFicha - tSesion, 'ms.');
 
-    var veredicto = R.evalua(ficha, cuerpo.correo, cuerpo.importe, sesion.email);
+    // El importe que manden las versiones viejas de la aplicación se ignora
+    // sin más: la decisión ya no lo mira, y devolver un error por un campo de
+    // sobra dejaría sin corona a quien no ha actualizado.
+    var veredicto = R.evalua(ficha, cuerpo.correo, sesion.email);
     if (!veredicto.ok) {
       // A propósito NO se distingue por fuera entre "no existe" y "el importe
       // no cuadra": decir cuál de las dos falla convertiría esto en una forma
       // de averiguar quién ha donado. Por dentro sí queda anotado.
       console.warn('[reclamar] Rechazada:', veredicto.motivo);
-      var publicos = ['ya-reclamado', 'es-el-mismo', 'sin-sesion', 'correo-invalido', 'importe-invalido'];
+      var publicos = ['ya-reclamado', 'es-el-mismo', 'sin-sesion', 'correo-invalido'];
       var motivo = publicos.indexOf(veredicto.motivo) !== -1 ? veredicto.motivo : 'no-cuadra';
       return res.status(404).json({ motivo: motivo });
     }
@@ -364,6 +396,7 @@ exports.reclamarPatrocinio = functions
       return res.status(500).json({ motivo: 'error' });
     }
 
-    console.log('[reclamar] Donación de', veredicto.correo, 'reclamada por', veredicto.mio);
+    console.log('[reclamar] Donación de', veredicto.correo, 'reclamada por', veredicto.mio,
+      '— en total', Date.now() - t0, 'ms.');
     return res.status(200).json({ ok: true });
   });

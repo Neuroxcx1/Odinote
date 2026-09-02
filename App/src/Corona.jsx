@@ -108,20 +108,54 @@ window.CoronaBoton = function CoronaBoton({ activo = false, onAbrir, size = 19 }
 // es el de Google: un Hotmail de toda la vida, un Yahoo del instituto. Esa
 // persona ha pagado, no ve nada, y el programa no puede adivinarlo solo.
 //
-// Aquí lo demuestra con dos datos que solo tiene ella: con qué correo pagó y
-// cuánto. Va plegado porque a quien no le hace falta no debe estorbarle, y
-// quien lo necesita lo busca.
+// Aquí dice con qué correo pagó y el servidor mira si esa donación existe y
+// está sin reclamar. Va plegado porque a quien no le hace falta no debe
+// estorbarle, y quien lo necesita lo busca.
+//
+// ── Dos cosas que antes estaban mal ──
+//
+// No se enseña sin sesión de Google. El servidor exige un identificador
+// firmado por Google, así que sin sesión este panel solo servía para llevar a
+// alguien a un formulario que iba a rechazarle sin que hubiera hecho nada mal
+// —y encima con un mensaje sobre "verificar tu identidad" que no explicaba
+// qué hacer—. Si no hay sesión, aquí no hay nada: primero se entra.
+//
+// Y no se pide el importe. Se pedía como prueba de que la donación era tuya,
+// pero a los tres días nadie recuerda si fueron 3 o 5, el recibo se perdió, y
+// Ko-fi cobra en la moneda de quien paga. Esa prueba dejaba fuera sobre todo a
+// los donantes de verdad. Ahora basta el correo, y se comprueba solo en cuanto
+// está escrito: un botón más era un paso más para llegar al mismo sitio.
 window.PanelReclamo = function PanelReclamo({ onConcedida }) {
-  const { useState } = React;
+  const { useState, useEffect, useRef } = React;
+  const P = window.Patrocinio;
+
+  // ¿Hay sesión de Google? Se pregunta al montar y se sigue escuchando: quien
+  // entra con su cuenta teniendo esta ventana abierta ve aparecer el panel sin
+  // tener que cerrarla y volver.
+  const [haySesion, setHaySesion] = useState(() => !!(P && P.haySesion && P.haySesion()));
+  useEffect(() => {
+    if (!P || !P.vigilaSesion) return;
+    return P.vigilaSesion(setHaySesion);
+  }, []);
+
   const [abierto, setAbierto] = useState(false);
   const [correo, setCorreo] = useState('');
-  const [importe, setImporte] = useState('');
   const [esperando, setEsperando] = useState(false);
+  const [tardando, setTardando] = useState(false);
   const [aviso, setAviso] = useState(null);
 
+  // Lo que ya se preguntó, para no repetir la misma pregunta en cada tecla que
+  // se toca después. Y una petición en vuelo a la vez: como se dispara sola,
+  // sin esto un correo escrito despacio saldría tres veces.
+  const contestados = useRef({});
+  const enCurso = useRef(false);
+  const reloj = useRef(null);
+  const relojLento = useRef(null);
+
   // Un mensaje por cada motivo. El del servidor no distingue entre "no existe"
-  // y "el importe no cuadra" a propósito —decirlo sería una forma de averiguar
-  // quién ha donado—, así que aquí se explica lo que la persona puede hacer.
+  // y "ya es de otro" en todos los casos a propósito —decirlo sería una forma
+  // de averiguar quién ha donado—, así que aquí se explica lo que la persona
+  // puede hacer.
   const MENSAJES = {
     'ya-reclamado': window.t(
       'Esa donación ya está vinculada a otra cuenta.',
@@ -138,12 +172,15 @@ window.PanelReclamo = function PanelReclamo({ onConcedida }) {
       'Odinote no consigue identificarte ante Google en este momento. Cierra sesión aquí abajo, vuelve a entrar y prueba otra vez.',
       'Odinote cannot verify your Google identity right now. Sign out below, sign back in and try again.'),
     'correo-invalido': window.t('Ese correo no parece un correo.', 'That does not look like an email.'),
+    // Este no lo vería nunca quien usa el programa: sale solo si la función
+    // del servidor es anterior a la versión que dejó de pedir el importe. Se
+    // dice lo que pasa en vez de un 'algo falló' que no lleva a ninguna parte.
     'importe-invalido': window.t(
-      'Escribe cuánto donaste, por ejemplo 5 o 3.50.',
-      'Enter how much you donated, for example 5 or 3.50.'),
+      'El servidor todavía pide el importe. Falta desplegar la versión nueva de la función.',
+      'The server still asks for the amount. The new function version has not been deployed yet.'),
     'no-cuadra': window.t(
-      'No encontramos una donación con ese correo y ese importe. Revisa los dos. Si acabas de pagar, espera un minuto y vuelve a intentarlo.',
-      'We could not find a donation with that email and amount. Check both. If you just paid, wait a minute and try again.'),
+      'No encontramos ninguna donación con ese correo. Míralo otra vez. Si acabas de pagar, espera un minuto.',
+      'We could not find any donation with that email. Check it again. If you just paid, wait a minute.'),
     'demasiadas': window.t(
       'Demasiados intentos seguidos. Espera un minuto.',
       'Too many attempts in a row. Wait a minute.'),
@@ -151,20 +188,65 @@ window.PanelReclamo = function PanelReclamo({ onConcedida }) {
     'error': window.t('Algo falló. Inténtalo más tarde.', 'Something went wrong. Try again later.'),
   };
 
-  const enviar = () => {
-    if (esperando) return;
+  // Deliberadamente flojo: aquí no se valida el correo de nadie, solo se decide
+  // cuándo merece la pena preguntar al servidor. Quien escribe "ana@" todavía
+  // no ha terminado.
+  const pareceCorreo = (c) => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(String(c || '').trim());
+
+  const comprueba = (valor, insistiendo) => {
+    const c = String(valor || '').trim().toLowerCase();
+    if (!P || !pareceCorreo(c) || enCurso.current) return;
+    if (!insistiendo && contestados.current[c]) return;
+
+    contestados.current[c] = true;
+    enCurso.current = true;
     setEsperando(true);
     setAviso(null);
-    window.Patrocinio.reclama(correo, importe).then((r) => {
+    setTardando(false);
+
+    // El aviso de que está tardando. La espera puede irse a veinte segundos
+    // cuando la función del servidor lleva rato apagada y tiene que encenderse,
+    // y una pantalla quieta durante veinte segundos parece una pantalla rota.
+    clearTimeout(relojLento.current);
+    relojLento.current = setTimeout(() => setTardando(true), 6000);
+
+    P.reclama(c).then((r) => {
+      clearTimeout(relojLento.current);
+      enCurso.current = false;
       setEsperando(false);
+      setTardando(false);
       if (r.ok) {
         setAviso({ bien: true, texto: window.t('¡Listo! Tu corona ya está activa.', 'Done! Your crown is active.') });
         onConcedida && onConcedida();
         return;
       }
-      setAviso({ bien: false, texto: MENSAJES[r.motivo] || MENSAJES.error });
+      setAviso({
+        bien: false,
+        texto: MENSAJES[r.motivo] || MENSAJES.error,
+        // Volver a preguntar solo tiene sentido cuando la respuesta puede
+        // cambiar: la donación que aún no ha llegado, la red que falló. Que
+        // una donación sea de otro no va a cambiar por insistir.
+        seArregla: r.motivo === 'no-cuadra' || r.motivo === 'sin-conexion' ||
+                   r.motivo === 'demasiadas' || r.motivo === 'error',
+      });
     });
   };
+
+  // Se comprueba solo, poco después de dejar de escribir. Novecientos
+  // milisegundos: menos y salta a mitad de un correo escrito despacio, más y
+  // parece que no hace nada.
+  useEffect(() => {
+    clearTimeout(reloj.current);
+    const c = correo.trim().toLowerCase();
+    if (!abierto || !pareceCorreo(c) || contestados.current[c]) return;
+    reloj.current = setTimeout(() => comprueba(c), 900);
+    return () => clearTimeout(reloj.current);
+  }, [correo, abierto]);
+
+  useEffect(() => () => { clearTimeout(reloj.current); clearTimeout(relojLento.current); }, []);
+
+  // Sin sesión de Google no hay panel. Ver el comentario de arriba.
+  if (!haySesion) return null;
 
   if (!abierto) {
     return (
@@ -198,28 +280,35 @@ window.PanelReclamo = function PanelReclamo({ onConcedida }) {
     }}>
       <div style={{ fontSize: '12.5px', color: 'var(--ink-3, #595459)', lineHeight: 1.45 }}>
         {window.t(
-          'Si pagaste con un correo distinto al de tu Google, dinos cuál y cuánto donaste. Es la forma de comprobar que esa donación es tuya.',
-          'If you paid with an email other than your Google one, tell us which and how much you donated. That is how we check the donation is yours.')}
+          'Si pagaste con un correo distinto al de tu Google, escríbelo aquí. Se comprueba solo.',
+          'If you paid with an email other than your Google one, type it here. It checks itself.')}
       </div>
 
       <input
         type="email"
         value={correo}
-        onChange={(e) => setCorreo(e.target.value)}
+        autoFocus
+        onChange={(e) => { setCorreo(e.target.value); setAviso(null); }}
+        onKeyDown={(e) => { if (e.key === 'Enter') { clearTimeout(reloj.current); comprueba(correo, true); } }}
         placeholder={window.t('Correo con el que pagaste', 'Email you paid with')}
         style={campo}
       />
-      <input
-        type="text"
-        inputMode="decimal"
-        value={importe}
-        onChange={(e) => setImporte(e.target.value)}
-        onKeyDown={(e) => { if (e.key === 'Enter') enviar(); }}
-        placeholder={window.t('Cuánto donaste (por ejemplo 5)', 'How much you donated (e.g. 5)')}
-        style={campo}
-      />
 
-      {aviso && (
+      {esperando && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: '8px',
+          fontSize: '12.5px', color: 'var(--ink-3, #595459)', lineHeight: 1.45,
+        }}>
+          <span className="material-symbols-rounded corona-girando" style={{ fontSize: 16 }}>progress_activity</span>
+          <span>
+            {tardando
+              ? window.t('Está tardando más de lo normal. Sigue en marcha.', 'This is taking longer than usual. Still going.')
+              : window.t('Comprobando…', 'Checking…')}
+          </span>
+        </div>
+      )}
+
+      {!esperando && aviso && (
         <div style={{
           fontSize: '12.5px', lineHeight: 1.45, padding: '8px 10px', borderRadius: '6px',
           color: 'var(--ink, #1A1A1A)',
@@ -227,21 +316,19 @@ window.PanelReclamo = function PanelReclamo({ onConcedida }) {
           border: '1.5px solid ' + (aviso.bien ? 'var(--brand-green, #90B968)' : 'var(--wine, #E6544F)'),
         }}>
           {aviso.texto}
+          {aviso.seArregla && (
+            <button
+              onClick={() => comprueba(correo, true)}
+              style={{
+                display: 'block', marginTop: '6px', padding: 0, border: 'none', background: 'none',
+                color: 'var(--olive, #6A8546)', fontWeight: 700, fontSize: '12.5px', cursor: 'pointer',
+              }}
+            >
+              {window.t('Probar otra vez', 'Try again')}
+            </button>
+          )}
         </div>
       )}
-
-      <button
-        className="btn lift"
-        onClick={enviar}
-        disabled={esperando}
-        style={{
-          padding: '9px 14px', borderRadius: '6px', border: 'none', cursor: 'pointer',
-          background: 'var(--olive, #6A8546)', color: '#FFF', fontWeight: 700, fontSize: '13px',
-          opacity: esperando ? 0.6 : 1,
-        }}
-      >
-        {esperando ? window.t('Comprobando…', 'Checking…') : window.t('Vincular mi donación', 'Link my donation')}
-      </button>
     </div>
   );
 };
@@ -330,7 +417,7 @@ window.VentanaCorona = function VentanaCorona({ esPatrocinador, onCerrar, onConc
     >
       <div
         style={{
-          width: 'min(420px, 100%)', maxHeight: '86vh', overflowY: 'auto',
+          width: 'min(380px, 100%)', maxHeight: '86vh', overflowY: 'auto',
           background: 'var(--bg-card, #FFF)', color: 'var(--ink, #1A1A1A)',
           border: '1.5px solid var(--line, #595459)', borderRadius: '14px',
           boxShadow: '0 20px 60px rgba(0,0,0,0.35)', padding: '20px',
@@ -381,6 +468,7 @@ window.VentanaCorona = function VentanaCorona({ esPatrocinador, onCerrar, onConc
                 <window.SelectorColor
                   valor={cfg.color || '#E0A82E'}
                   colores={window.COLORES_ODINOTE_CURSOR}
+                  compacto
                   onCambio={(c) => setCfg({ ...cfg, color: c })}
                 />
               ) : (

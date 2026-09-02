@@ -90,6 +90,8 @@ window.SelectorColor = function SelectorColor({
   tam = 24,
   incluirTransparente = false,
   etiquetaLibre,
+  // Todo en una fila en vez de en tres. Lo pide quien tiene ancho y no altura.
+  compacto = false,
 }) {
   const { useRef, useState } = React;
   const entrada = useRef(null);
@@ -163,6 +165,164 @@ window.SelectorColor = function SelectorColor({
     prev === null ? { previo: valor || '#1A1A1A', actual: c } : { ...prev, actual: c }
   ));
 
+  // ── Las casillas, cada una definida una sola vez ──
+  //
+  // Se sacan del return porque hay dos maneras de colocarlas —en filas o todas
+  // seguidas— y lo que no puede haber es dos copias del mismo botón: la
+  // siguiente vez que se toque una, se arregla en una y se queda rota en la
+  // otra.
+
+  // Los recientes van un poco más pequeños. No es adorno: así se distinguen de
+  // la paleta cuando van pegados en la misma fila, sin necesidad de un rótulo.
+  const casillaReciente = (c) => (
+    <button
+      key={'reciente-' + c}
+      type="button"
+      style={{
+        width: (tam - 5) + 'px', height: (tam - 5) + 'px', borderRadius: '50%',
+        padding: 0, cursor: 'pointer', background: c,
+        border: norm(c) === actual ? '2px solid var(--wine)' : '1.5px solid var(--line-soft)',
+      }}
+      onMouseDown={sinRobarFoco}
+      onClick={() => elige(c)}
+      title={window.t('Usado hace poco: ', 'Used recently: ') + c}
+      aria-label={c}
+    />
+  );
+
+  const casillaNinguno = () => (
+    <button
+      key="ninguno"
+      type="button"
+      className="selector-color-ninguno"
+      style={{ ...redondo, border: marco(actual === 'transparent' || actual === '') }}
+      onMouseDown={sinRobarFoco}
+      onClick={() => elige('transparent')}
+      title={window.t('Sin color', 'No colour')}
+      aria-label={window.t('Sin color', 'No colour')}
+    />
+  );
+
+  const casillaPaleta = (c) => (
+    <button
+      key={c}
+      type="button"
+      style={{ ...redondo, background: c, border: marco(norm(c) === actual) }}
+      onMouseDown={sinRobarFoco}
+      onClick={() => elige(c)}
+      title={c}
+      aria-label={c}
+    />
+  );
+
+  // El arcoíris: siempre arcoíris, tenga o no un color libre puesto. Si mostrara
+  // el color elegido se confundiría con una casilla más de la paleta y dejaría
+  // de leerse como "aquí hay más". Que esté elegido se ve por el aro, igual que
+  // en las demás.
+  const casillaLibre = () => (
+    <button
+      key="libre"
+      type="button"
+      className="selector-color-libre"
+      style={{
+        ...redondo,
+        position: 'relative',
+        border: marco(!enPaleta),
+        background: 'conic-gradient(#E6544F, #DDAF2C, #90B968, #3CA59E, #3D5A80, #955BA5, #E6544F)',
+      }}
+      onMouseDown={sinRobarFoco}
+      onClick={() => entrada.current && entrada.current.click()}
+      title={etiquetaLibre || window.t('Elegir otro color', 'Pick another colour')}
+      aria-label={etiquetaLibre || window.t('Elegir otro color', 'Pick another colour')}
+    >
+      {/* Se escuchan los dos avisos que da el navegador. Cuál de ellos llega,
+          y cuántas veces, cambia de un navegador a otro; lo único seguro es
+          que con los dos no se pierde ningún movimiento de la rueda. Ninguno
+          da el color por bueno: de eso se encarga Aceptar. */}
+      <input
+        ref={entrada}
+        type="color"
+        value={/^#[0-9a-f]{6}$/i.test(valor || '') ? valor : '#1A1A1A'}
+        onInput={(e) => { enCurso(e.target.value); devuelveSeleccion(); onCambio(e.target.value); }}
+        onChange={(e) => { enCurso(e.target.value); devuelveSeleccion(); onCambio(e.target.value); }}
+        style={{
+          position: 'absolute', inset: 0, width: '100%', height: '100%',
+          opacity: 0, border: 'none', padding: 0, cursor: 'pointer',
+        }}
+        tabIndex={-1}
+        aria-hidden="true"
+      />
+    </button>
+  );
+
+  // Aceptar y Deshacer. Van ARRIBA del todo y no al final: la ventana del
+  // sistema se abre junto al arcoíris, que está abajo, así que este botón se
+  // queda fuera de su sombra y se puede pulsar sin cerrar nada antes. El color
+  // ya se está viendo aplicado; esto lo da por bueno y lo guarda.
+  const confirmacion = () => (!eligiendo ? null : (
+    <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+      <button
+        type="button"
+        className="btn"
+        style={{
+          flex: '1 1 auto', padding: '7px 10px', borderRadius: '6px', border: 'none',
+          background: 'var(--olive, #6A8546)', color: '#FFF',
+          fontWeight: 700, fontSize: '11.5px', cursor: 'pointer',
+        }}
+        onMouseDown={sinRobarFoco}
+        onClick={() => elige(eligiendo.actual || valor)}
+      >
+        {window.t('Aceptar', 'Accept')}
+      </button>
+      <button
+        type="button"
+        className="btn"
+        style={{
+          flex: '0 0 auto', padding: '7px 9px', borderRadius: '6px', fontSize: '11.5px', cursor: 'pointer',
+          border: '1.5px solid var(--line-soft)', background: 'transparent',
+          color: 'var(--ink-3, #595459)',
+        }}
+        onMouseDown={sinRobarFoco}
+        onClick={() => {
+          const previo = eligiendo.previo;
+          setEligiendo(null);
+          devuelveSeleccion();
+          onCambio(previo);
+        }}
+      >
+        {window.t('Deshacer', 'Undo')}
+      </button>
+    </div>
+  ));
+
+  // ── Todo seguido, en una sola fila ──
+  //
+  // Para quien tiene ancho de sobra y ninguna prisa por la altura: una ventana,
+  // no una barra lateral de 86 píxeles. Repartido en tres filas —recientes,
+  // paleta, arcoíris— ninguna llegaba a la mitad del ancho y la ventana se
+  // quedaba con un agujero al lado de los colores. Junto, ocupa una línea y se
+  // lee igual: los recientes se distinguen porque son más pequeños, y una raya
+  // fina los separa de los de siempre.
+  if (compacto) {
+    return (
+      <div className="selector-color-caja" style={{ display: 'flex', flexDirection: 'column', gap: '7px' }}>
+        {confirmacion()}
+        <div className="selector-color" style={enFila}>
+          {recientes.map(casillaReciente)}
+          {recientes.length > 0 && (
+            <span
+              aria-hidden="true"
+              style={{ width: '1px', height: (tam - 6) + 'px', background: 'var(--line-soft, #E5E1DD)', margin: '0 1px' }}
+            />
+          )}
+          {incluirTransparente && casillaNinguno()}
+          {paleta.map(casillaPaleta)}
+          {casillaLibre()}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="selector-color-caja" style={{ display: 'flex', flexDirection: 'column', gap: '7px' }}>
 
@@ -173,131 +333,23 @@ window.SelectorColor = function SelectorColor({
             {window.t('Los últimos que usaste', 'The last ones you used')}
           </div>
           <div className="selector-color-recientes" style={{ ...enFila, gap: '5px' }}>
-            {recientes.map(c => (
-              <button
-                key={c}
-                type="button"
-                style={{
-                  width: (tam - 5) + 'px', height: (tam - 5) + 'px', borderRadius: '50%',
-                  padding: 0, cursor: 'pointer', background: c,
-                  border: norm(c) === actual ? '2px solid var(--wine)' : '1.5px solid var(--line-soft)',
-                }}
-                onMouseDown={sinRobarFoco}
-                onClick={() => elige(c)}
-                title={window.t('Usado hace poco: ', 'Used recently: ') + c}
-                aria-label={c}
-              />
-            ))}
+            {recientes.map(casillaReciente)}
           </div>
         </div>
       )}
 
-      {/* ── 2. Aceptar ──
-          Aquí arriba y no al final: la ventana del sistema se abre junto al
-          arcoíris, que está abajo del todo, así que este botón se queda fuera de
-          su sombra y se puede pulsar sin tener que cerrar nada antes. El color ya
-          se está viendo aplicado; esto lo da por bueno y lo guarda. */}
-      {eligiendo && (
-        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-          <button
-            type="button"
-            className="btn"
-            style={{
-              flex: '1 1 auto', padding: '7px 10px', borderRadius: '6px', border: 'none',
-              background: 'var(--olive, #6A8546)', color: '#FFF',
-              fontWeight: 700, fontSize: '11.5px', cursor: 'pointer',
-            }}
-            onMouseDown={sinRobarFoco}
-            onClick={() => elige(eligiendo.actual || valor)}
-          >
-            {window.t('Aceptar', 'Accept')}
-          </button>
-          <button
-            type="button"
-            className="btn"
-            style={{
-              flex: '0 0 auto', padding: '7px 9px', borderRadius: '6px', fontSize: '11.5px', cursor: 'pointer',
-              border: '1.5px solid var(--line-soft)', background: 'transparent',
-              color: 'var(--ink-3, #595459)',
-            }}
-            onMouseDown={sinRobarFoco}
-            onClick={() => {
-              const previo = eligiendo.previo;
-              setEligiendo(null);
-              devuelveSeleccion();
-              onCambio(previo);
-            }}
-          >
-            {window.t('Deshacer', 'Undo')}
-          </button>
-        </div>
-      )}
+      {/* ── 2. Aceptar ── */}
+      {confirmacion()}
 
       {/* ── 3. Los de siempre ── */}
       <div className="selector-color" style={enFila}>
-        {incluirTransparente && (
-          <button
-            type="button"
-            className="selector-color-ninguno"
-            style={{ ...redondo, border: marco(actual === 'transparent' || actual === '') }}
-            onMouseDown={sinRobarFoco}
-            onClick={() => elige('transparent')}
-            title={window.t('Sin color', 'No colour')}
-            aria-label={window.t('Sin color', 'No colour')}
-          />
-        )}
-
-        {paleta.map(c => (
-          <button
-            key={c}
-            type="button"
-            style={{ ...redondo, background: c, border: marco(norm(c) === actual) }}
-            onMouseDown={sinRobarFoco}
-            onClick={() => elige(c)}
-            title={c}
-            aria-label={c}
-          />
-        ))}
+        {incluirTransparente && casillaNinguno()}
+        {paleta.map(casillaPaleta)}
       </div>
 
-      {/* ── 4. El arcoíris, abajo del todo ──
-          Siempre arcoíris, tenga o no un color libre puesto: si mostrara el
-          color elegido se confundiría con una casilla más de la paleta y
-          dejaría de leerse como "aquí hay más". Que esté elegido se ve por el
-          aro, igual que en las demás. */}
+      {/* ── 4. El arcoíris, abajo del todo ── */}
       <div style={enFila}>
-        <button
-          type="button"
-          className="selector-color-libre"
-          style={{
-            ...redondo,
-            position: 'relative',
-            border: marco(!enPaleta),
-            background: 'conic-gradient(#E6544F, #DDAF2C, #90B968, #3CA59E, #3D5A80, #955BA5, #E6544F)',
-          }}
-          onMouseDown={sinRobarFoco}
-          onClick={() => entrada.current && entrada.current.click()}
-          title={etiquetaLibre || window.t('Elegir otro color', 'Pick another colour')}
-          aria-label={etiquetaLibre || window.t('Elegir otro color', 'Pick another colour')}
-        >
-          {/* Se escuchan los dos avisos que da el navegador. Cuál de ellos llega,
-              y cuántas veces, cambia de un navegador a otro; lo único seguro es
-              que con los dos no se pierde ningún movimiento de la rueda. Ninguno
-              da el color por bueno: de eso se encarga Aceptar. */}
-          <input
-            ref={entrada}
-            type="color"
-            value={/^#[0-9a-f]{6}$/i.test(valor || '') ? valor : '#1A1A1A'}
-            onInput={(e) => { enCurso(e.target.value); devuelveSeleccion(); onCambio(e.target.value); }}
-            onChange={(e) => { enCurso(e.target.value); devuelveSeleccion(); onCambio(e.target.value); }}
-            style={{
-              position: 'absolute', inset: 0, width: '100%', height: '100%',
-              opacity: 0, border: 'none', padding: 0, cursor: 'pointer',
-            }}
-            tabIndex={-1}
-            aria-hidden="true"
-          />
-        </button>
+        {casillaLibre()}
       </div>
     </div>
   );
