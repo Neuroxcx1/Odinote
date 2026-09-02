@@ -340,6 +340,25 @@ function ContextSidebar({
 
         {isShape && (
           <button
+            className="ctx-btn"
+            onClick={() => {
+              // La media de los dos lados, no el mayor ni el menor: subir al
+              // mayor se come lo que haya al lado y bajar al menor encoge tanto
+              // que parece que se ha roto algo. Con la media la figura se queda
+              // donde estaba y del tamaño que ya tenía.
+              const lado = Math.max(80, Math.round(((item.w || 200) + (item.h || 160)) / 2));
+              onUpdate({ w: lado, h: lado, manualH: true });
+              window.playAudioTone && window.playAudioTone('click');
+            }}
+            title={window.t('Igualar los lados: el círculo vuelve a ser un círculo', 'Even the sides: the circle becomes a circle again')}
+          >
+            <span className="material-symbols-rounded">aspect_ratio</span>
+            <span>{window.t('Igualar', 'Even out')}</span>
+          </button>
+        )}
+
+        {isShape && (
+          <button
             className={`ctx-btn ${pane === 'figura' ? 'active' : ''}`}
             onClick={()=>setPane(pane === 'figura' ? null : 'figura')}
             title={window.t('Cambiar la forma', 'Change the shape')}
@@ -1507,7 +1526,7 @@ function ContextSidebar({
         <div className="ctx-popout">
           <div className="ctx-pop-section">
             <div className="ctx-pop-title">{window.t('Color del texto', 'Text color')}</div>
-            <div className="text-color-grid" style={{ marginTop: '6px' }}>
+            <div style={{ marginTop: '6px' }}>
               <window.SelectorColor
                 valor={item.titleColor || item.textColor || '#1A1A1A'}
                 onCambio={(c) => onUpdate({ textColor: c })}

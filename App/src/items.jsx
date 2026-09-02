@@ -3982,38 +3982,64 @@ function FrameItem({ item, lang, editing, onUpdate, callbacks }) {
 
 // ──────────────── BIG TITLE ( head heading ) ────────────────
 // ══════════════════════════════════════════════════════════
-// FIGURAS — círculo, rombo, píldora y hexágono, con texto dentro
+// FIGURAS — con texto dentro
 // ══════════════════════════════════════════════════════════
 //
-// Cuatro y no catorce. Son las que se usan para diagramar —un estado, una
-// decisión, una etiqueta, un paso— y con más formas la herramienta se convierte
-// en un catálogo donde hay que elegir antes de poder escribir.
+// Ocho formas: las cuatro de diagramar de siempre (círculo, rombo, píldora,
+// hexágono), el rectángulo y el triángulo que faltaban, el paralelogramo —que
+// en un diagrama es "entrada de datos"— y la estrella, que no diagrama nada
+// pero marca lo importante, que es para lo que se usa de verdad.
 //
 // Dibujadas en SVG y no con `clip-path`: un recorte no deja borde, y en esta
 // aplicación todo lleva su línea de 1,5 px. Además el trazo no se deforma al
-// estirar el nodo, porque el viewBox va en píxeles reales del nodo y no en una
-// caja de 100x100 escalada.
-const FIGURAS = ['circulo', 'rombo', 'pildora', 'hexagono'];
+// estirar el nodo, porque el viewBox va en píxeles reales del nodo.
+//
+// Ninguna forma es "la redonda" y "la ovalada" por separado: es la misma, y se
+// vuelve redonda con el botón de igualar de la barra de la derecha. Dos
+// entradas para la misma figura solo obligan a elegir dos veces.
+const FIGURAS = ['circulo', 'rectangulo', 'rombo', 'pildora', 'hexagono', 'triangulo', 'paralelogramo', 'estrella'];
 
-// Cuánto hay que meter el texto, en porcentaje, para que no se salga por los
-// lados en diagonal. Un rombo se estrecha muy deprisa hacia las puntas; una
-// píldora casi no se estrecha.
+// Cuánto hay que meter el texto por cada lado, en porcentaje, para que no se
+// salga por donde la figura se estrecha. Un triángulo no tiene sitio arriba —
+// ahí acaba en punta—, así que su texto empieza más abajo.
 const HUECO_FIGURA = {
-  circulo:  { x: 15, y: 13 },
-  rombo:    { x: 25, y: 22 },
-  pildora:  { x: 11, y: 8 },
-  hexagono: { x: 17, y: 9 },
+  circulo:       { i: 15, d: 15, a: 13, b: 13 },
+  rectangulo:    { i: 8,  d: 8,  a: 8,  b: 8 },
+  rombo:         { i: 25, d: 25, a: 22, b: 22 },
+  pildora:       { i: 11, d: 11, a: 8,  b: 8 },
+  hexagono:      { i: 17, d: 17, a: 9,  b: 9 },
+  triangulo:     { i: 22, d: 22, a: 38, b: 8 },
+  paralelogramo: { i: 18, d: 18, a: 10, b: 10 },
+  estrella:      { i: 28, d: 28, a: 30, b: 24 },
 };
 
-// Blanco o tinta, según lo oscuro que sea el relleno. Un texto oscuro sobre un
-// fondo oscuro no se lee, y quien elige el color de la figura no tiene por qué
-// acordarse de cambiar también el del texto.
+// Negro o blanco, según lo oscuro que sea el relleno. Y negro de verdad, no
+// `var(--ink)`: el relleno de una figura es el mismo en tema claro y en oscuro,
+// así que el color del texto tiene que serlo también. Con la variable, una
+// figura blanca en tema oscuro salía con el texto blanco encima.
 function tintaLegible(hex) {
   const m = /^#([0-9a-fA-F]{6})$/.exec(String(hex || '').trim());
-  if (!m) return 'var(--ink)';
+  if (!m) return '#1A1A1A';
   const n = parseInt(m[1], 16);
   const luz = 0.2126 * ((n >> 16) & 255) + 0.7152 * ((n >> 8) & 255) + 0.0722 * (n & 255);
-  return luz < 140 ? '#FFFFFF' : 'var(--ink)';
+  return luz < 140 ? '#FFFFFF' : '#1A1A1A';
+}
+
+// Los diez puntos de una estrella de cinco: cinco fuera y cinco dentro,
+// alternados. Se calcula y no se escribe a mano para que siga siendo una
+// estrella cuando el nodo deja de ser cuadrado.
+function puntosEstrella(w, h, m) {
+  const cx = w / 2, cy = h / 2;
+  const rx = w / 2 - m, ry = h / 2 - m;
+  const puntos = [];
+  for (let i = 0; i < 10; i++) {
+    const dentro = i % 2 === 1;
+    const f = dentro ? 0.42 : 1;
+    // Se empieza arriba: -90 grados.
+    const ang = (Math.PI / 5) * i - Math.PI / 2;
+    puntos.push((cx + Math.cos(ang) * rx * f).toFixed(1) + ',' + (cy + Math.sin(ang) * ry * f).toFixed(1));
+  }
+  return puntos.join(' ');
 }
 
 function FiguraSVG({ figura, w, h, relleno, grosor = 1.5 }) {
@@ -4021,23 +4047,32 @@ function FiguraSVG({ figura, w, h, relleno, grosor = 1.5 }) {
   // mitad de la línea cortada por el canto del nodo.
   const m = grosor / 2 + 0.5;
   const pintura = { fill: relleno, stroke: 'var(--line)', strokeWidth: grosor, strokeLinejoin: 'round' };
-  const ancho = Math.max(2 * m + 1, w);
-  const alto = Math.max(2 * m + 1, h);
+  const an = Math.max(2 * m + 1, w);
+  const al = Math.max(2 * m + 1, h);
 
   let dibujo;
-  if (figura === 'rombo') {
-    dibujo = <polygon points={`${ancho / 2},${m} ${ancho - m},${alto / 2} ${ancho / 2},${alto - m} ${m},${alto / 2}`} style={pintura} />;
+  if (figura === 'rectangulo') {
+    dibujo = <rect x={m} y={m} width={an - 2 * m} height={al - 2 * m} rx={6} style={pintura} />;
+  } else if (figura === 'rombo') {
+    dibujo = <polygon points={`${an / 2},${m} ${an - m},${al / 2} ${an / 2},${al - m} ${m},${al / 2}`} style={pintura} />;
   } else if (figura === 'pildora') {
-    dibujo = <rect x={m} y={m} width={ancho - 2 * m} height={alto - 2 * m} rx={Math.min(ancho, alto) / 2} style={pintura} />;
+    dibujo = <rect x={m} y={m} width={an - 2 * m} height={al - 2 * m} rx={Math.min(an, al) / 2} style={pintura} />;
   } else if (figura === 'hexagono') {
-    const q = Math.min(ancho * 0.24, alto * 0.5);
-    dibujo = <polygon points={`${q},${m} ${ancho - q},${m} ${ancho - m},${alto / 2} ${ancho - q},${alto - m} ${q},${alto - m} ${m},${alto / 2}`} style={pintura} />;
+    const q = Math.min(an * 0.24, al * 0.5);
+    dibujo = <polygon points={`${q},${m} ${an - q},${m} ${an - m},${al / 2} ${an - q},${al - m} ${q},${al - m} ${m},${al / 2}`} style={pintura} />;
+  } else if (figura === 'triangulo') {
+    dibujo = <polygon points={`${an / 2},${m} ${an - m},${al - m} ${m},${al - m}`} style={pintura} />;
+  } else if (figura === 'paralelogramo') {
+    const k = Math.min(an * 0.2, 46);
+    dibujo = <polygon points={`${k},${m} ${an - m},${m} ${an - k},${al - m} ${m},${al - m}`} style={pintura} />;
+  } else if (figura === 'estrella') {
+    dibujo = <polygon points={puntosEstrella(an, al, m)} style={pintura} />;
   } else {
-    dibujo = <ellipse cx={ancho / 2} cy={alto / 2} rx={ancho / 2 - m} ry={alto / 2 - m} style={pintura} />;
+    dibujo = <ellipse cx={an / 2} cy={al / 2} rx={an / 2 - m} ry={al / 2 - m} style={pintura} />;
   }
 
   return (
-    <svg viewBox={`0 0 ${ancho} ${alto}`} width="100%" height="100%" preserveAspectRatio="none" style={{ display: 'block' }}>
+    <svg viewBox={`0 0 ${an} ${al}`} width="100%" height="100%" preserveAspectRatio="none" style={{ display: 'block' }}>
       {dibujo}
     </svg>
   );
@@ -4047,7 +4082,7 @@ function ShapeItem({ item, lang, editing, onUpdate }) {
   const figura = FIGURAS.indexOf(item.figura) !== -1 ? item.figura : 'circulo';
   const w = Math.max(1, item.w || 200);
   const h = Math.max(1, item.h || 160);
-  const relleno = window.resolveStickyColor ? window.resolveStickyColor(item.color || 'sage') : '#E8F0DA';
+  const relleno = window.resolveStickyColor ? window.resolveStickyColor(item.color || 'white') : '#FFFFFF';
   const texto = pickLang(item.content, lang);
   const ref = React.useRef(null);
   const hueco = HUECO_FIGURA[figura] || HUECO_FIGURA.circulo;
@@ -4059,6 +4094,41 @@ function ShapeItem({ item, lang, editing, onUpdate }) {
     const sano = window.repairEscapedMarkup ? window.repairEscapedMarkup(texto || '') : (texto || '');
     if (ref.current.innerHTML !== sano) ref.current.innerHTML = sano;
   }, [item.id, texto]);
+
+  // ── La figura crece con lo que se escribe ──
+  //
+  // Sin esto, una lista de quince líneas dentro de un círculo se comía sus
+  // primeras líneas sin avisar: el texto se recorta por arriba y por abajo y no
+  // hay barra de desplazamiento que lo insinúe.
+  //
+  // Se mide con la caja suelta —sin `bottom`, alto automático— porque encajada
+  // entre los dos bordes su `scrollHeight` no puede ser menor que el hueco, y
+  // entonces la figura crecería pero no volvería a encoger al borrar texto.
+  // Y hay que devolver lo medido a tamaño de figura: el texto solo ocupa la
+  // franja de en medio, así que un círculo necesita crecer más que un
+  // rectángulo para el mismo párrafo.
+  React.useEffect(() => {
+    if (!ref.current) return;
+    if (document.body.classList.contains('odi-busy')) return;
+    const el = ref.current;
+    const antesBottom = el.style.bottom;
+    const antesHeight = el.style.height;
+    el.style.bottom = 'auto';
+    el.style.height = 'auto';
+    const necesario = el.scrollHeight;
+    el.style.bottom = antesBottom;
+    el.style.height = antesHeight;
+
+    const franja = Math.max(0.2, 1 - (hueco.a + hueco.b) / 100);
+    const total = Math.max(90, Math.round(necesario / franja) + 4);
+    // Crece, pero no encoge. Una nota sí puede encogerse porque es un
+    // rectángulo y da igual su proporción; una figura no: al ajustarse a una
+    // línea de texto, un círculo de 200x160 se convertía en una raja de 200x90
+    // en cuanto se escribía dentro. Aquí el alto de partida es un suelo, y
+    // quien quiera menos lo arrastra o pulsa Igualar.
+    if (total > (item.h || 0)) onUpdate({ h: total });
+  // eslint-disable-next-line
+  }, [texto, editing, item.h, item.w, item.figura, item.textScale, item.manualH, lang]);
 
   // Entrar a editar es poner el cursor dentro, no solo permitirlo: sin esto se
   // podía hacer doble clic en la figura, ver la barra de formato aparecer, y
@@ -4096,9 +4166,10 @@ function ShapeItem({ item, lang, editing, onUpdate }) {
         data-placeholder={window.t('Escribe aquí…', 'Write here…')}
         style={{
           position: 'absolute',
-          left: hueco.x + '%', right: hueco.x + '%',
-          top: hueco.y + '%', bottom: hueco.y + '%',
+          left: hueco.i + '%', right: hueco.d + '%',
+          top: hueco.a + '%', bottom: hueco.b + '%',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
+          flexDirection: 'column',
           textAlign: item.align || 'center',
           color: color,
           fontWeight: item.bold === false ? 500 : 700,

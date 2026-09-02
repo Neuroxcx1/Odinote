@@ -47,7 +47,7 @@ try {
 
 // Marcador de build: si la consola no muestra esta versión, el navegador está
 // sirviendo JS cacheado (subir ?v= en index.html invalida la caché)
-window.ODINOTE_BUILD = '1.0.8-159';
+window.ODINOTE_BUILD = '1.0.8-160';
 console.log('[ODINOTE] Código cargado: ' + window.ODINOTE_BUILD);
 
 // Global shortcuts configuration
@@ -295,6 +295,15 @@ function App() {
     window.playAudioTone && window.playAudioTone('click');
   };
   window.showToast = showToast;
+
+  // La corona cuelga de la cuenta: sin sesión de Google no hay a quién darle
+  // los cosméticos, ni forma de comprobar una donación. Así que sin sesión el
+  // botón no lleva a la ventana de la corona —donde solo se podría mirar— sino
+  // a la de entrar, que es el paso que de verdad falta.
+  const abreLaCorona = () => {
+    if (!userProfile) { setUserModalOpen(true); return; }
+    setCoronaOpen(true);
+  };
 
   // ── La corona de quien ha invitado a un café ──
   //
@@ -2717,7 +2726,7 @@ function App() {
       onSettingsClick={() => setSettingsOpen(true)}
       userProfile={userProfile}
       esPatrocinador={esPatrocinador}
-      onAbrirCorona={() => setCoronaOpen(true)}
+      onAbrirCorona={abreLaCorona}
       onUserClick={() => setUserModalOpen(true)}
       onJoinProjectClick={() => setJoiningModalOpen(true)}
       onTogglePublic={togglePublicProject}
@@ -2760,7 +2769,7 @@ function App() {
       vaultPath={vaultPath}
       userProfile={userProfile}
       esPatrocinador={esPatrocinador}
-      onAbrirCorona={() => setCoronaOpen(true)}
+      onAbrirCorona={abreLaCorona}
       onUserClick={() => setUserModalOpen(true)}
       projects={projects}
       setProjects={setProjects}

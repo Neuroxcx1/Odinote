@@ -180,7 +180,10 @@ function makeNewItem(type, x, y, w, h, lang) {
       // primera figura todavía no sabe qué va a escribir dentro.
       return { ...base, type: 'shape', ...defaultSize(200, 160),
         figura: 'circulo',
-        color: 'sage',
+        // Blanca, el mismo blanco que una nota. Nacía en verde claro y ese
+        // "hueso" no era el blanco de ningún otro nodo, así que una figura
+        // recién puesta no se parecía a nada de lo que ya había en el lienzo.
+        color: 'white',
         content: { es: '', en: '' } };
     case 'bigtitle':
       return { ...base, type: 'bigtitle', ...defaultSize(300, 80),
@@ -5139,7 +5142,6 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
           <window.TextFormatSidebar
             item={it}
             lang={lang}
-            noCodeQuote={it.type === 'comment'}
             onUpdate={(patch)=>updateItem(it.id, patch)}
             onClose={()=>{
               if (isEditingMapTitle) {

@@ -2198,14 +2198,11 @@ body.odi-busy iframe { pointer-events: none !important; }
 
 /* Day context menu — positioned lower so it doesn't cover the top toolbar */
 .ctx-side.ctx-side-day { position: fixed; top: 96px; left: 14px; z-index: 202; }
-.text-color-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; }
-.text-color-swatch {
-  aspect-ratio: 1;
-  border-radius: 50%;
-  cursor: pointer;
-  transition: transform 120ms var(--e-out);
-}
-.text-color-swatch:hover { transform: scale(1.15); }
+/* Aquí vivían .text-color-grid y .text-color-swatch: la rejilla de siete
+   columnas y sus casillas, de cuando el color del texto se elegía con siete
+   círculos escritos a mano. Los eligió el selector único hace tiempo, y la
+   rejilla se quedó encajando ese selector en una columna de treinta píxeles,
+   que es lo que hacía que el panel saliera estirado hacia abajo. */
 .note .note-inner.rich, .note .note-edit.rich {
   padding: 10px 12px;
   font-family: var(--font-body);
@@ -2957,7 +2954,9 @@ body.odi-busy iframe { pointer-events: none !important; }
 /* Las cuatro figuras para elegir, en la barra de la derecha. */
 .ctx-figura-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  /* Cuatro columnas y dos filas para las ocho: en dos columnas la lista se iba
+     al doble de alto que el panel y había que buscarlas con la rueda. */
+  grid-template-columns: repeat(4, 1fr);
   gap: 6px;
 }
 .ctx-figura-swatch {
@@ -2973,7 +2972,7 @@ body.odi-busy iframe { pointer-events: none !important; }
 .ctx-figura-swatch:hover { border-color: var(--line); background: var(--paper); }
 .ctx-figura-swatch:active { transform: scale(0.95); }
 .ctx-figura-swatch.active { border-color: var(--wine); background: var(--paper); }
-.ctx-figura-swatch svg { width: 34px; height: 26px; }
+.ctx-figura-swatch svg { width: 30px; height: 24px; }
 
 /* ── La barra de la portada ──
    Un arcoíris por el que se arrastra. Para una portada nadie busca "el
