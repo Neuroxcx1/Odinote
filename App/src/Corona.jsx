@@ -66,16 +66,23 @@ window.Corona = function Corona({ size = 16, className = '', title, insignia = f
 // de tres píxeles en una esquina no la ve nadie, y lo que se compra aquí es
 // precisamente que se vea. El brillo respira despacio en vez de parpadear —
 // un parpadeo en una barra de herramientas cansa a los diez minutos.
+//
+// Abre la ventana en los dos estados, y esto es lo importante: con la corona
+// encendida antes solo sacaba un aviso de agradecimiento y ahí se acababa. Un
+// botón que da las gracias y no hace nada más está roto — se pulsa una vez, se
+// lee el mensaje y no se vuelve a tocar, así que quien había pagado no llegaba
+// nunca al sitio donde se cambia el cursor, que es justo lo que había pagado.
+// Las gracias siguen estando, dentro de la ventana, que es donde no estorban.
 window.CoronaBoton = function CoronaBoton({ activo = false, onAbrir, size = 19 }) {
-  const gracias = window.t(
-    'Gracias por invitar a un café. Tus cosméticos de patrocinador están activos.',
-    'Thanks for the coffee. Your supporter cosmetics are active.'
+  const cosmeticos = window.t(
+    'Tus cosméticos de patrocinador: elige tu cursor',
+    'Your supporter cosmetics: choose your cursor'
   );
   const invita = window.t(
     'Apoya Odinote y consigue la corona y el cursor dorado',
     'Support Odinote and get the crown and the golden cursor'
   );
-  const texto = activo ? gracias : invita;
+  const texto = activo ? cosmeticos : invita;
 
   return (
     <button
@@ -84,12 +91,9 @@ window.CoronaBoton = function CoronaBoton({ activo = false, onAbrir, size = 19 }
       aria-label={texto}
       onClick={() => {
         window.playAudioTone && window.playAudioTone('click');
-        if (activo) {
-          window.showToast && window.showToast('👑 ' + gracias);
-          return;
-        }
-        // Apagada, lleva a la ventana de perfil: ahí está tanto el enlace para
-        // apoyar como el panel para reclamar una donación ya hecha.
+        // Encendida lleva al taller —el cursor— y apagada a lo que se consigue
+        // y al panel para reclamar una donación ya hecha. Es la misma ventana:
+        // ella sabe cuál de las dos caras toca enseñar.
         onAbrir && onAbrir();
       }}
     >
@@ -253,7 +257,7 @@ window.PanelReclamo = function PanelReclamo({ onConcedida }) {
 // taller: aquí se cambia el cursor, que es lo que de verdad hace que el programa
 // se parezca un poco a ti.
 window.VentanaCorona = function VentanaCorona({ esPatrocinador, onCerrar, onConcedida }) {
-  const { useState, useEffect } = React;
+  const { useState, useEffect, useRef } = React;
   const C = window.CursorOdinote;
 
   const [cfg, setCfg] = useState(() => (C && C.lee()) || { modo: 'color', color: '#E0A82E', imagen: null });
@@ -265,6 +269,17 @@ window.VentanaCorona = function VentanaCorona({ esPatrocinador, onCerrar, onConc
     if (!C || !esPatrocinador) return;
     C.aplica(cfg);
   }, [cfg, esPatrocinador]);
+
+  // Y al cerrar manda lo que hay guardado, no lo que se estuvo probando. Sin
+  // esto, quien paseaba por la rueda de color y cerraba sin guardar se quedaba
+  // con el último tono que rozó el ratón hasta reiniciar la aplicación, sin
+  // haber dicho que sí en ningún momento.
+  const esPatro = useRef(esPatrocinador);
+  esPatro.current = esPatrocinador;
+  useEffect(() => () => {
+    if (!C) return;
+    C.aplica(esPatro.current ? C.lee() : null);
+  }, []);
 
   const guardar = () => {
     C && C.guarda(cfg);
@@ -299,8 +314,9 @@ window.VentanaCorona = function VentanaCorona({ esPatrocinador, onCerrar, onConc
     color: 'var(--ink, #1A1A1A)',
   });
 
-  const cursorDePrueba = C
-    ? 'url("' + C.urlDe(cfg) + '") ' + (cfg.modo === 'imagen' ? '20 20' : '4 4') + ', auto'
+  const urlPrueba = C && C.urlDe(cfg);
+  const cursorDePrueba = urlPrueba
+    ? 'url("' + urlPrueba + '") ' + (cfg.modo === 'imagen' ? '20 20' : '4 4') + ', auto'
     : 'auto';
 
   return (
@@ -364,6 +380,7 @@ window.VentanaCorona = function VentanaCorona({ esPatrocinador, onCerrar, onConc
               {cfg.modo === 'color' ? (
                 <window.SelectorColor
                   valor={cfg.color || '#E0A82E'}
+                  colores={window.COLORES_ODINOTE_CURSOR}
                   onCambio={(c) => setCfg({ ...cfg, color: c })}
                 />
               ) : (

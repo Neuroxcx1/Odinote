@@ -39,6 +39,15 @@ window.COLORES_ODINOTE_SUAVES = ['#FFF3A3', '#FFC7C2', '#CFEFD6', '#CDE9FF'];
 // amarilleando para siempre.
 window.COLORES_ODINOTE_FONDO = ['#FFFFFF', '#F7DA84', '#FBDFDD', '#E8F0DA'];
 
+// Los del cursor de quien invita a un café. El dorado va PRIMERO y no es
+// decoración del orden: es el que se anuncia en la propia ventana —"el cursor
+// dorado"— y hasta ahora no estaba en ninguna casilla, así que quien pagaba por
+// él tenía que ir a buscarlo a la rueda del sistema y acertar el tono a ojo.
+// Detrás, blanco para los lienzos oscuros y dos de la casa. El cuerpo de la
+// flecha es oscuro y el color elegido es su borde, así que aquí no valen los
+// tonos que se confunden con ese cuerpo.
+window.COLORES_ODINOTE_CURSOR = ['#E0A82E', '#FFFFFF', '#E6544F', '#3D5A80'];
+
 // Y los de una flecha: negro y blanco, nada más. Sobre el lienzo claro se ve el
 // negro y sobre el oscuro el blanco, y con eso está casi todo resuelto; el resto
 // está en el arcoíris. Además su barra lateral es estrecha y no caben más.
