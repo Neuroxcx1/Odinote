@@ -38,14 +38,39 @@ window.displayMediaSrc = displayMediaSrc;
 // Fondo de un nodo respetando el tema: si el usuario NO eligió color, el nodo
 // sigue el tema (papel oscuro en modo oscuro) en vez de quedar blanco fijo.
 // Un color elegido explícitamente (incluido el blanco) se respeta tal cual.
+// Un color de fondo puede venir de dos sitios: un nombre de la paleta de
+// siempre ("yellow", "sage") o un color libre elegido con el selector, que se
+// guarda tal cual en hexadecimal. Se distinguen por la almohadilla.
+function esColorLibre(c) {
+  return typeof c === 'string' && /^#[0-9a-fA-F]{3,8}$/.test(c);
+}
+window.esColorLibre = esColorLibre;
+
+// Que blanco o que negro pedir para el texto encima de un color libre. Se mira
+// el brillo percibido y no la media de los canales: el ojo ve el verde mucho
+// mas claro que el azul, y con la media un verde vivo salia "oscuro" y le
+// tocaba texto blanco, que sobre el no se lee.
+function brilloDe(hex) {
+  let h = hex.replace('#', '');
+  if (h.length === 3) h = h.split('').map(x => x + x).join('');
+  const n = parseInt(h.slice(0, 6), 16);
+  if (!isFinite(n)) return 1;
+  const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+  return (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+}
+
 function nodeBg(item) {
   if (!item.color) return 'var(--paper)';
+  // Un color libre se deja pasar sin traducir: la tabla de nombres no lo
+  // conoce y devolveria blanco, asi que el color elegido se perderia.
+  if (esColorLibre(item.color)) return item.color;
   return window.resolveStickyColor ? window.resolveStickyColor(item.color) : '#FFFFFF';
 }
 // Color de texto acorde al fondo: sin color → tinta del tema; fondo oscuro →
 // blanco; fondo claro elegido → tinta oscura fija.
 function nodeInk(item) {
   if (!item.color) return 'var(--ink)';
+  if (esColorLibre(item.color)) return brilloDe(item.color) < 0.6 ? '#FFFFFF' : '#1A1A1A';
   const dark = ['olive','wine','dark','green','red','purple','navy','indigo','plum','forest','black'].includes(item.color);
   return dark ? '#FFFFFF' : '#1A1A1A';
 }
@@ -109,6 +134,10 @@ const CATEGORY_HEX = {
 };
 
 function colorClass(c) {
+  // Un color libre no tiene clase. Se devuelve la de blanco para no emitir un
+  // nombre de clase con almohadilla, que no es valido en CSS; el fondo de
+  // verdad lo pone `nodeBg` en linea.
+  if (typeof c === 'string' && c.charAt(0) === '#') return 'white';
   const map = {
     yellow:'cream', pink:'rose', mint:'sage', sky:'stone',
     lavender:'wine', lav:'wine', coral:'cream', lime:'sage', paper:'white',

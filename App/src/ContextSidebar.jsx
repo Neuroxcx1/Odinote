@@ -1082,6 +1082,20 @@ function ContextSidebar({
                 />
               ))}
             </div>
+
+            {/* Y cualquier otro. La paleta de arriba son los de siempre y se
+                quedan: quien lleva meses eligiendo "amarillo" no tiene por que
+                aprender un color nuevo. Esto es para el que quiere el suyo. */}
+            <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1.5px solid var(--line-soft)' }}>
+              <div style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--ink-3)', marginBottom: '6px' }}>
+                {window.t('Otro color', 'Another colour')}
+              </div>
+              <window.SelectorColor
+                valor={window.esColorLibre && window.esColorLibre(item.color) ? item.color : ''}
+                onCambio={(c) => onUpdate({ color: c })}
+                tam={22}
+              />
+            </div>
           </div>
         </div>
       )}
@@ -1346,6 +1360,16 @@ function ContextSidebar({
                 />
               ))}
             </div>
+            <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1.5px solid var(--line-soft)' }}>
+              <div style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--ink-3)', marginBottom: '6px' }}>
+                {window.t('Otro color', 'Another colour')}
+              </div>
+              <window.SelectorColor
+                valor={window.esColorLibre && window.esColorLibre(tableCell.cellData?.color) ? tableCell.cellData?.color : ''}
+                onCambio={(c) => tableCell.updateCell({ color: c })}
+                tam={22}
+              />
+            </div>
           </div>
         </div>
       )}
@@ -1543,16 +1567,28 @@ function ColorTabs({ item, onUpdate }) {
       </div>
 
       {tab === 'bg' && (
-        <div className="ctx-sticky-grid">
-          {STICKY_PALETTE.map(p => (
-            <button
-              key={p.key}
-              className={`ctx-sticky-swatch ${(item.bgColor || 'white') === p.key ? 'active' : ''}`}
-              style={{ background: p.hex, border: p.hex === '#FFFFFF' ? '1.5px solid var(--line-soft)' : '1.5px solid var(--line)' }}
-              onClick={()=>onUpdate({ bgColor: p.key })}
-              title={p.label}
+        <div>
+          <div className="ctx-sticky-grid">
+            {STICKY_PALETTE.map(p => (
+              <button
+                key={p.key}
+                className={`ctx-sticky-swatch ${(item.bgColor || 'white') === p.key ? 'active' : ''}`}
+                style={{ background: p.hex, border: p.hex === '#FFFFFF' ? '1.5px solid var(--line-soft)' : '1.5px solid var(--line)' }}
+                onClick={()=>onUpdate({ bgColor: p.key })}
+                title={p.label}
+              />
+            ))}
+          </div>
+          <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1.5px solid var(--line-soft)' }}>
+            <div style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--ink-3)', marginBottom: '6px' }}>
+              {window.t('Otro color', 'Another colour')}
+            </div>
+            <window.SelectorColor
+              valor={window.esColorLibre && window.esColorLibre(item.bgColor) ? item.bgColor : ''}
+              onCambio={(c) => onUpdate({ bgColor: c })}
+              tam={22}
             />
-          ))}
+          </div>
         </div>
       )}
 

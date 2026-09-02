@@ -73,6 +73,12 @@ window.SelectorColor = function SelectorColor({
   // devuelve lo que había.
   const [eligiendo, setEligiendo] = useState(null);
 
+  // Sin esto, pulsar una casilla le quita el foco al texto que se estaba
+  // escribiendo y se pierde el cursor. Y sin cursor, elegir un color solo hacia
+  // algo si ya habia texto seleccionado: escribir despues salia del color de
+  // antes, que es exactamente lo que no espera nadie.
+  const sinRobarFoco = (e) => e.preventDefault();
+
   const norm = (c) => (typeof c === 'string' ? c.trim().toLowerCase() : '');
   const actual = norm(valor);
   const enPaleta = paleta.some(c => norm(c) === actual) ||
@@ -104,6 +110,7 @@ window.SelectorColor = function SelectorColor({
             type="button"
             className="selector-color-ninguno"
             style={{ ...redondo, border: marco(actual === 'transparent' || actual === '') }}
+            onMouseDown={sinRobarFoco}
             onClick={() => elige('transparent')}
             title={window.t('Sin color', 'No colour')}
             aria-label={window.t('Sin color', 'No colour')}
@@ -115,6 +122,7 @@ window.SelectorColor = function SelectorColor({
             key={c}
             type="button"
             style={{ ...redondo, background: c, border: marco(norm(c) === actual) }}
+            onMouseDown={sinRobarFoco}
             onClick={() => elige(c)}
             title={c}
             aria-label={c}
@@ -136,6 +144,7 @@ window.SelectorColor = function SelectorColor({
               ? 'conic-gradient(#E6544F, #DDAF2C, #90B968, #3CA59E, #3D5A80, #955BA5, #E6544F)'
               : (valor || '#1A1A1A'),
           }}
+          onMouseDown={sinRobarFoco}
           onClick={() => entrada.current && entrada.current.click()}
           title={etiquetaLibre || window.t('Elegir otro color', 'Pick another colour')}
           aria-label={etiquetaLibre || window.t('Elegir otro color', 'Pick another colour')}
@@ -162,6 +171,10 @@ window.SelectorColor = function SelectorColor({
 
       {/* ── Los últimos que se usaron ── */}
       {recientes.length > 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+          <div style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--ink-3, #8E8A8E)' }}>
+            {window.t('Los últimos que usaste', 'The last ones you used')}
+          </div>
         <div
           className="selector-color-recientes"
           style={{
@@ -180,11 +193,13 @@ window.SelectorColor = function SelectorColor({
                 padding: 0, cursor: 'pointer', background: c,
                 border: norm(c) === actual ? '2px solid var(--wine)' : '1.5px solid var(--line-soft)',
               }}
+              onMouseDown={sinRobarFoco}
               onClick={() => elige(c)}
               title={window.t('Usado hace poco: ', 'Used recently: ') + c}
               aria-label={c}
             />
           ))}
+          </div>
         </div>
       )}
 
@@ -203,6 +218,7 @@ window.SelectorColor = function SelectorColor({
               background: 'var(--olive, #6A8546)', color: '#FFF',
               fontWeight: 700, fontSize: '11.5px', cursor: 'pointer',
             }}
+            onMouseDown={sinRobarFoco}
             onClick={() => elige(valor)}
           >
             {window.t('Aceptar', 'Accept')}
@@ -215,6 +231,7 @@ window.SelectorColor = function SelectorColor({
               border: '1.5px solid var(--line-soft)', background: 'transparent',
               color: 'var(--ink-3, #595459)',
             }}
+            onMouseDown={sinRobarFoco}
             onClick={() => { const p = eligiendo.previo; setEligiendo(null); onCambio(p); }}
           >
             {window.t('Cancelar', 'Cancel')}

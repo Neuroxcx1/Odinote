@@ -1176,14 +1176,17 @@ body[data-patrocinador="1"] .board-preview-item {
 }
 
 /* ── El fogonazo ──
-   Los bordes del lienzo se encienden en blanco un instante y se apagan, como el
-   obturador de una cámara. Entre pulsar el botón y ver la ventana de guardar
-   pasa casi un segundo, y sin nada en medio parece que no ha pasado nada y se
-   vuelve a pulsar.
 
-   Es un halo hacia adentro y no un velo blanco encima: velar el lienzo entero
-   tapa justo lo que la persona quiere ver, que es lo que va a salir en la foto.
-   Y no recibe clics, para no comerse el que venga detrás. */
+   Al disparar, el lienzo se apaga un instante y los bordes se encienden en
+   blanco, hacia dentro. Es el mismo velo oscuro que usa el modo dibujo, y a
+   proposito: ya se sabe lo que significa —"esto de aqui es lo que importa
+   ahora"— y no hace falta aprenderlo dos veces.
+
+   Entre pulsar y ver la ventana de guardar pasa casi un segundo, y sin nada en
+   medio parece que el boton no ha hecho nada y se vuelve a pulsar.
+
+   No recibe clics, para no comerse el que venga detras. Y se apaga ANTES de
+   disparar, o saldria en la foto. */
 .canvas-fogonazo {
   position: absolute;
   inset: 0;
@@ -1195,31 +1198,24 @@ body[data-patrocinador="1"] .board-preview-item {
 
 @keyframes canvas-fogonazo {
   0% {
+    background: rgba(10, 10, 12, 0);
     box-shadow: inset 0 0 0 0 rgba(255, 255, 255, 0);
-    background: rgba(255, 255, 255, 0);
   }
-  35% {
-    box-shadow: inset 0 0 90px 14px rgba(255, 255, 255, 0.85);
-    background: rgba(255, 255, 255, 0.10);
+  30% {
+    /* El velo y el borde llegan juntos. El halo entra 150px hacia el centro:
+       lo bastante para que se lea como un marco y no como una linea. */
+    background: rgba(10, 10, 12, 0.42);
+    box-shadow: inset 0 0 150px 26px rgba(255, 255, 255, 0.92);
+  }
+  55% {
+    background: rgba(10, 10, 12, 0.34);
+    box-shadow: inset 0 0 120px 18px rgba(255, 255, 255, 0.6);
   }
   100% {
+    background: rgba(10, 10, 12, 0);
     box-shadow: inset 0 0 0 0 rgba(255, 255, 255, 0);
-    background: rgba(255, 255, 255, 0);
   }
 }
-
-/* Sobre el tema claro un blanco puro no se ve: ahí el destello va en el verde
-   de la marca, que sí destaca sobre el papel. */
-:root:not([data-theme="dark"]) .canvas-fogonazo {
-  animation-name: canvas-fogonazo-claro;
-}
-
-@keyframes canvas-fogonazo-claro {
-  0%   { box-shadow: inset 0 0 0 0 rgba(106, 133, 70, 0); }
-  35%  { box-shadow: inset 0 0 90px 14px rgba(106, 133, 70, 0.55); }
-  100% { box-shadow: inset 0 0 0 0 rgba(106, 133, 70, 0); }
-}
-
 @media (prefers-reduced-motion: reduce) {
   .canvas-fogonazo { animation-duration: 1ms; }
 }
