@@ -92,6 +92,10 @@ window.SelectorColor = function SelectorColor({
   etiquetaLibre,
   // Todo en una fila en vez de en tres. Lo pide quien tiene ancho y no altura.
   compacto = false,
+  // El color del botón de aceptar. Verde en toda la aplicación; la ventana de
+  // la corona lo pide dorado, porque allí el dorado es lo que se ha comprado.
+  acento,
+  acentoTexto,
 }) {
   const { useRef, useState } = React;
   const entrada = useRef(null);
@@ -266,7 +270,7 @@ window.SelectorColor = function SelectorColor({
         className="btn"
         style={{
           flex: '1 1 auto', padding: '7px 10px', borderRadius: '6px', border: 'none',
-          background: 'var(--olive, #6A8546)', color: '#FFF',
+          background: acento || 'var(--olive, #6A8546)', color: acentoTexto || '#FFF',
           fontWeight: 700, fontSize: '11.5px', cursor: 'pointer',
         }}
         onMouseDown={sinRobarFoco}
@@ -300,24 +304,48 @@ window.SelectorColor = function SelectorColor({
   // Para quien tiene ancho de sobra y ninguna prisa por la altura: una ventana,
   // no una barra lateral de 86 píxeles. Repartido en tres filas —recientes,
   // paleta, arcoíris— ninguna llegaba a la mitad del ancho y la ventana se
-  // quedaba con un agujero al lado de los colores. Junto, ocupa una línea y se
-  // lee igual: los recientes se distinguen porque son más pequeños, y una raya
-  // fina los separa de los de siempre.
+  // quedaba con un agujero al lado de los colores.
+  //
+  // ── Por qué el historial va a la DERECHA y con un reloj delante ──
+  //
+  // La primera versión de esta fila puso los recientes a la izquierda y los
+  // separó de la paleta con una rayita de un píxel. No se entendía: la rayita
+  // no se ve sobre fondo oscuro, y sin el rótulo que tenía en la versión de
+  // tres filas, once círculos seguidos parecen una sola paleta larga. Quien la
+  // usó dio por hecho que el historial era la parte de la derecha —la fija—,
+  // eligió un color nuevo, vio que esa parte no cambiaba y concluyó que el
+  // historial estaba roto. Funcionaba; no se veía.
+  //
+  // Ahora lo de siempre va primero, porque no cambia nunca, y detrás de una
+  // separación de verdad viene el historial con un reloj delante. El color
+  // recién elegido aparece justo después del reloj, que es donde se está
+  // mirando al soltar la rueda.
   if (compacto) {
     return (
       <div className="selector-color-caja" style={{ display: 'flex', flexDirection: 'column', gap: '7px' }}>
         {confirmacion()}
         <div className="selector-color" style={enFila}>
-          {recientes.map(casillaReciente)}
-          {recientes.length > 0 && (
-            <span
-              aria-hidden="true"
-              style={{ width: '1px', height: (tam - 6) + 'px', background: 'var(--line-soft, #E5E1DD)', margin: '0 1px' }}
-            />
-          )}
           {incluirTransparente && casillaNinguno()}
           {paleta.map(casillaPaleta)}
           {casillaLibre()}
+
+          {recientes.length > 0 && (
+            <span
+              className="selector-color-raya"
+              aria-hidden="true"
+              style={{ height: (tam + 2) + 'px' }}
+            />
+          )}
+          {recientes.length > 0 && (
+            <span
+              className="material-symbols-rounded selector-color-reloj"
+              title={window.t('Los últimos que usaste', 'The last ones you used')}
+              aria-label={window.t('Los últimos que usaste', 'The last ones you used')}
+            >
+              schedule
+            </span>
+          )}
+          {recientes.map(casillaReciente)}
         </div>
       </div>
     );

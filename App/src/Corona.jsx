@@ -349,6 +349,12 @@ window.VentanaCorona = function VentanaCorona({ esPatrocinador, onCerrar, onConc
 
   const [cfg, setCfg] = useState(() => (C && C.lee()) || { modo: 'color', color: '#E0A82E', imagen: null });
   const [aviso, setAviso] = useState(null);
+  // Si hay algo guardado, "El de siempre" tiene trabajo; si no, no lo tiene y
+  // se apaga. Un botón que no puede hacer nada y aun así se deja pulsar es la
+  // forma más rápida de que alguien crea que la aplicación no le responde.
+  const [hayGuardado, setHayGuardado] = useState(() => !!(C && C.lee()));
+  // El acuse de recibo del botón de guardar, que dura lo que dura la lectura.
+  const [recienGuardado, setRecienGuardado] = useState(false);
 
   // Se va aplicando mientras se toca, no al guardar. Un cursor no se puede
   // elegir a ciegas: hay que verlo moverse para saber si estorba.
@@ -368,10 +374,14 @@ window.VentanaCorona = function VentanaCorona({ esPatrocinador, onCerrar, onConc
     C.aplica(esPatro.current ? C.lee() : null);
   }, []);
 
+  // El acuse va en el propio botón y no en un aviso debajo: la mano está en el
+  // botón y la mirada también, así que es ahí donde hay que contestar.
   const guardar = () => {
     C && C.guarda(cfg);
-    setAviso(window.t('Guardado.', 'Saved.'));
-    setTimeout(() => setAviso(null), 2200);
+    setHayGuardado(true);
+    setRecienGuardado(true);
+    window.playAudioTone && window.playAudioTone('click');
+    setTimeout(() => setRecienGuardado(false), 1800);
   };
 
   const restablecer = () => {
@@ -379,6 +389,8 @@ window.VentanaCorona = function VentanaCorona({ esPatrocinador, onCerrar, onConc
     setCfg(limpio);
     C && C.guarda(null);
     C && C.aplica(null);
+    setHayGuardado(false);
+    window.playAudioTone && window.playAudioTone('click');
     setAviso(window.t('Cursor de siempre restablecido.', 'Default cursor restored.'));
     setTimeout(() => setAviso(null), 2200);
   };
@@ -394,13 +406,6 @@ window.VentanaCorona = function VentanaCorona({ esPatrocinador, onCerrar, onConc
         'That file could not be used. Try a PNG or a JPG.')));
   };
 
-  const pestana = (activa) => ({
-    flex: 1, padding: '8px 10px', borderRadius: '7px', fontSize: '12.5px', fontWeight: 600,
-    cursor: 'pointer', border: '1.5px solid ' + (activa ? 'var(--olive, #6A8546)' : 'var(--line-soft, #E5E1DD)'),
-    background: activa ? 'rgba(106, 133, 70, 0.12)' : 'transparent',
-    color: 'var(--ink, #1A1A1A)',
-  });
-
   const urlPrueba = C && C.urlDe(cfg);
   const cursorDePrueba = urlPrueba
     ? 'url("' + urlPrueba + '") ' + (cfg.modo === 'imagen' ? '20 20' : '4 4') + ', auto'
@@ -415,17 +420,9 @@ window.VentanaCorona = function VentanaCorona({ esPatrocinador, onCerrar, onConc
         background: 'rgba(0,0,0,0.45)', padding: '20px',
       }}
     >
-      <div
-        style={{
-          width: 'min(380px, 100%)', maxHeight: '86vh', overflowY: 'auto',
-          background: 'var(--bg-card, #FFF)', color: 'var(--ink, #1A1A1A)',
-          border: '1.5px solid var(--line, #595459)', borderRadius: '14px',
-          boxShadow: '0 20px 60px rgba(0,0,0,0.35)', padding: '20px',
-          display: 'flex', flexDirection: 'column', gap: '16px',
-        }}
-      >
+      <div className="corona-taller">
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <window.Corona size={30} apagada={!esPatrocinador} title="" />
+          <window.Corona size={34} apagada={!esPatrocinador} title="" />
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontWeight: 700, fontSize: '16px', lineHeight: 1.2 }}>
               {esPatrocinador
@@ -439,7 +436,7 @@ window.VentanaCorona = function VentanaCorona({ esPatrocinador, onCerrar, onConc
             </div>
           </div>
           <button
-            className="icon-btn"
+            className="icon-btn lift"
             onClick={onCerrar}
             title={window.t('Cerrar', 'Close')}
             style={{ width: '32px', height: '32px', flexShrink: 0 }}
@@ -448,18 +445,26 @@ window.VentanaCorona = function VentanaCorona({ esPatrocinador, onCerrar, onConc
           </button>
         </div>
 
+        <hr className="corona-hilo" />
+
         {esPatrocinador ? (
           <>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              <div style={{ fontWeight: 600, fontSize: '13px' }}>
+              <div className="corona-rotulo">
                 {window.t('Tu cursor', 'Your cursor')}
               </div>
 
               <div style={{ display: 'flex', gap: '8px' }}>
-                <button style={pestana(cfg.modo === 'color')} onClick={() => setCfg({ ...cfg, modo: 'color' })}>
+                <button
+                  className={'corona-pestana' + (cfg.modo === 'color' ? ' activa' : '')}
+                  onClick={() => setCfg({ ...cfg, modo: 'color' })}
+                >
                   {window.t('Un color', 'A colour')}
                 </button>
-                <button style={pestana(cfg.modo === 'imagen')} onClick={() => setCfg({ ...cfg, modo: 'imagen' })}>
+                <button
+                  className={'corona-pestana' + (cfg.modo === 'imagen' ? ' activa' : '')}
+                  onClick={() => setCfg({ ...cfg, modo: 'imagen' })}
+                >
                   {window.t('Una imagen', 'An image')}
                 </button>
               </div>
@@ -469,18 +474,13 @@ window.VentanaCorona = function VentanaCorona({ esPatrocinador, onCerrar, onConc
                   valor={cfg.color || '#E0A82E'}
                   colores={window.COLORES_ODINOTE_CURSOR}
                   compacto
+                  acento="linear-gradient(180deg, #F6D65C 0%, #E0A82E 55%, #C1841B 100%)"
+                  acentoTexto="#3E2C05"
                   onCambio={(c) => setCfg({ ...cfg, color: c })}
                 />
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  <label
-                    className="btn lift"
-                    style={{
-                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '7px',
-                      padding: '10px', borderRadius: '8px', cursor: 'pointer', fontSize: '12.5px',
-                      border: '1.5px dashed var(--line-soft, #E5E1DD)', fontWeight: 600,
-                    }}
-                  >
+                  <label className="corona-imagen">
                     <span className="material-symbols-rounded" style={{ fontSize: 18 }}>add_photo_alternate</span>
                     {cfg.imagen ? window.t('Cambiar la imagen', 'Change the image') : window.t('Elegir una imagen', 'Choose an image')}
                     <input type="file" accept="image/*" onChange={subirImagen} style={{ display: 'none' }} />
@@ -495,13 +495,7 @@ window.VentanaCorona = function VentanaCorona({ esPatrocinador, onCerrar, onConc
 
               {/* La prueba. Sin un sitio donde moverlo no hay forma de saber si
                   el cursor elegido estorba o se pierde sobre el fondo. */}
-              <div
-                style={{
-                  border: '1.5px dashed var(--line-soft, #E5E1DD)', borderRadius: '9px',
-                  padding: '20px 12px', textAlign: 'center', fontSize: '12px',
-                  color: 'var(--ink-3, #595459)', cursor: cursorDePrueba,
-                }}
-              >
+              <div className="corona-prueba" style={{ cursor: cursorDePrueba }}>
                 {window.t('Mueve el ratón por aquí para probarlo', 'Move the mouse here to try it')}
               </div>
             </div>
@@ -516,24 +510,24 @@ window.VentanaCorona = function VentanaCorona({ esPatrocinador, onCerrar, onConc
 
             <div style={{ display: 'flex', gap: '8px' }}>
               <button
-                className="btn lift"
+                className={'corona-guardar' + (recienGuardado ? ' hecho' : '')}
                 onClick={guardar}
-                style={{
-                  flex: 1, padding: '10px', borderRadius: '8px', border: 'none', cursor: 'pointer',
-                  background: 'var(--olive, #6A8546)', color: '#FFF', fontWeight: 700, fontSize: '13px',
-                }}
+                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '7px' }}
               >
-                {window.t('Guardar', 'Save')}
+                {recienGuardado && (
+                  <span className="material-symbols-rounded" style={{ fontSize: 18 }}>check_circle</span>
+                )}
+                {recienGuardado ? window.t('Guardado', 'Saved') : window.t('Guardar', 'Save')}
               </button>
               <button
-                className="btn lift"
+                className="corona-normal"
                 onClick={restablecer}
-                style={{
-                  padding: '10px 14px', borderRadius: '8px', cursor: 'pointer', fontSize: '12.5px',
-                  border: '1.5px solid var(--line-soft, #E5E1DD)', background: 'transparent',
-                  color: 'var(--ink-3, #595459)',
-                }}
+                disabled={!hayGuardado}
+                title={hayGuardado
+                  ? window.t('Volver al cursor de siempre', 'Back to the usual cursor')
+                  : window.t('Ya llevas el cursor de siempre', 'You already have the usual cursor')}
               >
+                <span className="material-symbols-rounded" style={{ fontSize: 17 }}>undo</span>
                 {window.t('El de siempre', 'Default one')}
               </button>
             </div>
