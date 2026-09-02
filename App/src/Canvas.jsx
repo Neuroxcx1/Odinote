@@ -4791,6 +4791,44 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
     }
   };
 
+  // ── Foto del lienzo ──
+  //
+  // Se esconden los mandos que viven DENTRO del lienzo —la busqueda, la barra de
+  // estado, el zoom y el selector de fondo— y se captura la ventana de verdad.
+  // La barra de herramientas de arriba no hace falta esconderla: esta fuera de
+  // esta zona y el recorte ya la deja fuera.
+  //
+  // `visibility` y no `display`: quitar un elemento del flujo reordena lo que
+  // queda y la foto saldria con el contenido movido respecto a lo que se veia.
+  // Invisible sigue ocupando su sitio.
+  const capturaLienzo = async () => {
+    const api = window.electronAPI;
+    const zona = document.querySelector('.canvas-wrap');
+    if (!api || !api.capturarLienzo || !zona) return;
+
+    const mandos = Array.from(zona.children).filter(c => !c.classList.contains('canvas-surface'));
+    mandos.forEach(m => { m.style.visibility = 'hidden'; });
+
+    try {
+      // Dos fotogramas antes de disparar. Con uno solo, a veces la captura sale
+      // con los mandos todavia puestos: el navegador aun no ha repintado.
+      await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+
+      const r = zona.getBoundingClientRect();
+      const res = await api.capturarLienzo({ x: r.left, y: r.top, width: r.width, height: r.height });
+
+      if (res && res.ok) {
+        window.showToast && window.showToast(window.t('Captura guardada.', 'Screenshot saved.'));
+      } else if (res && res.motivo !== 'cancelado') {
+        window.showToast && window.showToast(window.t('No se pudo guardar la captura.', 'Could not save the screenshot.'), 'error');
+      }
+    } finally {
+      // En un `finally` a proposito: si algo falla a medias, lo que no puede
+      // pasar es que la persona se quede con el lienzo sin mandos.
+      mandos.forEach(m => { m.style.visibility = ''; });
+    }
+  };
+
   return (
     <div className="app" data-screen-label={`Canvas · ${window.pickLang(current.title, lang)}`}>
       {/* Invisible paste interceptor — focused when an image node is selected, so Ctrl+V fires paste here */}
@@ -5561,6 +5599,16 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
 
         {/* Zoom controls */}
         <div className="zoom-ctrls">
+          {/* La foto del lienzo. Va aqui y no en la barra de arriba porque lo
+              que captura es esta zona, y un boton que actua sobre algo conviene
+              tenerlo al lado de ese algo. Solo existe en el escritorio: en el
+              navegador no hay forma de fotografiar la ventana sin pedir permisos
+              y ensenar un selector de pantallas, que para esto sobra. */}
+          {window.electronAPI && window.electronAPI.capturarLienzo && (
+            <button title={window.t('Guardar una foto de este lienzo', 'Save a picture of this canvas')} onClick={capturaLienzo}>
+              <span className="material-symbols-rounded" style={{fontSize:15}}>photo_camera</span>
+            </button>
+          )}
           <button title="Zoom out" onClick={()=>setScale(s => Math.max(0.2, s - 0.1))}>
             <span className="material-symbols-rounded" style={{fontSize:15}}>remove</span>
           </button>

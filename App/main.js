@@ -1112,6 +1112,47 @@ ipcMain.handle('google-refresh-access', async () => {
 // arrancar, para saber si puede reconectarse sola.
 ipcMain.handle('google-has-refresh', async () => ({ ok: !!leeRefresco() }));
 
+// ── Foto del lienzo ──
+//
+// Se captura la ventana de verdad y se recorta al trozo que ocupa el lienzo, en
+// vez de redibujar el contenido en un <canvas>. Redibujarlo obliga a arrastrar
+// una libreria que reinterpreta el CSS por su cuenta, y lo que sale nunca es
+// exactamente lo que habia en pantalla: las sombras, las tipografias y los
+// degradados salen aproximados. Aqui lo que se guarda es literalmente lo que se
+// estaba viendo, que es lo que se pide cuando se pide una captura.
+ipcMain.handle('capturar-lienzo', async (evt, recorte) => {
+  try {
+    if (!mainWindow) return { ok: false, motivo: 'sin-ventana' };
+
+    // Los numeros vienen del navegador en pixeles CSS y capturePage los quiere
+    // enteros; medio pixel de mas y Electron devuelve una imagen vacia.
+    const rect = {
+      x: Math.max(0, Math.round(recorte.x)),
+      y: Math.max(0, Math.round(recorte.y)),
+      width: Math.max(1, Math.round(recorte.width)),
+      height: Math.max(1, Math.round(recorte.height)),
+    };
+
+    const imagen = await mainWindow.webContents.capturePage(rect);
+    if (imagen.isEmpty()) return { ok: false, motivo: 'vacia' };
+
+    const sugerido = 'odinote-' + new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-') + '.png';
+    const destino = await dialog.showSaveDialog(mainWindow, {
+      title: 'Guardar la captura',
+      defaultPath: path.join(app.getPath('pictures'), sugerido),
+      filters: [{ name: 'Imagen PNG', extensions: ['png'] }],
+    });
+    if (destino.canceled || !destino.filePath) return { ok: false, motivo: 'cancelado' };
+
+    fs.writeFileSync(destino.filePath, imagen.toPNG());
+    logToFile('Captura del lienzo guardada en ' + destino.filePath);
+    return { ok: true, ruta: destino.filePath };
+  } catch (err) {
+    logToFile('No se pudo capturar el lienzo: ' + err.message);
+    return { ok: false, motivo: err.message };
+  }
+});
+
 // Cerrar sesión: se borra el papel de este equipo.
 ipcMain.handle('google-sign-out', async () => { borraRefresco(); return { ok: true }; });
 
