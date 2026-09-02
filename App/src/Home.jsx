@@ -8,7 +8,7 @@ function BrandMark() {
   return (
     <img
       src="./Icon/Icon.png"
-      alt="Odinote"
+      alt="Oddinote"
       style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }}
     />
   );
@@ -56,7 +56,18 @@ function Home({ lang, setLang, theme, setTheme, onOpenProject, projects, onCreat
   const [query, setQuery] = useStateHome('');
   const [modal, setModal] = useStateHome(false);
   const [section, setSection] = useStateHome('all');
-  const [viewMode, setViewMode] = useStateHome('grid'); // 'grid' | 'list'
+  // La vista elegida se recuerda. Antes era estado suelto: bastaba con entrar
+  // en un proyecto y volver para encontrarse otra vez la cuadricula, y quien
+  // prefiere la lista la volvia a elegir veinte veces al dia.
+  const [viewMode, setViewMode] = useStateHome(() => {
+    try { return localStorage.getItem('odinote.vista_proyectos') === 'list' ? 'list' : 'grid'; }
+    catch (e) { return 'grid'; }
+  });
+
+  const cambiaVista = (modo) => {
+    setViewMode(modo);
+    try { localStorage.setItem('odinote.vista_proyectos', modo); } catch (e) {}
+  };
   const [editProject, setEditProject] = useStateHome(null);
   // En móvil la barra lateral (con "Nuevo espacio", papelera, bóveda…) no cabe:
   // se abre como cajón desde el botón ☰. En escritorio esto no se usa.
@@ -85,7 +96,7 @@ function Home({ lang, setLang, theme, setTheme, onOpenProject, projects, onCreat
       <aside className="ms-side" onClick={(e)=>{ if (e.target.closest('button, a')) setSideOpen(false); }}>
         <div className="ms-brand">
           <div className="brand-mark"><BrandMark/></div>
-          <span>Odinote</span>
+          <span>Oddinote</span>
         </div>
 
         <button className="ms-new-btn" onClick={()=>setModal(true)}>
@@ -470,10 +481,10 @@ function Home({ lang, setLang, theme, setTheme, onOpenProject, projects, onCreat
                (window.t('Todos los proyectos', 'All projects'))}
             </h2>
             <div className="ms-view-toggle">
-              <button className={viewMode==='grid'?'active':''} onClick={()=>setViewMode('grid')} title={window.t('Cuadrícula', 'Grid')}>
+              <button className={viewMode==='grid'?'active':''} onClick={()=>cambiaVista('grid')} title={window.t('Cuadrícula', 'Grid')}>
                 <span className="material-symbols-rounded">grid_view</span>
               </button>
-              <button className={viewMode==='list'?'active':''} onClick={()=>setViewMode('list')} title={window.t('Lista', 'List')}>
+              <button className={viewMode==='list'?'active':''} onClick={()=>cambiaVista('list')} title={window.t('Lista', 'List')}>
                 <span className="material-symbols-rounded">view_list</span>
               </button>
             </div>

@@ -47,7 +47,7 @@ try {
 
 // Marcador de build: si la consola no muestra esta versión, el navegador está
 // sirviendo JS cacheado (subir ?v= en index.html invalida la caché)
-window.ODINOTE_BUILD = 'corona-147';
+window.ODINOTE_BUILD = '1.0.8-148';
 console.log('[ODINOTE] Código cargado: ' + window.ODINOTE_BUILD);
 
 // Global shortcuts configuration
@@ -1057,7 +1057,7 @@ function App() {
   const acordadoNubeRef = React.useRef(null);
   const ultimaSubidaNubeRef = React.useRef(0);
 
-  const CURRENT_VERSION = '1.0.7'; // debe coincidir con package.json
+  const CURRENT_VERSION = '1.0.8'; // debe coincidir con package.json
 
   // Compara versiones semánticas "a.b.c": devuelve true si `latest` > `current`
   const isNewerVersion = (latest, current) => {

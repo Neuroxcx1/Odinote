@@ -24,6 +24,10 @@ window.COLORES_ODINOTE = ['#1A1A1A', '#E6544F', '#90B968', '#3D5A80'];
 // que hay debajo: los de arriba tapan el texto y no valen aquí.
 window.COLORES_ODINOTE_SUAVES = ['#FFF3A3', '#FFC7C2', '#CFEFD6', '#CDE9FF'];
 
+// Y los cuatro de fondo de nodo. Tambien claros, y por lo mismo: encima de un
+// nodo se escribe, y sobre el negro o el vino de trazo no se lee nada.
+window.COLORES_ODINOTE_FONDO = ['#FEF7E0', '#F7DA84', '#FBDFDD', '#E8F0DA'];
+
 // ── Los últimos que se usaron ──
 //
 // Quien se sale de la paleta casi siempre lo hace por algo suyo: el color de su
@@ -73,11 +77,35 @@ window.SelectorColor = function SelectorColor({
   // devuelve lo que había.
   const [eligiendo, setEligiendo] = useState(null);
 
-  // Sin esto, pulsar una casilla le quita el foco al texto que se estaba
-  // escribiendo y se pierde el cursor. Y sin cursor, elegir un color solo hacia
-  // algo si ya habia texto seleccionado: escribir despues salia del color de
-  // antes, que es exactamente lo que no espera nadie.
-  const sinRobarFoco = (e) => e.preventDefault();
+  // ── Que no se pierda lo que hay seleccionado ──
+  //
+  // Dos cosas distintas se lo llevan por delante. Pulsar una casilla le quita el
+  // foco al texto, y eso se evita cancelando el mousedown. Pero la rueda de
+  // color del sistema es una ventana aparte: al abrirse se lleva la seleccion
+  // entera y no hay forma de impedirlo, asi que hay que apuntarla antes y
+  // devolverla justo antes de aplicar el color.
+  //
+  // Sin esto, elegir un color y escribir despues salia del color de antes, que
+  // es exactamente lo que no espera nadie.
+  const rango = useRef(null);
+
+  const apuntaSeleccion = () => {
+    try {
+      const sel = window.getSelection();
+      if (sel && sel.rangeCount) rango.current = sel.getRangeAt(0).cloneRange();
+    } catch (e) {}
+  };
+
+  const devuelveSeleccion = () => {
+    try {
+      if (!rango.current) return;
+      const sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(rango.current);
+    } catch (e) {}
+  };
+
+  const sinRobarFoco = (e) => { e.preventDefault(); apuntaSeleccion(); };
 
   const norm = (c) => (typeof c === 'string' ? c.trim().toLowerCase() : '');
   const actual = norm(valor);
@@ -90,6 +118,7 @@ window.SelectorColor = function SelectorColor({
   const elige = (c) => {
     setEligiendo(null);
     setRecientes(apuntaReciente(c));
+    devuelveSeleccion();
     onCambio(c);
   };
 
@@ -140,9 +169,11 @@ window.SelectorColor = function SelectorColor({
             ...redondo,
             position: 'relative',
             border: marco(!enPaleta),
-            background: enPaleta
-              ? 'conic-gradient(#E6544F, #DDAF2C, #90B968, #3CA59E, #3D5A80, #955BA5, #E6544F)'
-              : (valor || '#1A1A1A'),
+            // Siempre el arcoiris, tenga o no un color libre puesto. Antes pasaba
+            // a mostrar el color elegido y entonces se confundia con una casilla
+            // mas de la paleta: dejaba de leerse como "aqui hay mas". Que este
+            // elegido se ve por el aro, igual que en las demas.
+            background: 'conic-gradient(#E6544F, #DDAF2C, #90B968, #3CA59E, #3D5A80, #955BA5, #E6544F)',
           }}
           onMouseDown={sinRobarFoco}
           onClick={() => entrada.current && entrada.current.click()}
@@ -154,10 +185,13 @@ window.SelectorColor = function SelectorColor({
             type="color"
             value={/^#[0-9a-f]{6}$/i.test(valor || '') ? valor : '#1A1A1A'}
             onChange={(e) => {
+              const c = e.target.value;
               // El primer movimiento guarda de dónde se venía, para poder
-              // deshacer si se cierra sin aceptar.
-              setEligiendo(prev => (prev === null ? { previo: valor || '#1A1A1A' } : prev));
-              onCambio(e.target.value);
+              // deshacer si se cierra sin aceptar. Y en cada uno se apunta el
+              // color en curso: es el que hay que dar por bueno al aceptar.
+              setEligiendo(prev => (prev === null ? { previo: valor || '#1A1A1A', actual: c } : { ...prev, actual: c }));
+              devuelveSeleccion();
+              onCambio(c);
             }}
             style={{
               position: 'absolute', inset: 0, width: '100%', height: '100%',
@@ -209,7 +243,12 @@ window.SelectorColor = function SelectorColor({
           que este botón no lo aplica: lo da por bueno y lo guarda en los
           recientes. Cancelar devuelve lo que había antes de tocar nada. */}
       {eligiendo && (
-        <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+        <div style={{
+          display: 'flex', gap: '6px', alignItems: 'center',
+          padding: '8px', borderRadius: '8px',
+          background: 'rgba(224, 168, 46, 0.10)',
+          border: '1.5px solid rgba(224, 168, 46, 0.45)',
+        }}>
           <button
             type="button"
             className="btn"
@@ -219,7 +258,7 @@ window.SelectorColor = function SelectorColor({
               fontWeight: 700, fontSize: '11.5px', cursor: 'pointer',
             }}
             onMouseDown={sinRobarFoco}
-            onClick={() => elige(valor)}
+            onClick={() => elige(eligiendo.actual || valor)}
           >
             {window.t('Aceptar', 'Accept')}
           </button>
@@ -232,7 +271,7 @@ window.SelectorColor = function SelectorColor({
               color: 'var(--ink-3, #595459)',
             }}
             onMouseDown={sinRobarFoco}
-            onClick={() => { const p = eligiendo.previo; setEligiendo(null); onCambio(p); }}
+            onClick={() => { const p = eligiendo.previo; setEligiendo(null); devuelveSeleccion(); onCambio(p); }}
           >
             {window.t('Cancelar', 'Cancel')}
           </button>

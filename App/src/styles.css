@@ -637,9 +637,15 @@ body[data-patrocinador="1"] .board-preview-item {
 .ms-project-emoji { font-size: 38px; z-index: 1; filter: drop-shadow(1px 2px 0 rgba(0,0,0,0.1)); }
 
 /* Hover action buttons on cards (favourite / delete / restore) */
-.ms-card-actions { position: absolute; top: 6px; right: 6px; display: flex; gap: 5px; z-index: 3; opacity: 0; transition: opacity 130ms; }
+/* `pointer-events: none` mientras estan invisibles, y no es un detalle.
+   Un elemento con `opacity: 0` sigue recibiendo clics: en cuadricula quedaban
+   en una esquina de la portada y no molestaban, pero en lista se colocan en
+   medio de la fila, asi que el clic para abrir el proyecto se lo llevaba un
+   boton que no se veia. Y el cursor cambiaba a mano sobre un sitio donde,
+   aparentemente, no habia nada. */
+.ms-card-actions { position: absolute; top: 6px; right: 6px; display: flex; gap: 5px; z-index: 3; opacity: 0; pointer-events: none; transition: opacity 130ms; }
 .ms-project-card:hover .ms-card-actions,
-.ms-recent-card:hover .ms-card-actions { opacity: 1; }
+.ms-recent-card:hover .ms-card-actions { opacity: 1; pointer-events: auto; }
 .ms-card-btn {
   width: 26px; height: 26px; display: grid; place-items: center;
   background: rgba(255,255,255,0.94); border: 1.5px solid var(--line);
@@ -649,6 +655,10 @@ body[data-patrocinador="1"] .board-preview-item {
   color: #1A1A1A;
 }
 .ms-card-btn:hover { background: #fff; transform: translate(-1px,-1px); box-shadow: 2px 2px 0 var(--line); }
+/* En lista, ese pellizco de un pixel apartaba el boton del raton justo cuando
+   lo tocabas, se perdia el hover, volvia a su sitio y otra vez: parpadeo. En
+   cuadricula no pasa porque hay mas aire alrededor. */
+.ms-grid-list .ms-card-btn:hover { transform: none; }
 .ms-card-btn.danger:hover { color: var(--wine); }
 .ms-card-btn.on { color: #E0A82E; }
 .ms-card-btn.star-btn:hover, .ms-card-btn.star-btn.on { color: #E0A82E !important; }
@@ -660,7 +670,9 @@ body[data-patrocinador="1"] .board-preview-item {
 .ms-grid-list .ms-project-card { display: flex; align-items: center; }
 .ms-grid-list .ms-project-cover { width: 84px; height: 60px; flex-shrink: 0; border-bottom: none; border-right: 1.5px solid var(--line); }
 .ms-grid-list .ms-project-emoji { font-size: 26px; }
-.ms-grid-list .ms-project-body { flex: 1; }
+/* Hueco al final de la fila para los tres botones y para el icono de la nube,
+   que antes se pisaban entre ellos. */
+.ms-grid-list .ms-project-body { flex: 1; min-width: 0; padding-right: 108px; }
 .ms-grid-list .ms-new-cover { width: 84px; height: 60px; }
 
 .ms-project-body { padding: 11px 14px; }

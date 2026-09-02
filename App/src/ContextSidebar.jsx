@@ -1054,48 +1054,17 @@ function ContextSidebar({
         <div className="ctx-popout">
           <div className="ctx-pop-section">
             <div className="ctx-pop-title">{isColumn ? (window.t('Color de la franja', 'Strip color')) : (window.t('Color de fondo', 'Background'))}</div>
-            <div className="ctx-sticky-grid">
-              {(isFrame || isBigTitle) && (
-                <button
-                  className={`ctx-sticky-swatch ${(item.color || 'transparent') === 'transparent' ? 'active' : ''}`}
-                  style={{ 
-                    background: 'transparent', 
-                    border: '1.5px dashed var(--line, #121214)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    cursor: 'pointer'
-                  }}
-                  onClick={()=>onUpdate({ color: 'transparent' })}
-                  title={window.t('Transparente', 'Transparent')}
-                >
-                  <span className="material-symbols-rounded" style={{ fontSize: '14px', color: 'var(--ink)' }}>close</span>
-                </button>
-              )}
-              {STICKY_PALETTE.map(p => (
-                <button
-                  key={p.key}
-                  className={`ctx-sticky-swatch ${(item.color || 'white') === p.key ? 'active' : ''}`}
-                  style={{ background: p.hex, border: p.hex === '#FFFFFF' ? '1.5px solid var(--line-soft)' : '1.5px solid var(--line)' }}
-                  onClick={()=>onUpdate({ color: p.key })}
-                  title={p.label}
-                />
-              ))}
-            </div>
-
-            {/* Y cualquier otro. La paleta de arriba son los de siempre y se
-                quedan: quien lleva meses eligiendo "amarillo" no tiene por que
-                aprender un color nuevo. Esto es para el que quiere el suyo. */}
-            <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1.5px solid var(--line-soft)' }}>
-              <div style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--ink-3)', marginBottom: '6px' }}>
-                {window.t('Otro color', 'Another colour')}
-              </div>
-              <window.SelectorColor
-                valor={window.esColorLibre && window.esColorLibre(item.color) ? item.color : ''}
-                onCambio={(c) => onUpdate({ color: c })}
-                tam={22}
-              />
-            </div>
+            {/* Cuatro y el arcoiris, como la barra de herramientas. Antes eran
+                trece cuadrados: una rejilla de trece colores parecidos obliga a
+                comparar, y comparar cuesta mas que elegir. Los cuatro cubren lo
+                de siempre y el resto esta en la ultima casilla. */}
+            <window.SelectorColor
+              valor={item.color === 'transparent' ? 'transparent' : (window.resolveStickyColor ? window.resolveStickyColor(item.color || 'white') : item.color)}
+              onCambio={(c) => onUpdate({ color: c })}
+              colores={window.COLORES_ODINOTE_FONDO}
+              incluirTransparente={!!(isFrame || isBigTitle)}
+              tam={26}
+            />
           </div>
         </div>
       )}
