@@ -172,7 +172,17 @@ exports.kofi97941138ba45a559b3e4 = functions
     }
 
     if (!mismoToken(pago.verification_token, esperado)) {
-      console.error('[kofi] Token de verificación incorrecto. Aviso rechazado.');
+      // Se apunta lo justo para saber POR QUÉ no cuadra sin escribir el token
+      // en ningún sitio: cuántas letras tiene cada uno y si la forma es la de
+      // un identificador de Ko-fi. Con eso se distingue un token de otra
+      // cuenta (misma longitud) de uno cortado al pegarlo, de un espacio de
+      // más, o de que no llegue ninguno. Un registro no es sitio para un
+      // secreto, ni siquiera un trozo.
+      const recibido = typeof pago.verification_token === 'string' ? pago.verification_token : '';
+      console.error('[kofi] Token incorrecto. Guardado:', esperado.length, 'letras; recibido:', recibido.length,
+        '; misma longitud:', esperado.length === recibido.length,
+        '; el recibido tiene forma de UUID:', /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(recibido),
+        '; el guardado tiene forma de UUID:', /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(esperado));
       return res.status(401).send('No autorizado');
     }
 
