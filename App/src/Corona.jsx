@@ -241,3 +241,240 @@ window.PanelReclamo = function PanelReclamo({ onConcedida }) {
     </div>
   );
 };
+
+// ── La ventana de la corona ──
+//
+// Tiene la suya y no comparte la del perfil, que es donde estaba antes. No es
+// una manía de orden: en la del perfil, la corona era un párrafo más entre el
+// correo y el botón de cerrar sesión, y lo que se compra con una donación es
+// precisamente que se note.
+//
+// Quien no tiene corona ve lo que se consigue y por dónde. Quien la tiene ve el
+// taller: aquí se cambia el cursor, que es lo que de verdad hace que el programa
+// se parezca un poco a ti.
+window.VentanaCorona = function VentanaCorona({ esPatrocinador, onCerrar, onConcedida }) {
+  const { useState, useEffect } = React;
+  const C = window.CursorOdinote;
+
+  const [cfg, setCfg] = useState(() => (C && C.lee()) || { modo: 'color', color: '#E0A82E', imagen: null });
+  const [aviso, setAviso] = useState(null);
+
+  // Se va aplicando mientras se toca, no al guardar. Un cursor no se puede
+  // elegir a ciegas: hay que verlo moverse para saber si estorba.
+  useEffect(() => {
+    if (!C || !esPatrocinador) return;
+    C.aplica(cfg);
+  }, [cfg, esPatrocinador]);
+
+  const guardar = () => {
+    C && C.guarda(cfg);
+    setAviso(window.t('Guardado.', 'Saved.'));
+    setTimeout(() => setAviso(null), 2200);
+  };
+
+  const restablecer = () => {
+    const limpio = { modo: 'color', color: '#E0A82E', imagen: null };
+    setCfg(limpio);
+    C && C.guarda(null);
+    C && C.aplica(null);
+    setAviso(window.t('Cursor de siempre restablecido.', 'Default cursor restored.'));
+    setTimeout(() => setAviso(null), 2200);
+  };
+
+  const subirImagen = (e) => {
+    const archivo = e.target.files && e.target.files[0];
+    e.target.value = '';
+    if (!archivo || !C) return;
+    C.preparaImagen(archivo)
+      .then(img => setCfg({ ...cfg, modo: 'imagen', imagen: img }))
+      .catch(() => setAviso(window.t(
+        'Ese archivo no se pudo usar. Prueba con un PNG o un JPG.',
+        'That file could not be used. Try a PNG or a JPG.')));
+  };
+
+  const pestana = (activa) => ({
+    flex: 1, padding: '8px 10px', borderRadius: '7px', fontSize: '12.5px', fontWeight: 600,
+    cursor: 'pointer', border: '1.5px solid ' + (activa ? 'var(--olive, #6A8546)' : 'var(--line-soft, #E5E1DD)'),
+    background: activa ? 'rgba(106, 133, 70, 0.12)' : 'transparent',
+    color: 'var(--ink, #1A1A1A)',
+  });
+
+  const cursorDePrueba = C
+    ? 'url("' + C.urlDe(cfg) + '") ' + (cfg.modo === 'imagen' ? '20 20' : '4 4') + ', auto'
+    : 'auto';
+
+  return (
+    <div
+      className="modal-backdrop"
+      onClick={(e) => { if (e.target === e.currentTarget) onCerrar(); }}
+      style={{
+        position: 'fixed', inset: 0, zIndex: 9000, display: 'grid', placeItems: 'center',
+        background: 'rgba(0,0,0,0.45)', padding: '20px',
+      }}
+    >
+      <div
+        style={{
+          width: 'min(420px, 100%)', maxHeight: '86vh', overflowY: 'auto',
+          background: 'var(--bg-card, #FFF)', color: 'var(--ink, #1A1A1A)',
+          border: '1.5px solid var(--line, #595459)', borderRadius: '14px',
+          boxShadow: '0 20px 60px rgba(0,0,0,0.35)', padding: '20px',
+          display: 'flex', flexDirection: 'column', gap: '16px',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <window.Corona size={30} apagada={!esPatrocinador} title="" />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontWeight: 700, fontSize: '16px', lineHeight: 1.2 }}>
+              {esPatrocinador
+                ? window.t('Tus cosméticos', 'Your cosmetics')
+                : window.t('Apoya Odinote', 'Support Odinote')}
+            </div>
+            <div style={{ fontSize: '12px', color: 'var(--ink-3, #595459)', marginTop: '2px' }}>
+              {esPatrocinador
+                ? window.t('Gracias por invitar a un café.', 'Thanks for the coffee.')
+                : window.t('Un café, y el programa se parece un poco más a ti.', 'One coffee, and the app looks a little more like you.')}
+            </div>
+          </div>
+          <button
+            className="icon-btn"
+            onClick={onCerrar}
+            title={window.t('Cerrar', 'Close')}
+            style={{ width: '32px', height: '32px', flexShrink: 0 }}
+          >
+            <span className="material-symbols-rounded" style={{ fontSize: 18 }}>close</span>
+          </button>
+        </div>
+
+        {esPatrocinador ? (
+          <>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <div style={{ fontWeight: 600, fontSize: '13px' }}>
+                {window.t('Tu cursor', 'Your cursor')}
+              </div>
+
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button style={pestana(cfg.modo === 'color')} onClick={() => setCfg({ ...cfg, modo: 'color' })}>
+                  {window.t('Un color', 'A colour')}
+                </button>
+                <button style={pestana(cfg.modo === 'imagen')} onClick={() => setCfg({ ...cfg, modo: 'imagen' })}>
+                  {window.t('Una imagen', 'An image')}
+                </button>
+              </div>
+
+              {cfg.modo === 'color' ? (
+                <window.SelectorColor
+                  valor={cfg.color || '#E0A82E'}
+                  onCambio={(c) => setCfg({ ...cfg, color: c })}
+                />
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <label
+                    className="btn lift"
+                    style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '7px',
+                      padding: '10px', borderRadius: '8px', cursor: 'pointer', fontSize: '12.5px',
+                      border: '1.5px dashed var(--line-soft, #E5E1DD)', fontWeight: 600,
+                    }}
+                  >
+                    <span className="material-symbols-rounded" style={{ fontSize: 18 }}>add_photo_alternate</span>
+                    {cfg.imagen ? window.t('Cambiar la imagen', 'Change the image') : window.t('Elegir una imagen', 'Choose an image')}
+                    <input type="file" accept="image/*" onChange={subirImagen} style={{ display: 'none' }} />
+                  </label>
+                  <div style={{ fontSize: '11px', color: 'var(--ink-3, #595459)', lineHeight: 1.4 }}>
+                    {window.t(
+                      'Se recorta a 40 píxeles. Los navegadores ignoran los cursores más grandes, así que no se puede hacer otra cosa.',
+                      'It is cropped to 40 pixels. Browsers ignore larger cursors, so there is no way around it.')}
+                  </div>
+                </div>
+              )}
+
+              {/* La prueba. Sin un sitio donde moverlo no hay forma de saber si
+                  el cursor elegido estorba o se pierde sobre el fondo. */}
+              <div
+                style={{
+                  border: '1.5px dashed var(--line-soft, #E5E1DD)', borderRadius: '9px',
+                  padding: '20px 12px', textAlign: 'center', fontSize: '12px',
+                  color: 'var(--ink-3, #595459)', cursor: cursorDePrueba,
+                }}
+              >
+                {window.t('Mueve el ratón por aquí para probarlo', 'Move the mouse here to try it')}
+              </div>
+            </div>
+
+            {aviso && (
+              <div style={{
+                fontSize: '12.5px', padding: '8px 10px', borderRadius: '7px',
+                background: 'rgba(144, 185, 104, 0.16)',
+                border: '1.5px solid var(--brand-green, #90B968)',
+              }}>{aviso}</div>
+            )}
+
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button
+                className="btn lift"
+                onClick={guardar}
+                style={{
+                  flex: 1, padding: '10px', borderRadius: '8px', border: 'none', cursor: 'pointer',
+                  background: 'var(--olive, #6A8546)', color: '#FFF', fontWeight: 700, fontSize: '13px',
+                }}
+              >
+                {window.t('Guardar', 'Save')}
+              </button>
+              <button
+                className="btn lift"
+                onClick={restablecer}
+                style={{
+                  padding: '10px 14px', borderRadius: '8px', cursor: 'pointer', fontSize: '12.5px',
+                  border: '1.5px solid var(--line-soft, #E5E1DD)', background: 'transparent',
+                  color: 'var(--ink-3, #595459)',
+                }}
+              >
+                {window.t('El de siempre', 'Default one')}
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            <div style={{
+              display: 'flex', flexDirection: 'column', gap: '9px',
+              padding: '14px', borderRadius: '10px',
+              background: 'rgba(224, 168, 46, 0.08)',
+              border: '1.5px solid rgba(224, 168, 46, 0.45)',
+            }}>
+              {[
+                window.t('La corona dorada, en tu barra.', 'The gold crown, in your toolbar.'),
+                window.t('El cursor en el color que elijas.', 'The cursor in the colour you choose.'),
+                window.t('O con una imagen tuya.', 'Or with an image of your own.'),
+              ].map((t, i) => (
+                <div key={i} style={{ display: 'flex', gap: '9px', alignItems: 'flex-start', fontSize: '13px' }}>
+                  <span className="material-symbols-rounded" style={{ fontSize: 17, color: '#C9962A' }}>check</span>
+                  <span>{t}</span>
+                </div>
+              ))}
+              <div style={{ fontSize: '11.5px', color: 'var(--ink-3, #595459)', lineHeight: 1.45, marginTop: '2px' }}>
+                {window.t(
+                  'Nada de Odinote está detrás de esto: la aplicación entera es gratis y lo seguirá siendo. Esto son adornos.',
+                  'None of Odinote is behind this: the whole app is free and will stay that way. These are ornaments.')}
+              </div>
+            </div>
+
+            <button
+              className="btn lift"
+              onClick={() => window.open('https://ko-fi.com/neuroxcx', '_blank', 'noopener,noreferrer')}
+              style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+                padding: '11px', borderRadius: '8px', border: 'none', cursor: 'pointer',
+                background: 'var(--wine, #7B2D26)', color: '#FFF', fontWeight: 700, fontSize: '13px',
+              }}
+            >
+              <span className="material-symbols-rounded" style={{ fontSize: 18 }}>coffee</span>
+              {window.t('Invitar a un café', 'Buy a coffee')}
+            </button>
+
+            <window.PanelReclamo onConcedida={onConcedida} />
+          </>
+        )}
+      </div>
+    </div>
+  );
+};

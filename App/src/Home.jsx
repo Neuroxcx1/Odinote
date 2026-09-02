@@ -51,7 +51,7 @@ function renderProjectIcon(icon) {
 }
 window.renderProjectIcon = renderProjectIcon;
 
-function Home({ lang, setLang, theme, setTheme, onOpenProject, projects, onCreate, onDelete, onRename, onRestore, onPurge, onToggleStar, onExport, onImport, vaultPath, onOpenVault, onCloseVault, updateAvailable, onUpdateClick, onSettingsClick, userProfile, esPatrocinador, onUserClick, onJoinProjectClick, onTogglePublic, onManualSync, isSyncingDrive, needsDriveAuth }) {
+function Home({ lang, setLang, theme, setTheme, onOpenProject, projects, onCreate, onDelete, onRename, onRestore, onPurge, onToggleStar, onExport, onImport, vaultPath, onOpenVault, onCloseVault, updateAvailable, onUpdateClick, onSettingsClick, userProfile, esPatrocinador, onAbrirCorona, onUserClick, onJoinProjectClick, onTogglePublic, onManualSync, isSyncingDrive, needsDriveAuth }) {
   const t = window.TRANSLATIONS[lang];
   const [query, setQuery] = useStateHome('');
   const [modal, setModal] = useStateHome(false);
@@ -311,7 +311,7 @@ function Home({ lang, setLang, theme, setTheme, onOpenProject, projects, onCreat
                 </span>
               </button>
             )}
-            <window.CoronaBoton activo={!!esPatrocinador} onAbrir={onUserClick} />
+            <window.CoronaBoton activo={!!esPatrocinador} onAbrir={onAbrirCorona} />
             <button
               className={`icon-btn lift user-profile-btn ${userProfile ? 'has-name' : 'no-name'}`}
               title={userProfile ? `${window.t('Perfil de', 'Profile of')} ${userProfile.name}` : window.t('Iniciar sesión con Google (Requerido para colaborar)', 'Sign in with Google (Required to collaborate)')}

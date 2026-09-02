@@ -266,6 +266,7 @@ function App() {
   const [esPatrocinador, setEsPatrocinador] = useStateApp(() => {
     try { return !!(window.Patrocinio && window.Patrocinio.activo()); } catch (err) { return false; }
   });
+  const [coronaOpen, setCoronaOpen] = useStateApp(false);
   const [userModalOpen, setUserModalOpen] = useStateApp(false);
   const [loginError, setLoginError] = useStateApp(null);
   const [waitingForWebLogin, setWaitingForWebLogin] = useStateApp(false);
@@ -336,6 +337,15 @@ function App() {
   // atributo, para no tener que repetir la regla en cada componente.
   useEffectApp(() => {
     try { document.body.dataset.patrocinador = esPatrocinador ? '1' : '0'; } catch (err) {}
+  }, [esPatrocinador]);
+
+  // Y encima de ese dorado, el cursor que cada quien se haya montado en la
+  // ventana de la corona. Se aplica al arrancar y cada vez que cambia si es
+  // patrocinador; si deja de serlo se quita, sin borrar lo que tenia guardado
+  // — si vuelve a apoyar, se encuentra su cursor donde lo dejo.
+  useEffectApp(() => {
+    if (!window.CursorOdinote) return;
+    window.CursorOdinote.aplica(esPatrocinador ? window.CursorOdinote.lee() : null);
   }, [esPatrocinador]);
 
   React.useEffect(() => {
@@ -2707,6 +2717,7 @@ function App() {
       onSettingsClick={() => setSettingsOpen(true)}
       userProfile={userProfile}
       esPatrocinador={esPatrocinador}
+      onAbrirCorona={() => setCoronaOpen(true)}
       onUserClick={() => setUserModalOpen(true)}
       onJoinProjectClick={() => setJoiningModalOpen(true)}
       onTogglePublic={togglePublicProject}
@@ -2749,6 +2760,7 @@ function App() {
       vaultPath={vaultPath}
       userProfile={userProfile}
       esPatrocinador={esPatrocinador}
+      onAbrirCorona={() => setCoronaOpen(true)}
       onUserClick={() => setUserModalOpen(true)}
       projects={projects}
       setProjects={setProjects}
@@ -3282,6 +3294,14 @@ function App() {
 
       {/* User Profile Modal */}
       {/* User Profile Modal */}
+      {coronaOpen && window.VentanaCorona && (
+        <window.VentanaCorona
+          esPatrocinador={esPatrocinador}
+          onCerrar={() => setCoronaOpen(false)}
+          onConcedida={() => setEsPatrocinador(true)}
+        />
+      )}
+
       {userModalOpen && (
         <div className="doc-modal-overlay" style={{ zIndex: 10000, display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.45)' }} onClick={() => setUserModalOpen(false)}>
           <div className="odi-dialog" style={{ width: '400px', background: 'var(--bg, #FAF9F6)', border: '1.5px solid var(--line, #595459)', padding: '24px', borderRadius: '12px', boxShadow: 'var(--pop-md)' }} onClick={(e) => e.stopPropagation()}>
