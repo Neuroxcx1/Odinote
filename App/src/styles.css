@@ -2292,7 +2292,10 @@ body.odi-busy iframe { pointer-events: none !important; }
   display: flex; flex-direction: column;
   gap: 2px;
   z-index: 70;
-  width: 76px;
+  /* 86 y no 76: con el selector de color dentro, setenta y seis se quedaban
+     cortos y las casillas se salian del panel. Diez pixeles mas y entran, y de
+     paso respiran las etiquetas de los botones. */
+  width: 86px;
   animation: ctx-slide-in 180ms var(--e-out);
   /* En una ventana baja, las barras largas (la de formato de texto tiene
      dieciséis botones) se salían por debajo de la pantalla y no había manera
@@ -2304,7 +2307,7 @@ body.odi-busy iframe { pointer-events: none !important; }
   overflow-y: auto;
   overscroll-behavior: contain;
   /* Una barra de desplazamiento fina: la normal se comería la etiqueta de los
-     botones, que solo tienen 76 px de ancho. */
+     botones, que son estrechos. */
   scrollbar-width: thin;
   scrollbar-color: var(--line-soft) transparent;
 }

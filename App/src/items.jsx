@@ -59,6 +59,18 @@ function brilloDe(hex) {
   return (0.299 * r + 0.587 * g + 0.114 * b) / 255;
 }
 
+// Un hexadecimal con la transparencia que se le pida. Se usa en los marcos,
+// que no son un nodo mas: son una caja que agrupa a otros, y si se pintan
+// opacos tapan lo que hay debajo, que es justo lo que fueron a rodear.
+function conAlfa(hex, alfa) {
+  let h = String(hex || '').replace('#', '');
+  if (h.length === 3) h = h.split('').map(x => x + x).join('');
+  const n = parseInt(h.slice(0, 6), 16);
+  if (!isFinite(n)) return hex;
+  return 'rgba(' + ((n >> 16) & 255) + ', ' + ((n >> 8) & 255) + ', ' + (n & 255) + ', ' + alfa + ')';
+}
+window.conAlfa = conAlfa;
+
 function nodeBg(item) {
   if (!item.color) return 'var(--paper)';
   // Un color libre se deja pasar sin traducir: la tabla de nombres no lo
@@ -3886,7 +3898,7 @@ function FrameItem({ item, lang, editing, onUpdate, callbacks }) {
   };
 
   return (
-    <div className={`frame-card c-${cls}`} style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', boxSizing: 'border-box', ...(colorLibre ? { background: colorLibre } : null) }}>
+    <div className={`frame-card c-${cls}`} style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', boxSizing: 'border-box', ...(colorLibre ? { background: conAlfa(colorLibre, 0.20) } : null) }}>
       <div 
         className="frame-header" 
         style={{ 
@@ -3895,6 +3907,10 @@ function FrameItem({ item, lang, editing, onUpdate, callbacks }) {
           justifyContent: 'flex-start',
           padding: '6px 12px', 
           borderBottom: '1px dashed var(--line-soft, #E5E1DD)',
+          // La cabecera, algo menos transparente que el cuerpo: es la parte que
+          // se agarra para mover el marco y la que lleva el nombre, asi que
+          // conviene que se lea sobre lo que haya debajo.
+          ...(colorLibre ? { background: conAlfa(colorLibre, 0.42) } : null),
           pointerEvents: 'auto',
           cursor: 'move',
           gap: '8px'

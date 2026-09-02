@@ -5065,7 +5065,8 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
               <window.SelectorColor
                 valor={conn.color || '#1A1A1A'}
                 onCambio={(c) => updateConnector(conn.id, { color: c, isColorExplicit: true })}
-                tam={22}
+                colores={window.COLORES_ODINOTE_FLECHA}
+                tam={20}
               />
             </div>
 

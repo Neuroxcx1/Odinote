@@ -31,6 +31,11 @@ window.COLORES_ODINOTE_SUAVES = ['#FFF3A3', '#FFC7C2', '#CFEFD6', '#CDE9FF'];
 // para siempre.
 window.COLORES_ODINOTE_FONDO = ['#FFFFFF', '#F7DA84', '#FBDFDD', '#E8F0DA'];
 
+// Y los de una flecha: negro y blanco, nada mas. Sobre el lienzo claro se ve el
+// negro y sobre el oscuro el blanco, y con eso esta el 95% resuelto; el resto
+// esta en el arcoiris. Ademas su barra lateral es estrecha y no caben mas.
+window.COLORES_ODINOTE_FLECHA = ['#1A1A1A', '#FFFFFF'];
+
 // ── Los últimos que se usaron ──
 //
 // Quien se sale de la paleta casi siempre lo hace por algo suyo: el color de su
@@ -128,11 +133,15 @@ window.SelectorColor = function SelectorColor({
   return (
     <div className="selector-color-caja" style={{ display: 'flex', flexDirection: 'column', gap: '7px' }}>
 
+      {/* En fila y con salto de linea, no en rejilla de ancho fijo. La barra
+          lateral de un conector mide 76 px: con una rejilla de cinco columnas
+          fijas el contenido se salia del panel y las casillas se apilaban de
+          cualquier manera. Asi se acomodan al sitio que haya, sea el que sea. */}
       <div
         className="selector-color"
         style={{
-          display: 'grid',
-          gridTemplateColumns: `repeat(${paleta.length + (incluirTransparente ? 2 : 1)}, ${tam}px)`,
+          display: 'flex',
+          flexWrap: 'wrap',
           gap: '6px',
           alignItems: 'center',
         }}
@@ -215,8 +224,8 @@ window.SelectorColor = function SelectorColor({
         <div
           className="selector-color-recientes"
           style={{
-            display: 'grid',
-            gridTemplateColumns: `repeat(${MAX_RECIENTES}, ${tam - 5}px)`,
+            display: 'flex',
+            flexWrap: 'wrap',
             gap: '5px',
             alignItems: 'center',
           }}
