@@ -1,7 +1,7 @@
 // =====================================================
 // Odinote — Home v4 (Miro-style with sidebar)
 // =====================================================
-const { useState: useStateHome, useMemo: useMemoHome } = React;
+const { useState: useStateHome, useMemo: useMemoHome, useRef: useRefHome } = React;
 
 function BrandMark() {
   // Original logo, shown without the black box (container background is transparent now)
@@ -29,40 +29,77 @@ const COVER_PRESETS = [
   'linear-gradient(135deg, #FFFFFF 0%, #F7DA84 100%)',
 ];
 
-// ── El color libre de una portada ──
+// ── La portada, moviéndose por un degradado ──
 //
-// Los doce degradados se quedan: un degradado no se elige con una rueda, es una
-// pareja de colores ya escogida. Lo que faltaba era lo de siempre — doce nunca
-// son los colores de nadie, y quien tiene una marca, un juego o una manía la
-// quiere en la portada de su proyecto.
+// Los doce de arriba se quedan: son parejas de colores ya escogidas. Debajo,
+// una barra por la que se pasea. Antes había un selector de colores fijos, y
+// para una portada no es lo que se quiere: nadie busca "el #7B3FE4", busca
+// "un poco más morado que eso", y eso se hace arrastrando, no eligiendo entre
+// cuatro casillas y una rueda del sistema que se abre en otra ventana.
 //
-// Un color suelto se convierte en degradado del mismo tono, más oscuro abajo, y
-// no en un rectángulo plano: al lado de doce portadas con profundidad, una
-// plana se ve como un fallo y no como una elección.
-function oscurece(hex, factor) {
-  const m = /^#([0-9a-f]{6})$/i.exec(String(hex || '').trim());
-  if (!m) return hex;
-  const n = parseInt(m[1], 16);
-  const canal = (v) => Math.max(0, Math.min(255, Math.round(v * factor))).toString(16).padStart(2, '0');
-  return '#' + canal((n >> 16) & 255) + canal((n >> 8) & 255) + canal(n & 255);
+// El tono se guarda dentro del propio degradado —en hsl, que se lee de vuelta—
+// así que no hace falta un campo nuevo en el proyecto: la portada sigue siendo
+// una sola cadena de CSS, como la de los doce.
+function portadaDeTono(tono) {
+  const t = ((Math.round(tono) % 360) + 360) % 360;
+  // El segundo color va veinte grados por detrás y mucho más oscuro: un
+  // degradado entre dos tonos vecinos parece profundidad; entre dos opuestos,
+  // un error de imprenta.
+  const sombra = (t + 340) % 360;
+  return 'linear-gradient(135deg, hsl(' + t + ', 72%, 62%) 0%, hsl(' + sombra + ', 62%, 32%) 100%)';
 }
 
-function portadaDeColor(hex) {
-  return 'linear-gradient(135deg, ' + hex + ' 0%, ' + oscurece(hex, 0.55) + ' 100%)';
+function tonoDePortada(cover) {
+  const m = /hsl\((\d+)/.exec(String(cover || ''));
+  return m ? Number(m[1]) : null;
 }
 
-// De qué color es una portada hecha a mano. Los doce de la lista no cuentan:
-// ahí manda el recuadro con su aro, y marcar además una casilla del selector
-// diría que hay dos cosas elegidas.
-function colorDePortada(cover) {
-  if (!cover || COVER_PRESETS.indexOf(cover) !== -1) return '';
-  const m = String(cover).match(/#[0-9a-fA-F]{6}/);
-  return m ? m[0] : '';
+// Una portada es "tuya" cuando no es ninguna de las doce. Da igual cómo se
+// hiciera: las hay de cuando se elegía un color suelto, y esas también.
+function esPortadaPropia(cover) {
+  return !!cover && COVER_PRESETS.indexOf(cover) === -1;
+}
+
+function BarraDegradado({ tono, onCambio }) {
+  const barra = useRefHome(null);
+
+  const desdeX = (clientX) => {
+    const r = barra.current.getBoundingClientRect();
+    const p = Math.min(1, Math.max(0, (clientX - r.left) / r.width));
+    onCambio(Math.round(p * 360));
+  };
+
+  return (
+    <div
+      ref={barra}
+      className="portada-barra"
+      role="slider"
+      tabIndex={0}
+      aria-label={window.t('Color de la portada', 'Cover colour')}
+      aria-valuemin={0}
+      aria-valuemax={360}
+      aria-valuenow={tono == null ? 0 : tono}
+      // Con captura del puntero: se sigue arrastrando aunque el ratón se salga
+      // de la barra, que es lo que hace todo el mundo al buscar un tono.
+      onPointerDown={(e) => { e.currentTarget.setPointerCapture(e.pointerId); desdeX(e.clientX); }}
+      onPointerMove={(e) => { if (e.currentTarget.hasPointerCapture(e.pointerId)) desdeX(e.clientX); }}
+      onKeyDown={(e) => {
+        const t = tono == null ? 0 : tono;
+        if (e.key === 'ArrowLeft')  { e.preventDefault(); onCambio((t + 355) % 360); }
+        if (e.key === 'ArrowRight') { e.preventDefault(); onCambio((t + 5) % 360); }
+      }}
+    >
+      {tono != null && (
+        <span className="portada-barra-tirador" style={{ left: (tono / 360 * 100) + '%' }} />
+      )}
+    </div>
+  );
 }
 
 // El mismo campo en las dos ventanas —crear y editar—, escrito una sola vez:
 // dos copias del mismo formulario acaban siempre con una arreglada y la otra no.
 function CampoPortada({ cover, onCambio }) {
+  const propia = esPortadaPropia(cover);
   return (
     <div className="field">
       <label>{window.t('Portada', 'Cover')}</label>
@@ -76,14 +113,14 @@ function CampoPortada({ cover, onCambio }) {
           />
         ))}
         {/* La portada hecha a mano se pone la última, entre las demás y con su
-            aro. Sin ella, elegir un color de abajo no se veía por ninguna parte:
+            aro. Sin ella, moverse por la barra no se veía por ninguna parte:
             ningún recuadro quedaba marcado, y el degradado que iba a salir no
             aparecía hasta después de crear el proyecto. */}
-        {colorDePortada(cover) && (
+        {propia && (
           <button
             className="cover-pick active"
             style={{ background: cover, border: '1.5px solid var(--line)' }}
-            title={window.t('Tu color', 'Your colour')}
+            title={window.t('La tuya', 'Yours')}
             onClick={() => onCambio(cover)}
           />
         )}
@@ -93,23 +130,14 @@ function CampoPortada({ cover, onCambio }) {
           fontSize: '10px', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase',
           color: 'var(--ink-3, #8E8A8E)', marginBottom: '6px',
         }}>
-          {window.t('Otro color', 'Another colour')}
+          {window.t('O muévete por aquí', 'Or slide through here')}
         </div>
-        <window.SelectorColor
-          valor={colorDePortada(cover)}
-          colores={window.COLORES_ODINOTE_FONDO}
-          compacto
-          tam={22}
-          etiquetaLibre={window.t('Elegir el color de la portada', 'Pick the cover colour')}
-          onCambio={(c) => onCambio(portadaDeColor(c))}
-        />
+        <BarraDegradado tono={tonoDePortada(cover)} onCambio={(t) => onCambio(portadaDeTono(t))} />
       </div>
     </div>
   );
 }
-// Iconos de proyecto: Fluent Emoji 3D de Microsoft (licencia MIT, incluidos en
-// lib/project-icons — ver LICENSE.txt). Los proyectos antiguos con emojis o
-// nombres de Material Symbols se siguen mostrando tal cual.
+
 const EMOJI_PRESETS = [
   'icon:video_game', 'icon:crossed_swords', 'icon:rocket', 'icon:artist_palette',
   'icon:paintbrush', 'icon:puzzle_piece', 'icon:game_die', 'icon:world_map',
@@ -767,7 +795,11 @@ function ProjectCard({ project, lang, t, onOpen, onDelete, onRenameClick, onRest
 
 function NewProjectCard({ label, onClick, lang }) {
   return (
-    <div className="ms-project-card ms-new-project-card" onClick={onClick}>
+    // `position: relative` como en las tarjetas de proyecto de verdad, que lo
+    // llevan puesto. Era la única que no, y esa asimetría es la que dejaba
+    // suelta la textura de su portada: sin un antepasado colocado, lo que
+    // debía cubrir 84x60 píxeles se estiraba por toda el área de proyectos.
+    <div className="ms-project-card ms-new-project-card" onClick={onClick} style={{ position: 'relative' }}>
       <div className="ms-project-cover ms-new-cover">
         <div className="ms-new-plus">
           <span className="material-symbols-rounded">add</span>

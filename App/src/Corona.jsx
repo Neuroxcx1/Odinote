@@ -406,11 +406,6 @@ window.VentanaCorona = function VentanaCorona({ esPatrocinador, onCerrar, onConc
         'That file could not be used. Try a PNG or a JPG.')));
   };
 
-  const urlPrueba = C && C.urlDe(cfg);
-  const cursorDePrueba = urlPrueba
-    ? 'url("' + urlPrueba + '") ' + (cfg.modo === 'imagen' ? '20 20' : '4 4') + ', auto'
-    : 'auto';
-
   return (
     <div
       className="modal-backdrop"
@@ -493,11 +488,10 @@ window.VentanaCorona = function VentanaCorona({ esPatrocinador, onCerrar, onConc
                 </div>
               )}
 
-              {/* La prueba. Sin un sitio donde moverlo no hay forma de saber si
-                  el cursor elegido estorba o se pierde sobre el fondo. */}
-              <div className="corona-prueba" style={{ cursor: cursorDePrueba }}>
-                {window.t('Mueve el ratón por aquí para probarlo', 'Move the mouse here to try it')}
-              </div>
+              {/* Aquí había una zona para "probar" el cursor. No servía de nada:
+                  el cursor elegido se aplica a la ventana entera en cuanto se
+                  toca, así que ya se está probando en todas partes. Un recuadro
+                  que pide hacer lo que ya estás haciendo solo ocupa sitio. */}
             </div>
 
             {aviso && (

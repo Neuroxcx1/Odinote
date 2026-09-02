@@ -480,17 +480,6 @@ a, button, select, input[type="submit"], input[type="button"], [role="button"],
   border-color: var(--line-soft, #E5E1DD);
 }
 
-/* ── La zona de prueba ── */
-.corona-prueba {
-  border: 1.5px dashed rgba(224, 168, 46, 0.5);
-  border-radius: 11px;
-  padding: 22px 12px;
-  text-align: center;
-  font-size: 12px;
-  color: var(--ink-3, #595459);
-  background: rgba(224, 168, 46, 0.05);
-}
-
 /* ── El botón de subir una imagen ── */
 .corona-imagen {
   display: flex;
@@ -858,6 +847,15 @@ body[data-patrocinador="1"] .board-preview-item {
   background-image: radial-gradient(circle at 1px 1px, rgba(0,0,0,0.08) 1px, transparent 0);
   background-size: 12px 12px;
   opacity: 0.6;
+  /* Esto es una textura, no un botón, y por no decirlo se comió media pantalla.
+     En modo lista la portada pasa a `position: static` (ver más abajo, para que
+     los botones de la fila se anclen a la fila y no a la miniatura), así que
+     este `inset: 0` deja de medirse contra la portada y se mide contra el primer
+     antepasado colocado, que puede ser el área entera de proyectos. Invisible,
+     pero recibiendo TODOS los clics: pulsar el botón de cambiar de vista abría
+     "Nuevo proyecto", y la tarjeta se quedaba con el aspecto de estar siempre
+     bajo el ratón. Un adorno nunca debe poder recibir un clic. */
+  pointer-events: none;
 }
 .ms-project-emoji { font-size: 38px; z-index: 1; filter: drop-shadow(1px 2px 0 rgba(0,0,0,0.1)); }
 
@@ -2943,6 +2941,35 @@ body.odi-busy iframe { pointer-events: none !important; }
 .cover-pick { width: 48px; height: 30px; border-radius: 2px; border: 1.5px solid var(--line); cursor: pointer; transition: transform 120ms var(--e-out); }
 .cover-pick:hover { transform: translateY(-1px); }
 .cover-pick.active { outline: 2px solid var(--ink); outline-offset: 2px; }
+
+/* ── La barra de la portada ──
+   Un arcoíris por el que se arrastra. Para una portada nadie busca "el
+   #7B3FE4": busca "un poco más morado que ese", y eso se hace moviéndose, no
+   eligiendo entre casillas. */
+.portada-barra {
+  position: relative;
+  height: 26px;
+  border-radius: 6px;
+  border: 1.5px solid var(--line);
+  cursor: pointer;
+  touch-action: none;
+  background: linear-gradient(90deg,
+    hsl(0, 72%, 55%) 0%, hsl(45, 80%, 55%) 12.5%, hsl(90, 60%, 45%) 25%,
+    hsl(135, 55%, 42%) 37.5%, hsl(180, 60%, 42%) 50%, hsl(225, 65%, 52%) 62.5%,
+    hsl(270, 60%, 55%) 75%, hsl(315, 65%, 55%) 87.5%, hsl(360, 72%, 55%) 100%);
+}
+.portada-barra:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+.portada-barra-tirador {
+  position: absolute;
+  top: -4px; bottom: -4px;
+  width: 12px;
+  transform: translateX(-50%);
+  border-radius: 4px;
+  background: transparent;
+  border: 2.5px solid #FFFFFF;
+  box-shadow: 0 0 0 1.5px var(--line), 0 2px 6px rgba(0, 0, 0, 0.35);
+  pointer-events: none;
+}
 .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
 
 /* Doc fullscreen modal */
