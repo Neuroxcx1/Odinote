@@ -4554,7 +4554,14 @@ function DrawItem({ item }) {
 // están dentro de una nota no hay de dónde sacarles la ruta.
 window.rutaDeArchivo = function (archivo) {
   try {
-    return archivo && typeof archivo.path === 'string' && archivo.path ? archivo.path : null;
+    const ruta = archivo && typeof archivo.path === 'string' && archivo.path ? archivo.path : null;
+    // Queda escrito en el registro (%APPDATA%Odinoteodinote-debug.log) qué
+    // llegó con cada archivo. Sin esto, cuando el botón de abrir la carpeta no
+    // aparece no hay forma de saber si es que el archivo entró antes de que
+    // esto existiera, o si el sistema no dio la ruta esta vez.
+    console.log('[Oddinote] archivo añadido: ' + ((archivo && archivo.name) || '?') +
+      ' · ruta: ' + (ruta || 'no llegó ninguna'));
+    return ruta;
   } catch (e) {
     return null;
   }
