@@ -47,7 +47,7 @@ try {
 
 // Marcador de build: si la consola no muestra esta versión, el navegador está
 // sirviendo JS cacheado (subir ?v= en index.html invalida la caché)
-window.ODINOTE_BUILD = '1.0.8-163';
+window.ODINOTE_BUILD = '1.0.8-165';
 console.log('[ODINOTE] Código cargado: ' + window.ODINOTE_BUILD);
 
 // Global shortcuts configuration
@@ -1370,6 +1370,22 @@ function App() {
     window.__hideSplash && window.__hideSplash();
   }, []);
 
+  // ── La carpeta de cada proyecto dentro de la bóveda ──
+  //
+  // Se calcula del nombre del proyecto (ver boveda.js), y sin pasarle el idioma
+  // a propósito: si dependiera del idioma de la interfaz, cambiar la aplicación
+  // a inglés renombraría las carpetas de todo el mundo.
+  const carpetasProyecto = React.useMemo(
+    () => (window.Boveda ? window.Boveda.carpetasDeProyectos(projects) : {}),
+    [projects]
+  );
+
+  // Y cuál es la del proyecto abierto, para que sus imágenes se busquen dentro
+  // de ella. Va en window porque lo pregunta cada nodo al pintarse.
+  React.useEffect(() => {
+    window.odiCarpetaProyecto = (view && view.projectId && carpetasProyecto[view.projectId]) || null;
+  }, [view && view.projectId, carpetasProyecto]);
+
   const savingMediaRef = React.useRef(new Set());
 
   const saveBase64MediaLocally = async (currentCanvases, activeVaultPath) => {
@@ -1378,6 +1394,20 @@ function App() {
     let changed = false;
     const nextCanvases = JSON.parse(JSON.stringify(currentCanvases));
     const saves = [];
+
+    // De qué proyecto es cada lienzo, para que su imagen caiga en la carpeta
+    // correcta. Un tablero anidado cuenta como del proyecto que lo contiene.
+    const carpetaPorCanvas = {};
+    try {
+      const reparte = window.OdiDrive && window.OdiDrive.collectProjectCanvases;
+      (projects || []).forEach(p => {
+        if (!p || !p.id || !reparte) return;
+        const suyos = reparte(currentCanvases, p.id) || {};
+        Object.keys(suyos).forEach(cid => { carpetaPorCanvas[cid] = carpetasProyecto[p.id] || null; });
+      });
+    } catch (err) {
+      console.warn('[Oddinote] no se pudo repartir los lienzos por proyecto:', err);
+    }
 
     for (const [cid, canvas] of Object.entries(nextCanvases)) {
       if (!canvas.items) continue;
@@ -1394,9 +1424,13 @@ function App() {
           
           saves.push((async () => {
             try {
-              const relativePath = await window.electronAPI.saveMedia(activeVaultPath, rawName, item.src);
-              const normalizedRelative = relativePath.replace(/\\/g, '/');
-              const absolutePath = `file:///${activeVaultPath.replace(/\\/g, '/')}/${normalizedRelative}`;
+              const carpeta = carpetaPorCanvas[cid] || null;
+              const relativePath = await window.electronAPI.saveMedia(activeVaultPath, rawName, item.src, carpeta);
+              // Se guarda RELATIVO ('media/foto.png'), no absoluto. Así la bóveda
+              // se puede mover de disco y un proyecto se puede renombrar —su
+              // carpeta se mueve entera— sin reescribir una sola nota. Quien lo
+              // pinta le pone delante la carpeta del proyecto.
+              const absolutePath = relativePath.replace(/\\/g, '/');
               
               item.src = absolutePath;
               
@@ -1779,7 +1813,7 @@ function App() {
       try {
         if (vaultPath && window.electronAPI) {
           const cleanCanvases = await saveBase64MediaLocally(canvases, vaultPath);
-          window.electronAPI.writeVault(vaultPath, { view, lang, theme, projects, canvases: cleanCanvases, templatesVersion: 2 });
+          window.electronAPI.writeVault(vaultPath, { view, lang, theme, projects, canvases: cleanCanvases, templatesVersion: 2 }, carpetasProyecto);
         } else {
           saveStateToDB({ view, lang, theme, projects, canvases, templatesVersion: 2 });
         }
@@ -1986,7 +2020,7 @@ function App() {
     if (loading) return;
     const flush = () => {
       if (vaultPath && window.electronAPI) {
-        window.electronAPI.writeVault(vaultPath, { view, lang, theme, projects, canvases, templatesVersion: 2 });
+        window.electronAPI.writeVault(vaultPath, { view, lang, theme, projects, canvases, templatesVersion: 2 }, carpetasProyecto);
       } else {
         saveStateToDB({ view, lang, theme, projects, canvases, templatesVersion: 2 });
       }

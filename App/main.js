@@ -2,6 +2,10 @@ const { app, BrowserWindow, ipcMain, dialog, shell, Menu } = require('electron')
 app.commandLine.appendSwitch('disable-features', 'WinUseBrowserSpellChecker');
 const path = require('path');
 const fs = require('fs');
+// Cómo se llama la carpeta de cada proyecto y dónde cae cada archivo. Vive
+// aparte porque es lo único de la bóveda que se puede probar sin Electron:
+// node scripts/test-boveda.js
+const Boveda = require('./boveda.js');
 const http = require('http');
 
 let mainWindow;
@@ -199,8 +203,20 @@ function createWindow() {
         res.end('404 No Active Vault');
         return;
       }
-      const relativePart = decodedPath.replace('/vault-media/', ''); // e.g., media/web_image_abc.png
-      const filePath = path.join(activeVaultPath, relativePart);
+      const relativePart = decodedPath.replace('/vault-media/', ''); // p. ej. Diana/media/foto.png
+      let filePath = path.join(activeVaultPath, relativePart);
+
+      // Si ahí no está, se prueba en el montón de siempre. Una bóveda con
+      // historia tiene las dos cosas: lo de este mes dentro del proyecto y lo
+      // de hace meses en el 'media' común, y ninguna imagen debe romperse por
+      // haber cambiado de sitio la casa.
+      if (!fs.existsSync(filePath)) {
+        const cola = relativePart.match(/media\/[^/]+$/i);
+        if (cola) {
+          const alternativa = path.join(activeVaultPath, cola[0]);
+          if (fs.existsSync(alternativa)) filePath = alternativa;
+        }
+      }
       const ext = path.extname(filePath).toLowerCase();
 
       logToFile(`HTTP Request (Vault): ${req.method} ${req.url} -> Resolved: ${filePath}`);
@@ -361,64 +377,47 @@ function canvasesOfProject(allCanvases, rootId) {
   return out;
 }
 
-function readSplitVault(folderPath) {
-  const projectsDir = path.join(folderPath, 'projects');
-  if (!fs.existsSync(projectsDir)) return null;
-
-  const projects = [];
-  const canvases = {};
-  let meta = {};
-  for (const entry of fs.readdirSync(projectsDir)) {
-    const file = path.join(projectsDir, entry, 'project.json');
-    if (!fs.existsSync(file)) continue;
-    try {
-      const parsed = JSON.parse(fs.readFileSync(file, 'utf-8'));
-      if (parsed.project) projects.push(parsed.project);
-      Object.assign(canvases, parsed.canvases || {});
-      if (parsed.meta) meta = parsed.meta;
-    } catch (err) {
-      // Un proyecto ilegible ya no se lleva a los demás por delante: se anota
-      // y se sigue con el resto.
-      logToFile(`read-vault: ${entry}/project.json ilegible (${err.message}), se omite`);
-    }
-  }
-  if (!projects.length) return null;
-  return { ...meta, projects, canvases };
-}
+// Todo el reparto en carpetas vive en boveda.js, que se puede probar contra una
+// carpeta de verdad sin levantar Electron: node scripts/test-boveda.js
+const IO = { fs: fs, path: path, log: logToFile };
 
 ipcMain.handle('read-vault', async (event, folderPath) => {
   logToFile(`IPC Call: read-vault at ${folderPath}`);
   activeVaultPath = folderPath;
   const filePath = path.join(folderPath, 'odinote.json');
   try {
-    const split = readSplitVault(folderPath);
+    const porCarpetas = Boveda.leeCarpetas(IO, folderPath);
+    const split = Boveda.leeRepartoAnterior(IO, folderPath);
     const legacy = fs.existsSync(filePath) ? JSON.parse(fs.readFileSync(filePath, 'utf-8')) : null;
 
-    // Se usa el reparto por proyecto salvo que el archivo antiguo tenga MÁS
-    // proyectos: eso significaría que el reparto se quedó a medias, y perder
-    // proyectos en silencio es lo único inaceptable aquí.
-    if (split) {
-      const legacyCount = (legacy && legacy.projects && legacy.projects.length) || 0;
-      if (split.projects.length >= legacyCount) {
-        logToFile(`IPC read-vault: leídos ${split.projects.length} proyectos de projects/`);
-        return split;
-      }
-      logToFile(`IPC read-vault: projects/ tiene ${split.projects.length} y odinote.json ${legacyCount}; se usa odinote.json`);
+    // Gana quien traiga MÁS proyectos. No es un capricho de orden: si un
+    // reparto se quedó a medias por un corte a media escritura, elegirlo
+    // significaría perder proyectos en silencio, que es lo único inaceptable
+    // aquí. Entre iguales manda el reparto nuevo, que es el que se escribe.
+    const candidatos = [
+      { nombre: 'carpetas por proyecto', datos: porCarpetas },
+      { nombre: 'projects/ (reparto anterior)', datos: split },
+      { nombre: 'odinote.json', datos: legacy },
+    ].filter(c => c.datos && Array.isArray(c.datos.projects) && c.datos.projects.length);
+
+    if (!candidatos.length) {
+      logToFile('IPC read-vault: no hay nada que leer todavía.');
+      return legacy || null;
     }
 
-    if (legacy) {
-      logToFile(`IPC read-vault: Found odinote.json. Read successfully.`);
-      return legacy;
+    let elegido = candidatos[0];
+    for (const c of candidatos) {
+      if (c.datos.projects.length > elegido.datos.projects.length) elegido = c;
     }
-    logToFile(`IPC read-vault: odinote.json not found.`);
-    return null;
+    logToFile(`IPC read-vault: se usa ${elegido.nombre} (${elegido.datos.projects.length} proyectos)`);
+    return elegido.datos;
   } catch (err) {
     logToFile(`IPC read-vault ERROR: ${err.message}`);
     throw err;
   }
 });
 
-ipcMain.handle('write-vault', async (event, { folderPath, data }) => {
+ipcMain.handle('write-vault', async (event, { folderPath, data, carpetas }) => {
   logToFile(`IPC Call: write-vault at ${folderPath}`);
   activeVaultPath = folderPath;
   const filePath = path.join(folderPath, 'odinote.json');
@@ -427,42 +426,15 @@ ipcMain.handle('write-vault', async (event, { folderPath, data }) => {
     // es el respaldo del que tira la lectura si el reparto sale mal.
     fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf-8');
 
-    // 2. Y además, un archivo por proyecto.
+    // 2. Y además, una carpeta por proyecto, con su nombre.
     try {
-      const { projects = [], canvases = {}, ...meta } = data || {};
-      const projectsDir = path.join(folderPath, 'projects');
-      fs.mkdirSync(projectsDir, { recursive: true });
-
-      const alive = new Set();
-      for (const project of projects) {
-        if (!project || !project.id) continue;
-        const safeId = String(project.id).replace(/[^a-zA-Z0-9._-]/g, '_');
-        alive.add(safeId);
-        const dir = path.join(projectsDir, safeId);
-        fs.mkdirSync(dir, { recursive: true });
-        const payload = { meta, project, canvases: canvasesOfProject(canvases, project.id) };
-        // Escritura atómica: a un archivo temporal y luego renombrar. Si se corta
-        // la corriente a media escritura, el project.json anterior sigue entero
-        // en vez de quedarse truncado.
-        const tmp = path.join(dir, 'project.json.tmp');
-        fs.writeFileSync(tmp, JSON.stringify(payload, null, 2), 'utf-8');
-        fs.renameSync(tmp, path.join(dir, 'project.json'));
-      }
-
-      // Carpetas de proyectos que ya no existen: se retiran para que la bóveda
-      // no acumule restos. Solo se toca lo que tenga un project.json nuestro.
-      for (const entry of fs.readdirSync(projectsDir)) {
-        if (alive.has(entry)) continue;
-        const stale = path.join(projectsDir, entry);
-        if (fs.existsSync(path.join(stale, 'project.json'))) {
-          fs.rmSync(stale, { recursive: true, force: true });
-          logToFile(`write-vault: retirada la carpeta del proyecto eliminado ${entry}`);
-        }
-      }
+      const hecho = Boveda.escribeCarpetas(IO, folderPath, data, carpetas);
+      logToFile(`write-vault: ${hecho.escritos.length} carpetas escritas, ` +
+        `${hecho.renombrados.length} renombradas, ${hecho.retirados.length} retiradas`);
     } catch (splitErr) {
       // El reparto es una mejora, no un requisito: si falla, odinote.json ya
       // está escrito y la app sigue funcionando exactamente como antes.
-      logToFile(`write-vault: el reparto por proyecto falló (${splitErr.message}); odinote.json sí se guardó`);
+      logToFile(`write-vault: el reparto por carpetas falló (${splitErr.message}); odinote.json sí se guardó`);
     }
 
     logToFile(`IPC write-vault: Saved successfully.`);
@@ -473,9 +445,12 @@ ipcMain.handle('write-vault', async (event, { folderPath, data }) => {
   }
 });
 
-ipcMain.handle('save-media', async (event, { folderPath, fileName, base64Data }) => {
-  logToFile(`IPC Call: save-media at ${folderPath} with name: ${fileName}`);
-  const mediaDir = path.join(folderPath, 'media');
+ipcMain.handle('save-media', async (event, { folderPath, fileName, base64Data, carpeta }) => {
+  logToFile(`IPC Call: save-media at ${folderPath} with name: ${fileName} (proyecto: ${carpeta || 'sin carpeta'})`);
+  // Cada proyecto guarda lo suyo en su carpeta. Sin carpeta —una versión vieja
+  // llamando, o un proyecto sin identificar— se cae al montón de siempre, que
+  // sigue funcionando.
+  const mediaDir = carpeta ? path.join(folderPath, carpeta, 'media') : path.join(folderPath, 'media');
   try {
     if (!fs.existsSync(mediaDir)) {
       fs.mkdirSync(mediaDir, { recursive: true });
@@ -495,12 +470,15 @@ ipcMain.handle('save-media', async (event, { folderPath, fileName, base64Data })
 
     // De-duplication check: if file already exists, reuse it and skip writing
     if (fs.existsSync(destPath)) {
-      logToFile(`IPC save-media: File already exists on disk, reusing: media/${finalName}`);
+      logToFile(`IPC save-media: ya estaba, se reutiliza: media/${finalName}`);
       return `media/${finalName}`;
     }
 
     fs.writeFileSync(destPath, buffer);
-    logToFile(`IPC save-media: Saved successfully to media/${finalName}`);
+    logToFile(`IPC save-media: guardado en ${carpeta ? carpeta + '/' : ''}media/${finalName}`);
+    // Se devuelve RELATIVO a la carpeta del proyecto, no absoluto: así la
+    // bóveda entera se puede mover de disco, o renombrar un proyecto, sin que
+    // haya que reescribir una sola nota.
     return `media/${finalName}`;
   } catch (err) {
     logToFile(`IPC save-media ERROR: ${err.message}`);
@@ -627,6 +605,20 @@ ipcMain.handle('remove-word-from-dictionary', async (event, word) => {
 // la nota y no existe como archivo en ninguna parte.
 //
 // Solo abre carpetas; no lee el archivo, ni lo copia, ni lo ejecuta.
+// Los sitios donde puede estar el archivo de un nodo, en orden de preferencia.
+// Se prueban todos porque una bóveda de verdad tiene mezcla: lo añadido hoy en
+// la carpeta del proyecto, y lo de hace meses en el montón común.
+function candidatasEnBoveda(src, carpeta) {
+  if (!activeVaultPath) return [];
+  const fuera = [];
+  const relativa = Boveda.relativoEnBoveda(src, carpeta);
+  if (relativa) fuera.push(path.join(activeVaultPath, relativa));
+  // Y siempre, el montón de antes: 'media/loquesea.png'.
+  const suelta = Boveda.relativoEnBoveda(src, null);
+  if (suelta) fuera.push(path.join(activeVaultPath, suelta));
+  return fuera;
+}
+
 function rutaDesdeSrc(src) {
   if (typeof src !== 'string' || !src.trim()) return null;
   if (src.startsWith('data:') || src.startsWith('http://') || src.startsWith('https://')) return null;
@@ -660,7 +652,11 @@ ipcMain.handle('mostrar-en-carpeta', async (event, datos) => {
   try {
     // Se admite el texto suelto de la primera versión y el objeto de ahora.
     const peticion = typeof datos === 'string' ? { ruta: datos } : (datos || {});
-    const candidatas = [peticion.ruta, rutaDesdeSrc(peticion.src)]
+    // Por orden: la ruta de donde salió el archivo, la copia dentro de la
+    // carpeta del proyecto, y la del montón de antes. La primera que exista.
+    const candidatas = [peticion.ruta]
+      .concat(candidatasEnBoveda(peticion.src, peticion.carpeta))
+      .concat([rutaDesdeSrc(peticion.src)])
       .filter(r => typeof r === 'string' && r.trim());
 
     if (!candidatas.length) return { ok: false, motivo: 'sin-ruta' };

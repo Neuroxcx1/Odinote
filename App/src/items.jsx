@@ -18,7 +18,11 @@ function resolveMediaSrc(src) {
     }
   }
   if (src.startsWith('media/')) {
-    return `/vault-media/${src}`;
+    // Guardado relativo a la carpeta del proyecto, así que hay que ponerle
+    // delante cuál es. Si no se sabe —al arrancar, antes de abrir ninguno— se
+    // pide sin ella y el servidor la busca en el montón de siempre.
+    const carpeta = window.odiCarpetaProyecto;
+    return carpeta ? `/vault-media/${encodeURIComponent(carpeta)}/${src}` : `/vault-media/${src}`;
   }
   if (src.startsWith('/vault-media/')) {
     return src;

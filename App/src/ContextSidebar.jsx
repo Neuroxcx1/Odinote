@@ -123,7 +123,11 @@ function ContextSidebar({
 
   const abreLaCarpeta = () => {
     window.playAudioTone && window.playAudioTone('click');
-    window.electronAPI.mostrarEnCarpeta({ ruta: item.rutaOrigen, src: item.src }).then((r) => {
+    window.electronAPI.mostrarEnCarpeta({
+      ruta: item.rutaOrigen,
+      src: item.src,
+      carpeta: window.odiCarpetaProyecto || null,
+    }).then((r) => {
       if (r && r.ok) return;
       const motivo = r && r.motivo;
       window.showToast && window.showToast(
