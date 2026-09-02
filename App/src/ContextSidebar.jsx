@@ -105,6 +105,29 @@ function ContextSidebar({
   const isBigTitle = item.type === 'bigtitle';
   const isMap = item.type === 'map';
   const isShape = item.type === 'shape';
+
+  // ── "Abrir la carpeta del archivo" ──
+  //
+  // Solo aparece si hay algo que abrir: una ruta apuntada al añadir el archivo
+  // (ver window.rutaDeArchivo en items.jsx) y un escritorio donde abrirla. En
+  // la versión web no sale nunca, y en los archivos que ya estaban dentro de
+  // una nota tampoco: de esos no hay ruta que sacar, porque nunca se guardó.
+  const puedeAbrirCarpeta = !!(item.rutaOrigen && window.electronAPI && window.electronAPI.mostrarEnCarpeta);
+
+  const abreLaCarpeta = () => {
+    window.playAudioTone && window.playAudioTone('click');
+    window.electronAPI.mostrarEnCarpeta(item.rutaOrigen).then((r) => {
+      if (r && r.ok) return;
+      const motivo = r && r.motivo;
+      window.showToast && window.showToast(
+        motivo === 'no-esta'
+          ? window.t('El archivo ya no está en esa carpeta. Lo que ves aquí sigue guardado dentro de la nota.',
+                     'The file is not in that folder any more. What you see here is still saved inside the note.')
+          : window.t('No se pudo abrir la carpeta.', 'The folder could not be opened.'),
+        'error'
+      );
+    });
+  };
   const isDraw = item.type === 'draw';
   const isCurrentlyCropping = isImage && callbacks?.croppingId === item.id;
   // Dibujando: la barra se convierte en la caja de herramientas del lápiz y
@@ -335,6 +358,17 @@ function ContextSidebar({
           >
             <div className="ctx-color-chip" style={{ background: isColor ? (item.hex || '#56B3A7') : resolveStickyColor(item.color || 'white'), border: '1.5px solid var(--line-soft)' }}/>
             <span>Color</span>
+          </button>
+        )}
+
+        {puedeAbrirCarpeta && (
+          <button
+            className="ctx-btn"
+            onClick={abreLaCarpeta}
+            title={item.rutaOrigen}
+          >
+            <span className="material-symbols-rounded">folder_open</span>
+            <span>{window.t('Abrir la carpeta', 'Open the folder')}</span>
           </button>
         )}
 

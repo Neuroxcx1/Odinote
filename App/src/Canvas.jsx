@@ -1858,6 +1858,10 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
       // Read drop coordinates in canvas space for creating a new node
       const pt = screenToCanvas(e.clientX, e.clientY);
 
+      // De dónde salió, para poder abrir su carpeta después. Ver
+      // window.rutaDeArchivo en items.jsx: en el navegador esto es null.
+      const rutaOrigen = window.rutaDeArchivo ? window.rutaDeArchivo(file) : null;
+
       if (isImg) {
         const fr = new FileReader();
         fr.onload = () => {
@@ -1868,7 +1872,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
             if (targetItem && targetItem.type === 'image') {
               // Replace existing image
               const w = targetItem.w || 260;
-              updateItem(targetId, { src, name: file.name, w, h: Math.max(60, Math.round(w / ratio)) });
+              updateItem(targetId, { src, name: file.name, w, h: Math.max(60, Math.round(w / ratio)), rutaOrigen });
             } else {
               // Create a new image node at drop location
               const w = 300;
@@ -1878,6 +1882,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
               newItem.name = file.name;
               newItem.w = w;
               newItem.h = h;
+              newItem.rutaOrigen = rutaOrigen;
               setCanvases(prev => {
                 const c = prev[currentId];
                 return { ...prev, [currentId]: { ...c, items: [...c.items, newItem] } };
@@ -1886,7 +1891,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
             }
           };
           img.onerror = () => {
-            if (targetItem && targetItem.type === 'image') updateItem(targetId, { src, name: file.name });
+            if (targetItem && targetItem.type === 'image') updateItem(targetId, { src, name: file.name, rutaOrigen });
           };
           img.src = src;
         };
@@ -1897,7 +1902,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
           const src = fr.result;
           if (targetItem && targetItem.type === 'audio') {
             // Replace existing audio
-            updateItem(targetId, { src, name: file.name, size: file.size });
+            updateItem(targetId, { src, name: file.name, size: file.size, rutaOrigen });
           } else {
             // Create a new audio node at drop location
             const w = 320;
@@ -1906,6 +1911,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
             newItem.src = src;
             newItem.name = file.name;
             newItem.size = file.size;
+            newItem.rutaOrigen = rutaOrigen;
             setCanvases(prev => {
               const c = prev[currentId];
               return { ...prev, [currentId]: { ...c, items: [...c.items, newItem] } };
@@ -1921,11 +1927,12 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
           const src = fr.result;
           const ext = (file.name.split('.').pop() || '').toLowerCase();
           if (targetItem && targetItem.type === 'file') {
-            updateItem(targetId, { src, name: file.name, size: file.size, fileType: ext });
+            updateItem(targetId, { src, name: file.name, size: file.size, fileType: ext, rutaOrigen });
           } else {
             const w = 200, h = 190;
             const newItem = makeNewItem('file', pt.x - w / 2, pt.y - h / 2, w, h, lang);
             newItem.src = src; newItem.name = file.name; newItem.size = file.size; newItem.fileType = ext;
+            newItem.rutaOrigen = rutaOrigen;
             newItem._triggerFilePick = false;
             setCanvases(prev => {
               const c = prev[currentId];

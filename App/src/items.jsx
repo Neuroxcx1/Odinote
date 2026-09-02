@@ -655,13 +655,14 @@ function ImageItem({ item, lang, onUpdate, callbacks }) {
     reader.onload = () => {
       const src = reader.result;
       const img = new Image();
+      const rutaOrigen = window.rutaDeArchivo ? window.rutaDeArchivo(file) : null;
       img.onload = () => {
         const ratio = img.naturalWidth / img.naturalHeight;
         setNaturalRatio(ratio);
         const w = itemWRef.current || 260;
-        onUpdateRef.current({ src, w, h: Math.max(60, Math.round(w / ratio)), naturalRatio: ratio });
+        onUpdateRef.current({ src, w, h: Math.max(60, Math.round(w / ratio)), naturalRatio: ratio, rutaOrigen });
       };
-      img.onerror = () => onUpdateRef.current({ src });
+      img.onerror = () => onUpdateRef.current({ src, rutaOrigen });
       img.src = src;
     };
     reader.readAsDataURL(file);
@@ -3369,7 +3370,8 @@ function AudioItem({ item, lang, onUpdate }) {
         src: reader.result,
         name: file.name,
         _originalName: file.name,
-        size: file.size
+        size: file.size,
+        rutaOrigen: window.rutaDeArchivo ? window.rutaDeArchivo(file) : null
       });
     };
     reader.readAsDataURL(file);
@@ -3683,7 +3685,8 @@ function FileItem({ item, lang, onUpdate, onOpenFile }) {
     reader.onprogress = (ev) => { if (ev.lengthComputable) setProgress(Math.round((ev.loaded / ev.total) * 100)); };
     reader.onload = () => {
       const fext = (file.name.split('.').pop() || '').toLowerCase();
-      onUpdate({ src: reader.result, name: file.name, size: file.size, fileType: fext });
+      onUpdate({ src: reader.result, name: file.name, size: file.size, fileType: fext,
+        rutaOrigen: window.rutaDeArchivo ? window.rutaDeArchivo(file) : null });
       setUploading(false); setProgress(100);
     };
     reader.onerror = () => setUploading(false);
@@ -4534,6 +4537,28 @@ function DrawItem({ item }) {
     </div>
   );
 }
+
+// ── ¿De dónde salió este archivo? ──
+//
+// Cuando Oddinote guarda una imagen o un PDF se queda con el contenido metido
+// dentro de la nota y se olvida de dónde vino, así que después no hay ninguna
+// carpeta que abrir. Aquí se apunta la ruta, y solo eso: la ruta, no el
+// archivo, que sigue viajando incrustado como siempre.
+//
+// En el escritorio, Electron pone `path` en los archivos que se eligen o se
+// sueltan. En el navegador NO existe —y no puede existir, porque una página web
+// no tiene por qué saber cómo se llaman tus carpetas—, así que ahí esto
+// devuelve null y el botón de abrir la carpeta sencillamente no aparece.
+//
+// Solo sirve para los archivos que se añadan a partir de ahora: a los que ya
+// están dentro de una nota no hay de dónde sacarles la ruta.
+window.rutaDeArchivo = function (archivo) {
+  try {
+    return archivo && typeof archivo.path === 'string' && archivo.path ? archivo.path : null;
+  } catch (e) {
+    return null;
+  }
+};
 
 function ItemRenderer({ item, lang, editing, callbacks }) {
   const cb = callbacks || {};

@@ -606,6 +606,26 @@ ipcMain.handle('remove-word-from-dictionary', async (event, word) => {
   return false;
 });
 
+// ── Enseñar un archivo en su carpeta ──
+//
+// Lo pide el botón "Abrir la carpeta" de la barra del nodo. Se comprueba que el
+// archivo siga ahí antes de llamar al sistema: `showItemInFolder` con una ruta
+// que ya no existe no falla, simplemente no hace nada, y entonces quien lo pulsa
+// no sabe si la aplicación está rota o si movió el archivo el mes pasado.
+//
+// Solo abre carpetas; no lee el archivo, ni lo copia, ni lo ejecuta.
+ipcMain.handle('mostrar-en-carpeta', async (event, ruta) => {
+  try {
+    if (typeof ruta !== 'string' || !ruta.trim()) return { ok: false, motivo: 'sin-ruta' };
+    if (!fs.existsSync(ruta)) return { ok: false, motivo: 'no-esta' };
+    shell.showItemInFolder(path.normalize(ruta));
+    return { ok: true };
+  } catch (err) {
+    logToFile(`mostrar-en-carpeta failed: ${err.message}`);
+    return { ok: false, motivo: 'error' };
+  }
+});
+
 ipcMain.handle('open-user-data-folder', async () => {
   logToFile('IPC Call: open-user-data-folder');
   try {
