@@ -1017,6 +1017,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
   // sesión): así "Descartar" es gratis y todo lo dibujado entra en el
   // historial general como un solo paso al guardar.
   const [drawingId, setDrawingId] = useStateCanvas(null);
+  const [fogonazo, setFogonazo] = useStateCanvas(false);
   const [drawSession, setDrawSession] = useStateCanvas(null); // { strokes, past, future }
   const [drawTool, setDrawTool] = useStateCanvas('pen');      // pen | move | eraser
   const [drawColor, setDrawColor] = useStateCanvas('#E6544F');
@@ -4817,14 +4818,23 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
   const capturaLienzo = async () => {
     const api = window.electronAPI;
     const zona = document.querySelector('.canvas-wrap');
-    if (!api || !api.capturarLienzo || !zona) return;
+    if (!api || !api.capturarLienzo || !zona || fogonazo) return;
 
     const mandos = Array.from(zona.children).filter(c => !c.classList.contains('canvas-surface'));
     mandos.forEach(m => { m.style.visibility = 'hidden'; });
 
     try {
+      // El fogonazo primero: los bordes se encienden en blanco un instante, como
+      // el obturador de una camara. No es adorno — entre pulsar y ver la ventana
+      // de guardar pasa casi un segundo, y sin nada en medio parece que el boton
+      // no ha hecho nada y se pulsa otra vez.
+      setFogonazo(true);
+      await new Promise(r => setTimeout(r, 420));
+      setFogonazo(false);
+
       // Dos fotogramas antes de disparar. Con uno solo, a veces la captura sale
-      // con los mandos todavia puestos: el navegador aun no ha repintado.
+      // con los mandos todavia puestos: el navegador aun no ha repintado. Y aqui
+      // ademas hace falta que el fogonazo se haya ido, o saldria en la foto.
       await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
 
       const r = zona.getBoundingClientRect();
@@ -4836,6 +4846,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
         window.showToast && window.showToast(window.t('No se pudo guardar la captura.', 'Could not save the screenshot.'), 'error');
       }
     } finally {
+      setFogonazo(false);
       // En un `finally` a proposito: si algo falla a medias, lo que no puede
       // pasar es que la persona se quede con el lienzo sin mandos.
       mandos.forEach(m => { m.style.visibility = ''; });
@@ -5612,16 +5623,6 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
 
         {/* Zoom controls */}
         <div className="zoom-ctrls">
-          {/* La foto del lienzo. Va aqui y no en la barra de arriba porque lo
-              que captura es esta zona, y un boton que actua sobre algo conviene
-              tenerlo al lado de ese algo. Solo existe en el escritorio: en el
-              navegador no hay forma de fotografiar la ventana sin pedir permisos
-              y ensenar un selector de pantallas, que para esto sobra. */}
-          {window.electronAPI && window.electronAPI.capturarLienzo && (
-            <button title={window.t('Guardar una foto de este lienzo', 'Save a picture of this canvas')} onClick={capturaLienzo}>
-              <span className="material-symbols-rounded" style={{fontSize:15}}>photo_camera</span>
-            </button>
-          )}
           <button title="Zoom out" onClick={()=>setScale(s => Math.max(0.2, s - 0.1))}>
             <span className="material-symbols-rounded" style={{fontSize:15}}>remove</span>
           </button>
@@ -5632,6 +5633,23 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
             <span className="material-symbols-rounded" style={{fontSize:15}}>add</span>
           </button>
         </div>
+
+        {/* La foto del lienzo. Suelta y no dentro del grupo del zoom: alli
+            quedaba amontonada entre el menos y el mas, y una accion que guarda
+            un archivo no es del mismo tipo que ajustar el aumento. */}
+        {window.electronAPI && window.electronAPI.capturarLienzo && (
+          <button
+            className="icon-btn lift canvas-shot"
+            title={window.t('Guardar una foto de este lienzo', 'Save a picture of this canvas')}
+            onClick={capturaLienzo}
+          >
+            <span className="material-symbols-rounded" style={{fontSize:17}}>photo_camera</span>
+          </button>
+        )}
+
+        {/* El fogonazo. Se enciende justo antes de disparar y se apaga antes de
+            que la camara mire, para que no salga en la foto. */}
+        {fogonazo && <div className="canvas-fogonazo" />}
 
         {/* Background Color Selector */}
         <div className="canvas-bg-selector" style={{ position: 'absolute', bottom: '16px', right: '160px', zIndex: 40 }}>

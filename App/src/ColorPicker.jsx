@@ -24,6 +24,36 @@ window.COLORES_ODINOTE = ['#1A1A1A', '#E6544F', '#90B968', '#3D5A80'];
 // que hay debajo: los de arriba tapan el texto y no valen aquí.
 window.COLORES_ODINOTE_SUAVES = ['#FFF3A3', '#FFC7C2', '#CFEFD6', '#CDE9FF'];
 
+// ── Los últimos que se usaron ──
+//
+// Quien se sale de la paleta casi siempre lo hace por algo suyo: el color de su
+// marca, el de su juego. Y lo va a querer otra vez dentro de dos minutos, en
+// otro nodo. Sin esto tendría que volver a buscarlo en la rueda cada vez, y
+// acertar el mismo tono a ojo no se puede.
+//
+// Se guardan en el equipo y no en el proyecto: son una costumbre de quien
+// trabaja, no parte del tablero, y no tiene sentido que viajen a quien lo abra.
+const CLAVE_RECIENTES = 'odinote.colores.recientes';
+const MAX_RECIENTES = 6;
+
+function leeRecientes() {
+  try {
+    const crudo = localStorage.getItem(CLAVE_RECIENTES);
+    const lista = crudo ? JSON.parse(crudo) : [];
+    return Array.isArray(lista) ? lista.filter(c => typeof c === 'string').slice(0, MAX_RECIENTES) : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function apuntaReciente(color) {
+  if (typeof color !== 'string' || !/^#[0-9a-f]{6}$/i.test(color)) return leeRecientes();
+  const c = color.toLowerCase();
+  const lista = [c, ...leeRecientes().filter(x => x.toLowerCase() !== c)].slice(0, MAX_RECIENTES);
+  try { localStorage.setItem(CLAVE_RECIENTES, JSON.stringify(lista)); } catch (e) {}
+  return lista;
+}
+
 window.SelectorColor = function SelectorColor({
   valor,
   onCambio,
@@ -32,9 +62,16 @@ window.SelectorColor = function SelectorColor({
   incluirTransparente = false,
   etiquetaLibre,
 }) {
-  const { useRef } = React;
+  const { useRef, useState } = React;
   const entrada = useRef(null);
   const paleta = colores || window.COLORES_ODINOTE;
+
+  const [recientes, setRecientes] = useState(leeRecientes);
+  // Mientras se mueve la rueda del sistema el color se va aplicando para poder
+  // verlo sobre el nodo de verdad, pero no se da por bueno hasta Aceptar. Por
+  // eso hace falta recordar con qué se empezó: si se cierra sin aceptar, se
+  // devuelve lo que había.
+  const [eligiendo, setEligiendo] = useState(null);
 
   const norm = (c) => (typeof c === 'string' ? c.trim().toLowerCase() : '');
   const actual = norm(valor);
@@ -42,88 +79,148 @@ window.SelectorColor = function SelectorColor({
                    (incluirTransparente && (actual === 'transparent' || actual === ''));
 
   const marco = (activo) => (activo ? '2.5px solid var(--wine)' : '1.5px solid var(--line-soft)');
+  const redondo = { width: tam + 'px', height: tam + 'px', borderRadius: '50%', cursor: 'pointer', padding: 0 };
 
-  const redondo = {
-    width: tam + 'px',
-    height: tam + 'px',
-    borderRadius: '50%',
-    cursor: 'pointer',
-    padding: 0,
+  const elige = (c) => {
+    setEligiendo(null);
+    setRecientes(apuntaReciente(c));
+    onCambio(c);
   };
 
   return (
-    <div
-      className="selector-color"
-      style={{
-        display: 'grid',
-        gridTemplateColumns: `repeat(${paleta.length + (incluirTransparente ? 2 : 1)}, ${tam}px)`,
-        gap: '6px',
-        alignItems: 'center',
-      }}
-    >
-      {incluirTransparente && (
+    <div className="selector-color-caja" style={{ display: 'flex', flexDirection: 'column', gap: '7px' }}>
+
+      <div
+        className="selector-color"
+        style={{
+          display: 'grid',
+          gridTemplateColumns: `repeat(${paleta.length + (incluirTransparente ? 2 : 1)}, ${tam}px)`,
+          gap: '6px',
+          alignItems: 'center',
+        }}
+      >
+        {incluirTransparente && (
+          <button
+            type="button"
+            className="selector-color-ninguno"
+            style={{ ...redondo, border: marco(actual === 'transparent' || actual === '') }}
+            onClick={() => elige('transparent')}
+            title={window.t('Sin color', 'No colour')}
+            aria-label={window.t('Sin color', 'No colour')}
+          />
+        )}
+
+        {paleta.map(c => (
+          <button
+            key={c}
+            type="button"
+            style={{ ...redondo, background: c, border: marco(norm(c) === actual) }}
+            onClick={() => elige(c)}
+            title={c}
+            aria-label={c}
+          />
+        ))}
+
+        {/* La quinta. Cuando hay un color de la paleta puesto se ve el arcoíris,
+            que es lo que dice "aquí hay más"; en cuanto se elige uno libre, la
+            casilla pasa a mostrarlo, porque si no no habría forma de saber cuál
+            está puesto. */}
         <button
           type="button"
-          className="selector-color-ninguno"
-          style={{ ...redondo, border: marco(actual === 'transparent' || actual === '') }}
-          onClick={() => onCambio('transparent')}
-          title={window.t('Sin color', 'No colour')}
-          aria-label={window.t('Sin color', 'No colour')}
-        />
+          className="selector-color-libre"
+          style={{
+            ...redondo,
+            position: 'relative',
+            border: marco(!enPaleta),
+            background: enPaleta
+              ? 'conic-gradient(#E6544F, #DDAF2C, #90B968, #3CA59E, #3D5A80, #955BA5, #E6544F)'
+              : (valor || '#1A1A1A'),
+          }}
+          onClick={() => entrada.current && entrada.current.click()}
+          title={etiquetaLibre || window.t('Elegir otro color', 'Pick another colour')}
+          aria-label={etiquetaLibre || window.t('Elegir otro color', 'Pick another colour')}
+        >
+          <input
+            ref={entrada}
+            type="color"
+            value={/^#[0-9a-f]{6}$/i.test(valor || '') ? valor : '#1A1A1A'}
+            onChange={(e) => {
+              // El primer movimiento guarda de dónde se venía, para poder
+              // deshacer si se cierra sin aceptar.
+              setEligiendo(prev => (prev === null ? { previo: valor || '#1A1A1A' } : prev));
+              onCambio(e.target.value);
+            }}
+            style={{
+              position: 'absolute', inset: 0, width: '100%', height: '100%',
+              opacity: 0, border: 'none', padding: 0, cursor: 'pointer',
+            }}
+            tabIndex={-1}
+            aria-hidden="true"
+          />
+        </button>
+      </div>
+
+      {/* ── Los últimos que se usaron ── */}
+      {recientes.length > 0 && (
+        <div
+          className="selector-color-recientes"
+          style={{
+            display: 'grid',
+            gridTemplateColumns: `repeat(${MAX_RECIENTES}, ${tam - 5}px)`,
+            gap: '5px',
+            alignItems: 'center',
+          }}
+        >
+          {recientes.map(c => (
+            <button
+              key={c}
+              type="button"
+              style={{
+                width: (tam - 5) + 'px', height: (tam - 5) + 'px', borderRadius: '50%',
+                padding: 0, cursor: 'pointer', background: c,
+                border: norm(c) === actual ? '2px solid var(--wine)' : '1.5px solid var(--line-soft)',
+              }}
+              onClick={() => elige(c)}
+              title={window.t('Usado hace poco: ', 'Used recently: ') + c}
+              aria-label={c}
+            />
+          ))}
+        </div>
       )}
 
-      {paleta.map(c => (
-        <button
-          key={c}
-          type="button"
-          style={{ ...redondo, background: c, border: marco(norm(c) === actual) }}
-          onClick={() => onCambio(c)}
-          title={c}
-          aria-label={c}
-        />
-      ))}
-
-      {/* La quinta. Cuando hay un color de la paleta puesto se ve el arcoíris,
-          que es lo que dice "aquí hay más"; en cuanto se elige uno libre, la
-          casilla pasa a mostrarlo, porque si no no habría forma de saber cuál
-          está puesto. */}
-      <button
-        type="button"
-        className="selector-color-libre"
-        style={{
-          ...redondo,
-          position: 'relative',
-          border: marco(!enPaleta),
-          background: enPaleta
-            ? 'conic-gradient(#E6544F, #DDAF2C, #90B968, #3CA59E, #3D5A80, #955BA5, #E6544F)'
-            : (valor || '#1A1A1A'),
-        }}
-        onClick={() => entrada.current && entrada.current.click()}
-        title={etiquetaLibre || window.t('Elegir otro color', 'Pick another colour')}
-        aria-label={etiquetaLibre || window.t('Elegir otro color', 'Pick another colour')}
-      >
-        {/* El campo de color del sistema, escondido detrás de la casilla: se
-            usa su ventana, que es la que la persona ya conoce, sin heredar su
-            aspecto, que no se parece a nada de aquí. */}
-        <input
-          ref={entrada}
-          type="color"
-          value={/^#[0-9a-f]{6}$/i.test(valor || '') ? valor : '#1A1A1A'}
-          onChange={(e) => onCambio(e.target.value)}
-          style={{
-            position: 'absolute',
-            inset: 0,
-            width: '100%',
-            height: '100%',
-            opacity: 0,
-            border: 'none',
-            padding: 0,
-            cursor: 'pointer',
-          }}
-          tabIndex={-1}
-          aria-hidden="true"
-        />
-      </button>
+      {/* ── Aceptar ──
+          Solo aparece mientras se está moviendo la rueda del sistema. El color ya
+          se está viendo aplicado —que es la única forma de acertar un tono—, así
+          que este botón no lo aplica: lo da por bueno y lo guarda en los
+          recientes. Cancelar devuelve lo que había antes de tocar nada. */}
+      {eligiendo && (
+        <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+          <button
+            type="button"
+            className="btn"
+            style={{
+              flex: 1, padding: '6px 10px', borderRadius: '6px', border: 'none',
+              background: 'var(--olive, #6A8546)', color: '#FFF',
+              fontWeight: 700, fontSize: '11.5px', cursor: 'pointer',
+            }}
+            onClick={() => elige(valor)}
+          >
+            {window.t('Aceptar', 'Accept')}
+          </button>
+          <button
+            type="button"
+            className="btn"
+            style={{
+              padding: '6px 10px', borderRadius: '6px', fontSize: '11.5px', cursor: 'pointer',
+              border: '1.5px solid var(--line-soft)', background: 'transparent',
+              color: 'var(--ink-3, #595459)',
+            }}
+            onClick={() => { const p = eligiendo.previo; setEligiendo(null); onCambio(p); }}
+          >
+            {window.t('Cancelar', 'Cancel')}
+          </button>
+        </div>
+      )}
     </div>
   );
 };

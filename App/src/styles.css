@@ -1164,6 +1164,67 @@ body[data-patrocinador="1"] .board-preview-item {
 .canvas-wrap.linking { cursor: crosshair; }
 
 /* Zoom controls */
+/* ── La cámara del lienzo ── */
+.canvas-shot {
+  position: absolute;
+  bottom: 16px;
+  right: 205px;
+  width: 32px;
+  height: 32px;
+  border-radius: 2px;
+  z-index: 40;
+}
+
+/* ── El fogonazo ──
+   Los bordes del lienzo se encienden en blanco un instante y se apagan, como el
+   obturador de una cámara. Entre pulsar el botón y ver la ventana de guardar
+   pasa casi un segundo, y sin nada en medio parece que no ha pasado nada y se
+   vuelve a pulsar.
+
+   Es un halo hacia adentro y no un velo blanco encima: velar el lienzo entero
+   tapa justo lo que la persona quiere ver, que es lo que va a salir en la foto.
+   Y no recibe clics, para no comerse el que venga detrás. */
+.canvas-fogonazo {
+  position: absolute;
+  inset: 0;
+  z-index: 45;
+  pointer-events: none;
+  border-radius: inherit;
+  animation: canvas-fogonazo 420ms ease-out forwards;
+}
+
+@keyframes canvas-fogonazo {
+  0% {
+    box-shadow: inset 0 0 0 0 rgba(255, 255, 255, 0);
+    background: rgba(255, 255, 255, 0);
+  }
+  35% {
+    box-shadow: inset 0 0 90px 14px rgba(255, 255, 255, 0.85);
+    background: rgba(255, 255, 255, 0.10);
+  }
+  100% {
+    box-shadow: inset 0 0 0 0 rgba(255, 255, 255, 0);
+    background: rgba(255, 255, 255, 0);
+  }
+}
+
+/* Sobre el tema claro un blanco puro no se ve: ahí el destello va en el verde
+   de la marca, que sí destaca sobre el papel. */
+:root:not([data-theme="dark"]) .canvas-fogonazo {
+  animation-name: canvas-fogonazo-claro;
+}
+
+@keyframes canvas-fogonazo-claro {
+  0%   { box-shadow: inset 0 0 0 0 rgba(106, 133, 70, 0); }
+  35%  { box-shadow: inset 0 0 90px 14px rgba(106, 133, 70, 0.55); }
+  100% { box-shadow: inset 0 0 0 0 rgba(106, 133, 70, 0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .canvas-fogonazo { animation-duration: 1ms; }
+}
+
+
 .zoom-ctrls { position: absolute; bottom: 16px; right: 16px; display: flex; background: var(--paper); border: 1.5px solid var(--line); border-radius: 2px; box-shadow: var(--pop-sm); overflow: hidden; z-index: 40; }
 .zoom-ctrls button { padding: 6px 10px; font-size: 12.5px; font-weight: 600; border-right: 1.5px solid var(--line); display: grid; place-items: center; transition: background 100ms; }
 .zoom-ctrls button:last-child { border-right: none; }
