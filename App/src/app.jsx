@@ -47,7 +47,7 @@ try {
 
 // Marcador de build: si la consola no muestra esta versión, el navegador está
 // sirviendo JS cacheado (subir ?v= en index.html invalida la caché)
-window.ODINOTE_BUILD = '1.0.8-154';
+window.ODINOTE_BUILD = '1.0.8-155';
 console.log('[ODINOTE] Código cargado: ' + window.ODINOTE_BUILD);
 
 // Global shortcuts configuration
@@ -504,8 +504,8 @@ function App() {
       window._odiEsperaLogin = setTimeout(() => {
         setWaitingForWebLogin(false);
         setLoginError(window.t(
-          'Google no respondió. Si en el navegador viste "Se ha producido un error", el problema está en la configuración del proyecto de Google Cloud, no en Odinote: revisa la pantalla de consentimiento de OAuth. Prueba también en una ventana de incógnito.',
-          'Google never answered. If the browser showed "Something went wrong", the problem is in the Google Cloud project setup, not in Odinote: check the OAuth consent screen. Try an incognito window too.'
+          'Google no respondió. Si en el navegador viste "Se ha producido un error", el problema está en la configuración del proyecto de Google Cloud, no en Oddinote: revisa la pantalla de consentimiento de OAuth. Prueba también en una ventana de incógnito.',
+          'Google never answered. If the browser showed "Something went wrong", the problem is in the Google Cloud project setup, not in Oddinote: check the OAuth consent screen. Try an incognito window too.'
         ));
       }, 120000);
       window.electronAPI.startGoogleLogin()
@@ -2571,7 +2571,7 @@ function App() {
           const parsed = JSON.parse(reader.result);
           const state = parsed.state || parsed;
           if (!state.projects || !state.canvases) {
-            alert(window.t('Este archivo no parece ser un respaldo valido de Odinote.', 'This file does not look like a valid Odinote backup.'));
+            alert(window.t('Este archivo no parece ser un respaldo valido de Oddinote.', 'This file does not look like a valid Oddinote backup.'));
             return;
           }
           // FUSIONAR, no reemplazar: un respaldo importado solía borrar TODOS los
@@ -2930,7 +2930,7 @@ function App() {
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--wine, #7B2D26)' }}>
                 <span className="material-symbols-rounded" style={{ fontSize: '24px' }}>settings</span>
                 <span style={{ fontWeight: '700', fontSize: '18px' }}>
-                  {window.t('Ajustes de Odinote', 'Odinote Settings')}
+                  {window.t('Ajustes de Oddinote', 'Oddinote Settings')}
                 </span>
                 {/* En el móvil no hay consola: sin esto es imposible saber si el
                     navegador está sirviendo el código nuevo o una copia vieja de
@@ -3487,11 +3487,11 @@ function App() {
                   </div>
                 )}
 
-                {/* Solo para quien todavia no tiene corona: al que ya la tiene
-                    no hay nada que preguntarle. */}
-                {!esPatrocinador && (
-                  <window.PanelReclamo onConcedida={() => setEsPatrocinador(true)} />
-                )}
+                {/* Aqui estaba tambien el panel de reclamar una donacion, y
+                    salia dos veces: una aqui y otra en la ventana de la
+                    corona. Dos formularios iguales en dos sitios distintos no
+                    dan mas oportunidades de encontrarlo, dan la duda de si son
+                    lo mismo. Se queda donde vive la corona. */}
 
                 <div style={{ borderTop: '1px solid var(--line-soft, #E5E1DD)', paddingTop: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <button
@@ -3968,7 +3968,7 @@ function App() {
                   {/* ── Sincronización instantánea ──
                       Apagada de fábrica y a propósito. Con ella, el texto y las
                       posiciones de las notas se guardan en el servidor de
-                      Odinote para que los cambios lleguen al instante sin que
+                      Oddinote para que los cambios lleguen al instante sin que
                       nadie tenga que estar de anfitrión. Quien no la encienda
                       no manda ni un byte de contenido a ningún servidor, y por
                       eso lo que dice el interruptor está escrito sin rodeos:
@@ -4000,8 +4000,8 @@ function App() {
                             return;
                           }
                           window.customConfirm(window.t(
-                            '¿Encender la sincronización instantánea para este proyecto?\n\n· El TEXTO de las notas y dónde está cada una se guardan en el servidor de Odinote, no solo en tu Drive. Es lo que permite que los cambios lleguen al instante.\n· Las imágenes y los audios NO: esos siguen en tu Google Drive.\n· Solo pueden verlo las cuentas a las que ya compartiste el proyecto.\n· Puedes apagarla cuando quieras.\n\nEl resto de tus proyectos no se ven afectados.',
-                            'Turn on instant sync for this project?\n\n· The TEXT of the notes and where each one sits are stored on Odinote\'s server, not only in your Drive. That is what makes changes arrive at once.\n· Images and audio are NOT: those stay in your Google Drive.\n· Only the accounts you already shared the project with can see it.\n· You can turn it off whenever you like.\n\nYour other projects are not affected.'
+                            '¿Encender la sincronización instantánea para este proyecto?\n\n· El TEXTO de las notas y dónde está cada una se guardan en el servidor de Oddinote, no solo en tu Drive. Es lo que permite que los cambios lleguen al instante.\n· Las imágenes y los audios NO: esos siguen en tu Google Drive.\n· Solo pueden verlo las cuentas a las que ya compartiste el proyecto.\n· Puedes apagarla cuando quieras.\n\nEl resto de tus proyectos no se ven afectados.',
+                            'Turn on instant sync for this project?\n\n· The TEXT of the notes and where each one sits are stored on Oddinote\'s server, not only in your Drive. That is what makes changes arrive at once.\n· Images and audio are NOT: those stay in your Google Drive.\n· Only the accounts you already shared the project with can see it.\n· You can turn it off whenever you like.\n\nYour other projects are not affected.'
                           )).then((acepta) => {
                             if (!acepta) return;
                             setProjects(prev => prev.map(p => p.id === project.id ? { ...p, sincroInstantanea: true } : p));
@@ -4022,8 +4022,8 @@ function App() {
                     {project.sincroInstantanea && (
                       <div style={{ marginTop: '8px', fontSize: '10.5px', color: 'var(--text-soft)', lineHeight: 1.4 }}>
                         {window.t(
-                          'El texto de este proyecto se guarda en el servidor de Odinote. Las imágenes y los audios siguen solo en tu Drive.',
-                          'This project\'s text is stored on Odinote\'s server. Images and audio remain only in your Drive.'
+                          'El texto de este proyecto se guarda en el servidor de Oddinote. Las imágenes y los audios siguen solo en tu Drive.',
+                          'This project\'s text is stored on Oddinote\'s server. Images and audio remain only in your Drive.'
                         )}
                       </div>
                     )}
@@ -4437,7 +4437,7 @@ function App() {
               </span>
               <div>
                 <div style={{ fontSize: '17px', fontWeight: '800', fontFamily: 'var(--font-display)' }}>
-                  {updateModal.state === 'available' && window.t(`Odinote v${updateModal.version} disponible`, `Odinote v${updateModal.version} available`)}
+                  {updateModal.state === 'available' && window.t(`Oddinote v${updateModal.version} disponible`, `Oddinote v${updateModal.version} available`)}
                   {updateModal.state === 'downloading' && window.t('Descargando actualización…', 'Downloading update…')}
                   {updateModal.state === 'uptodate' && window.t('Todo al día', 'You are up to date')}
                   {updateModal.state === 'error' && window.t('No se pudo actualizar', 'Update failed')}
@@ -4488,7 +4488,7 @@ function App() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                   <p style={{ margin: 0, fontSize: '13.5px', color: 'var(--ink, #1A1A1A)' }}>
                     {updateModal.state === 'uptodate'
-                      ? window.t('Ya tienes la versión más reciente de Odinote.', 'You already have the latest version of Odinote.')
+                      ? window.t('Ya tienes la versión más reciente de Oddinote.', 'You already have the latest version of Oddinote.')
                       : window.t('Revisa tu conexión a internet e inténtalo de nuevo, o descarga manualmente desde GitHub.', 'Check your internet connection and try again, or download manually from GitHub.')}
                   </p>
                   <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>

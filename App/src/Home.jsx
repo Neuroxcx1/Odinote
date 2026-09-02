@@ -208,7 +208,7 @@ function Home({ lang, setLang, theme, setTheme, onOpenProject, projects, onCreat
           <div className="kofi-card-title" style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--wine, #7B2D26)', fontWeight: '600', fontSize: '14px' }}>
             <span className="material-symbols-rounded" style={{ fontSize: '20px' }}>favorite</span>
             <span style={{ fontWeight: '600', fontSize: '14px' }}>
-              {window.t('Apoya Odinote', 'Support Odinote')}
+              {window.t('Apoya Oddinote', 'Support Oddinote')}
             </span>
           </div>
           
@@ -223,7 +223,7 @@ function Home({ lang, setLang, theme, setTheme, onOpenProject, projects, onCreat
           </div>
 
           <p style={{ fontSize: '11px', color: 'var(--text-soft, #595459)', margin: 0, lineHeight: '1.4' }}>
-            {window.t('Odinote es 100% gratuito. Si te ayuda en tus apuntes, considera hacernos una donación para apoyar el desarrollo independiente.', 'Odinote is 100% free. If it helps you with your notes, consider supporting independent development.')}
+            {window.t('Oddinote es 100% gratuito. Si te ayuda en tus apuntes, considera hacernos una donación para apoyar el desarrollo independiente.', 'Oddinote is 100% free. If it helps you with your notes, consider supporting independent development.')}
           </p>
 
           {/* El correo con el que hay que donar, dicho en el momento justo:

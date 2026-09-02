@@ -21,7 +21,7 @@ window.Corona = function Corona({ size = 16, className = '', title, insignia = f
   // suelta se comporta como un elemento normal y la coloca quien la use.
   const clases = ['corona-dibujo', insignia ? 'corona-patrocinador' : '', className]
     .filter(Boolean).join(' ');
-  const texto = title || window.t('Patrocinador de Odinote', 'Odinote supporter');
+  const texto = title || window.t('Patrocinador de Oddinote', 'Oddinote supporter');
   // Dos degradados con nombres distintos: si compartieran id, el primero que
   // se pintara mandaria sobre el otro y la corona apagada saldria dorada.
   const idTinta = apagada ? 'odi-corona-gris' : 'odi-corona-oro';
@@ -79,8 +79,8 @@ window.CoronaBoton = function CoronaBoton({ activo = false, onAbrir, size = 19 }
     'Your supporter cosmetics: choose your cursor'
   );
   const invita = window.t(
-    'Apoya Odinote y consigue la corona y el cursor dorado',
-    'Support Odinote and get the crown and the golden cursor'
+    'Apoya Oddinote y consigue la corona y el cursor dorado',
+    'Support Oddinote and get the crown and the golden cursor'
   );
   const texto = activo ? cosmeticos : invita;
 
@@ -169,8 +169,8 @@ window.PanelReclamo = function PanelReclamo({ onConcedida }) {
     // Firebase, que es otra cosa, se ha perdido. Ahora se dice lo que pasa y
     // qué hacer.
     'sin-sesion': window.t(
-      'Odinote no consigue identificarte ante Google en este momento. Cierra sesión aquí abajo, vuelve a entrar y prueba otra vez.',
-      'Odinote cannot verify your Google identity right now. Sign out below, sign back in and try again.'),
+      'Oddinote no consigue identificarte ante Google en este momento. Cierra sesión aquí abajo, vuelve a entrar y prueba otra vez.',
+      'Oddinote cannot verify your Google identity right now. Sign out below, sign back in and try again.'),
     'correo-invalido': window.t('Ese correo no parece un correo.', 'That does not look like an email.'),
     // Este no lo vería nunca quien usa el programa: sale solo si la función
     // del servidor es anterior a la versión que dejó de pedir el importe. Se
@@ -430,7 +430,7 @@ window.VentanaCorona = function VentanaCorona({ esPatrocinador, onCerrar, onConc
             <div style={{ fontWeight: 700, fontSize: '16px', lineHeight: 1.2 }}>
               {esPatrocinador
                 ? window.t('Tus cosméticos', 'Your cosmetics')
-                : window.t('Apoya Odinote', 'Support Odinote')}
+                : window.t('Apoya Oddinote', 'Support Oddinote')}
             </div>
             <div style={{ fontSize: '12px', color: 'var(--ink-3, #595459)', marginTop: '2px' }}>
               {esPatrocinador
@@ -558,8 +558,8 @@ window.VentanaCorona = function VentanaCorona({ esPatrocinador, onCerrar, onConc
               ))}
               <div style={{ fontSize: '11.5px', color: 'var(--ink-3, #595459)', lineHeight: 1.45, marginTop: '2px' }}>
                 {window.t(
-                  'Nada de Odinote está detrás de esto: la aplicación entera es gratis y lo seguirá siendo. Esto son adornos.',
-                  'None of Odinote is behind this: the whole app is free and will stay that way. These are ornaments.')}
+                  'Nada de Oddinote está detrás de esto: la aplicación entera es gratis y lo seguirá siendo. Esto son adornos.',
+                  'None of Oddinote is behind this: the whole app is free and will stay that way. These are ornaments.')}
               </div>
             </div>
 

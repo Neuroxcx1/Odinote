@@ -82,7 +82,7 @@ function createWindow() {
     minWidth: 1024,
     minHeight: 700,
     icon: path.join(__dirname, 'Icon/Icon.ico'),
-    title: 'Odinote',
+    title: 'Oddinote',
     show: false,
     backgroundColor: savedTheme === 'dark' ? '#232123' : '#F4F3EF',
     webPreferences: {
@@ -969,14 +969,14 @@ function startAuthServer() {
 
       if (errorGoogle) {
         logToFile(`OAuth: Google devolvió error "${errorGoogle}"`);
-        cierra('No se pudo conectar', 'Vuelve a Odinote e inténtalo otra vez.', false);
+        cierra('No se pudo conectar', 'Vuelve a Oddinote e inténtalo otra vez.', false);
         if (mainWindow) mainWindow.webContents.send('google-signin-failed', { error: errorGoogle });
         return;
       }
       if (!code || !estado || estado !== pkceState || !pkceVerifier) {
         // La respuesta no es del intento que abrimos nosotros: se descarta.
         logToFile('OAuth: respuesta descartada (estado o verificador que no cuadran)');
-        cierra('Petición no válida', 'Vuelve a Odinote y empieza la conexión de nuevo.', false);
+        cierra('Petición no válida', 'Vuelve a Oddinote y empieza la conexión de nuevo.', false);
         return;
       }
 
@@ -1010,7 +1010,7 @@ function startAuthServer() {
             puedeRenovar: guardado,
           });
         }
-        cierra('Ya está', 'Puedes cerrar esta pestaña y volver a Odinote.', true);
+        cierra('Ya está', 'Puedes cerrar esta pestaña y volver a Oddinote.', true);
         setTimeout(() => { if (authServer) { authServer.close(); authServer = null; } }, 1500);
       }).catch((err) => {
         logToFile(`OAuth: fallo al canjear el código — ${err.message}`);
