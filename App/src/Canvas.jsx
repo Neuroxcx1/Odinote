@@ -4677,6 +4677,19 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
   // ───── Tool drag-from-toolbar ─────
   const onToolDragStart = (e, toolId) => {
     e.preventDefault();
+
+    // Con el modo dibujo abierto no puede haber ademas una herramienta armada.
+    // La capa de dibujo se come los clics del lienzo, asi que la herramienta se
+    // queda puesta y sin forma de usarla; y al salir del dibujo el lienzo se
+    // queda "colocando" algo que nunca se coloco. Desde fuera se ve como que la
+    // aplicacion se ha muerto: ni pone nodos ni deja mover los que hay.
+    //
+    // La barra de arriba sigue clicable mientras se dibuja a proposito —desde
+    // ahi se sale, se deshace y se cambia de lienzo—, asi que la solucion no es
+    // bloquearla: es cerrar el dibujo, que es lo que esa persona esta pidiendo
+    // al coger otra herramienta.
+    if (drawingId) saveDrawing();
+
     const startX = e.clientX, startY = e.clientY;
     let dragging = false;
     setActiveTool(toolId);

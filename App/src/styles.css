@@ -1144,6 +1144,22 @@ body[data-patrocinador="1"] .board-preview-item {
 }
 .canvas-content { position: absolute; top: 0; left: 0; width: 1px; height: 1px; transform-origin: 0 0; }
 .canvas-wrap.placing { cursor: crosshair; }
+
+/* Con una herramienta armada, los tiradores de tamano y los enganches de los
+   nodos dejan de recibir clics.
+
+   Sin esto basta con que uno quede debajo del cursor para que se trague el clic
+   y el nodo nuevo no se coloque nunca. Y no es raro: los tiradores de un dibujo
+   grande estan repartidos por media pantalla y son invisibles, asi que el
+   lienzo parece muerto sin que nada explique por que.
+
+   Los enganches se quedan vivos al tirar una linea, que es justo cuando hacen
+   falta. */
+.canvas-wrap.placing .handle,
+.canvas-wrap.placing .anchor,
+.canvas-wrap.linking .handle {
+  pointer-events: none;
+}
 .canvas-wrap.placing .item { pointer-events: none; }
 .canvas-wrap.linking { cursor: crosshair; }
 
