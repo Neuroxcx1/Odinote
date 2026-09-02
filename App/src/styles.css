@@ -3627,7 +3627,22 @@ body.odi-busy iframe { pointer-events: none !important; }
 
 /* Preview state — fills with the first page (no gray margins); double-click opens the viewer */
 .file-preview { flex: 1; min-height: 0; overflow: hidden; background: #fff; position: relative; }
+/* La vista previa no se toca —es una miniatura, no una aplicación— salvo el
+   vídeo y el audio, que existen precisamente para darles al play. */
 .file-preview > * { pointer-events: none; }
+.file-preview > video,
+.file-preview > .file-audio-wrap,
+.file-preview .file-media { pointer-events: auto; }
+.file-preview > video { width: 100%; height: 100%; object-fit: contain; background: #000; display: block; }
+.file-audio-wrap {
+  width: 100%; height: 100%;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
+  padding: 10px; box-sizing: border-box; background: var(--paper);
+}
+.file-audio-wrap .file-media { width: 100%; }
+.file-viewer-body.kind-video, .file-viewer-body.kind-audio { align-items: center; justify-content: center; }
+.file-viewer-body.kind-video video { max-width: 100%; max-height: 100%; box-shadow: 0 4px 18px rgba(0,0,0,0.4); border-radius: 2px; background: #000; }
+.file-viewer-body.kind-audio audio { width: min(560px, 100%); }
 .file-preview img { width: 100%; height: 100%; object-fit: cover; object-position: top center; display: block; }
 .file-preview iframe { width: 100%; height: 100%; border: none; background: #fff; }
 /* Office/text content is rendered at page width then scaled down to the node, like an image */

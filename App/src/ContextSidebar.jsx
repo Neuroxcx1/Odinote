@@ -379,7 +379,7 @@ function ContextSidebar({
           <button
             className="ctx-btn"
             onClick={abreLaCarpeta}
-            title={item.rutaOrigen || window.t('Abrir la carpeta donde está el archivo', 'Open the folder where the file is')}
+            title={window.t('Abrir la carpeta donde está el archivo', 'Open the folder where the file is')}
           >
             <span className="material-symbols-rounded">folder_open</span>
             <span>{window.t('Abrir la carpeta', 'Open the folder')}</span>

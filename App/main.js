@@ -652,11 +652,17 @@ ipcMain.handle('mostrar-en-carpeta', async (event, datos) => {
   try {
     // Se admite el texto suelto de la primera versión y el objeto de ahora.
     const peticion = typeof datos === 'string' ? { ruta: datos } : (datos || {});
-    // Por orden: la ruta de donde salió el archivo, la copia dentro de la
-    // carpeta del proyecto, y la del montón de antes. La primera que exista.
-    const candidatas = [peticion.ruta]
-      .concat(candidatasEnBoveda(peticion.src, peticion.carpeta))
-      .concat([rutaDesdeSrc(peticion.src)])
+    // Por orden: la copia que vive en la carpeta del proyecto, la del montón
+    // de antes, y solo al final el sitio de donde salió el archivo.
+    //
+    // La carpeta del proyecto va PRIMERO a propósito. Lo que hay en la nota es
+    // esa copia: si el original se movió, se editó o se borró, lo que se ve en
+    // el lienzo sigue siendo la copia, así que abrir la carpeta de descargas de
+    // hace tres meses no lleva a lo que se está mirando. Y para ordenar la
+    // bóveda —que es para lo que se usa esto— el sitio al que hay que llegar es
+    // el de la bóveda.
+    const candidatas = candidatasEnBoveda(peticion.src, peticion.carpeta)
+      .concat([rutaDesdeSrc(peticion.src), peticion.ruta])
       .filter(r => typeof r === 'string' && r.trim());
 
     if (!candidatas.length) return { ok: false, motivo: 'sin-ruta' };

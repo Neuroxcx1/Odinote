@@ -3606,6 +3606,13 @@ function ColorItem({ item, lang, onUpdate }) {
 function fileKind(ext) {
   const e = (ext || '').toLowerCase();
   if (['png','jpg','jpeg','gif','webp','svg','bmp'].includes(e)) return 'image';
+  // Un vídeo y un audio no son "otros": son lo que la gente suelta más a menudo
+  // después de una imagen, y hasta ahora los dos acababan en un cuadrado gris
+  // con un logo en medio. Mkv y avi entran a propósito aunque el navegador no
+  // sepa reproducirlos casi nunca: si no puede, lo dice, que es mejor que
+  // fingir que el archivo no es un vídeo.
+  if (['mp4','webm','ogv','mov','m4v','mkv','avi'].includes(e)) return 'video';
+  if (['mp3','wav','ogg','oga','m4a','flac','aac'].includes(e)) return 'audio';
   if (e === 'pdf') return 'pdf';
   if (e === 'docx' || e === 'doc') return 'docx';
   if (['xlsx','xls','ods'].includes(e)) return 'excel';   // SheetJS also reads .ods
@@ -3663,6 +3670,26 @@ function fileMeta(ext) {
   return { label: (e ? e.slice(0, 4).toUpperCase() : 'FILE'), color: '#595459' };
 }
 
+// Un vídeo no cabe en la misma caja que un PDF. Al llegar el archivo se le da
+// al nodo la forma de lo que lleva dentro: apaisado para el vídeo, de página
+// para los documentos, una tira para el audio, y la caja pequeña de siempre
+// para lo que no se puede enseñar.
+const FORMA_POR_TIPO = {
+  video: { w: 340, h: 230 },
+  image: { w: 300, h: 220 },
+  audio: { w: 320, h: 110 },
+  pdf:   { w: 260, h: 340 },
+  docx:  { w: 260, h: 340 },
+  excel: { w: 320, h: 240 },
+  text:  { w: 280, h: 300 },
+};
+
+function formaDeArchivo(ext) {
+  return FORMA_POR_TIPO[fileKind(ext)] || null;
+}
+window.formaDeArchivo = formaDeArchivo;
+window.fileKind = fileKind;
+
 function FileItem({ item, lang, onUpdate, onOpenFile }) {
   const fileInputRef = React.useRef(null);
   const [uploading, setUploading] = React.useState(false);
@@ -3689,8 +3716,15 @@ function FileItem({ item, lang, onUpdate, onOpenFile }) {
     reader.onprogress = (ev) => { if (ev.lengthComputable) setProgress(Math.round((ev.loaded / ev.total) * 100)); };
     reader.onload = () => {
       const fext = (file.name.split('.').pop() || '').toLowerCase();
-      onUpdate({ src: reader.result, name: file.name, size: file.size, fileType: fext,
-        rutaOrigen: window.rutaDeArchivo ? window.rutaDeArchivo(file) : null });
+      // Solo la primera vez: si ya se cambió el tamaño a mano, se respeta.
+      const forma = formaDeArchivo(fext);
+      onUpdate(Object.assign({
+        src: reader.result, name: file.name, size: file.size, fileType: fext,
+        // Nace enseñando lo que es. Un cuadrado con un logo en medio no dice
+        // nada que el nombre del archivo no dijera ya.
+        showPreview: item.showPreview !== false,
+        rutaOrigen: window.rutaDeArchivo ? window.rutaDeArchivo(file) : null,
+      }, (forma && !item.manualH) ? forma : {}));
       setUploading(false); setProgress(100);
     };
     reader.onerror = () => setUploading(false);
@@ -3760,6 +3794,27 @@ function FileItem({ item, lang, onUpdate, onOpenFile }) {
               title={window.t('Doble clic para ver completo', 'Double-click to view full')}
             >
               {kind === 'image' && <img src={window.resolveMediaSrc(item.src)} alt={item.name} onError={driveImageFallback}/>}
+              {/* El vídeo se reproduce AQUÍ, en el lienzo, sin abrir nada. Se
+                  paran los eventos del ratón para que arrastrar la barra de
+                  reproducción no arrastre el nodo entero; para mover el nodo
+                  están sus bordes y su fila de abajo. */}
+              {kind === 'video' && (
+                <video
+                  className="file-media"
+                  src={window.resolveMediaSrc(item.src)}
+                  controls
+                  preload="metadata"
+                  playsInline
+                  onMouseDown={(ev)=>ev.stopPropagation()}
+                  onDoubleClick={(ev)=>ev.stopPropagation()}
+                />
+              )}
+              {kind === 'audio' && (
+                <div className="file-audio-wrap" onMouseDown={(ev)=>ev.stopPropagation()} onDoubleClick={(ev)=>ev.stopPropagation()}>
+                  <div className="file-icon" style={{ '--file-accent': meta.color }}><span className="file-icon-label">{meta.label}</span></div>
+                  <audio className="file-media" src={window.resolveMediaSrc(item.src)} controls preload="metadata"/>
+                </div>
+              )}
               {kind === 'pdf' && <iframe title={item.name} src={window.resolveMediaSrc(item.src)}/>}
               {kind === 'text' && (
                 <div className="file-page-scale" style={{ width: REF, transform: `scale(${scale})`, transformOrigin: 'top left' }}>
@@ -3853,6 +3908,12 @@ function FileViewerModal({ fileItem, lang, onClose }) {
         </div>
         <div className={`file-viewer-body kind-${kind}`}>
           {kind === 'image' && <img src={window.resolveMediaSrc(fileItem.src)} alt={fileItem.name} onError={driveImageFallback}/>}
+          {kind === 'video' && (
+            <video className="file-media" src={window.resolveMediaSrc(fileItem.src)} controls autoPlay playsInline/>
+          )}
+          {kind === 'audio' && (
+            <audio className="file-media" src={window.resolveMediaSrc(fileItem.src)} controls autoPlay/>
+          )}
           {kind === 'pdf' && <iframe title={fileItem.name} src={window.resolveMediaSrc(fileItem.src)}/>}
           {kind === 'text' && <FilePreviewText src={window.resolveMediaSrc(fileItem.src)}/>}
           {(kind === 'docx' || kind === 'excel') && (

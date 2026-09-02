@@ -166,7 +166,10 @@ function makeNewItem(type, x, y, w, h, lang) {
     case 'color':
       return { ...base, type: 'color', ...defaultSize(220, 240), hex: randomHex(), showHex: true };
     case 'file':
-      return { ...base, type: 'file', ...defaultSize(230, 150), name: '', src: '', size: 0, fileType: '', showPreview: false, showInfo: false, _triggerFilePick: true };
+      // showPreview en true: un nodo de archivo enseña el archivo. El cuadrado
+      // con un logo en medio sigue estando a un clic, en "Vista previa" de la
+      // barra del nodo, para quien prefiera la lista compacta.
+      return { ...base, type: 'file', ...defaultSize(230, 150), name: '', src: '', size: 0, fileType: '', showPreview: true, showInfo: false, _triggerFilePick: true };
     case 'frame':
       return { ...base, type: 'frame', ...defaultSize(400, 400),
         color: 'transparent',
@@ -1929,7 +1932,10 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
           if (targetItem && targetItem.type === 'file') {
             updateItem(targetId, { src, name: file.name, size: file.size, fileType: ext, rutaOrigen });
           } else {
-            const w = 200, h = 190;
+            // El nodo nace con la forma de lo que se ha soltado: un vídeo
+            // apaisado, un PDF de página. Ver formaDeArchivo en items.jsx.
+            const forma = (window.formaDeArchivo && window.formaDeArchivo(ext)) || { w: 200, h: 190 };
+            const w = forma.w, h = forma.h;
             const newItem = makeNewItem('file', pt.x - w / 2, pt.y - h / 2, w, h, lang);
             newItem.src = src; newItem.name = file.name; newItem.size = file.size; newItem.fileType = ext;
             newItem.rutaOrigen = rutaOrigen;
