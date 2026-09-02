@@ -982,25 +982,50 @@ body[data-patrocinador="1"] .board-preview-item {
 }
 .theme-btn .material-symbols-rounded { transition: transform 200ms var(--e-out); }
 
+/* ── Volumen: un cuadrado, no un rectangulo ──
+
+   Era el unico control de la barra con otra forma, porque llevaba el
+   deslizador pegado al lado y eso lo hacia el doble de ancho que sus vecinos.
+   Ahora ocupa un cuadrado igual que los demas y el deslizador aparece flotando
+   debajo al acercar el raton.
+
+   Y de paso arregla algo peor que la forma: por debajo de 1200 px el
+   deslizador se escondia ENTERO porque no cabia a lo ancho, o sea que en una
+   ventana estrecha no habia manera de bajar el volumen, solo de silenciarlo.
+   Flotando no ocupa ancho, asi que ya no hay que esconderlo nunca. */
 .volume-ctrl {
-  display: flex;
-  align-items: center;
-  gap: 6px;
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  gap: 0;
   background: var(--paper);
   border: 1.5px solid var(--line);
   border-radius: 8px;
-  padding: 0 10px 0 0;
-  height: 42px;
   box-shadow: var(--pop-sm);
   transition: transform 140ms var(--e-out), box-shadow 140ms var(--e-out);
+}
+
+/* El puente invisible entre el boton y el deslizador. Sin el, al bajar el raton
+   se pierde el hover en el hueco de 10 px y el panel se cierra en las narices
+   justo cuando ibas a tocarlo. */
+.volume-ctrl::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: -8px;
+  right: -8px;
+  height: 14px;
 }
 .volume-ctrl:hover {
   transform: translate(-1px, -1px);
   box-shadow: var(--pop-hover);
 }
 .volume-ctrl .icon-btn-mute {
-  width: 40px;
-  height: 40px;
+  width: 100%;
+  height: 100%;
   display: grid;
   place-items: center;
   cursor: pointer;
@@ -1013,16 +1038,51 @@ body[data-patrocinador="1"] .board-preview-item {
 .volume-ctrl .volume-slider {
   -webkit-appearance: none;
   appearance: none;
-  width: 60px;
+  position: absolute;
+  top: calc(100% + 10px);
+  left: 50%;
+  width: 124px;
+  height: 34px;
+  margin: 0;
+  padding: 0 12px;
+  background: var(--paper);
+  border: 1.5px solid var(--line);
+  border-radius: 8px;
+  box-shadow: var(--pop);
+  outline: none;
+  cursor: pointer;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateX(-50%) translateY(-4px);
+  transition: opacity 130ms var(--e-out), transform 130ms var(--e-out), visibility 130ms;
+  z-index: 70;
+}
+
+/* Con el foco tambien, no solo con el raton: quien llega con el teclado tiene
+   que poder ver lo que esta moviendo. */
+.volume-ctrl:hover .volume-slider,
+.volume-ctrl:focus-within .volume-slider {
+  opacity: 1;
+  visibility: visible;
+  transform: translateX(-50%) translateY(0);
+}
+
+/* Al pasar a panel, el fondo del control ya no es la barra: hay que pintar la
+   barra aparte dentro de el. */
+.volume-ctrl .volume-slider::-webkit-slider-runnable-track {
   height: 4px;
   border-radius: 99px;
   background: var(--line-soft);
-  outline: none;
-  cursor: pointer;
+}
+.volume-ctrl .volume-slider::-moz-range-track {
+  height: 4px;
+  border-radius: 99px;
+  background: var(--line-soft);
 }
 .volume-ctrl .volume-slider::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
+  margin-top: -4px;
   width: 12px;
   height: 12px;
   border-radius: 50%;
@@ -3784,7 +3844,7 @@ body.odi-busy iframe { pointer-events: none !important; }
     gap: 11px;
     padding: 8px 12px;
   }
-  .icon-btn {
+  .icon-btn, .volume-ctrl {
     width: 39px;
     height: 39px;
   }
@@ -3796,6 +3856,21 @@ body.odi-busy iframe { pointer-events: none !important; }
     padding: 7px 13px;
     font-size: 12.5px;
   }
+
+  /* Y la barra de nodos, que es donde de verdad faltaba sitio.
+
+     El detalle que se escapa si se mide en ingles: las etiquetas en espanol son
+     mas largas. "Documento" contra "Document", "Tablero" contra "Board",
+     "Dibujar" contra "Draw". Medido a 1920 con la aplicacion en espanol, la
+     barra se pasaba 40 px: "Dibujar" salia cortado y "Mas" no llegaba a verse.
+     En ingles cabia justo, asi que el fallo era invisible desde ahi.
+
+     Se recorta el aire de cada herramienta y no el tamano de los iconos: dos
+     pixeles por lado en quince herramientas son treinta, y no se notan. Encoger
+     los iconos si se habria notado, y es lo que hacia que 1080 pareciera una
+     version apretada de la aplicacion. */
+  .tool { padding: 4px 5px; }
+  .tool-divider { margin: 0 2px; }
 }
 
 /* Por debajo de 1920 ya no cabe holgado: aqui empieza la compresion que antes
@@ -3805,7 +3880,7 @@ body.odi-busy iframe { pointer-events: none !important; }
     gap: 7px;
     padding: 6px 10px;
   }
-  .icon-btn {
+  .icon-btn, .volume-ctrl {
     width: 36px;
     height: 36px;
   }
@@ -3837,27 +3912,15 @@ body.odi-busy iframe { pointer-events: none !important; }
   .kofi-topbar-btn::before, .kofi-topbar-btn::after {
     border-radius: 50%;
   }
-  .volume-slider {
-    width: 50px;
-  }
   .crumb-path { max-width: 200px; }
 }
 
 @media (max-width: 1440px) {
-  .volume-ctrl {
-    gap: 2px;
-  }
-  .volume-slider {
-    width: 40px;
-  }
   .crumb-path { max-width: 170px; }
 }
 
-/* Aqui ya se quita el deslizador de volumen entero */
 @media (max-width: 1200px) {
-  .volume-slider {
-    display: none;
-  }
+  /* El deslizador ya no se esconde: flotando no ocupa ancho. */
   .volume-ctrl {
     margin-right: 0;
   }
@@ -4055,7 +4118,37 @@ html[data-mobile="1"] .topbar-tail.open .kofi-topbar-btn span:not(.material-symb
   display: inline;
 }
 html[data-mobile="1"] .topbar-tail.open .icon-btn { width: 44px; height: 44px; }
-html[data-mobile="1"] .topbar-tail.open .volume-slider { display: block; width: 90px; }
+/* En el movil el deslizador no puede depender del raton: no hay raton. Aqui se
+   deshace lo flotante y vuelve a ir en linea, dentro del cajon que se abre con
+   el boton de los tres puntos. */
+html[data-mobile="1"] .volume-ctrl {
+  position: static;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: auto;
+  height: auto;
+  padding: 0 10px 0 0;
+}
+html[data-mobile="1"] .volume-ctrl::after { display: none; }
+html[data-mobile="1"] .volume-ctrl .icon-btn-mute { width: 44px; height: 44px; }
+html[data-mobile="1"] .topbar-tail.open .volume-slider {
+  position: static;
+  display: block;
+  width: 90px;
+  height: 4px;
+  padding: 0;
+  margin: 0;
+  background: var(--line-soft);
+  border: none;
+  border-radius: 99px;
+  box-shadow: none;
+  opacity: 1;
+  visibility: visible;
+  transform: none;
+}
+html[data-mobile="1"] .volume-slider::-webkit-slider-runnable-track { background: transparent; }
+html[data-mobile="1"] .volume-slider::-webkit-slider-thumb { margin-top: 0; }
 html[data-mobile="1"] .topbar-more + .topbar-tail-scrim,
 html[data-mobile="1"] .topbar-tail-scrim { display: block; position: fixed; inset: 0; z-index: 310; }
 
