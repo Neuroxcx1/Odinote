@@ -3769,7 +3769,38 @@ body.odi-busy iframe { pointer-events: none !important; }
    se desplaza con la rueda en vez de cortarse.
    ========================================================================== */
 
+/* 1920 de ancho es la pantalla mas comun del mundo, y aqui se estaba tratando
+   como si fuera pequena: entraba en la misma compresion que un portatil de
+   1440 y salia con los botones a 36 px y los huecos a 7. Al lado de un 2K
+   parecia otra aplicacion, mas apretada y peor terminada.
+
+   Medido a 1920 con la barra de nodos abierta: con los valores de 2K enteros
+   (hueco 12, boton 40) el rail se pasa 6 px; con 11 y 39 cabe exacto, cero
+   desbordamiento. Un pixel de diferencia con el 2K, invisible al ojo. Asi que
+   1080 se queda practicamente igual que 2K y la compresion de verdad empieza
+   por debajo, que es donde de verdad falta sitio. */
 @media (max-width: 1920px) {
+  .topbar {
+    gap: 11px;
+    padding: 8px 12px;
+  }
+  .icon-btn {
+    width: 39px;
+    height: 39px;
+  }
+  .icon-btn .material-symbols-rounded {
+    font-size: 20px;
+  }
+  .kofi-topbar-btn, .feedback-topbar-btn {
+    margin-right: 6px;
+    padding: 7px 13px;
+    font-size: 12.5px;
+  }
+}
+
+/* Por debajo de 1920 ya no cabe holgado: aqui empieza la compresion que antes
+   se aplicaba tambien a 1080. */
+@media (max-width: 1899px) {
   .topbar {
     gap: 7px;
     padding: 6px 10px;
