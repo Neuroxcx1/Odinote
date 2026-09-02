@@ -47,7 +47,7 @@ try {
 
 // Marcador de build: si la consola no muestra esta versión, el navegador está
 // sirviendo JS cacheado (subir ?v= en index.html invalida la caché)
-window.ODINOTE_BUILD = '1.0.8-155';
+window.ODINOTE_BUILD = '1.0.8-156';
 console.log('[ODINOTE] Código cargado: ' + window.ODINOTE_BUILD);
 
 // Global shortcuts configuration
@@ -3371,32 +3371,17 @@ function App() {
                       <span>{window.t('Iniciar sesión con Google', 'Sign in with Google')}</span>
                     </button>
 
-                    {/* La salida, aquí mismo. Quien llega a esta ventana desde
-                        un celular por la dirección de red se encuentra con que
-                        Google no le deja pasar — y lo que quería hacer, entrar
-                        al lienzo de alguien, no necesitaba a Google para nada.
-                        Antes tenía que cerrar, buscar otro botón y adivinarlo. */}
-                    <button
-                      className="btn lift"
-                      onClick={() => {
-                        setUserModalOpen(false);
-                        setLoginError(null);
-                        setSalaError(null);
-                        setJoiningModalOpen(true);
-                        window.playAudioTone && window.playAudioTone('click');
-                      }}
-                      style={{
-                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
-                        padding: '11px', borderRadius: '8px',
-                        border: '1.5px solid var(--line, #595459)',
-                        background: 'var(--olive, #6A8546)', color: '#FFFFFF',
-                        fontWeight: '700', fontSize: '13px', cursor: 'pointer',
-                        boxShadow: 'var(--pop-sm)',
-                      }}
-                    >
-                      <span className="material-symbols-rounded" style={{ fontSize: 18 }}>sensors</span>
-                      <span>{window.t('Unirme a una sesión con un código', 'Join a session with a code')}</span>
-                    </button>
+                    {/* Aquí estaba también "Unirme a una sesión con un código".
+                        Se puso pensando en quien abre la aplicación desde el
+                        móvil, se encuentra con que Google no le deja pasar y lo
+                        único que quería era entrar al lienzo de alguien. Pero
+                        ese botón ya está fuera, en la barra de arriba, y ahí
+                        sigue estando en el móvil —solo pierde el rótulo y se
+                        queda el icono, ver .ms-join-top en styles.css—. Dos
+                        botones iguales, uno encima del otro, no dan dos
+                        caminos: dan la duda de si llevan al mismo sitio. El
+                        párrafo de arriba ya explica que para trabajar en vivo
+                        no hace falta cuenta. */}
                   </>
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', alignItems: 'center', textAlign: 'center', padding: '10px 0' }}>
