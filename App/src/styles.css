@@ -1410,6 +1410,12 @@ body[data-patrocinador="1"] .board-preview-item {
    falta. */
 .canvas-wrap.placing .handle,
 .canvas-wrap.placing .anchor,
+/* Espacio pulsado: mano abierta, y cerrada mientras se arrastra. El cursor va
+   con !important porque cada nodo trae el suyo (texto, mover, redimensionar) y
+   si no, la mano solo se vería sobre el hueco vacío del lienzo. */
+.canvas-wrap.con-espacio, .canvas-wrap.con-espacio * { cursor: grab !important; }
+.canvas-wrap.paneando, .canvas-wrap.paneando * { cursor: grabbing !important; }
+
 .canvas-wrap.linking .handle {
   pointer-events: none;
 }
@@ -2479,6 +2485,10 @@ body.odi-busy iframe { pointer-events: none !important; }
 .connector-handle.endpoint { fill: var(--paper); stroke: var(--wine); stroke-width: 2.5; }
 /* Orthogonal (Miro-style) editing handles */
 .connector-handle.waypoint { fill: var(--wine); stroke: var(--paper); stroke-width: 2; }
+/* El enganche: relleno, para distinguirlo del tirador hueco del centro (que
+   cambia la flecha de nodo). Este solo se pasea por el borde de su nodo. */
+.connector-handle.anchor-slide { fill: var(--olive); stroke: var(--paper); stroke-width: 2; cursor: move; }
+.connector-handle.anchor-slide:hover { r: 8; }
 .connector-handle.seg-move { fill: var(--paper); stroke: var(--wine); stroke-width: 2.5; }
 .connector-handle.seg-move:hover { fill: var(--wine); }
 .arrowhead { fill: var(--ink); }
@@ -3593,6 +3603,107 @@ body.odi-busy iframe { pointer-events: none !important; }
 .ctx-colorhex { display: flex; align-items: center; gap: 8px; padding: 2px 0; }
 .ctx-colorhex input[type="color"] { width: 34px; height: 30px; border: 1.5px solid var(--line); border-radius: 4px; background: none; padding: 2px; cursor: pointer; }
 .ctx-hex-input { flex: 1; min-width: 0; font-family: var(--font-mono); font-size: 12.5px; padding: 6px 8px; border: 1.5px solid var(--line-soft); border-radius: 4px; text-transform: uppercase; }
+
+/* ============================================
+   NODO DE CÓDIGO
+   ============================================ */
+/* El azul oscuro con el degradado radial ES este nodo: por eso su fondo no se
+   puede cambiar. Lo que sí se cambia es el título y su barra. El color va
+   fijo y no por variables del tema, porque un bloque de código se ve igual de
+   noche que de día — como en cualquier editor. */
+.code-card .item-card {
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background:
+    radial-gradient(120% 90% at 12% 0%, #2A3F6B 0%, rgba(42,63,107,0) 60%),
+    radial-gradient(90% 70% at 100% 100%, #1B2E52 0%, rgba(27,46,82,0) 55%),
+    #131C2E;
+  border-color: #0C1220;
+}
+.code-bar {
+  flex: 0 0 auto;
+  display: flex; align-items: center; gap: 9px;
+  padding: 7px 11px;
+  border-bottom: 1px solid rgba(255,255,255,0.09);
+  font-size: 11.5px;
+}
+.code-dots { display: flex; gap: 5px; flex: 0 0 auto; }
+.code-dots i { width: 8px; height: 8px; border-radius: 50%; background: rgba(255,255,255,0.22); }
+.code-title {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  cursor: text;
+}
+.code-title.vacio { opacity: 0.45; font-style: italic; font-weight: 500; }
+.code-title-input {
+  font-family: var(--font-mono); font-weight: 700; font-size: 11.5px;
+  background: rgba(255,255,255,0.10); border: none; outline: none;
+  border-radius: 4px; padding: 2px 6px; min-width: 0; flex: 1;
+}
+.code-lang {
+  margin-left: auto; flex: 0 0 auto;
+  font-family: var(--font-mono); font-size: 10px; font-weight: 700;
+  letter-spacing: 0.05em; text-transform: uppercase;
+  color: rgba(221,230,245,0.55);
+  border: 1px solid rgba(255,255,255,0.14); border-radius: 4px; padding: 2px 6px;
+}
+/* El resaltado va detrás y el textarea encima, transparente: así se escribe
+   con el cursor de siempre y a la vez se ven los colores. Las dos capas TIENEN
+   que compartir tipografía, tamaño, interlineado y relleno al píxel, o el
+   texto que se escribe baila sobre el de colores. */
+.code-scroll { position: relative; flex: 1; min-height: 0; }
+.code-pre, .code-area {
+  margin: 0;
+  padding: 12px 14px;
+  font-family: var(--font-mono), 'JetBrains Mono', ui-monospace, monospace;
+  font-size: calc(12.5px * var(--node-scale, 1));
+  line-height: 1.55;
+  tab-size: 2;
+  white-space: pre;
+  word-break: normal;
+  border: 0;
+}
+.code-pre {
+  position: absolute; inset: 0;
+  overflow: auto;
+  color: #C9D6EE;
+  background: none;
+}
+.code-pre code.hljs { background: none; padding: 0; font: inherit; color: inherit; display: block; }
+.code-area {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  resize: none; outline: none;
+  background: transparent;
+  color: transparent;
+  caret-color: #9FC46E;
+  overflow: auto;
+}
+.code-area::selection { background: rgba(159,196,110,0.30); }
+.code-area::placeholder { color: rgba(201,214,238,0.35); }
+/* Los colores del resaltador, en la gama del nodo. */
+.code-card .hljs-keyword, .code-card .hljs-selector-tag, .code-card .hljs-literal { color: #E88BC8; }
+.code-card .hljs-string, .code-card .hljs-meta .hljs-string { color: #9FC46E; }
+.code-card .hljs-number, .code-card .hljs-symbol { color: #E9B872; }
+.code-card .hljs-comment, .code-card .hljs-quote { color: #6E7E9B; font-style: italic; }
+.code-card .hljs-title, .code-card .hljs-name, .code-card .hljs-section { color: #78C6E8; }
+.code-card .hljs-attr, .code-card .hljs-attribute, .code-card .hljs-variable { color: #C7B6F0; }
+.code-card .hljs-built_in, .code-card .hljs-type { color: #6FD3C0; }
+.code-card .hljs-deletion { color: #E8706A; }
+.code-card .hljs-addition { color: #9FC46E; }
+/* Lista de lenguajes de la barra del nodo */
+.ctx-lang-list { display: flex; flex-direction: column; gap: 1px; max-height: 300px; overflow-y: auto; }
+.ctx-lang-item {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  padding: 6px 9px; border: none; background: none; cursor: pointer;
+  font-size: 12.5px; color: var(--ink); border-radius: 5px; text-align: left;
+}
+.ctx-lang-item:hover { background: var(--bg-2); }
+.ctx-lang-item.active { background: var(--olive-l, var(--bg-2)); font-weight: 700; }
+.ctx-lang-item .material-symbols-rounded { font-size: 15px; color: var(--olive); }
 
 /* ============================================
    FILE NODE

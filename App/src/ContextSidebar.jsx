@@ -75,7 +75,7 @@ function resolveStickyColor(key) {
 
 function ContextSidebar({
   item, lang, onUpdate, onDelete, onDuplicate, onOpen, backlinks, onGoToBacklink,
-  onClose, isColChild, onStartEdit, callbacks,
+  onClose, isColChild, onStartEdit, callbacks, editando,
 }) {
   const [pane, setPane] = React.useState(null); // 'color' | 'emoji' | 'comments' | 'rename' | null
   const [focusedRowVersion, setFocusedRowVersion] = React.useState(0);
@@ -105,6 +105,12 @@ function ContextSidebar({
   const isBigTitle = item.type === 'bigtitle';
   const isMap = item.type === 'map';
   const isShape = item.type === 'shape';
+  const isCode = item.type === 'code';
+  // Mientras se escribe código, la barra se queda en lo justo: volver, y
+  // comentar lo que esté seleccionado. Todo lo demás (colores, duplicar,
+  // eliminar) estorba con las manos en el teclado, y una de esas es
+  // irreversible.
+  const editandoCodigo = isCode && editando;
 
   // ── "Abrir la carpeta del archivo" ──
   //
@@ -235,7 +241,18 @@ function ContextSidebar({
           <span className="material-symbols-rounded">arrow_back</span>
         </button>
 
-        {isCurrentlyCropping ? (
+        {editandoCodigo ? (
+          /* Escribiendo código: solo volver (el botón de arriba) y comentar.
+             Nada más, que con las manos en el teclado el resto sobra. */
+          <button
+            className="ctx-btn"
+            onClick={()=>{ const f = window[`__codigoComentar_${item.id}`]; if (f) f(); }}
+            title={window.t('Comentar o descomentar lo seleccionado', 'Comment or uncomment the selection')}
+          >
+            <span className="material-symbols-rounded">comment</span>
+            <span>{window.t('Comentar', 'Comment')}</span>
+          </button>
+        ) : isCurrentlyCropping ? (
           <button
             className="ctx-btn"
             onClick={() => callbacks.setCroppingId(null)}
@@ -363,8 +380,11 @@ function ContextSidebar({
               </button>
             )}
             {/* Un dibujo no tiene fondo de tarjeta: su color es el de la tinta,
-                y va en su propio botón (abajo) porque se aplica a los trazos. */}
-            {!tableCell && !isImage && !isDraw && (
+                y va en su propio botón (abajo) porque se aplica a los trazos.
+                Y un bloque de código tampoco: su azul oscuro con el degradado
+                es lo que lo hace reconocible de un vistazo. Ahí se cambia el
+                título y su barra, que van en sus propios botones. */}
+            {!tableCell && !isImage && !isDraw && !isCode && (
               <button
             className={`ctx-btn ${(pane === 'color' || pane === 'colorHex') ? 'active' : ''}`}
             onClick={()=> isColor ? setPane(pane === 'colorHex' ? null : 'colorHex') : setPane(pane === 'color' ? null : 'color')}
@@ -652,6 +672,46 @@ function ContextSidebar({
             <span className="material-symbols-rounded">title</span>
             <span>{window.t('Título', 'Title')}</span>
           </button>
+        )}
+
+        {/* Nodo de código: el lenguaje, y los dos colores que sí se tocan.
+            El del fondo no está a propósito: el azul oscuro con su degradado
+            ES el nodo, y dejarlo cambiar lo convierte en otra cosa. */}
+        {isCode && (
+          <>
+            <button
+              className={`ctx-btn ${pane === 'codeLang' ? 'active' : ''}`}
+              onClick={()=>setPane(pane === 'codeLang' ? null : 'codeLang')}
+              title={window.t('Lenguaje', 'Language')}
+            >
+              <span className="material-symbols-rounded">code</span>
+              <span>{(window.lenguajeCodigo ? window.lenguajeCodigo(item.codeLang).nombre : 'Código')}</span>
+            </button>
+            <button
+              className="ctx-btn"
+              onClick={()=>onStartEdit && onStartEdit()}
+              title={window.t('Escribir', 'Edit')}
+            >
+              <span className="material-symbols-rounded">edit</span>
+              <span>{window.t('Escribir', 'Edit')}</span>
+            </button>
+            <button
+              className={`ctx-btn ${pane === 'codeTitleColor' ? 'active' : ''}`}
+              onClick={()=>setPane(pane === 'codeTitleColor' ? null : 'codeTitleColor')}
+              title={window.t('Color del título', 'Title colour')}
+            >
+              <div className="ctx-color-chip" style={{ background: item.titleColor && item.titleColor !== 'inherit' ? item.titleColor : '#DDE6F5', border: '1.5px solid var(--line-soft)' }}/>
+              <span>{window.t('Título', 'Title')}</span>
+            </button>
+            <button
+              className={`ctx-btn ${pane === 'codeBarColor' ? 'active' : ''}`}
+              onClick={()=>setPane(pane === 'codeBarColor' ? null : 'codeBarColor')}
+              title={window.t('Color de la barra', 'Bar colour')}
+            >
+              <div className="ctx-color-chip" style={{ background: item.barColor || '#243352', border: '1.5px solid var(--line-soft)' }}/>
+              <span>{window.t('Barra', 'Bar')}</span>
+            </button>
+          </>
         )}
 
         {/* Color node: toggle showing the HEX code */}
@@ -1170,6 +1230,56 @@ function ContextSidebar({
               onCambio={(c) => onUpdate({ color: c })}
               colores={window.COLORES_ODINOTE_FONDO}
               incluirTransparente={!!(isFrame || isBigTitle)}
+              tam={26}
+            />
+          </div>
+        </div>
+      )}
+
+      {pane === 'codeLang' && (
+        <div className="ctx-popout">
+          <div className="ctx-pop-section">
+            <div className="ctx-pop-title">{window.t('Lenguaje', 'Language')}</div>
+            {/* Lista y no rejilla: aquí se busca un nombre concreto, y una
+                lista se lee de un vistazo de arriba abajo. */}
+            <div className="ctx-lang-list">
+              {(window.LENGUAJES_CODIGO || []).map(l => (
+                <button
+                  key={l.id}
+                  className={`ctx-lang-item ${(item.codeLang || 'javascript') === l.id ? 'active' : ''}`}
+                  onClick={()=>{ onUpdate({ codeLang: l.id }); window.playAudioTone && window.playAudioTone('click'); }}
+                >
+                  <span>{l.nombre}</span>
+                  {(item.codeLang || 'javascript') === l.id && <span className="material-symbols-rounded">check</span>}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {pane === 'codeTitleColor' && (
+        <div className="ctx-popout">
+          <div className="ctx-pop-section">
+            <div className="ctx-pop-title">{window.t('Color del título', 'Title colour')}</div>
+            <window.SelectorColor
+              valor={item.titleColor && item.titleColor !== 'inherit' ? item.titleColor : '#DDE6F5'}
+              onCambio={(c) => onUpdate({ titleColor: c })}
+              colores={window.COLORES_ODINOTE_TEXTO || window.COLORES_ODINOTE_FONDO}
+              tam={26}
+            />
+          </div>
+        </div>
+      )}
+
+      {pane === 'codeBarColor' && (
+        <div className="ctx-popout">
+          <div className="ctx-pop-section">
+            <div className="ctx-pop-title">{window.t('Color de la barra', 'Bar colour')}</div>
+            <window.SelectorColor
+              valor={item.barColor || '#243352'}
+              onCambio={(c) => onUpdate({ barColor: c })}
+              colores={window.COLORES_ODINOTE_FONDO}
               tam={26}
             />
           </div>

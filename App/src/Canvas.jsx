@@ -64,6 +64,7 @@ function defaultDims(type) {
     case 'file':     return { w: 230, h: 150 };
     case 'frame':    return { w: 400, h: 400 };
     case 'shape':    return { w: 200, h: 160 };
+    case 'code':     return { w: 420, h: 260 };
     case 'bigtitle': return { w: 300, h: 80 };
     case 'map':      return { w: 340, h: 280 };
     case 'draw':     return { w: 420, h: 300 };
@@ -188,6 +189,11 @@ function makeNewItem(type, x, y, w, h, lang) {
         // recién puesta no se parecía a nada de lo que ya había en el lienzo.
         color: 'white',
         content: { es: '', en: '' } };
+    case 'code':
+      // Nace en JavaScript porque es lo que más se pega desde fuera, y con el
+      // nombre vacío: el nombre se pone cuando ya sabes qué hay dentro.
+      return { ...base, type: 'code', ...defaultSize(420, 260),
+        code: '', codeLang: 'javascript', codeTitle: '' };
     case 'bigtitle':
       return { ...base, type: 'bigtitle', ...defaultSize(300, 80),
         color: 'transparent',
@@ -916,6 +922,12 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
   }, [currentId]);
 
   const [pan, setPan] = useStateCanvas({ x: 40, y: 20 });
+  // Barra espaciadora: mientras está pulsada, arrastrar mueve el lienzo, como
+  // el botón central. En una ref además del estado porque quien la consulta son
+  // controladores de ratón, que no se vuelven a crear en cada render.
+  const espacioRef = useRefCanvas(false);
+  const [espacio, setEspacio] = useStateCanvas(false);
+  const [paneando, setPaneando] = useStateCanvas(false);
   // En un móvil, al 100% una nota corriente (300px) ocupa el 80% del ancho y
   // no ves nada alrededor. Los lienzos sin cámara guardada se abren más
   // alejados para tener contexto; acercar es un pellizco.
@@ -2664,7 +2676,69 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
   };
 
   // ───── Surface mousedown ─────
+  // ───── La barra espaciadora mueve el lienzo ─────
+  //
+  // Es el gesto que traen aprendido los que vienen de Photoshop, Figma o
+  // Blender, y saca del apuro a los ratones sin botón central.
+  //
+  // Lo delicado es no robarle el espacio a quien está escribiendo: dentro de
+  // una nota, de un título o de cualquier campo, el espacio es un espacio y
+  // punto. Por eso se mira antes dónde está el foco. También se suelta al
+  // perder la ventana, o al volver el espacio se habría quedado "pulsado".
+  useEffectCanvas(() => {
+    const escribiendo = () => {
+      const ae = document.activeElement;
+      return !!(ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || ae.isContentEditable));
+    };
+    const bajar = (e) => {
+      if (e.code !== 'Space' || e.repeat || escribiendo()) return;
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      espacioRef.current = true;
+      setEspacio(true);
+      // Sin esto la página se desplaza y, si hay un botón con el foco, el
+      // espacio lo pulsa.
+      e.preventDefault();
+    };
+    const soltar = () => { espacioRef.current = false; setEspacio(false); };
+    const subir = (e) => { if (e.code === 'Space') soltar(); };
+    window.addEventListener('keydown', bajar);
+    window.addEventListener('keyup', subir);
+    window.addEventListener('blur', soltar);
+    return () => {
+      window.removeEventListener('keydown', bajar);
+      window.removeEventListener('keyup', subir);
+      window.removeEventListener('blur', soltar);
+    };
+  }, []);
+
+  // Arrastrar el lienzo. Lo comparten el botón central, Alt y la barra
+  // espaciadora, así que vive aquí y no dentro de un solo controlador.
+  const empiezaPan = (e) => {
+    e.preventDefault();
+    const startX = e.clientX, startY = e.clientY, startPan = { ...panRef.current };
+    setPaneando(true);
+    const onMove = (ev) => setPan({ x: startPan.x + ev.clientX - startX, y: startPan.y + ev.clientY - startY });
+    const onUp = () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+      setPaneando(false);
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  };
+
+  // Con el espacio pulsado, TODO arrastra el lienzo: da igual que el ratón
+  // esté sobre un nodo, sobre un tirador o sobre una flecha. Por eso esta
+  // comprobación se llama la primera en cada gesto y corta el resto.
+  const panearSiEspacio = (e) => {
+    if (!espacioRef.current || e.button !== 0) return false;
+    e.stopPropagation();
+    empiezaPan(e);
+    return true;
+  };
+
   const onSurfaceMouseDown = (e) => {
+    if (panearSiEspacio(e)) return;
     if (e.button === 2) return; // right-click is handled by the create menu, not the marquee
     if (!surfaceRef.current.contains(e.target)) return;
     const isSurface =
@@ -2688,11 +2762,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
 
     // panning
     if (e.button === 1 || e.altKey) {
-      e.preventDefault();
-      const startX = e.clientX, startY = e.clientY, startPan = { ...pan };
-      const onMove = (ev) => setPan({ x: startPan.x + ev.clientX - startX, y: startPan.y + ev.clientY - startY });
-      const onUp = () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
-      window.addEventListener('mousemove', onMove); window.addEventListener('mouseup', onUp);
+      empiezaPan(e);
       return;
     }
 
@@ -2907,6 +2977,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
 
   // ───── Item drag (with column drop detection) ─────
   const startDragItem = (e, itemId) => {
+    if (panearSiEspacio(e)) return;
     if (e.target.closest('input, textarea, button, .todo-check, .swatch-btn, .anchor, .todo-add, .cal-mb-input, .cal-mb-cell, .cal-mb-nav')) return;
 
     if (e.shiftKey) {
@@ -4206,6 +4277,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
   const ANCLA_GIRO = 90;
   const TOLERANCIA_GIRO = 7;      // grados para pegarse a un múltiplo de 90
   const startRotate = (e, itemId) => {
+    if (panearSiEspacio(e)) return;
     e.stopPropagation(); e.preventDefault();
     const item = current.items.find(i => i.id === itemId);
     if (!item) return;
@@ -4248,6 +4320,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
   };
 
   const startResize = (e, itemId, corner) => {
+    if (panearSiEspacio(e)) return;
     e.stopPropagation(); e.preventDefault();
     const item = current.items.find(i => i.id === itemId);
     if (!item) return;
@@ -4784,6 +4857,8 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
   if (transition === 'entering') wrapClass.push('entering');
   if (activeTool && activeTool !== 'line') wrapClass.push('placing');
   if (activeTool === 'line') wrapClass.push('linking');
+  // La mano abierta avisa de que el espacio está pulsado antes de arrastrar.
+  if (espacio) wrapClass.push(paneando ? 'paneando' : 'con-espacio');
 
   const selectedItem = (() => {
     if (editingChild) {
@@ -5067,7 +5142,11 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
       {toolGhost && <ToolGhost {...toolGhost} lang={lang}/>}
 
       {/* Contextual sidebar — hidden while actively editing THIS node's text (format sidebar shows instead) */}
-      {selectedItem && !captionFocusId && editing !== selectedItem.id && !selectedItem._editingTitle && (() => {
+      {/* El nodo de codigo es la excepcion: mientras se escribe SI se le
+          deja su barra, porque ahi vive el boton de comentar. La de formato
+          de texto (negrita, cursiva, colores) no pinta nada en un bloque de
+          codigo, asi que no la sustituye ninguna. */}
+      {selectedItem && !captionFocusId && (editing !== selectedItem.id || selectedItem.type === 'code') && !selectedItem._editingTitle && (() => {
         const isColChild = editingChild && selectedItem.id === editingChild.childId;
         return (
           <window.ContextSidebar
@@ -5078,6 +5157,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
             backlinks={backlinksForSelected}
             onGoToBacklink={(b) => onGoToNode && onGoToNode(b)}
             onStartEdit={() => setEditing(selectedItem.id)}
+            editando={editing === selectedItem.id}
             onUpdate={(patch) => {
               if (isColChild) {
                 callbacks.updateColChild(editingChild.colId, editingChild.childId, patch);
@@ -5438,7 +5518,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
                     if (item.type === 'doc') { e.stopPropagation(); setDocOpen({ id: item.id }); return; }
                     if (item.type === 'draw') { e.stopPropagation(); enterDrawMode(item.id); return; }
                     if (item.type === 'board') return;
-                    if (['note','comment','todo','column','link','board','bigtitle','frame','shape'].includes(item.type)) {
+                    if (['note','comment','todo','column','link','board','bigtitle','frame','shape','code'].includes(item.type)) {
                       e.stopPropagation();
                       setSelected(item.id);
                       setSelectedIds([]);

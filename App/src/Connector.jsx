@@ -317,12 +317,65 @@ function resolveEndpoint(end, items) {
   return { x: end?.x ?? 0, y: end?.y ?? 0 };
 }
 
+// ───── Enganche libre por el borde ─────
+//
+// Un extremo pegado a un nodo se guardaba solo como `{ itemId }`, y el sitio
+// por el que salía la flecha se recalculaba con geometría en cada pintada: la
+// flecha decidía sola por qué lado salir, y al mover los nodos se cambiaba de
+// lado sola. Ahora un extremo puede llevar además `frac`, que es dónde se
+// agarró EN EL NODO, en coordenadas de 0 a 1 (0,0 la esquina de arriba a la
+// izquierda; 1,1 la de abajo a la derecha). Con eso el enganche se queda donde
+// lo dejaste y se puede mover por todo el borde, no solo por los cuatro
+// puntos de siempre.
+//
+// Sin `frac` todo sigue como estaba, así que las flechas ya hechas no cambian.
+
+// Lleva un punto cualquiera del nodo al borde más cercano, en fracciones.
+function fracEnElBorde(rect, x, y) {
+  const w = rect.w || 1, h = rect.h || 1;
+  let u = (x - rect.x) / w, v = (y - rect.y) / h;
+  u = Math.min(1, Math.max(0, u));
+  v = Math.min(1, Math.max(0, v));
+  // ¿Qué borde está más cerca? El de menos distancia en fracción.
+  const dIzq = u, dDer = 1 - u, dArr = v, dAba = 1 - v;
+  const min = Math.min(dIzq, dDer, dArr, dAba);
+  if (min === dIzq) u = 0; else if (min === dDer) u = 1;
+  else if (min === dArr) v = 0; else v = 1;
+  // Imán a los cuatro de siempre y a las esquinas: son los que uno busca el
+  // 90% de las veces, y sin imán es imposible clavarlos con el pulso.
+  const IMAN = 0.08;
+  const pega = (t) => (Math.abs(t - 0.5) < IMAN ? 0.5 : (t < IMAN ? 0 : (t > 1 - IMAN ? 1 : t)));
+  if (u === 0 || u === 1) v = pega(v); else u = pega(u);
+  return { x: +u.toFixed(3), y: +v.toFixed(3) };
+}
+
+// El punto de la pantalla al que corresponde un `frac`, y por qué lado sale.
+function puntoDeFrac(rect, frac) {
+  const p = { x: rect.x + frac.x * rect.w, y: rect.y + frac.y * rect.h };
+  // El lado por el que sale: el borde sobre el que está posado el punto.
+  let dir = 'h', sgn = 1;
+  if (frac.x === 0)      { dir = 'h'; sgn = -1; }
+  else if (frac.x === 1) { dir = 'h'; sgn = 1; }
+  else if (frac.y === 0) { dir = 'v'; sgn = -1; }
+  else if (frac.y === 1) { dir = 'v'; sgn = 1; }
+  else {
+    // Por dentro (no debería, pero por si acaso): al borde más cercano.
+    const f = fracEnElBorde(rect, p.x, p.y);
+    return puntoDeFrac(rect, f);
+  }
+  return { p, dir, sgn };
+}
+
 function endInfo(end, items) {
   if (end?.itemId) {
     const rect = getNodeRect(end.itemId, items);
-    if (rect) return { item: rect, center: { x: rect.x + rect.w / 2, y: rect.y + rect.h / 2 } };
+    if (rect) return {
+      item: rect,
+      center: { x: rect.x + rect.w / 2, y: rect.y + rect.h / 2 },
+      frac: end.frac && typeof end.frac.x === 'number' ? end.frac : null,
+    };
   }
-  return { item: null, center: { x: end?.x ?? 0, y: end?.y ?? 0 } };
+  return { item: null, center: { x: end?.x ?? 0, y: end?.y ?? 0 }, frac: null };
 }
 
 function Connector({ conn, items, selected, selectedIds, onSelect, onUpdate, onDragNodes, onDragNodesEnd, panZoom, screenToCanvas, layer, theme }) {
@@ -356,11 +409,18 @@ function Connector({ conn, items, selected, selectedIds, onSelect, onUpdate, onD
     // waypoint and add new ones by dragging a segment, while the path stays orthogonal.
     const hwA = A.item ? A.item.w / 2 : 0, hhA = A.item ? A.item.h / 2 : 0;
     const hwB = B.item ? B.item.w / 2 : 0, hhB = B.item ? B.item.h / 2 : 0;
-    let ortho = (Array.isArray(conn.ortho) && conn.ortho.length)
+    const orthoGuardado = Array.isArray(conn.ortho) && conn.ortho.length > 0;
+    let ortho = orthoGuardado
       ? conn.ortho.map(p => ({ x: p.x, y: p.y }))
       : [{ x: (cA.x + cB.x) / 2 + (bend.x || 0), y: (cA.y + cB.y) / 2 + (bend.y || 0) }];
 
-    if (ortho.length === 1) {
+    // Este ajuste es para el codo que se inventa la propia flecha cuando nadie
+    // la ha tocado: lo pega al medio de los dos nodos. Antes se aplicaba
+    // TAMBIÉN a un codo puesto a mano, así que en cuanto lo movías —o
+    // arrastrabas la flecha para llevarte los nodos— la siguiente pintada lo
+    // devolvía al medio. Eso es lo que se veía como "la flecha se recoloca
+    // sola cada dos por tres".
+    if (ortho.length === 1 && !orthoGuardado) {
       const ddx = cB.x - cA.x;
       const ddy = cB.y - cA.y;
       const avgHw = (hwA + hwB) / 2 || 1;
@@ -373,7 +433,20 @@ function Connector({ conn, items, selected, selectedIds, onSelect, onUpdate, onD
     }
     orthoWaypoints = ortho;
 
-    const exitFor = (c, hw, hh, hasItem, toward) => {
+    // Por dónde sale la flecha de cada nodo. Si el extremo tiene enganche
+    // guardado (`frac`), sale por AHÍ y no se discute; si no, se decide por
+    // geometría como siempre. Esa decisión automática es la que hacía que la
+    // flecha se cambiara de lado sola mientras movías los nodos.
+    const exitFor = (c, hw, hh, hasItem, toward, rect, frac) => {
+      if (rect && frac) {
+        const { p: e, dir, sgn } = puntoDeFrac(rect, frac);
+        return {
+          e, dir,
+          p: hasItem
+            ? (dir === 'h' ? { x: e.x + sgn * GAP, y: e.y } : { x: e.x, y: e.y + sgn * GAP })
+            : { x: e.x, y: e.y },
+        };
+      }
       const ddx = toward.x - c.x, ddy = toward.y - c.y;
       const normX = hw > 0 ? Math.abs(ddx) / hw : Math.abs(ddx);
       const normY = hh > 0 ? Math.abs(ddy) / hh : Math.abs(ddy);
@@ -387,8 +460,8 @@ function Connector({ conn, items, selected, selectedIds, onSelect, onUpdate, onD
       return { e, dir: 'v', p: hasItem ? { x: e.x, y: e.y + sgn * GAP } : { x: e.x, y: e.y } };
     };
 
-    const exA = exitFor(cA, hwA, hhA, !!A.item, ortho[0]);
-    const exB = exitFor(cB, hwB, hhB, !!B.item, ortho[ortho.length - 1]);
+    const exA = exitFor(cA, hwA, hhA, !!A.item, ortho[0], A.item, A.frac);
+    const exB = exitFor(cB, hwB, hhB, !!B.item, ortho[ortho.length - 1], B.item, B.frac);
     eA = exA.e; eB = exB.e;
     p1 = exA.p; p2 = exB.p;
     exADir = exA.dir;
@@ -398,8 +471,8 @@ function Connector({ conn, items, selected, selectedIds, onSelect, onUpdate, onD
       const cleaned = cleanOrthoWithEndpoints(ortho, p1, p2, exADir, exBDir);
       if (JSON.stringify(cleaned) !== JSON.stringify(ortho)) {
         ortho = cleaned;
-        const newExA = exitFor(cA, hwA, hhA, !!A.item, ortho[0]);
-        const newExB = exitFor(cB, hwB, hhB, !!B.item, ortho[ortho.length - 1]);
+        const newExA = exitFor(cA, hwA, hhA, !!A.item, ortho[0], A.item, A.frac);
+        const newExB = exitFor(cB, hwB, hhB, !!B.item, ortho[ortho.length - 1], B.item, B.frac);
         eA = newExA.e; eB = newExB.e;
         p1 = newExA.p; p2 = newExB.p;
         exADir = newExA.dir;
@@ -491,8 +564,11 @@ function Connector({ conn, items, selected, selectedIds, onSelect, onUpdate, onD
     }
     qx = qBase.x + bend.x;
     qy = qBase.y + bend.y;
-    eA = A.item ? edgeIntersect(A.item, qx, qy) : cA;
-    eB = B.item ? edgeIntersect(B.item, qx, qy) : cB;
+    // Con enganche guardado, la curva también sale por ahí en vez de buscar el
+    // corte con el borde: si no, mover el tirador de un extremo no servía de
+    // nada en modo curva.
+    eA = A.frac && A.item ? puntoDeFrac(A.item, A.frac).p : (A.item ? edgeIntersect(A.item, qx, qy) : cA);
+    eB = B.frac && B.item ? puntoDeFrac(B.item, B.frac).p : (B.item ? edgeIntersect(B.item, qx, qy) : cB);
     p1 = moveToward(eA, { x: qx, y: qy }, GAP);
     p2 = moveToward(eB, { x: qx, y: qy }, GAP);
     path = `M ${p1.x} ${p1.y} Q ${qx} ${qy} ${p2.x} ${p2.y}`;
@@ -575,6 +651,51 @@ function Connector({ conn, items, selected, selectedIds, onSelect, onUpdate, onD
     const scale = panZoom?.scale || 1;
     // axis = the coordinate this segment controls ('x' for a vertical segment, 'y' for horizontal)
     const axis = seg.axis;
+
+    // ── Una línea recta se MUEVE, no se dobla ──
+    //
+    // Si la flecha es un solo tramo recto entre dos nodos y se tira de ella
+    // hacia el lado, lo que uno quiere es correrla, no que aparezca un doblez
+    // y quede en escalera. Se puede hacer porque el enganche se pasea por el
+    // borde: se deslizan los dos extremos a la vez y la línea entera se mueve.
+    // Solo cuando de verdad no hay curva que romper (dos vértices) y los dos
+    // extremos salen por el mismo tipo de borde que el movimiento permite.
+    const rectaEntera = (orthoVerts || []).length <= 2;
+    const salenIgual = axis === 'y' ? (exADir === 'h' && exBDir === 'h')
+                                    : (exADir === 'v' && exBDir === 'v');
+    if (seg.wpIndex < 0 && rectaEntera && salenIgual && A.item && B.item && from?.itemId && to?.itemId) {
+      const rectA = A.item, rectB = B.item;
+      const iniA = A.frac ? { ...A.frac } : fracEnElBorde(rectA, eA.x, eA.y);
+      const iniB = B.frac ? { ...B.frac } : fracEnElBorde(rectB, eB.x, eB.y);
+      const largo = axis === 'y' ? 'h' : 'w';   // el lado del nodo por el que se desliza
+      const eje = axis === 'y' ? 'y' : 'x';
+      const onMoveRecta = (ev) => {
+        const d = axis === 'y' ? (ev.clientY - startY) / scale : (ev.clientX - startX) / scale;
+        const mueve = (rect, ini) => {
+          const t = Math.min(1, Math.max(0, ini[eje] + d / (rect[largo] || 1)));
+          const f = { ...ini };
+          f[eje] = +t.toFixed(3);
+          // El mismo imán que al soltar un extremo: medio y esquinas.
+          const IMAN = 0.06;
+          if (Math.abs(f[eje] - 0.5) < IMAN) f[eje] = 0.5;
+          else if (f[eje] < IMAN) f[eje] = 0;
+          else if (f[eje] > 1 - IMAN) f[eje] = 1;
+          return f;
+        };
+        onUpdate(conn.id, {
+          fromEnd: { itemId: from.itemId, frac: mueve(rectA, iniA) },
+          toEnd:   { itemId: to.itemId,   frac: mueve(rectB, iniB) },
+          from: undefined, to: undefined, fromAnchor: undefined, toAnchor: undefined,
+        });
+      };
+      const onUpRecta = () => {
+        window.removeEventListener('mousemove', onMoveRecta);
+        window.removeEventListener('mouseup', onUpRecta);
+      };
+      window.addEventListener('mousemove', onMoveRecta);
+      window.addEventListener('mouseup', onUpRecta);
+      return;
+    }
 
     // Stable starting array + index for this drag (insert a fresh bend if pinned to an exit)
     let startArr, targetIdx;
@@ -779,7 +900,13 @@ function Connector({ conn, items, selected, selectedIds, onSelect, onUpdate, onD
       const itemEl = el?.closest('.item, .col-child-wrap');
       const targetId = itemEl?.getAttribute('data-item-id');
       if (targetId) {
-        const newEnd = { itemId: targetId };
+        // Se guarda POR DÓNDE se soltó, no solo a qué nodo: el enganche se
+        // queda ahí y se puede poner en cualquier punto del borde, con imán a
+        // los cuatro de siempre y a las esquinas.
+        const rect = getNodeRect(targetId, items);
+        const newEnd = rect
+          ? { itemId: targetId, frac: fracEnElBorde(rect, p.x, p.y) }
+          : { itemId: targetId };
         onUpdate(conn.id, which === 'from' ? { fromEnd: newEnd, from: undefined, fromAnchor: undefined } : { toEnd: newEnd, to: undefined, toAnchor: undefined });
       } else {
         const newEnd = { x: p.x, y: p.y };
@@ -797,6 +924,35 @@ function Connector({ conn, items, selected, selectedIds, onSelect, onUpdate, onD
     window.addEventListener('mouseup', onUp);
   };
 
+  // Mover el punto de enganche por el borde del nodo, sin soltarlo de él.
+  //
+  // Es el tirador que faltaba: el del centro sirve para cambiar de nodo, pero
+  // no para decir POR DÓNDE entra la flecha. Este se queda siempre en el mismo
+  // nodo y se pasea por todo su borde, con imán a los cuatro puntos de siempre
+  // y a las esquinas.
+  const handleAnchorSlide = (which) => (e) => {
+    e.stopPropagation(); e.preventDefault();
+    onSelect && onSelect(conn.id);
+    const end = which === 'from' ? from : to;
+    if (!end?.itemId) return;
+    const onMove = (ev) => {
+      const rect = getNodeRect(end.itemId, items);
+      if (!rect) return;
+      const p = screenToCanvas(ev.clientX, ev.clientY);
+      const frac = fracEnElBorde(rect, p.x, p.y);
+      const nuevo = { itemId: end.itemId, frac };
+      onUpdate(conn.id, which === 'from'
+        ? { fromEnd: nuevo, from: undefined, fromAnchor: undefined }
+        : { toEnd: nuevo, to: undefined, toAnchor: undefined });
+    };
+    const onUp = () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  };
+
   // The handles layer (rendered ABOVE nodes) only carries the interactive
   // controls so the center anchors stay grabbable even when they sit inside a node.
   if (layer === 'handles') {
@@ -809,6 +965,22 @@ function Connector({ conn, items, selected, selectedIds, onSelect, onUpdate, onD
         {/* Center anchor handles */}
         <circle className="connector-handle endpoint" cx={cA.x} cy={cA.y} r={8} onMouseDown={handleEndpointDrag('from')}/>
         <circle className="connector-handle endpoint" cx={cB.x} cy={cB.y} r={8} onMouseDown={handleEndpointDrag('to')}/>
+        {/* Enganche: solo si esa punta está pegada a un nodo. Se pasea por su
+            borde y no se despega. Doble clic lo devuelve a automático. */}
+        {A.item && (
+          <circle
+            className="connector-handle anchor-slide" cx={eA.x} cy={eA.y} r={6}
+            onMouseDown={handleAnchorSlide('from')}
+            onDoubleClick={(ev)=>{ ev.stopPropagation(); onUpdate(conn.id, { fromEnd: { itemId: from.itemId } }); }}
+          />
+        )}
+        {B.item && (
+          <circle
+            className="connector-handle anchor-slide" cx={eB.x} cy={eB.y} r={6}
+            onMouseDown={handleAnchorSlide('to')}
+            onDoubleClick={(ev)=>{ ev.stopPropagation(); onUpdate(conn.id, { toEnd: { itemId: to.itemId } }); }}
+          />
+        )}
         {shape === 'orthogonal' ? (
           <>
             {/* Per-segment handles — drag anywhere on the segment or its midpoint circle */}

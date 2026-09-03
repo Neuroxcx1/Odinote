@@ -3606,6 +3606,242 @@ function ColorItem({ item, lang, onUpdate }) {
   );
 }
 
+// ──────────────── CÓDIGO ────────────────
+//
+// Un bloque de código de verdad: fondo azul oscuro, el texto coloreado solo
+// según el lenguaje, y una barra arriba con el nombre y el lenguaje.
+//
+// El coloreado lo hace highlight.js, que YA viaja dentro de la aplicación
+// (App/lib/highlight.min.js, 36 lenguajes) — no hace falta traer nada nuevo ni
+// pedir nada por internet, que es justo lo que no puede hacer una aplicación
+// que tiene que funcionar sin conexión.
+
+// Lo que se ofrece en el menú, con el nombre que usa la gente y no el interno.
+const LENGUAJES_CODIGO = [
+  { id: 'plaintext',  nombre: 'Texto plano', comentario: '# ' },
+  { id: 'javascript', nombre: 'JavaScript',  comentario: '// ' },
+  { id: 'typescript', nombre: 'TypeScript',  comentario: '// ' },
+  { id: 'python',     nombre: 'Python',      comentario: '# ' },
+  { id: 'csharp',     nombre: 'C#',          comentario: '// ' },
+  { id: 'cpp',        nombre: 'C++',         comentario: '// ' },
+  { id: 'c',          nombre: 'C',           comentario: '// ' },
+  { id: 'java',       nombre: 'Java',        comentario: '// ' },
+  { id: 'lua',        nombre: 'Lua',         comentario: '-- ' },
+  { id: 'rust',       nombre: 'Rust',        comentario: '// ' },
+  { id: 'go',         nombre: 'Go',          comentario: '// ' },
+  { id: 'ruby',       nombre: 'Ruby',        comentario: '# ' },
+  { id: 'php',        nombre: 'PHP',         comentario: '// ' },
+  { id: 'swift',      nombre: 'Swift',       comentario: '// ' },
+  { id: 'kotlin',     nombre: 'Kotlin',      comentario: '// ' },
+  { id: 'sql',        nombre: 'SQL',         comentario: '-- ' },
+  { id: 'bash',       nombre: 'Bash',        comentario: '# ' },
+  { id: 'shell',      nombre: 'Shell',       comentario: '# ' },
+  { id: 'json',       nombre: 'JSON',        comentario: '// ' },
+  { id: 'yaml',       nombre: 'YAML',        comentario: '# ' },
+  { id: 'xml',        nombre: 'HTML / XML',  comentario: '<!-- ' },
+  { id: 'css',        nombre: 'CSS',         comentario: '/* ' },
+  { id: 'scss',       nombre: 'SCSS',        comentario: '// ' },
+  { id: 'markdown',   nombre: 'Markdown',    comentario: '<!-- ' },
+  { id: 'ini',        nombre: 'INI / TOML',  comentario: '; ' },
+  { id: 'diff',       nombre: 'Diff',        comentario: '# ' },
+  { id: 'r',          nombre: 'R',           comentario: '# ' },
+  { id: 'perl',       nombre: 'Perl',        comentario: '# ' },
+  { id: 'objectivec', nombre: 'Objective-C', comentario: '// ' },
+  { id: 'vbnet',      nombre: 'VB.NET',      comentario: "' " },
+  { id: 'makefile',   nombre: 'Makefile',    comentario: '# ' },
+  { id: 'graphql',    nombre: 'GraphQL',     comentario: '# ' },
+  { id: 'less',       nombre: 'Less',        comentario: '// ' },
+  { id: 'wasm',       nombre: 'WebAssembly', comentario: ';; ' },
+];
+window.LENGUAJES_CODIGO = LENGUAJES_CODIGO;
+
+function lenguajeCodigo(id) {
+  return LENGUAJES_CODIGO.find(l => l.id === id) || LENGUAJES_CODIGO[0];
+}
+window.lenguajeCodigo = lenguajeCodigo;
+
+// Colorea un trozo de código. Si el lenguaje no está o el resaltador falla, se
+// devuelve el texto escapado: mejor sin color que sin texto.
+function coloreaCodigo(texto, lenguaje) {
+  const plano = String(texto || '');
+  const escapado = plano
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const hljs = window.hljs;
+  if (!hljs || !lenguaje || lenguaje === 'plaintext') return escapado;
+  try {
+    if (hljs.listLanguages && hljs.listLanguages().indexOf(lenguaje) === -1) return escapado;
+    return hljs.highlight(plano, { language: lenguaje, ignoreIllegals: true }).value;
+  } catch (e) {
+    return escapado;
+  }
+}
+window.coloreaCodigo = coloreaCodigo;
+
+// Comentar o descomentar las líneas que abarque la selección.
+//
+// Se decide una sola vez para todo el bloque: si TODAS las líneas ya están
+// comentadas, se descomenta; si hay una sola sin comentar, se comenta todo.
+// Es lo que hace cualquier editor, y evita el efecto cremallera de ir línea
+// por línea alternando.
+function alternaComentario(texto, ini, fin, marca) {
+  const lineas = String(texto).split('\n');
+  // De posición de carácter a número de línea.
+  let pos = 0, primera = 0, ultima = 0;
+  for (let i = 0; i < lineas.length; i++) {
+    const finLinea = pos + lineas[i].length;
+    if (pos <= ini && ini <= finLinea) primera = i;
+    if (pos <= fin && fin <= finLinea) { ultima = i; break; }
+    ultima = i;
+    pos = finLinea + 1;
+  }
+  const marcaSinEspacio = marca.trim();
+  const afectadas = lineas.slice(primera, ultima + 1);
+  const conTexto = afectadas.filter(l => l.trim() !== '');
+  const todasComentadas = conTexto.length > 0 &&
+    conTexto.every(l => l.trimStart().startsWith(marcaSinEspacio));
+
+  for (let i = primera; i <= ultima; i++) {
+    const l = lineas[i];
+    if (todasComentadas) {
+      const sangria = l.length - l.trimStart().length;
+      const resto = l.slice(sangria);
+      if (resto.startsWith(marca)) lineas[i] = l.slice(0, sangria) + resto.slice(marca.length);
+      else if (resto.startsWith(marcaSinEspacio)) lineas[i] = l.slice(0, sangria) + resto.slice(marcaSinEspacio.length);
+    } else if (l.trim() !== '') {
+      const sangria = l.length - l.trimStart().length;
+      lineas[i] = l.slice(0, sangria) + marca + l.slice(sangria);
+    }
+  }
+  return lineas.join('\n');
+}
+window.alternaComentario = alternaComentario;
+
+function CodeItem({ item, lang, editing, onUpdate, callbacks }) {
+  const areaRef = React.useRef(null);
+  const preRef = React.useRef(null);
+  const cb = callbacks || {};
+  const codigo = typeof item.code === 'string' ? item.code : '';
+  const lenguaje = lenguajeCodigo(item.codeLang || 'javascript');
+  const titulo = item.codeTitle || '';
+  const [editandoTitulo, setEditandoTitulo] = React.useState(false);
+
+  // El color del título y el de su barra sí se pueden cambiar; el del fondo no,
+  // porque el azul oscuro con el degradado ES el nodo.
+  const colorBarra = item.barColor || 'rgba(255,255,255,0.06)';
+  const colorTitulo = item.titleColor && item.titleColor !== 'inherit' ? item.titleColor : '#DDE6F5';
+
+  // Comentar la selección se pide desde la barra del nodo, que no tiene acceso
+  // al textarea: se deja aquí una función colgada del nodo mientras se edita.
+  // `editing` llega como SÍ/NO, no como el id del nodo: así se lo pasa el
+  // lienzo a todos los nodos.
+  React.useEffect(() => {
+    if (!editing) return;
+    const clave = `__codigoComentar_${item.id}`;
+    window[clave] = () => {
+      const ta = areaRef.current;
+      if (!ta) return;
+      const ini = ta.selectionStart, fin = ta.selectionEnd;
+      const nuevo = alternaComentario(ta.value, ini, fin, lenguaje.comentario);
+      onUpdate({ code: nuevo });
+      // El texto cambia de largo: se deja el cursor donde estaba en vez de
+      // mandarlo al final, que es lo que hace perder el sitio.
+      requestAnimationFrame(() => {
+        const t = areaRef.current;
+        if (!t) return;
+        t.focus();
+        const desplaza = nuevo.length - ta.value.length;
+        t.setSelectionRange(ini, Math.max(ini, fin + desplaza));
+      });
+    };
+    return () => { delete window[clave]; };
+  }, [editing, item.id, lenguaje.comentario, onUpdate]);
+
+  // El resaltado se pinta detrás y el textarea encima, transparente. Así se
+  // escribe con el cursor y la selección de siempre PERO con los colores
+  // debajo, en vez de tener que salir del modo edición para verlos.
+  const alDesplazar = () => {
+    const ta = areaRef.current, pre = preRef.current;
+    if (ta && pre) { pre.scrollTop = ta.scrollTop; pre.scrollLeft = ta.scrollLeft; }
+  };
+
+  const alEscribirTecla = (e) => {
+    // El tabulador dentro del código es un tabulador, no el salto al siguiente
+    // control: sin esto no se puede sangrar nada.
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      const ta = e.currentTarget;
+      const ini = ta.selectionStart, fin = ta.selectionEnd;
+      const nuevo = ta.value.slice(0, ini) + '  ' + ta.value.slice(fin);
+      onUpdate({ code: nuevo });
+      requestAnimationFrame(() => {
+        const t = areaRef.current;
+        if (t) { t.focus(); t.setSelectionRange(ini + 2, ini + 2); }
+      });
+      return;
+    }
+    if (e.key === 'Escape') { e.stopPropagation(); cb.endEdit && cb.endEdit(); }
+  };
+
+  const estaEditando = !!editing;
+
+  return (
+    <div className="code-card" style={{ width: '100%', height: '100%' }}>
+      <div className="item-card code-body">
+        {/* Barra de arriba: nombre y lenguaje */}
+        <div className="code-bar" style={{ background: colorBarra }}>
+          <span className="code-dots"><i/><i/><i/></span>
+          {editandoTitulo ? (
+            <input
+              className="code-title-input"
+              style={{ color: colorTitulo }}
+              defaultValue={titulo}
+              autoFocus
+              onMouseDown={(e)=>e.stopPropagation()}
+              onBlur={(e)=>{ onUpdate({ codeTitle: e.target.value }); setEditandoTitulo(false); }}
+              onKeyDown={(e)=>{ if (e.key === 'Enter') e.currentTarget.blur(); }}
+            />
+          ) : (
+            <span
+              className={`code-title${titulo ? '' : ' vacio'}`}
+              style={{ color: colorTitulo }}
+              onDoubleClick={(e)=>{ e.stopPropagation(); setEditandoTitulo(true); }}
+              title={window.t('Doble clic para ponerle nombre', 'Double-click to name it')}
+            >
+              {titulo || window.t('sin nombre', 'untitled')}
+            </span>
+          )}
+          <span className="code-lang">{lenguaje.nombre}</span>
+        </div>
+
+        {/* El código */}
+        <div className="code-scroll">
+          <pre ref={preRef} className="code-pre" aria-hidden="true">
+            <code
+              className="hljs"
+              dangerouslySetInnerHTML={{ __html: coloreaCodigo(codigo, lenguaje.id) + '\n' }}
+            />
+          </pre>
+          {estaEditando && (
+            <textarea
+              ref={areaRef}
+              className="code-area"
+              value={codigo}
+              spellCheck={false}
+              autoFocus
+              onChange={(e)=>onUpdate({ code: e.target.value })}
+              onScroll={alDesplazar}
+              onKeyDown={alEscribirTecla}
+              onMouseDown={(e)=>e.stopPropagation()}
+              onDoubleClick={(e)=>e.stopPropagation()}
+              placeholder={window.t('Escribe o pega tu código…', 'Type or paste your code…')}
+            />
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ──────────────── FILE ────────────────
 function fileKind(ext) {
   const e = (ext || '').toLowerCase();
@@ -4882,6 +5118,7 @@ function ItemRenderer({ item, lang, editing, callbacks }) {
     case 'comment':  return <CommentItem item={item} lang={lang} editing={editing} onUpdate={onUpdate}/>;
     case 'audio':    return <AudioItem item={item} lang={lang} onUpdate={onUpdate}/>;
     case 'color':    return <ColorItem item={item} lang={lang} onUpdate={onUpdate}/>;
+    case 'code':     return <CodeItem  item={item} lang={lang} editing={editing} onUpdate={onUpdate} callbacks={cb}/>;
     case 'file':     return <FileItem  item={item} lang={lang} onUpdate={onUpdate} onOpenFile={cb.openFile}/>;
     case 'title':    return <TitleItem item={item} lang={lang}/>;
     case 'swatch':   return <SwatchItem item={item} lang={lang}/>;
