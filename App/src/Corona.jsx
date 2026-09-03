@@ -21,7 +21,7 @@ window.Corona = function Corona({ size = 16, className = '', title, insignia = f
   // suelta se comporta como un elemento normal y la coloca quien la use.
   const clases = ['corona-dibujo', insignia ? 'corona-patrocinador' : '', className]
     .filter(Boolean).join(' ');
-  const texto = title || window.t('Patrocinador de Odinote', 'Odinote supporter');
+  const texto = title || window.t('Patrocinador de Oddinote', 'Oddinote supporter');
   // Dos degradados con nombres distintos: si compartieran id, el primero que
   // se pintara mandaria sobre el otro y la corona apagada saldria dorada.
   const idTinta = apagada ? 'odi-corona-gris' : 'odi-corona-oro';
@@ -66,16 +66,23 @@ window.Corona = function Corona({ size = 16, className = '', title, insignia = f
 // de tres píxeles en una esquina no la ve nadie, y lo que se compra aquí es
 // precisamente que se vea. El brillo respira despacio en vez de parpadear —
 // un parpadeo en una barra de herramientas cansa a los diez minutos.
+//
+// Abre la ventana en los dos estados, y esto es lo importante: con la corona
+// encendida antes solo sacaba un aviso de agradecimiento y ahí se acababa. Un
+// botón que da las gracias y no hace nada más está roto — se pulsa una vez, se
+// lee el mensaje y no se vuelve a tocar, así que quien había pagado no llegaba
+// nunca al sitio donde se cambia el cursor, que es justo lo que había pagado.
+// Las gracias siguen estando, dentro de la ventana, que es donde no estorban.
 window.CoronaBoton = function CoronaBoton({ activo = false, onAbrir, size = 19 }) {
-  const gracias = window.t(
-    'Gracias por invitar a un café. Tus cosméticos de patrocinador están activos.',
-    'Thanks for the coffee. Your supporter cosmetics are active.'
+  const cosmeticos = window.t(
+    'Tus cosméticos de patrocinador: elige tu cursor',
+    'Your supporter cosmetics: choose your cursor'
   );
   const invita = window.t(
-    'Apoya Odinote y consigue la corona y el cursor dorado',
-    'Support Odinote and get the crown and the golden cursor'
+    'Apoya Oddinote y consigue la corona y el cursor dorado',
+    'Support Oddinote and get the crown and the golden cursor'
   );
-  const texto = activo ? gracias : invita;
+  const texto = activo ? cosmeticos : invita;
 
   return (
     <button
@@ -84,12 +91,9 @@ window.CoronaBoton = function CoronaBoton({ activo = false, onAbrir, size = 19 }
       aria-label={texto}
       onClick={() => {
         window.playAudioTone && window.playAudioTone('click');
-        if (activo) {
-          window.showToast && window.showToast('👑 ' + gracias);
-          return;
-        }
-        // Apagada, lleva a la ventana de perfil: ahí está tanto el enlace para
-        // apoyar como el panel para reclamar una donación ya hecha.
+        // Encendida lleva al taller —el cursor— y apagada a lo que se consigue
+        // y al panel para reclamar una donación ya hecha. Es la misma ventana:
+        // ella sabe cuál de las dos caras toca enseñar.
         onAbrir && onAbrir();
       }}
     >
@@ -104,20 +108,54 @@ window.CoronaBoton = function CoronaBoton({ activo = false, onAbrir, size = 19 }
 // es el de Google: un Hotmail de toda la vida, un Yahoo del instituto. Esa
 // persona ha pagado, no ve nada, y el programa no puede adivinarlo solo.
 //
-// Aquí lo demuestra con dos datos que solo tiene ella: con qué correo pagó y
-// cuánto. Va plegado porque a quien no le hace falta no debe estorbarle, y
-// quien lo necesita lo busca.
+// Aquí dice con qué correo pagó y el servidor mira si esa donación existe y
+// está sin reclamar. Va plegado porque a quien no le hace falta no debe
+// estorbarle, y quien lo necesita lo busca.
+//
+// ── Dos cosas que antes estaban mal ──
+//
+// No se enseña sin sesión de Google. El servidor exige un identificador
+// firmado por Google, así que sin sesión este panel solo servía para llevar a
+// alguien a un formulario que iba a rechazarle sin que hubiera hecho nada mal
+// —y encima con un mensaje sobre "verificar tu identidad" que no explicaba
+// qué hacer—. Si no hay sesión, aquí no hay nada: primero se entra.
+//
+// Y no se pide el importe. Se pedía como prueba de que la donación era tuya,
+// pero a los tres días nadie recuerda si fueron 3 o 5, el recibo se perdió, y
+// Ko-fi cobra en la moneda de quien paga. Esa prueba dejaba fuera sobre todo a
+// los donantes de verdad. Ahora basta el correo, y se comprueba solo en cuanto
+// está escrito: un botón más era un paso más para llegar al mismo sitio.
 window.PanelReclamo = function PanelReclamo({ onConcedida }) {
-  const { useState } = React;
+  const { useState, useEffect, useRef } = React;
+  const P = window.Patrocinio;
+
+  // ¿Hay sesión de Google? Se pregunta al montar y se sigue escuchando: quien
+  // entra con su cuenta teniendo esta ventana abierta ve aparecer el panel sin
+  // tener que cerrarla y volver.
+  const [haySesion, setHaySesion] = useState(() => !!(P && P.haySesion && P.haySesion()));
+  useEffect(() => {
+    if (!P || !P.vigilaSesion) return;
+    return P.vigilaSesion(setHaySesion);
+  }, []);
+
   const [abierto, setAbierto] = useState(false);
   const [correo, setCorreo] = useState('');
-  const [importe, setImporte] = useState('');
   const [esperando, setEsperando] = useState(false);
+  const [tardando, setTardando] = useState(false);
   const [aviso, setAviso] = useState(null);
 
+  // Lo que ya se preguntó, para no repetir la misma pregunta en cada tecla que
+  // se toca después. Y una petición en vuelo a la vez: como se dispara sola,
+  // sin esto un correo escrito despacio saldría tres veces.
+  const contestados = useRef({});
+  const enCurso = useRef(false);
+  const reloj = useRef(null);
+  const relojLento = useRef(null);
+
   // Un mensaje por cada motivo. El del servidor no distingue entre "no existe"
-  // y "el importe no cuadra" a propósito —decirlo sería una forma de averiguar
-  // quién ha donado—, así que aquí se explica lo que la persona puede hacer.
+  // y "ya es de otro" en todos los casos a propósito —decirlo sería una forma
+  // de averiguar quién ha donado—, así que aquí se explica lo que la persona
+  // puede hacer.
   const MENSAJES = {
     'ya-reclamado': window.t(
       'Esa donación ya está vinculada a otra cuenta.',
@@ -131,15 +169,18 @@ window.PanelReclamo = function PanelReclamo({ onConcedida }) {
     // Firebase, que es otra cosa, se ha perdido. Ahora se dice lo que pasa y
     // qué hacer.
     'sin-sesion': window.t(
-      'Odinote no consigue identificarte ante Google en este momento. Cierra sesión aquí abajo, vuelve a entrar y prueba otra vez.',
-      'Odinote cannot verify your Google identity right now. Sign out below, sign back in and try again.'),
+      'Oddinote no consigue identificarte ante Google en este momento. Cierra sesión aquí abajo, vuelve a entrar y prueba otra vez.',
+      'Oddinote cannot verify your Google identity right now. Sign out below, sign back in and try again.'),
     'correo-invalido': window.t('Ese correo no parece un correo.', 'That does not look like an email.'),
+    // Este no lo vería nunca quien usa el programa: sale solo si la función
+    // del servidor es anterior a la versión que dejó de pedir el importe. Se
+    // dice lo que pasa en vez de un 'algo falló' que no lleva a ninguna parte.
     'importe-invalido': window.t(
-      'Escribe cuánto donaste, por ejemplo 5 o 3.50.',
-      'Enter how much you donated, for example 5 or 3.50.'),
+      'El servidor todavía pide el importe. Falta desplegar la versión nueva de la función.',
+      'The server still asks for the amount. The new function version has not been deployed yet.'),
     'no-cuadra': window.t(
-      'No encontramos una donación con ese correo y ese importe. Revisa los dos. Si acabas de pagar, espera un minuto y vuelve a intentarlo.',
-      'We could not find a donation with that email and amount. Check both. If you just paid, wait a minute and try again.'),
+      'No encontramos ninguna donación con ese correo. Míralo otra vez. Si acabas de pagar, espera un minuto.',
+      'We could not find any donation with that email. Check it again. If you just paid, wait a minute.'),
     'demasiadas': window.t(
       'Demasiados intentos seguidos. Espera un minuto.',
       'Too many attempts in a row. Wait a minute.'),
@@ -147,20 +188,65 @@ window.PanelReclamo = function PanelReclamo({ onConcedida }) {
     'error': window.t('Algo falló. Inténtalo más tarde.', 'Something went wrong. Try again later.'),
   };
 
-  const enviar = () => {
-    if (esperando) return;
+  // Deliberadamente flojo: aquí no se valida el correo de nadie, solo se decide
+  // cuándo merece la pena preguntar al servidor. Quien escribe "ana@" todavía
+  // no ha terminado.
+  const pareceCorreo = (c) => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(String(c || '').trim());
+
+  const comprueba = (valor, insistiendo) => {
+    const c = String(valor || '').trim().toLowerCase();
+    if (!P || !pareceCorreo(c) || enCurso.current) return;
+    if (!insistiendo && contestados.current[c]) return;
+
+    contestados.current[c] = true;
+    enCurso.current = true;
     setEsperando(true);
     setAviso(null);
-    window.Patrocinio.reclama(correo, importe).then((r) => {
+    setTardando(false);
+
+    // El aviso de que está tardando. La espera puede irse a veinte segundos
+    // cuando la función del servidor lleva rato apagada y tiene que encenderse,
+    // y una pantalla quieta durante veinte segundos parece una pantalla rota.
+    clearTimeout(relojLento.current);
+    relojLento.current = setTimeout(() => setTardando(true), 6000);
+
+    P.reclama(c).then((r) => {
+      clearTimeout(relojLento.current);
+      enCurso.current = false;
       setEsperando(false);
+      setTardando(false);
       if (r.ok) {
         setAviso({ bien: true, texto: window.t('¡Listo! Tu corona ya está activa.', 'Done! Your crown is active.') });
         onConcedida && onConcedida();
         return;
       }
-      setAviso({ bien: false, texto: MENSAJES[r.motivo] || MENSAJES.error });
+      setAviso({
+        bien: false,
+        texto: MENSAJES[r.motivo] || MENSAJES.error,
+        // Volver a preguntar solo tiene sentido cuando la respuesta puede
+        // cambiar: la donación que aún no ha llegado, la red que falló. Que
+        // una donación sea de otro no va a cambiar por insistir.
+        seArregla: r.motivo === 'no-cuadra' || r.motivo === 'sin-conexion' ||
+                   r.motivo === 'demasiadas' || r.motivo === 'error',
+      });
     });
   };
+
+  // Se comprueba solo, poco después de dejar de escribir. Novecientos
+  // milisegundos: menos y salta a mitad de un correo escrito despacio, más y
+  // parece que no hace nada.
+  useEffect(() => {
+    clearTimeout(reloj.current);
+    const c = correo.trim().toLowerCase();
+    if (!abierto || !pareceCorreo(c) || contestados.current[c]) return;
+    reloj.current = setTimeout(() => comprueba(c), 900);
+    return () => clearTimeout(reloj.current);
+  }, [correo, abierto]);
+
+  useEffect(() => () => { clearTimeout(reloj.current); clearTimeout(relojLento.current); }, []);
+
+  // Sin sesión de Google no hay panel. Ver el comentario de arriba.
+  if (!haySesion) return null;
 
   if (!abierto) {
     return (
@@ -194,28 +280,35 @@ window.PanelReclamo = function PanelReclamo({ onConcedida }) {
     }}>
       <div style={{ fontSize: '12.5px', color: 'var(--ink-3, #595459)', lineHeight: 1.45 }}>
         {window.t(
-          'Si pagaste con un correo distinto al de tu Google, dinos cuál y cuánto donaste. Es la forma de comprobar que esa donación es tuya.',
-          'If you paid with an email other than your Google one, tell us which and how much you donated. That is how we check the donation is yours.')}
+          'Si pagaste con un correo distinto al de tu Google, escríbelo aquí. Se comprueba solo.',
+          'If you paid with an email other than your Google one, type it here. It checks itself.')}
       </div>
 
       <input
         type="email"
         value={correo}
-        onChange={(e) => setCorreo(e.target.value)}
+        autoFocus
+        onChange={(e) => { setCorreo(e.target.value); setAviso(null); }}
+        onKeyDown={(e) => { if (e.key === 'Enter') { clearTimeout(reloj.current); comprueba(correo, true); } }}
         placeholder={window.t('Correo con el que pagaste', 'Email you paid with')}
         style={campo}
       />
-      <input
-        type="text"
-        inputMode="decimal"
-        value={importe}
-        onChange={(e) => setImporte(e.target.value)}
-        onKeyDown={(e) => { if (e.key === 'Enter') enviar(); }}
-        placeholder={window.t('Cuánto donaste (por ejemplo 5)', 'How much you donated (e.g. 5)')}
-        style={campo}
-      />
 
-      {aviso && (
+      {esperando && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: '8px',
+          fontSize: '12.5px', color: 'var(--ink-3, #595459)', lineHeight: 1.45,
+        }}>
+          <span className="material-symbols-rounded corona-girando" style={{ fontSize: 16 }}>progress_activity</span>
+          <span>
+            {tardando
+              ? window.t('Está tardando más de lo normal. Sigue en marcha.', 'This is taking longer than usual. Still going.')
+              : window.t('Comprobando…', 'Checking…')}
+          </span>
+        </div>
+      )}
+
+      {!esperando && aviso && (
         <div style={{
           fontSize: '12.5px', lineHeight: 1.45, padding: '8px 10px', borderRadius: '6px',
           color: 'var(--ink, #1A1A1A)',
@@ -223,21 +316,19 @@ window.PanelReclamo = function PanelReclamo({ onConcedida }) {
           border: '1.5px solid ' + (aviso.bien ? 'var(--brand-green, #90B968)' : 'var(--wine, #E6544F)'),
         }}>
           {aviso.texto}
+          {aviso.seArregla && (
+            <button
+              onClick={() => comprueba(correo, true)}
+              style={{
+                display: 'block', marginTop: '6px', padding: 0, border: 'none', background: 'none',
+                color: 'var(--olive, #6A8546)', fontWeight: 700, fontSize: '12.5px', cursor: 'pointer',
+              }}
+            >
+              {window.t('Probar otra vez', 'Try again')}
+            </button>
+          )}
         </div>
       )}
-
-      <button
-        className="btn lift"
-        onClick={enviar}
-        disabled={esperando}
-        style={{
-          padding: '9px 14px', borderRadius: '6px', border: 'none', cursor: 'pointer',
-          background: 'var(--olive, #6A8546)', color: '#FFF', fontWeight: 700, fontSize: '13px',
-          opacity: esperando ? 0.6 : 1,
-        }}
-      >
-        {esperando ? window.t('Comprobando…', 'Checking…') : window.t('Vincular mi donación', 'Link my donation')}
-      </button>
     </div>
   );
 };
@@ -253,11 +344,17 @@ window.PanelReclamo = function PanelReclamo({ onConcedida }) {
 // taller: aquí se cambia el cursor, que es lo que de verdad hace que el programa
 // se parezca un poco a ti.
 window.VentanaCorona = function VentanaCorona({ esPatrocinador, onCerrar, onConcedida }) {
-  const { useState, useEffect } = React;
+  const { useState, useEffect, useRef } = React;
   const C = window.CursorOdinote;
 
   const [cfg, setCfg] = useState(() => (C && C.lee()) || { modo: 'color', color: '#E0A82E', imagen: null });
   const [aviso, setAviso] = useState(null);
+  // Si hay algo guardado, "El de siempre" tiene trabajo; si no, no lo tiene y
+  // se apaga. Un botón que no puede hacer nada y aun así se deja pulsar es la
+  // forma más rápida de que alguien crea que la aplicación no le responde.
+  const [hayGuardado, setHayGuardado] = useState(() => !!(C && C.lee()));
+  // El acuse de recibo del botón de guardar, que dura lo que dura la lectura.
+  const [recienGuardado, setRecienGuardado] = useState(false);
 
   // Se va aplicando mientras se toca, no al guardar. Un cursor no se puede
   // elegir a ciegas: hay que verlo moverse para saber si estorba.
@@ -266,10 +363,25 @@ window.VentanaCorona = function VentanaCorona({ esPatrocinador, onCerrar, onConc
     C.aplica(cfg);
   }, [cfg, esPatrocinador]);
 
+  // Y al cerrar manda lo que hay guardado, no lo que se estuvo probando. Sin
+  // esto, quien paseaba por la rueda de color y cerraba sin guardar se quedaba
+  // con el último tono que rozó el ratón hasta reiniciar la aplicación, sin
+  // haber dicho que sí en ningún momento.
+  const esPatro = useRef(esPatrocinador);
+  esPatro.current = esPatrocinador;
+  useEffect(() => () => {
+    if (!C) return;
+    C.aplica(esPatro.current ? C.lee() : null);
+  }, []);
+
+  // El acuse va en el propio botón y no en un aviso debajo: la mano está en el
+  // botón y la mirada también, así que es ahí donde hay que contestar.
   const guardar = () => {
     C && C.guarda(cfg);
-    setAviso(window.t('Guardado.', 'Saved.'));
-    setTimeout(() => setAviso(null), 2200);
+    setHayGuardado(true);
+    setRecienGuardado(true);
+    window.playAudioTone && window.playAudioTone('click');
+    setTimeout(() => setRecienGuardado(false), 1800);
   };
 
   const restablecer = () => {
@@ -277,6 +389,8 @@ window.VentanaCorona = function VentanaCorona({ esPatrocinador, onCerrar, onConc
     setCfg(limpio);
     C && C.guarda(null);
     C && C.aplica(null);
+    setHayGuardado(false);
+    window.playAudioTone && window.playAudioTone('click');
     setAviso(window.t('Cursor de siempre restablecido.', 'Default cursor restored.'));
     setTimeout(() => setAviso(null), 2200);
   };
@@ -292,17 +406,6 @@ window.VentanaCorona = function VentanaCorona({ esPatrocinador, onCerrar, onConc
         'That file could not be used. Try a PNG or a JPG.')));
   };
 
-  const pestana = (activa) => ({
-    flex: 1, padding: '8px 10px', borderRadius: '7px', fontSize: '12.5px', fontWeight: 600,
-    cursor: 'pointer', border: '1.5px solid ' + (activa ? 'var(--olive, #6A8546)' : 'var(--line-soft, #E5E1DD)'),
-    background: activa ? 'rgba(106, 133, 70, 0.12)' : 'transparent',
-    color: 'var(--ink, #1A1A1A)',
-  });
-
-  const cursorDePrueba = C
-    ? 'url("' + C.urlDe(cfg) + '") ' + (cfg.modo === 'imagen' ? '20 20' : '4 4') + ', auto'
-    : 'auto';
-
   return (
     <div
       className="modal-backdrop"
@@ -312,22 +415,14 @@ window.VentanaCorona = function VentanaCorona({ esPatrocinador, onCerrar, onConc
         background: 'rgba(0,0,0,0.45)', padding: '20px',
       }}
     >
-      <div
-        style={{
-          width: 'min(420px, 100%)', maxHeight: '86vh', overflowY: 'auto',
-          background: 'var(--bg-card, #FFF)', color: 'var(--ink, #1A1A1A)',
-          border: '1.5px solid var(--line, #595459)', borderRadius: '14px',
-          boxShadow: '0 20px 60px rgba(0,0,0,0.35)', padding: '20px',
-          display: 'flex', flexDirection: 'column', gap: '16px',
-        }}
-      >
+      <div className="corona-taller">
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <window.Corona size={30} apagada={!esPatrocinador} title="" />
+          <window.Corona size={34} apagada={!esPatrocinador} title="" />
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontWeight: 700, fontSize: '16px', lineHeight: 1.2 }}>
               {esPatrocinador
                 ? window.t('Tus cosméticos', 'Your cosmetics')
-                : window.t('Apoya Odinote', 'Support Odinote')}
+                : window.t('Apoya Oddinote', 'Support Oddinote')}
             </div>
             <div style={{ fontSize: '12px', color: 'var(--ink-3, #595459)', marginTop: '2px' }}>
               {esPatrocinador
@@ -336,7 +431,7 @@ window.VentanaCorona = function VentanaCorona({ esPatrocinador, onCerrar, onConc
             </div>
           </div>
           <button
-            className="icon-btn"
+            className="icon-btn lift"
             onClick={onCerrar}
             title={window.t('Cerrar', 'Close')}
             style={{ width: '32px', height: '32px', flexShrink: 0 }}
@@ -345,18 +440,26 @@ window.VentanaCorona = function VentanaCorona({ esPatrocinador, onCerrar, onConc
           </button>
         </div>
 
+        <hr className="corona-hilo" />
+
         {esPatrocinador ? (
           <>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              <div style={{ fontWeight: 600, fontSize: '13px' }}>
+              <div className="corona-rotulo">
                 {window.t('Tu cursor', 'Your cursor')}
               </div>
 
               <div style={{ display: 'flex', gap: '8px' }}>
-                <button style={pestana(cfg.modo === 'color')} onClick={() => setCfg({ ...cfg, modo: 'color' })}>
+                <button
+                  className={'corona-pestana' + (cfg.modo === 'color' ? ' activa' : '')}
+                  onClick={() => setCfg({ ...cfg, modo: 'color' })}
+                >
                   {window.t('Un color', 'A colour')}
                 </button>
-                <button style={pestana(cfg.modo === 'imagen')} onClick={() => setCfg({ ...cfg, modo: 'imagen' })}>
+                <button
+                  className={'corona-pestana' + (cfg.modo === 'imagen' ? ' activa' : '')}
+                  onClick={() => setCfg({ ...cfg, modo: 'imagen' })}
+                >
                   {window.t('Una imagen', 'An image')}
                 </button>
               </div>
@@ -364,18 +467,15 @@ window.VentanaCorona = function VentanaCorona({ esPatrocinador, onCerrar, onConc
               {cfg.modo === 'color' ? (
                 <window.SelectorColor
                   valor={cfg.color || '#E0A82E'}
+                  colores={window.COLORES_ODINOTE_CURSOR}
+                  compacto
+                  acento="linear-gradient(180deg, #F6D65C 0%, #E0A82E 55%, #C1841B 100%)"
+                  acentoTexto="#3E2C05"
                   onCambio={(c) => setCfg({ ...cfg, color: c })}
                 />
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  <label
-                    className="btn lift"
-                    style={{
-                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '7px',
-                      padding: '10px', borderRadius: '8px', cursor: 'pointer', fontSize: '12.5px',
-                      border: '1.5px dashed var(--line-soft, #E5E1DD)', fontWeight: 600,
-                    }}
-                  >
+                  <label className="corona-imagen">
                     <span className="material-symbols-rounded" style={{ fontSize: 18 }}>add_photo_alternate</span>
                     {cfg.imagen ? window.t('Cambiar la imagen', 'Change the image') : window.t('Elegir una imagen', 'Choose an image')}
                     <input type="file" accept="image/*" onChange={subirImagen} style={{ display: 'none' }} />
@@ -388,17 +488,10 @@ window.VentanaCorona = function VentanaCorona({ esPatrocinador, onCerrar, onConc
                 </div>
               )}
 
-              {/* La prueba. Sin un sitio donde moverlo no hay forma de saber si
-                  el cursor elegido estorba o se pierde sobre el fondo. */}
-              <div
-                style={{
-                  border: '1.5px dashed var(--line-soft, #E5E1DD)', borderRadius: '9px',
-                  padding: '20px 12px', textAlign: 'center', fontSize: '12px',
-                  color: 'var(--ink-3, #595459)', cursor: cursorDePrueba,
-                }}
-              >
-                {window.t('Mueve el ratón por aquí para probarlo', 'Move the mouse here to try it')}
-              </div>
+              {/* Aquí había una zona para "probar" el cursor. No servía de nada:
+                  el cursor elegido se aplica a la ventana entera en cuanto se
+                  toca, así que ya se está probando en todas partes. Un recuadro
+                  que pide hacer lo que ya estás haciendo solo ocupa sitio. */}
             </div>
 
             {aviso && (
@@ -411,24 +504,24 @@ window.VentanaCorona = function VentanaCorona({ esPatrocinador, onCerrar, onConc
 
             <div style={{ display: 'flex', gap: '8px' }}>
               <button
-                className="btn lift"
+                className={'corona-guardar' + (recienGuardado ? ' hecho' : '')}
                 onClick={guardar}
-                style={{
-                  flex: 1, padding: '10px', borderRadius: '8px', border: 'none', cursor: 'pointer',
-                  background: 'var(--olive, #6A8546)', color: '#FFF', fontWeight: 700, fontSize: '13px',
-                }}
+                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '7px' }}
               >
-                {window.t('Guardar', 'Save')}
+                {recienGuardado && (
+                  <span className="material-symbols-rounded" style={{ fontSize: 18 }}>check_circle</span>
+                )}
+                {recienGuardado ? window.t('Guardado', 'Saved') : window.t('Guardar', 'Save')}
               </button>
               <button
-                className="btn lift"
+                className="corona-normal"
                 onClick={restablecer}
-                style={{
-                  padding: '10px 14px', borderRadius: '8px', cursor: 'pointer', fontSize: '12.5px',
-                  border: '1.5px solid var(--line-soft, #E5E1DD)', background: 'transparent',
-                  color: 'var(--ink-3, #595459)',
-                }}
+                disabled={!hayGuardado}
+                title={hayGuardado
+                  ? window.t('Volver al cursor de siempre', 'Back to the usual cursor')
+                  : window.t('Ya llevas el cursor de siempre', 'You already have the usual cursor')}
               >
+                <span className="material-symbols-rounded" style={{ fontSize: 17 }}>undo</span>
                 {window.t('El de siempre', 'Default one')}
               </button>
             </div>
@@ -453,8 +546,8 @@ window.VentanaCorona = function VentanaCorona({ esPatrocinador, onCerrar, onConc
               ))}
               <div style={{ fontSize: '11.5px', color: 'var(--ink-3, #595459)', lineHeight: 1.45, marginTop: '2px' }}>
                 {window.t(
-                  'Nada de Odinote está detrás de esto: la aplicación entera es gratis y lo seguirá siendo. Esto son adornos.',
-                  'None of Odinote is behind this: the whole app is free and will stay that way. These are ornaments.')}
+                  'Nada de Oddinote está detrás de esto: la aplicación entera es gratis y lo seguirá siendo. Esto son adornos.',
+                  'None of Oddinote is behind this: the whole app is free and will stay that way. These are ornaments.')}
               </div>
             </div>
 

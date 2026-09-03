@@ -70,6 +70,29 @@
     }
   }
 
+  // ¿Hay una sesión de Google de verdad, con correo y todo?
+  //
+  // Lo pregunta el panel de reclamar para no enseñarse antes de tiempo. Sin
+  // sesión, ese panel no puede funcionar —el servidor exige un identificador
+  // firmado por Google— y lo único que conseguía era llevarse a alguien a un
+  // formulario que iba a rechazarle sin que él hubiera hecho nada mal.
+  //
+  // Una sesión anónima no cuenta: es la que usa la aplicación para el trabajo
+  // en la nube de quien no ha entrado con su cuenta, y no lleva correo.
+  function haySesion() {
+    var auth = sesion();
+    var usuario = auth && auth.currentUser;
+    return !!(usuario && !usuario.isAnonymous && usuario.email);
+  }
+
+  // Avisa cada vez que eso cambia. Devuelve la función de soltar, o una vacía
+  // si aquí no hay Firebase (la web sin configurar, las pruebas).
+  function vigilaSesion(alCambiar) {
+    var auth = sesion();
+    if (!auth || typeof auth.onAuthStateChanged !== 'function') return function () {};
+    return auth.onAuthStateChanged(function () { alCambiar(haySesion()); });
+  }
+
   function leeCache() {
     var caja = almacen();
     if (!caja) return null;
@@ -223,22 +246,32 @@
   // una sesión de Google firmada, que desde el navegador no se puede falsificar.
   var URL_RECLAMO = 'https://us-central1-odinote-firebase.cloudfunctions.net/reclamarPatrocinio';
 
-  function reclama(correo, importe) {
+  function reclama(correo) {
     var auth = sesion();
     var usuario = auth && auth.currentUser;
     if (!usuario || usuario.isAnonymous) {
       return Promise.resolve({ ok: false, motivo: 'sin-sesion' });
     }
 
+    // Los tiempos de cada tramo van al registro, y no es curiosidad: esta
+    // espera se ha sentido de veinte y treinta segundos, y con un solo número
+    // al final no hay forma de saber si se fue en renovar el identificador de
+    // Google, en el viaje, o en que la función estaba apagada y tuvo que
+    // encenderse. En el programa de escritorio la consola acaba en
+    // %APPDATA%\Odinote\odinote-debug.log, así que queda escrito.
+    var t0 = Date.now();
+    var tToken = t0;
+
     return usuario.getIdToken()
       .then(function (token) {
+        tToken = Date.now();
         return fetch(URL_RECLAMO, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'Authorization': 'Bearer ' + token,
           },
-          body: JSON.stringify({ correo: correo, importe: importe }),
+          body: JSON.stringify({ correo: correo }),
         });
       })
       .then(function (respuesta) {
@@ -252,6 +285,9 @@
           });
       })
       .then(function (resultado) {
+        var fin = Date.now();
+        console.log('[Patrocinio] Reclamación: identificador de Google ' + (tToken - t0) +
+          ' ms, servidor ' + (fin - tToken) + ' ms, total ' + (fin - t0) + ' ms.');
         // Si salió bien se tira el recuerdo entero. La siguiente consulta va a
         // Firestore de verdad y encuentra la corona recién concedida, en vez de
         // contestar con el "no" que había guardado hace un momento.
@@ -259,6 +295,7 @@
         return resultado;
       })
       .catch(function () {
+        console.warn('[Patrocinio] La reclamación no llegó a contestar tras ' + (Date.now() - t0) + ' ms.');
         return { ok: false, motivo: 'sin-conexion' };
       });
   }
@@ -266,6 +303,8 @@
   var Patrocinio = {
     CLAVE: CLAVE,
     reclama: reclama,
+    haySesion: haySesion,
+    vigilaSesion: vigilaSesion,
     VIGENCIA_SI: VIGENCIA_SI,
     VIGENCIA_NO: VIGENCIA_NO,
     activo: activo,

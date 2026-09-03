@@ -7,19 +7,24 @@
 //
 // El problema que resuelve: alguien dona en Ko-fi con su correo de Hotmail y
 // luego entra en Odinote con su Google. Son dos correos distintos, así que la
-// corona no le llega. Para arreglarlo tiene que poder demostrar que esa
-// donación es suya, y lo hace diciendo dos cosas que solo sabe él: con qué
-// correo pagó y cuánto pagó.
+// corona no le llega. Para arreglarlo dice con qué correo pagó, y se le apunta
+// también el de Google.
 //
-// Por qué el importe y no solo el correo: el correo de alguien se puede saber.
-// Que además donó, y cuánto exactamente, ya no. Y como cada donación solo se
-// puede reclamar una vez, el que llegue después se encuentra la puerta
-// cerrada.
+// ── Por qué ya no se pide el importe ──
 //
-// Hasta dónde llega esto, dicho claro: quien conozca el correo de un donante Y
-// acierte el importe puede quedarse con su corona. No es un candado
-// criptográfico y no pretende serlo — al otro lado hay un adorno, no una
-// función de pago. Lo que sí evita es que alguien se pasee reclamando a ciegas.
+// Se pedía como prueba: el correo de alguien se puede saber, cuánto donó no.
+// Pero esa prueba se la comían los propios donantes. A los tres días nadie
+// recuerda si fueron 3 o 5, el recibo se borró con la promoción de la semana, y
+// Ko-fi cobra en la moneda de quien paga, así que ni el número que uno recuerda
+// tiene por qué ser el que quedó guardado. El resultado era una puerta que
+// dejaba fuera sobre todo a quien tenía derecho a pasar, que es justo el único
+// que iba a llamar a ella.
+//
+// Hasta dónde llega esto, dicho claro: quien sepa con qué correo donó otra
+// persona puede quedarse con su corona si llega antes que ella. No es un
+// candado criptográfico y no pretende serlo — al otro lado hay un adorno, no
+// una función de pago. Lo que sigue en pie es que cada donación se reclama una
+// sola vez: el segundo que llegue se encuentra la puerta cerrada.
 // =====================================================
 
 (function () {
@@ -71,7 +76,7 @@
   // Devuelve siempre un motivo, porque el de arriba necesita saber qué
   // decirle a la persona: no es lo mismo "no encuentro esa donación" que
   // "esa donación ya la reclamó alguien".
-  function evalua(ficha, correoPedido, importePedido, correoDeSesion) {
+  function evalua(ficha, correoPedido, correoDeSesion) {
     var correo = normalizaCorreo(correoPedido);
     if (!correo) return { ok: false, motivo: 'correo-invalido' };
 
@@ -82,19 +87,12 @@
     // donación existiera, ya tendrías la corona sin hacer nada.
     if (correo === mio) return { ok: false, motivo: 'es-el-mismo' };
 
-    var importe = normalizaImporte(importePedido);
-    if (importe === null) return { ok: false, motivo: 'importe-invalido' };
-
     if (!ficha) return { ok: false, motivo: 'no-existe' };
     if (ficha.reclamadoPor) return { ok: false, motivo: 'ya-reclamado' };
 
-    // Donaciones apuntadas antes de que se guardara el importe. No se pueden
-    // comprobar, así que se mandan a la vía manual en vez de dejarlas pasar.
-    var guardado = normalizaImporte(ficha.importe);
-    if (guardado === null) return { ok: false, motivo: 'sin-importe' };
-
-    if (guardado !== importe) return { ok: false, motivo: 'importe-no-cuadra' };
-
+    // Las donaciones viejas, apuntadas antes de que se guardara el importe,
+    // ahora también valen. Antes se quedaban fuera por un dato que no era
+    // culpa de quien pagó.
     return { ok: true, motivo: 'vale', correo: correo, mio: mio };
   }
 

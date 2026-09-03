@@ -47,7 +47,7 @@ try {
 
 // Marcador de build: si la consola no muestra esta versión, el navegador está
 // sirviendo JS cacheado (subir ?v= en index.html invalida la caché)
-window.ODINOTE_BUILD = '1.0.8-157';
+window.ODINOTE_BUILD = '1.0.8-167';
 console.log('[ODINOTE] Código cargado: ' + window.ODINOTE_BUILD);
 
 // Global shortcuts configuration
@@ -296,6 +296,15 @@ function App() {
   };
   window.showToast = showToast;
 
+  // La corona cuelga de la cuenta: sin sesión de Google no hay a quién darle
+  // los cosméticos, ni forma de comprobar una donación. Así que sin sesión el
+  // botón no lleva a la ventana de la corona —donde solo se podría mirar— sino
+  // a la de entrar, que es el paso que de verdad falta.
+  const abreLaCorona = () => {
+    if (!userProfile) { setUserModalOpen(true); return; }
+    setCoronaOpen(true);
+  };
+
   // ── La corona de quien ha invitado a un café ──
   //
   // Se espera a `onAuthStateChanged` en vez de consultar directamente porque
@@ -504,8 +513,8 @@ function App() {
       window._odiEsperaLogin = setTimeout(() => {
         setWaitingForWebLogin(false);
         setLoginError(window.t(
-          'Google no respondió. Si en el navegador viste "Se ha producido un error", el problema está en la configuración del proyecto de Google Cloud, no en Odinote: revisa la pantalla de consentimiento de OAuth. Prueba también en una ventana de incógnito.',
-          'Google never answered. If the browser showed "Something went wrong", the problem is in the Google Cloud project setup, not in Odinote: check the OAuth consent screen. Try an incognito window too.'
+          'Google no respondió. Si en el navegador viste "Se ha producido un error", el problema está en la configuración del proyecto de Google Cloud, no en Oddinote: revisa la pantalla de consentimiento de OAuth. Prueba también en una ventana de incógnito.',
+          'Google never answered. If the browser showed "Something went wrong", the problem is in the Google Cloud project setup, not in Oddinote: check the OAuth consent screen. Try an incognito window too.'
         ));
       }, 120000);
       window.electronAPI.startGoogleLogin()
@@ -1361,6 +1370,22 @@ function App() {
     window.__hideSplash && window.__hideSplash();
   }, []);
 
+  // ── La carpeta de cada proyecto dentro de la bóveda ──
+  //
+  // Se calcula del nombre del proyecto (ver boveda.js), y sin pasarle el idioma
+  // a propósito: si dependiera del idioma de la interfaz, cambiar la aplicación
+  // a inglés renombraría las carpetas de todo el mundo.
+  const carpetasProyecto = React.useMemo(
+    () => (window.Boveda ? window.Boveda.carpetasDeProyectos(projects) : {}),
+    [projects]
+  );
+
+  // Y cuál es la del proyecto abierto, para que sus imágenes se busquen dentro
+  // de ella. Va en window porque lo pregunta cada nodo al pintarse.
+  React.useEffect(() => {
+    window.odiCarpetaProyecto = (view && view.projectId && carpetasProyecto[view.projectId]) || null;
+  }, [view && view.projectId, carpetasProyecto]);
+
   const savingMediaRef = React.useRef(new Set());
 
   const saveBase64MediaLocally = async (currentCanvases, activeVaultPath) => {
@@ -1369,6 +1394,20 @@ function App() {
     let changed = false;
     const nextCanvases = JSON.parse(JSON.stringify(currentCanvases));
     const saves = [];
+
+    // De qué proyecto es cada lienzo, para que su imagen caiga en la carpeta
+    // correcta. Un tablero anidado cuenta como del proyecto que lo contiene.
+    const carpetaPorCanvas = {};
+    try {
+      const reparte = window.OdiDrive && window.OdiDrive.collectProjectCanvases;
+      (projects || []).forEach(p => {
+        if (!p || !p.id || !reparte) return;
+        const suyos = reparte(currentCanvases, p.id) || {};
+        Object.keys(suyos).forEach(cid => { carpetaPorCanvas[cid] = carpetasProyecto[p.id] || null; });
+      });
+    } catch (err) {
+      console.warn('[Oddinote] no se pudo repartir los lienzos por proyecto:', err);
+    }
 
     for (const [cid, canvas] of Object.entries(nextCanvases)) {
       if (!canvas.items) continue;
@@ -1385,9 +1424,13 @@ function App() {
           
           saves.push((async () => {
             try {
-              const relativePath = await window.electronAPI.saveMedia(activeVaultPath, rawName, item.src);
-              const normalizedRelative = relativePath.replace(/\\/g, '/');
-              const absolutePath = `file:///${activeVaultPath.replace(/\\/g, '/')}/${normalizedRelative}`;
+              const carpeta = carpetaPorCanvas[cid] || null;
+              const relativePath = await window.electronAPI.saveMedia(activeVaultPath, rawName, item.src, carpeta);
+              // Se guarda RELATIVO ('media/foto.png'), no absoluto. Así la bóveda
+              // se puede mover de disco y un proyecto se puede renombrar —su
+              // carpeta se mueve entera— sin reescribir una sola nota. Quien lo
+              // pinta le pone delante la carpeta del proyecto.
+              const absolutePath = relativePath.replace(/\\/g, '/');
               
               item.src = absolutePath;
               
@@ -1770,7 +1813,7 @@ function App() {
       try {
         if (vaultPath && window.electronAPI) {
           const cleanCanvases = await saveBase64MediaLocally(canvases, vaultPath);
-          window.electronAPI.writeVault(vaultPath, { view, lang, theme, projects, canvases: cleanCanvases, templatesVersion: 2 });
+          window.electronAPI.writeVault(vaultPath, { view, lang, theme, projects, canvases: cleanCanvases, templatesVersion: 2 }, carpetasProyecto);
         } else {
           saveStateToDB({ view, lang, theme, projects, canvases, templatesVersion: 2 });
         }
@@ -1977,7 +2020,7 @@ function App() {
     if (loading) return;
     const flush = () => {
       if (vaultPath && window.electronAPI) {
-        window.electronAPI.writeVault(vaultPath, { view, lang, theme, projects, canvases, templatesVersion: 2 });
+        window.electronAPI.writeVault(vaultPath, { view, lang, theme, projects, canvases, templatesVersion: 2 }, carpetasProyecto);
       } else {
         saveStateToDB({ view, lang, theme, projects, canvases, templatesVersion: 2 });
       }
@@ -2571,7 +2614,7 @@ function App() {
           const parsed = JSON.parse(reader.result);
           const state = parsed.state || parsed;
           if (!state.projects || !state.canvases) {
-            alert(window.t('Este archivo no parece ser un respaldo valido de Odinote.', 'This file does not look like a valid Odinote backup.'));
+            alert(window.t('Este archivo no parece ser un respaldo valido de Oddinote.', 'This file does not look like a valid Oddinote backup.'));
             return;
           }
           // FUSIONAR, no reemplazar: un respaldo importado solía borrar TODOS los
@@ -2717,7 +2760,7 @@ function App() {
       onSettingsClick={() => setSettingsOpen(true)}
       userProfile={userProfile}
       esPatrocinador={esPatrocinador}
-      onAbrirCorona={() => setCoronaOpen(true)}
+      onAbrirCorona={abreLaCorona}
       onUserClick={() => setUserModalOpen(true)}
       onJoinProjectClick={() => setJoiningModalOpen(true)}
       onTogglePublic={togglePublicProject}
@@ -2760,7 +2803,7 @@ function App() {
       vaultPath={vaultPath}
       userProfile={userProfile}
       esPatrocinador={esPatrocinador}
-      onAbrirCorona={() => setCoronaOpen(true)}
+      onAbrirCorona={abreLaCorona}
       onUserClick={() => setUserModalOpen(true)}
       projects={projects}
       setProjects={setProjects}
@@ -2930,7 +2973,7 @@ function App() {
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--wine, #7B2D26)' }}>
                 <span className="material-symbols-rounded" style={{ fontSize: '24px' }}>settings</span>
                 <span style={{ fontWeight: '700', fontSize: '18px' }}>
-                  {window.t('Ajustes de Odinote', 'Odinote Settings')}
+                  {window.t('Ajustes de Oddinote', 'Oddinote Settings')}
                 </span>
                 {/* En el móvil no hay consola: sin esto es imposible saber si el
                     navegador está sirviendo el código nuevo o una copia vieja de
@@ -3371,32 +3414,17 @@ function App() {
                       <span>{window.t('Iniciar sesión con Google', 'Sign in with Google')}</span>
                     </button>
 
-                    {/* La salida, aquí mismo. Quien llega a esta ventana desde
-                        un celular por la dirección de red se encuentra con que
-                        Google no le deja pasar — y lo que quería hacer, entrar
-                        al lienzo de alguien, no necesitaba a Google para nada.
-                        Antes tenía que cerrar, buscar otro botón y adivinarlo. */}
-                    <button
-                      className="btn lift"
-                      onClick={() => {
-                        setUserModalOpen(false);
-                        setLoginError(null);
-                        setSalaError(null);
-                        setJoiningModalOpen(true);
-                        window.playAudioTone && window.playAudioTone('click');
-                      }}
-                      style={{
-                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
-                        padding: '11px', borderRadius: '8px',
-                        border: '1.5px solid var(--line, #595459)',
-                        background: 'var(--olive, #6A8546)', color: '#FFFFFF',
-                        fontWeight: '700', fontSize: '13px', cursor: 'pointer',
-                        boxShadow: 'var(--pop-sm)',
-                      }}
-                    >
-                      <span className="material-symbols-rounded" style={{ fontSize: 18 }}>sensors</span>
-                      <span>{window.t('Unirme a una sesión con un código', 'Join a session with a code')}</span>
-                    </button>
+                    {/* Aquí estaba también "Unirme a una sesión con un código".
+                        Se puso pensando en quien abre la aplicación desde el
+                        móvil, se encuentra con que Google no le deja pasar y lo
+                        único que quería era entrar al lienzo de alguien. Pero
+                        ese botón ya está fuera, en la barra de arriba, y ahí
+                        sigue estando en el móvil —solo pierde el rótulo y se
+                        queda el icono, ver .ms-join-top en styles.css—. Dos
+                        botones iguales, uno encima del otro, no dan dos
+                        caminos: dan la duda de si llevan al mismo sitio. El
+                        párrafo de arriba ya explica que para trabajar en vivo
+                        no hace falta cuenta. */}
                   </>
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', alignItems: 'center', textAlign: 'center', padding: '10px 0' }}>
@@ -3487,11 +3515,11 @@ function App() {
                   </div>
                 )}
 
-                {/* Solo para quien todavia no tiene corona: al que ya la tiene
-                    no hay nada que preguntarle. */}
-                {!esPatrocinador && (
-                  <window.PanelReclamo onConcedida={() => setEsPatrocinador(true)} />
-                )}
+                {/* Aqui estaba tambien el panel de reclamar una donacion, y
+                    salia dos veces: una aqui y otra en la ventana de la
+                    corona. Dos formularios iguales en dos sitios distintos no
+                    dan mas oportunidades de encontrarlo, dan la duda de si son
+                    lo mismo. Se queda donde vive la corona. */}
 
                 <div style={{ borderTop: '1px solid var(--line-soft, #E5E1DD)', paddingTop: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <button
@@ -3968,7 +3996,7 @@ function App() {
                   {/* ── Sincronización instantánea ──
                       Apagada de fábrica y a propósito. Con ella, el texto y las
                       posiciones de las notas se guardan en el servidor de
-                      Odinote para que los cambios lleguen al instante sin que
+                      Oddinote para que los cambios lleguen al instante sin que
                       nadie tenga que estar de anfitrión. Quien no la encienda
                       no manda ni un byte de contenido a ningún servidor, y por
                       eso lo que dice el interruptor está escrito sin rodeos:
@@ -4000,8 +4028,8 @@ function App() {
                             return;
                           }
                           window.customConfirm(window.t(
-                            '¿Encender la sincronización instantánea para este proyecto?\n\n· El TEXTO de las notas y dónde está cada una se guardan en el servidor de Odinote, no solo en tu Drive. Es lo que permite que los cambios lleguen al instante.\n· Las imágenes y los audios NO: esos siguen en tu Google Drive.\n· Solo pueden verlo las cuentas a las que ya compartiste el proyecto.\n· Puedes apagarla cuando quieras.\n\nEl resto de tus proyectos no se ven afectados.',
-                            'Turn on instant sync for this project?\n\n· The TEXT of the notes and where each one sits are stored on Odinote\'s server, not only in your Drive. That is what makes changes arrive at once.\n· Images and audio are NOT: those stay in your Google Drive.\n· Only the accounts you already shared the project with can see it.\n· You can turn it off whenever you like.\n\nYour other projects are not affected.'
+                            '¿Encender la sincronización instantánea para este proyecto?\n\n· El TEXTO de las notas y dónde está cada una se guardan en el servidor de Oddinote, no solo en tu Drive. Es lo que permite que los cambios lleguen al instante.\n· Las imágenes y los audios NO: esos siguen en tu Google Drive.\n· Solo pueden verlo las cuentas a las que ya compartiste el proyecto.\n· Puedes apagarla cuando quieras.\n\nEl resto de tus proyectos no se ven afectados.',
+                            'Turn on instant sync for this project?\n\n· The TEXT of the notes and where each one sits are stored on Oddinote\'s server, not only in your Drive. That is what makes changes arrive at once.\n· Images and audio are NOT: those stay in your Google Drive.\n· Only the accounts you already shared the project with can see it.\n· You can turn it off whenever you like.\n\nYour other projects are not affected.'
                           )).then((acepta) => {
                             if (!acepta) return;
                             setProjects(prev => prev.map(p => p.id === project.id ? { ...p, sincroInstantanea: true } : p));
@@ -4022,8 +4050,8 @@ function App() {
                     {project.sincroInstantanea && (
                       <div style={{ marginTop: '8px', fontSize: '10.5px', color: 'var(--text-soft)', lineHeight: 1.4 }}>
                         {window.t(
-                          'El texto de este proyecto se guarda en el servidor de Odinote. Las imágenes y los audios siguen solo en tu Drive.',
-                          'This project\'s text is stored on Odinote\'s server. Images and audio remain only in your Drive.'
+                          'El texto de este proyecto se guarda en el servidor de Oddinote. Las imágenes y los audios siguen solo en tu Drive.',
+                          'This project\'s text is stored on Oddinote\'s server. Images and audio remain only in your Drive.'
                         )}
                       </div>
                     )}
@@ -4437,7 +4465,7 @@ function App() {
               </span>
               <div>
                 <div style={{ fontSize: '17px', fontWeight: '800', fontFamily: 'var(--font-display)' }}>
-                  {updateModal.state === 'available' && window.t(`Odinote v${updateModal.version} disponible`, `Odinote v${updateModal.version} available`)}
+                  {updateModal.state === 'available' && window.t(`Oddinote v${updateModal.version} disponible`, `Oddinote v${updateModal.version} available`)}
                   {updateModal.state === 'downloading' && window.t('Descargando actualización…', 'Downloading update…')}
                   {updateModal.state === 'uptodate' && window.t('Todo al día', 'You are up to date')}
                   {updateModal.state === 'error' && window.t('No se pudo actualizar', 'Update failed')}
@@ -4488,7 +4516,7 @@ function App() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                   <p style={{ margin: 0, fontSize: '13.5px', color: 'var(--ink, #1A1A1A)' }}>
                     {updateModal.state === 'uptodate'
-                      ? window.t('Ya tienes la versión más reciente de Odinote.', 'You already have the latest version of Odinote.')
+                      ? window.t('Ya tienes la versión más reciente de Oddinote.', 'You already have the latest version of Oddinote.')
                       : window.t('Revisa tu conexión a internet e inténtalo de nuevo, o descarga manualmente desde GitHub.', 'Check your internet connection and try again, or download manually from GitHub.')}
                   </p>
                   <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>

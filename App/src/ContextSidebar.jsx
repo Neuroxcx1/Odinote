@@ -43,7 +43,10 @@ const STICKY_PALETTE = [
   { key: 'dark',   hex: '#595459', label: 'Gris oscuro' },
 ];
 
-// Deep saturated palette for column header strips & boards
+// Los colores de las franjas de antes. Ya no se ofrecen —la franja se elige con
+// el selector de siempre, cuatro y el arcoíris— pero hay tableros y columnas
+// guardados con estos nombres, y sin esta lista se pintarían de blanco. Se queda
+// como diccionario de lo antiguo, no como paleta.
 const STRIP_PALETTE = [
   { key: 'navy',   hex: '#3D5A80' },
   { key: 'indigo', hex: '#6C5FAF' },
@@ -61,12 +64,13 @@ const STRIP_PALETTE = [
 function resolveStickyColor(key) {
   const found = STICKY_PALETTE.find(p => p.key === key);
   if (found) return found.hex;
-  return key && key.startsWith('#') ? key : '#FFFFFF';
-}
-function resolveStripColor(key) {
-  const found = STRIP_PALETTE.find(p => p.key === key);
-  if (found) return found.hex;
-  return key && key.startsWith('#') ? key : '#3D5A80';
+  if (key && key.startsWith('#')) return key;
+  // Y si no está, se mira en los nombres viejos de las franjas antes de
+  // rendirse. Quien tenga una columna guardada como 'navy' de hace meses la
+  // sigue viendo azul en lugar de descubrirla en blanco un día cualquiera.
+  const antiguo = STRIP_PALETTE.find(p => p.key === key);
+  if (antiguo) return antiguo.hex;
+  return '#FFFFFF';
 }
 
 function ContextSidebar({
@@ -100,6 +104,44 @@ function ContextSidebar({
   const isFrame = item.type === 'frame';
   const isBigTitle = item.type === 'bigtitle';
   const isMap = item.type === 'map';
+  const isShape = item.type === 'shape';
+
+  // ── "Abrir la carpeta del archivo" ──
+  //
+  // Aparece cuando hay algún archivo de verdad al que llevar, y hay dos formas
+  // de tenerlo: la ruta de donde salió (se apunta al añadirlo, ver
+  // window.rutaDeArchivo en items.jsx) o la copia que la bóveda escribe en su
+  // carpeta `media`. El proceso principal prueba las dos y abre la primera que
+  // exista, así que aquí basta con saber que hay algo que probar.
+  //
+  // Un `src` que empieza por `data:` no cuenta: eso es el archivo metido dentro
+  // de la nota, que no existe en ninguna carpeta. Uno de internet tampoco.
+  const srcLocal = typeof item.src === 'string' && item.src.trim() &&
+    !item.src.startsWith('data:') && !/^https?:/.test(item.src);
+  const puedeAbrirCarpeta = !!((item.rutaOrigen || srcLocal) &&
+    window.electronAPI && window.electronAPI.mostrarEnCarpeta);
+
+  const abreLaCarpeta = () => {
+    window.playAudioTone && window.playAudioTone('click');
+    window.electronAPI.mostrarEnCarpeta({
+      ruta: item.rutaOrigen,
+      src: item.src,
+      carpeta: window.odiCarpetaProyecto || null,
+    }).then((r) => {
+      if (r && r.ok) return;
+      const motivo = r && r.motivo;
+      window.showToast && window.showToast(
+        motivo === 'no-esta'
+          ? window.t('El archivo ya no está en esa carpeta. Lo que ves aquí sigue guardado en la nota.',
+                     'The file is not in that folder any more. What you see here is still saved in the note.')
+          : motivo === 'sin-ruta'
+          ? window.t('Este archivo vive dentro de la nota, no en una carpeta. Con una bóveda abierta, los que añadas se guardan también como archivos.',
+                     'This file lives inside the note, not in a folder. With a vault open, the ones you add are also saved as files.')
+          : window.t('No se pudo abrir la carpeta.', 'The folder could not be opened.'),
+        'error'
+      );
+    });
+  };
   const isDraw = item.type === 'draw';
   const isCurrentlyCropping = isImage && callbacks?.croppingId === item.id;
   // Dibujando: la barra se convierte en la caja de herramientas del lápiz y
@@ -310,7 +352,7 @@ function ContextSidebar({
                 notas, títulos, comentarios, etc. muestra las opciones de texto).
                 Se omite en imagen (se edita con doble clic / recorte) y en nodos
                 sin edición de contenido (color, audio, archivo). */}
-            {!tableCell && onStartEdit && ['note','comment','bigtitle','todo','link','board','column','frame'].includes(item.type) && (
+            {!tableCell && onStartEdit && ['note','comment','bigtitle','todo','link','board','column','frame','shape'].includes(item.type) && (
               <button
                 className="ctx-btn"
                 onClick={()=>{ onStartEdit(); window.playAudioTone && window.playAudioTone('click'); }}
@@ -330,6 +372,47 @@ function ContextSidebar({
           >
             <div className="ctx-color-chip" style={{ background: isColor ? (item.hex || '#56B3A7') : resolveStickyColor(item.color || 'white'), border: '1.5px solid var(--line-soft)' }}/>
             <span>Color</span>
+          </button>
+        )}
+
+        {puedeAbrirCarpeta && (
+          <button
+            className="ctx-btn"
+            onClick={abreLaCarpeta}
+            title={window.t('Abrir la carpeta donde está el archivo', 'Open the folder where the file is')}
+          >
+            <span className="material-symbols-rounded">folder_open</span>
+            <span>{window.t('Abrir la carpeta', 'Open the folder')}</span>
+          </button>
+        )}
+
+        {isShape && (
+          <button
+            className="ctx-btn"
+            onClick={() => {
+              // La media de los dos lados, no el mayor ni el menor: subir al
+              // mayor se come lo que haya al lado y bajar al menor encoge tanto
+              // que parece que se ha roto algo. Con la media la figura se queda
+              // donde estaba y del tamaño que ya tenía.
+              const lado = Math.max(80, Math.round(((item.w || 200) + (item.h || 160)) / 2));
+              onUpdate({ w: lado, h: lado, manualH: true });
+              window.playAudioTone && window.playAudioTone('click');
+            }}
+            title={window.t('Igualar los lados: el círculo vuelve a ser un círculo', 'Even the sides: the circle becomes a circle again')}
+          >
+            <span className="material-symbols-rounded">aspect_ratio</span>
+            <span>{window.t('Igualar', 'Even out')}</span>
+          </button>
+        )}
+
+        {isShape && (
+          <button
+            className={`ctx-btn ${pane === 'figura' ? 'active' : ''}`}
+            onClick={()=>setPane(pane === 'figura' ? null : 'figura')}
+            title={window.t('Cambiar la forma', 'Change the shape')}
+          >
+            <span className="material-symbols-rounded">category</span>
+            <span>{window.t('Forma', 'Shape')}</span>
           </button>
         )}
 
@@ -1081,6 +1164,31 @@ function ContextSidebar({
         </div>
       )}
 
+      {pane === 'figura' && (
+        <div className="ctx-popout">
+          <div className="ctx-pop-section">
+            <div className="ctx-pop-title">{window.t('Forma', 'Shape')}</div>
+            {/* Las cuatro dibujadas de verdad, no con nombres: "rombo" y
+                "hexágono" hay que traducirlos en la cabeza, y un dibujo de
+                veintiocho píxeles no. */}
+            <div className="ctx-figura-grid">
+              {(window.FIGURAS || []).map(f => (
+                <button
+                  key={f}
+                  className={`ctx-figura-swatch ${(item.figura || 'circulo') === f ? 'active' : ''}`}
+                  onClick={()=>{ onUpdate({ figura: f }); window.playAudioTone && window.playAudioTone('click'); }}
+                  title={f}
+                >
+                  {window.FiguraSVG && (
+                    <window.FiguraSVG figura={f} w={34} h={26} relleno="var(--paper)" />
+                  )}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
       {pane === 'colorHex' && (
         <div className="ctx-popout">
           <div className="ctx-pop-section">
@@ -1478,7 +1586,7 @@ function ContextSidebar({
         <div className="ctx-popout">
           <div className="ctx-pop-section">
             <div className="ctx-pop-title">{window.t('Color del texto', 'Text color')}</div>
-            <div className="text-color-grid" style={{ marginTop: '6px' }}>
+            <div style={{ marginTop: '6px' }}>
               <window.SelectorColor
                 valor={item.titleColor || item.textColor || '#1A1A1A'}
                 onCambio={(c) => onUpdate({ textColor: c })}
@@ -1526,68 +1634,12 @@ function ContextSidebar({
   );
 }
 
-function ColorTabs({ item, onUpdate }) {
-  const [tab, setTab] = React.useState('bg');
-  return (
-    <div className="ctx-pop-section">
-      <div className="ctx-color-tabs">
-        <button
-          className={tab === 'bg' ? 'active' : ''}
-          onClick={()=>setTab('bg')}
-        >
-          <div className="tab-chip" style={{background: resolveStickyColor(item.bgColor || item.color || 'white'), border:'1.5px solid var(--line-soft)'}}/>
-          <span>Fondo</span>
-        </button>
-        <button
-          className={tab === 'strip' ? 'active' : ''}
-          onClick={()=>setTab('strip')}
-        >
-          <div className="tab-chip" style={{background: resolveStripColor(item.color || 'navy')}}/>
-          <span>Franja</span>
-        </button>
-      </div>
-
-      {tab === 'bg' && (
-        <div>
-          <div className="ctx-sticky-grid">
-            {STICKY_PALETTE.map(p => (
-              <button
-                key={p.key}
-                className={`ctx-sticky-swatch ${(item.bgColor || 'white') === p.key ? 'active' : ''}`}
-                style={{ background: p.hex, border: p.hex === '#FFFFFF' ? '1.5px solid var(--line-soft)' : '1.5px solid var(--line)' }}
-                onClick={()=>onUpdate({ bgColor: p.key })}
-                title={p.label}
-              />
-            ))}
-          </div>
-          <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1.5px solid var(--line-soft)' }}>
-            <div style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--ink-3)', marginBottom: '6px' }}>
-              {window.t('Otro color', 'Another colour')}
-            </div>
-            <window.SelectorColor
-              valor={window.esColorLibre && window.esColorLibre(item.bgColor) ? item.bgColor : ''}
-              onCambio={(c) => onUpdate({ bgColor: c })}
-              tam={22}
-            />
-          </div>
-        </div>
-      )}
-
-      {tab === 'strip' && (
-        <div className="ctx-strip-grid">
-          {STRIP_PALETTE.map(p => (
-            <button
-              key={p.key}
-              className={`ctx-strip-swatch ${(item.color || 'navy') === p.key ? 'active' : ''}`}
-              style={{ background: p.hex }}
-              onClick={()=>onUpdate({ color: p.key })}
-            />
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
+// Aquí vivía ColorTabs: dos pestañas, "Fondo" con trece colores y "Franja" con
+// once, cada una con su rejilla escrita a mano. Se quedó sin usar cuando el
+// color pasó a elegirse con el selector único —cuatro colores y el arcoíris,
+// igual en toda la aplicación— y llevaba tiempo aquí sin que nada la pintara.
+// Un componente que no se usa no es inofensivo: se lee como si fuera la manera
+// de hacer las cosas, y la siguiente pantalla se escribe copiándolo.
 
 function CommentComposer({ onSubmit, lang }) {
   const [draft, setDraft] = React.useState('');
@@ -1615,7 +1667,5 @@ function CommentComposer({ onSubmit, lang }) {
 
 window.ContextSidebar = ContextSidebar;
 window.STICKY_PALETTE = STICKY_PALETTE;
-window.STRIP_PALETTE = STRIP_PALETTE;
 window.resolveStickyColor = resolveStickyColor;
-window.resolveStripColor = resolveStripColor;
 window.EMOJI_OPTIONS = EMOJI_OPTIONS;

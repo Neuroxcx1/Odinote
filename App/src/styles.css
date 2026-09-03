@@ -311,6 +311,220 @@ a, button, select, input[type="submit"], input[type="button"], [role="button"],
   .corona-patrocinador { animation: none; }
 }
 
+/* El aro que gira mientras se comprueba una donación. La espera puede irse a
+   veinte segundos cuando la función del servidor lleva rato apagada, y una
+   pantalla quieta durante veinte segundos parece una pantalla rota. */
+.corona-girando {
+  animation: spin 900ms linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .corona-girando { animation: none; }
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   EL TALLER DE LA CORONA
+   ══════════════════════════════════════════════════════════════════
+   Lo que se compra con una donación no es una función: es que se note. Así
+   que esta ventana no puede estar hecha del mismo gris que el resto de la
+   aplicación — si se pareciera a Ajustes, no habría nada que enseñar.
+   El dorado va en el borde, en el halo y en el botón que guarda; el resto se
+   queda en su sitio para que el color elegido siga siendo el protagonista.
+
+   Y todo lo que se puede pulsar responde al pulsarlo. Antes estos botones
+   llevaban su estilo escrito en el propio elemento, y un estilo escrito ahí
+   gana a cualquier regla de :hover o :active que se escriba aquí: se veían
+   tiesos y no era una impresión, es que literalmente no tenían respuesta. */
+
+.corona-taller {
+  width: min(380px, 100%);
+  max-height: 86vh;
+  overflow-y: auto;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  border-radius: 16px;
+  color: var(--ink, #1A1A1A);
+  border: 1.5px solid rgba(224, 168, 46, 0.55);
+  /* El degradado se apaga a los 160 px: es un reflejo en la parte de arriba,
+     no un fondo amarillo. Un panel entero en dorado no se puede leer. */
+  background:
+    linear-gradient(180deg, rgba(224, 168, 46, 0.14), rgba(224, 168, 46, 0) 160px),
+    var(--bg-card, #FFFFFF);
+  box-shadow:
+    0 24px 70px rgba(0, 0, 0, 0.38),
+    0 0 30px rgba(224, 168, 46, 0.13);
+}
+[data-theme="dark"] .corona-taller {
+  border-color: rgba(224, 168, 46, 0.45);
+  background:
+    linear-gradient(180deg, rgba(224, 168, 46, 0.16), rgba(224, 168, 46, 0) 160px),
+    var(--bg-card, #201F24);
+  box-shadow:
+    0 24px 70px rgba(0, 0, 0, 0.6),
+    0 0 34px rgba(224, 168, 46, 0.16);
+}
+
+/* La raya de debajo de la cabecera: dorada en el centro y transparente en las
+   puntas, para que no parezca un borde de tabla. */
+.corona-hilo {
+  height: 1px;
+  border: 0;
+  margin: 0;
+  background: linear-gradient(90deg,
+    rgba(224, 168, 46, 0) 0%,
+    rgba(224, 168, 46, 0.55) 50%,
+    rgba(224, 168, 46, 0) 100%);
+}
+
+.corona-rotulo {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #A8791A;
+}
+[data-theme="dark"] .corona-rotulo { color: #E0A82E; }
+
+/* ── Las dos pestañas ── */
+.corona-pestana {
+  flex: 1;
+  padding: 9px 10px;
+  border-radius: 9px;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+  color: var(--ink-3, #595459);
+  border: 1.5px solid var(--line-soft, #E5E1DD);
+  background: transparent;
+  transition: transform 120ms var(--e-out), border-color 140ms, background 140ms, color 140ms;
+}
+.corona-pestana:hover { color: var(--ink, #1A1A1A); border-color: rgba(224, 168, 46, 0.55); }
+.corona-pestana:active { transform: scale(0.975); }
+.corona-pestana.activa {
+  color: #6B4E0A;
+  border-color: rgba(224, 168, 46, 0.9);
+  background: linear-gradient(180deg, rgba(246, 214, 92, 0.38), rgba(224, 168, 46, 0.18));
+}
+[data-theme="dark"] .corona-pestana.activa {
+  color: #F6D65C;
+  background: linear-gradient(180deg, rgba(224, 168, 46, 0.30), rgba(224, 168, 46, 0.10));
+}
+
+/* ── Guardar: el único botón dorado de toda la aplicación ── */
+.corona-guardar {
+  flex: 1;
+  padding: 11px;
+  border-radius: 10px;
+  cursor: pointer;
+  font-weight: 800;
+  font-size: 13px;
+  color: #3E2C05;
+  border: 1.5px solid rgba(122, 83, 16, 0.45);
+  background: linear-gradient(180deg, #F6D65C 0%, #E0A82E 55%, #C1841B 100%);
+  box-shadow: 0 6px 16px rgba(224, 168, 46, 0.32), inset 0 1px 0 rgba(255, 255, 255, 0.55);
+  transition: transform 130ms var(--e-out), box-shadow 130ms var(--e-out), filter 130ms;
+}
+.corona-guardar:hover {
+  transform: translateY(-2px);
+  filter: brightness(1.05);
+  box-shadow: 0 11px 24px rgba(224, 168, 46, 0.42), inset 0 1px 0 rgba(255, 255, 255, 0.6);
+}
+/* Se hunde de verdad: baja, encoge y la sombra pasa de estar debajo a estar
+   dentro. Es la diferencia entre un botón que responde y uno que parece un
+   dibujo. */
+.corona-guardar:active {
+  transform: translateY(2px) scale(0.985);
+  box-shadow: 0 1px 3px rgba(224, 168, 46, 0.25), inset 0 2px 6px rgba(122, 83, 16, 0.4);
+}
+.corona-guardar.hecho {
+  color: #22431C;
+  border-color: rgba(58, 92, 41, 0.5);
+  background: linear-gradient(180deg, #C7E3A6 0%, #90B968 55%, #6A8546 100%);
+  box-shadow: 0 6px 16px rgba(144, 185, 104, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.5);
+}
+
+/* ── "El de siempre": secundario, pero no muerto ── */
+.corona-normal {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 11px 14px;
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--ink-3, #595459);
+  border: 1.5px solid var(--line-soft, #E5E1DD);
+  background: transparent;
+  transition: transform 130ms var(--e-out), border-color 140ms, background 140ms, color 140ms, box-shadow 140ms;
+}
+.corona-normal:hover {
+  color: var(--ink, #1A1A1A);
+  border-color: rgba(224, 168, 46, 0.6);
+  background: rgba(224, 168, 46, 0.10);
+}
+.corona-normal:active {
+  transform: scale(0.96);
+  background: rgba(224, 168, 46, 0.2);
+  border-color: rgba(224, 168, 46, 0.8);
+}
+/* Sin nada que restablecer no hay nada que pulsar, y decirlo apagándolo es más
+   honesto que dejar un botón que no hace nada. */
+.corona-normal:disabled {
+  opacity: 0.45;
+  cursor: default;
+  transform: none;
+  background: transparent;
+  border-color: var(--line-soft, #E5E1DD);
+}
+
+/* ── El botón de subir una imagen ── */
+.corona-imagen {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 11px;
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--ink, #1A1A1A);
+  border: 1.5px dashed rgba(224, 168, 46, 0.55);
+  background: rgba(224, 168, 46, 0.06);
+  transition: transform 130ms var(--e-out), background 140ms, border-color 140ms;
+}
+.corona-imagen:hover { background: rgba(224, 168, 46, 0.14); border-color: rgba(224, 168, 46, 0.85); }
+.corona-imagen:active { transform: scale(0.98); }
+
+@media (prefers-reduced-motion: reduce) {
+  .corona-guardar, .corona-normal, .corona-pestana, .corona-imagen { transition: none; }
+}
+
+/* ── El historial del selector de color, cuando va todo en una fila ── */
+.selector-color-raya {
+  width: 1.5px;
+  border-radius: 1px;
+  margin: 0 4px;
+  background: linear-gradient(180deg,
+    rgba(142, 138, 142, 0) 0%,
+    var(--line, #8E8A8E) 25%,
+    var(--line, #8E8A8E) 75%,
+    rgba(142, 138, 142, 0) 100%);
+}
+/* El reloj dice qué son las casillas que vienen detrás sin gastar una línea de
+   texto. Con el rótulo escrito no cabían en una fila, y sin nada delante once
+   círculos seguidos parecen una única paleta. */
+.selector-color-reloj {
+  font-size: 15px;
+  color: var(--ink-3, #8E8A8E);
+  cursor: default;
+  user-select: none;
+}
+
+
 /* El cursor, en dorado en vez de en verde. Mismo dibujo que el normal: la
    gracia es que se note el color, no que cambie la forma y desoriente. */
 body[data-patrocinador="1"] {
@@ -633,6 +847,15 @@ body[data-patrocinador="1"] .board-preview-item {
   background-image: radial-gradient(circle at 1px 1px, rgba(0,0,0,0.08) 1px, transparent 0);
   background-size: 12px 12px;
   opacity: 0.6;
+  /* Esto es una textura, no un botón, y por no decirlo se comió media pantalla.
+     En modo lista la portada pasa a `position: static` (ver más abajo, para que
+     los botones de la fila se anclen a la fila y no a la miniatura), así que
+     este `inset: 0` deja de medirse contra la portada y se mide contra el primer
+     antepasado colocado, que puede ser el área entera de proyectos. Invisible,
+     pero recibiendo TODOS los clics: pulsar el botón de cambiar de vista abría
+     "Nuevo proyecto", y la tarjeta se quedaba con el aspecto de estar siempre
+     bajo el ratón. Un adorno nunca debe poder recibir un clic. */
+  pointer-events: none;
 }
 .ms-project-emoji { font-size: 38px; z-index: 1; filter: drop-shadow(1px 2px 0 rgba(0,0,0,0.1)); }
 
@@ -1975,14 +2198,11 @@ body.odi-busy iframe { pointer-events: none !important; }
 
 /* Day context menu — positioned lower so it doesn't cover the top toolbar */
 .ctx-side.ctx-side-day { position: fixed; top: 96px; left: 14px; z-index: 202; }
-.text-color-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; }
-.text-color-swatch {
-  aspect-ratio: 1;
-  border-radius: 50%;
-  cursor: pointer;
-  transition: transform 120ms var(--e-out);
-}
-.text-color-swatch:hover { transform: scale(1.15); }
+/* Aquí vivían .text-color-grid y .text-color-swatch: la rejilla de siete
+   columnas y sus casillas, de cuando el color del texto se elegía con siete
+   círculos escritos a mano. Los eligió el selector único hace tiempo, y la
+   rejilla se quedó encajando ese selector en una columna de treinta píxeles,
+   que es lo que hacía que el panel saliera estirado hacia abajo. */
 .note .note-inner.rich, .note .note-edit.rich {
   padding: 10px 12px;
   font-family: var(--font-body);
@@ -2718,6 +2938,70 @@ body.odi-busy iframe { pointer-events: none !important; }
 .cover-pick { width: 48px; height: 30px; border-radius: 2px; border: 1.5px solid var(--line); cursor: pointer; transition: transform 120ms var(--e-out); }
 .cover-pick:hover { transform: translateY(-1px); }
 .cover-pick.active { outline: 2px solid var(--ink); outline-offset: 2px; }
+
+/* ── El texto de dentro de una figura ──
+   Sin fondo ni borde: el marco ya lo pone la figura. El aviso de que está vacía
+   se enseña como en las notas, con el atributo del propio elemento, para no
+   guardar un texto de mentira dentro del nodo. */
+.figura-texto:empty::before,
+.figura-texto:has(> br:only-child)::before {
+  content: attr(data-placeholder);
+  color: var(--ink-3, #8E8A8E);
+  opacity: 0.75;
+  pointer-events: none;
+}
+
+/* Las cuatro figuras para elegir, en la barra de la derecha. */
+.ctx-figura-grid {
+  display: grid;
+  /* Cuatro columnas y dos filas para las ocho: en dos columnas la lista se iba
+     al doble de alto que el panel y había que buscarlas con la rueda. */
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+.ctx-figura-swatch {
+  display: grid;
+  place-items: center;
+  padding: 6px;
+  border-radius: 7px;
+  cursor: pointer;
+  background: transparent;
+  border: 1.5px solid var(--line-soft);
+  transition: transform 120ms var(--e-out), border-color 120ms, background 120ms;
+}
+.ctx-figura-swatch:hover { border-color: var(--line); background: var(--paper); }
+.ctx-figura-swatch:active { transform: scale(0.95); }
+.ctx-figura-swatch.active { border-color: var(--wine); background: var(--paper); }
+.ctx-figura-swatch svg { width: 30px; height: 24px; }
+
+/* ── La barra de la portada ──
+   Un arcoíris por el que se arrastra. Para una portada nadie busca "el
+   #7B3FE4": busca "un poco más morado que ese", y eso se hace moviéndose, no
+   eligiendo entre casillas. */
+.portada-barra {
+  position: relative;
+  height: 26px;
+  border-radius: 6px;
+  border: 1.5px solid var(--line);
+  cursor: pointer;
+  touch-action: none;
+  background: linear-gradient(90deg,
+    hsl(0, 72%, 55%) 0%, hsl(45, 80%, 55%) 12.5%, hsl(90, 60%, 45%) 25%,
+    hsl(135, 55%, 42%) 37.5%, hsl(180, 60%, 42%) 50%, hsl(225, 65%, 52%) 62.5%,
+    hsl(270, 60%, 55%) 75%, hsl(315, 65%, 55%) 87.5%, hsl(360, 72%, 55%) 100%);
+}
+.portada-barra:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+.portada-barra-tirador {
+  position: absolute;
+  top: -4px; bottom: -4px;
+  width: 12px;
+  transform: translateX(-50%);
+  border-radius: 4px;
+  background: transparent;
+  border: 2.5px solid #FFFFFF;
+  box-shadow: 0 0 0 1.5px var(--line), 0 2px 6px rgba(0, 0, 0, 0.35);
+  pointer-events: none;
+}
 .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
 
 /* Doc fullscreen modal */
@@ -3359,14 +3643,35 @@ body.odi-busy iframe { pointer-events: none !important; }
 
 /* Preview state — fills with the first page (no gray margins); double-click opens the viewer */
 .file-preview { flex: 1; min-height: 0; overflow: hidden; background: #fff; position: relative; }
+/* La vista previa no se toca —es una miniatura, no una aplicación— salvo el
+   vídeo y el audio, que existen precisamente para darles al play. */
 .file-preview > * { pointer-events: none; }
+.file-preview > video,
+.file-preview > .file-audio-wrap,
+.file-preview .file-media { pointer-events: auto; }
+.file-preview > video { width: 100%; height: 100%; object-fit: contain; background: #000; display: block; }
+.file-audio-wrap {
+  width: 100%; height: 100%;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
+  padding: 10px; box-sizing: border-box; background: var(--paper);
+}
+.file-audio-wrap .file-media { width: 100%; }
+.file-viewer-body.kind-video, .file-viewer-body.kind-audio { align-items: center; justify-content: center; }
+.file-viewer-body.kind-video video { max-width: 100%; max-height: 100%; box-shadow: 0 4px 18px rgba(0,0,0,0.4); border-radius: 2px; background: #000; }
+.file-viewer-body.kind-audio audio { width: min(560px, 100%); }
 .file-preview img { width: 100%; height: 100%; object-fit: cover; object-position: top center; display: block; }
 .file-preview iframe { width: 100%; height: 100%; border: none; background: #fff; }
 /* Un reproductor SÍ tiene que recibir los clics, o no hay forma de darle a
    "play" ni de mover la barra (el resto del contenido de la vista previa se
    deja "sordo" a propósito, para que el doble clic abra el visor). */
 .file-preview .file-media { pointer-events: auto; }
+.file-preview .file-video-wrap { position: relative; width: 100%; height: 100%; pointer-events: auto; }
 .file-preview video.file-media { width: 100%; height: 100%; display: block; background: #000; object-fit: contain; }
+/* Capa por la que se arrastra el nodo: cubre el vídeo menos los 46 px de
+   abajo, que es donde Chromium pinta su barra de controles. Sin esto el
+   reproductor se quedaba TODOS los clics y el nodo no se podía mover si no
+   era rodeándolo con un recuadro de selección. */
+.file-video-drag { position: absolute; left: 0; right: 0; top: 0; bottom: 46px; cursor: grab; }
 .file-audio-wrap {
   pointer-events: auto;
   width: 100%; height: 100%; display: flex; flex-direction: column;

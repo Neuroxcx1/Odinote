@@ -12,7 +12,7 @@ const INITIAL_CANVASES = {};
 const TRANSLATIONS = {
   es: {
     home_hero: 'Tu mente,\nordenada en\ncanvases.',
-    home_sub: 'Odinote es un canvas infinito con tableros anidados. Pensado para game devs, escritores y creativos que no caben en una sola pantalla.',
+    home_sub: 'Oddinote es un canvas infinito con tableros anidados. Pensado para game devs, escritores y creativos que no caben en una sola pantalla.',
     new_project: 'Nuevo proyecto',
     search_projects: 'Buscar proyectos…',
     recent: 'Recientes',
@@ -25,13 +25,13 @@ const TRANSLATIONS = {
     tool_image: 'Imagen', tool_doc: 'Documento', tool_calendar: 'Calendario',
     tool_table: 'Tabla', tool_audio: 'Audio',
     tool_color: 'Color', tool_file: 'Archivo',
-    tool_frame: 'Marco', tool_bigtitle: 'Título', tool_map: 'Mapa',
+    tool_frame: 'Marco', tool_bigtitle: 'Título', tool_map: 'Mapa', tool_shape: 'Figura',
     search_canvas: 'Buscar en este canvas…',
     new_canvas: 'Nuevo canvas',
   },
   en: {
     home_hero: 'Your mind,\norganized as\ncanvases.',
-    home_sub: 'Odinote is an infinite canvas with nested boards. Built for game devs, writers and creatives who don\'t fit on one screen.',
+    home_sub: 'Oddinote is an infinite canvas with nested boards. Built for game devs, writers and creatives who don\'t fit on one screen.',
     new_project: 'New project',
     search_projects: 'Search projects…',
     recent: 'Recent',
@@ -44,13 +44,13 @@ const TRANSLATIONS = {
     tool_image: 'Image', tool_doc: 'Document', tool_calendar: 'Calendar',
     tool_table: 'Table', tool_audio: 'Audio',
     tool_color: 'Color', tool_file: 'File',
-    tool_frame: 'Frame', tool_bigtitle: 'Title', tool_map: 'Map',
+    tool_frame: 'Frame', tool_bigtitle: 'Title', tool_map: 'Map', tool_shape: 'Shape',
     search_canvas: 'Search this canvas…',
     new_canvas: 'New canvas',
   },
   fr: {
     home_hero: 'Votre esprit,\nordonné en\ncanevas.',
-    home_sub: 'Odinote est un canevas infini avec des tableaux imbriqués. Conçu pour les développeurs de jeux, écrivains et créatifs.',
+    home_sub: 'Oddinote est un canevas infini avec des tableaux imbriqués. Conçu pour les développeurs de jeux, écrivains et créatifs.',
     new_project: 'Nouveau projet',
     search_projects: 'Rechercher des projets…',
     recent: 'Récents',
@@ -68,7 +68,7 @@ const TRANSLATIONS = {
   },
   de: {
     home_hero: 'Ihr Geist,\ngeordnet in\nLeinwänden.',
-    home_sub: 'Odinote ist eine unendliche Leinwand mit verschachtelten Boards. Entwickelt für Game-Devs, Autoren und Kreative.',
+    home_sub: 'Oddinote ist eine unendliche Leinwand mit verschachtelten Boards. Entwickelt für Game-Devs, Autoren und Kreative.',
     new_project: 'Neues Projekt',
     search_projects: 'Projekte suchen…',
     recent: 'Verlauf',
@@ -86,7 +86,7 @@ const TRANSLATIONS = {
   },
   it: {
     home_hero: 'La tua mente,\nordinata in\ntavole.',
-    home_sub: 'Odinote è una tela infinita con tavole annidate. Pensata per game dev, scrittori e creativi che non entrano in un solo schermo.',
+    home_sub: 'Oddinote è una tela infinita con tavole annidate. Pensata per game dev, scrittori e creativi che non entrano in un solo schermo.',
     new_project: 'Nuovo progetto',
     search_projects: 'Cerca progetti…',
     recent: 'Recenti',
@@ -104,7 +104,7 @@ const TRANSLATIONS = {
   },
   pt: {
     home_hero: 'Sua mente,\norganizada em\ntelas.',
-    home_sub: 'Odinote é uma tela infinita com quadros aninhados. Projetado para game devs, escritores e criativos que não cabem em uma só tela.',
+    home_sub: 'Oddinote é uma tela infinita com quadros aninhados. Projetado para game devs, escritores e criativos que não cabem em uma só tela.',
     new_project: 'Novo projeto',
     search_projects: 'Buscar projetos…',
     recent: 'Recentes',
@@ -122,7 +122,7 @@ const TRANSLATIONS = {
   },
   zh: {
     home_hero: '理清思绪，\n尽在无限\n画布。',
-    home_sub: 'Odinote 是一个具有嵌套看板的无限画布。专为游戏开发者、作家和创意人员设计。',
+    home_sub: 'Oddinote 是一个具有嵌套看板的无限画布。专为游戏开发者、作家和创意人员设计。',
     new_project: '新建项目',
     search_projects: '搜索项目…',
     recent: '最近',
@@ -140,7 +140,7 @@ const TRANSLATIONS = {
   },
   ja: {
     home_hero: '無限のキャンバスで\n思考を整理する。',
-    home_sub: 'Odinoteは、ネストされたボードを備えた無限のキャンバスです。ゲーム開発者、作家、クリエイター向けに設計されています。',
+    home_sub: 'Oddinoteは、ネストされたボードを備えた無限のキャンバスです。ゲーム開発者、作家、クリエイター向けに設計されています。',
     new_project: '新規プロジェクト',
     search_projects: 'プロジェクトを検索…',
     recent: '最近',
@@ -158,7 +158,7 @@ const TRANSLATIONS = {
   },
   ko: {
     home_hero: '무한한 캔버스에\n당신의 생각을\n정리하세요.',
-    home_sub: 'Odinote는 중첩된 보드가 있는 무한 캔버스입니다. 게임 개발자, 작가, 크리에이터를 위해 설계되었습니다.',
+    home_sub: 'Oddinote는 중첩된 보드가 있는 무한 캔버스입니다. 게임 개발자, 작가, 크리에이터를 위해 설계되었습니다.',
     new_project: '새 프로젝트',
     search_projects: '프로젝트 검색…',
     recent: '최근 항목',
@@ -194,7 +194,7 @@ const TRANSLATIONS = {
   },
   ru: {
     home_hero: 'Ваш разум,\nорганизованный в\nхолсты.',
-    home_sub: 'Odinote — это бесконечный холст с вложенными досками. Создан для разработчиков игр, писателей и творцов, которым мало одного экрана.',
+    home_sub: 'Oddinote — это бесконечный холст с вложенными досками. Создан для разработчиков игр, писателей и творцов, которым мало одного экрана.',
     new_project: 'Новый проект',
     search_projects: 'Поиск проектов…',
     recent: 'Недавние',
@@ -1493,31 +1493,31 @@ window.UI_WORDS = {
     "ar": "متوفر في نسخة سطح المكتب لأجهزة الكمبيوتر.",
     "ru": "Доступна настольная версия для ПК."
   },
-  "Apoya Odinote": {
-    "es": "Apoya Odinote",
-    "en": "Support Odinote",
-    "fr": "Soutenir Odinote",
-    "de": "Odinote unterstützen",
-    "it": "Sostieni Odinote",
-    "pt": "Apoiar Odinote",
-    "zh": "支持 Odinote",
-    "ja": "Odinoteをサポート",
-    "ko": "Odinote 후원하기",
+  "Apoya Oddinote": {
+    "es": "Apoya Oddinote",
+    "en": "Support Oddinote",
+    "fr": "Soutenir Oddinote",
+    "de": "Oddinote unterstützen",
+    "it": "Sostieni Oddinote",
+    "pt": "Apoiar Oddinote",
+    "zh": "支持 Oddinote",
+    "ja": "Oddinoteをサポート",
+    "ko": "Oddinote 후원하기",
     "ar": "دعم أودينوت",
     "ru": "Поддержка Одиноте"
   },
-  "Odinote es 100% gratis y de código abierto. Si te es útil, considera apoyarnos para mantener el proyecto.": {
-    "es": "Odinote es 100% gratis y de código abierto. Si te es útil, considera apoyarnos para mantener el proyecto.",
-    "en": "Odinote is 100% free and open source. If you find it useful, consider supporting us to maintain the project.",
-    "fr": "Odinote est 100 % gratuit et open source. Si vous le trouvez utile, pensez à nous soutenir.",
-    "de": "Odinote ist 100% kostenlos und Open Source. Wenn es Ihnen nützlich ist, unterstützen Sie uns bitte.",
-    "it": "Odinote è gratuito al 100% e open source. Se lo trovi utile, considera di sostenerci.",
-    "pt": "Odinote é 100% gratuito e de código aberto. Se for útil, considere apoiar-nos.",
-    "zh": "Odinote 是 100% 免费且开源的。如果您觉得有用，请考虑支持我们以维持项目。",
-    "ja": "Odinoteは100%無料でオープンソースです。便利だと思ったら、プロジェクト継続のために支援をご検討ください。",
-    "ko": "Odinote는 100% 무료이며 오픈 소스입니다. 유용하다고 생각하시면 프로젝트 유지를 위한 후원을 고려해 주세요.",
+  "Oddinote es 100% gratis y de código abierto. Si te es útil, considera apoyarnos para mantener el proyecto.": {
+    "es": "Oddinote es 100% gratis y de código abierto. Si te es útil, considera apoyarnos para mantener el proyecto.",
+    "en": "Oddinote is 100% free and open source. If you find it useful, consider supporting us to maintain the project.",
+    "fr": "Oddinote est 100 % gratuit et open source. Si vous le trouvez utile, pensez à nous soutenir.",
+    "de": "Oddinote ist 100% kostenlos und Open Source. Wenn es Ihnen nützlich ist, unterstützen Sie uns bitte.",
+    "it": "Oddinote è gratuito al 100% e open source. Se lo trovi utile, considera di sostenerci.",
+    "pt": "Oddinote é 100% gratuito e de código aberto. Se for útil, considere apoiar-nos.",
+    "zh": "Oddinote 是 100% 免费且开源的。如果您觉得有用，请考虑支持我们以维持项目。",
+    "ja": "Oddinoteは100%無料でオープンソースです。便利だと思ったら、プロジェクト継続のために支援をご検討ください。",
+    "ko": "Oddinote는 100% 무료이며 오픈 소스입니다. 유용하다고 생각하시면 프로젝트 유지를 위한 후원을 고려해 주세요.",
     "ar": "أودينوت مجاني ومفتوح المصدر بنسبة 100٪. إذا كان مفيدًا لك، فيرجى التفكير في دعمنا للاستمرار.",
-    "ru": "Odinote на 100% бесплатен и имеет открытый исходный код. Если это будет вам полезно, рассмотрите возможность поддержать нас в поддержании проекта."
+    "ru": "Oddinote на 100% бесплатен и имеет открытый исходный код. Если это будет вам полезно, рассмотрите возможность поддержать нас в поддержании проекта."
   },
   "Apoyar en Ko-fi": {
     "es": "Apoyar en Ko-fi",
@@ -1636,18 +1636,18 @@ window.UI_WORDS = {
     "ar": "المتبرعون المحدثون",
     "ru": "Недавние доноры"
   },
-  "Gracias a estas personas por hacer posible Odinote": {
-    "es": "Gracias a estas personas por hacer posible Odinote",
-    "en": "Thanks to these people for making Odinote possible",
-    "fr": "Merci à ces personnes de rendre Odinote possible",
-    "de": "Danke an diese Personen, die Odinote möglich machen",
-    "it": "Grazie a queste persone per aver reso possibile Odinote",
-    "pt": "Agradecemos a estas pessoas por tornarem o Odinote possível",
-    "zh": "感谢这些让 Odinote 成为可能的人们",
-    "ja": "Odinoteの実現にご協力いただいた皆様に感謝いたします",
-    "ko": "Odinote를 가능하게 해주신 분들께 감사드립니다",
+  "Gracias a estas personas por hacer posible Oddinote": {
+    "es": "Gracias a estas personas por hacer posible Oddinote",
+    "en": "Thanks to these people for making Oddinote possible",
+    "fr": "Merci à ces personnes de rendre Oddinote possible",
+    "de": "Danke an diese Personen, die Oddinote möglich machen",
+    "it": "Grazie a queste persone per aver reso possibile Oddinote",
+    "pt": "Agradecemos a estas pessoas por tornarem o Oddinote possível",
+    "zh": "感谢这些让 Oddinote 成为可能的人们",
+    "ja": "Oddinoteの実現にご協力いただいた皆様に感謝いたします",
+    "ko": "Oddinote를 가능하게 해주신 분들께 감사드립니다",
     "ar": "شكراً لهؤلاء الأشخاص لجعل أودينوت ممكناً",
-    "ru": "Спасибо этим людям за то, что сделали Odinote возможным."
+    "ru": "Спасибо этим людям за то, что сделали Oddinote возможным."
   },
   "Añade una leyenda…": {
     "es": "Añade una leyenda…",
@@ -1818,18 +1818,18 @@ window.UI_WORDS = {
     "ar": "تعذر التحقق من وجود تحديثات. يرجى التحقق من الاتصال.",
     "ru": "Не удалось проверить наличие обновлений. Проверьте свое соединение."
   },
-  "¡Estás al día! Odinote está en su versión más reciente (%v).": {
-    "es": "¡Estás al día! Odinote está en su versión más reciente (%v).",
-    "en": "You are up to date! Odinote is on the latest version (%v).",
-    "fr": "Vous êtes à jour ! Odinote est dans sa version la plus récente (%v).",
-    "de": "Sie sind auf dem neuesten Stand! Odinote ist in der neuesten Version (%v).",
-    "it": "Sei al passo con gli aggiornamenti! Odinote è all'ultima versione (%v).",
-    "pt": "Você está atualizado! O Odinote está na versão mais recente (%v).",
-    "zh": "您已是最新版本！Odinote 处于最新版本 (%v)。",
-    "ja": "最新の状態です！Odinoteは最新バージョン (%v) です。",
-    "ko": "최신 버전입니다! Odinote가 최신 버전(%v)입니다.",
+  "¡Estás al día! Oddinote está en su versión más reciente (%v).": {
+    "es": "¡Estás al día! Oddinote está en su versión más reciente (%v).",
+    "en": "You are up to date! Oddinote is on the latest version (%v).",
+    "fr": "Vous êtes à jour ! Oddinote est dans sa version la plus récente (%v).",
+    "de": "Sie sind auf dem neuesten Stand! Oddinote ist in der neuesten Version (%v).",
+    "it": "Sei al passo con gli aggiornamenti! Oddinote è all'ultima versione (%v).",
+    "pt": "Você está atualizado! O Oddinote está na versão mais recente (%v).",
+    "zh": "您已是最新版本！Oddinote 处于最新版本 (%v)。",
+    "ja": "最新の状態です！Oddinoteは最新バージョン (%v) です。",
+    "ko": "최신 버전입니다! Oddinote가 최신 버전(%v)입니다.",
     "ar": "أنت على أحدث إصدار! أودينوت في أحدث إصدار (%v).",
-    "ru": "Вы в курсе! Odinote находится в самой последней версии (%v)."
+    "ru": "Вы в курсе! Oddinote находится в самой последней версии (%v)."
   },
   "No se pudo leer la boveda seleccionada.": {
     "es": "No se pudo leer la boveda seleccionada.",
@@ -1844,18 +1844,18 @@ window.UI_WORDS = {
     "ar": "تعذر قراءة الخزنة المحددة.",
     "ru": "Не удалось прочитать выбранное хранилище."
   },
-  "Este archivo no parece ser un respaldo valido de Odinote.": {
-    "es": "Este archivo no parece ser un respaldo valido de Odinote.",
-    "en": "This file does not look like a valid Odinote backup.",
-    "fr": "Ce fichier ne semble pas être une sauvegarde Odinote valide.",
-    "de": "Diese Datei scheint kein gültiges Odinote-Backup zu sein.",
-    "it": "Questo file non sembra un backup valido di Odinote.",
-    "pt": "Este arquivo não parece ser um backup válido do Odinote.",
-    "zh": "此文件似乎不是有效的 Odinote 备份文件。",
-    "ja": "このファイルは有効なOdinoteバックアップファイルではないようです。",
-    "ko": "이 파일은 올바른 Odinote 백업 파일이 아닌 것 같습니다.",
+  "Este archivo no parece ser un respaldo valido de Oddinote.": {
+    "es": "Este archivo no parece ser un respaldo valido de Oddinote.",
+    "en": "This file does not look like a valid Oddinote backup.",
+    "fr": "Ce fichier ne semble pas être une sauvegarde Oddinote valide.",
+    "de": "Diese Datei scheint kein gültiges Oddinote-Backup zu sein.",
+    "it": "Questo file non sembra un backup valido di Oddinote.",
+    "pt": "Este arquivo não parece ser um backup válido do Oddinote.",
+    "zh": "此文件似乎不是有效的 Oddinote 备份文件。",
+    "ja": "このファイルは有効なOddinoteバックアップファイルではないようです。",
+    "ko": "이 파일은 올바른 Oddinote 백업 파일이 아닌 것 같습니다.",
     "ar": "لا يبدو هذا الملف كنسخة احتياطية صالحة لأودينوت.",
-    "ru": "Этот файл не является действительной резервной копией Odinote."
+    "ru": "Этот файл не является действительной резервной копией Oddinote."
   },
   "No se pudo importar el respaldo.": {
     "es": "No se pudo importar el respaldo.",

@@ -4,7 +4,7 @@
 // so formatting applies only to selected text.
 // =====================================================
 
-function TextFormatSidebar({ item, lang, onUpdate, onClose, variant, noCodeQuote }) {
+function TextFormatSidebar({ item, lang, onUpdate, onClose, variant }) {
   if (!item) return null;
   const isCaption = variant === 'caption'; // captions get only Color/H1/B/I/S/U (no lists, quote, code)
   const isBigTitle = item.type === 'bigtitle';
@@ -319,62 +319,13 @@ function TextFormatSidebar({ item, lang, onUpdate, onClose, variant, noCodeQuote
             <span>{lang==='es'?'Numerada':'Numbered'}</span>
           </button>
 
-          {!noCodeQuote && (
-          <button className="ctx-btn" onClick={()=>exec('formatBlock', 'BLOCKQUOTE')}>
-            <span className="material-symbols-rounded">format_quote</span>
-            <span>{lang==='es'?'Cita':'Quote'}</span>
-          </button>
-          )}
+          {/* Aquí estaban Cita y Código. El código no funcionaba —envolvía la
+              selección en <pre> y el resaltado se comía el texto al volver a
+              editarlo— y la cita se usaba de adorno. Se quedan Lista y
+              Numerada, que sí hacen lo que dicen. Para escribir código está el
+              nodo Documento. */}
 
 
-          {!noCodeQuote && (
-          <button className="ctx-btn" onClick={()=>{
-            const ed = findEditor();
-            if (!ed) return;
-            const sel = window.getSelection();
-            if (sel && !sel.isCollapsed && sel.toString().includes('\n') === false && sel.toString().length < 60) {
-              // inline code — short single-line selection
-              const range = sel.getRangeAt(0);
-              const code = document.createElement('code');
-              code.appendChild(range.extractContents());
-              range.insertNode(code);
-            } else {
-              // block code — wrap selection (or insert empty block) in <pre><code>
-              let content = '';
-              if (sel && !sel.isCollapsed) {
-                const range = sel.getRangeAt(0);
-                content = range.toString();
-                range.deleteContents();
-              }
-              const pre = document.createElement('pre');
-              const code = document.createElement('code');
-              code.textContent = content || '// código';
-              pre.appendChild(code);
-              if (sel && sel.rangeCount) {
-                sel.getRangeAt(0).insertNode(pre);
-              } else {
-                ed.appendChild(pre);
-              }
-              // ensure a trailing paragraph after pre so user can click below
-              let next = pre.nextSibling;
-              if (!next || (next.nodeType === 1 && next.tagName === 'PRE')) {
-                const p = document.createElement('p');
-                p.appendChild(document.createElement('br'));
-                pre.parentNode.insertBefore(p, pre.nextSibling);
-              }
-              if (window.hljs) {
-                try {
-                  code.textContent = code.textContent;
-                  window.hljs.highlightElement(code);
-                } catch {}
-              }
-            }
-            ed.dispatchEvent(new Event('input', { bubbles: true }));
-          }}>
-            <span className="material-symbols-rounded">code</span>
-            <span>{lang==='es'?'Código':'Code'}</span>
-          </button>
-          )}
         </>
       )}
 
@@ -406,7 +357,12 @@ function TextFormatSidebar({ item, lang, onUpdate, onClose, variant, noCodeQuote
       <div className="ctx-popout text-color-pop" onMouseDown={(e)=>e.preventDefault()}>
         <div className="ctx-pop-section">
           <div className="ctx-pop-title">{lang==='es'?'Color del texto':'Text color'}</div>
-          <div className="text-color-grid">
+          {/* Sin `text-color-grid`: esa clase es una rejilla de siete columnas
+              de cuando aquí había siete casillas sueltas. Metiendo dentro el
+              selector entero, lo encajaba en una columna de treinta píxeles y
+              el panel salía en vertical, estirado hacia abajo, cuando en todas
+              las demás pantallas va en horizontal. */}
+          <div>
             <window.SelectorColor
               valor={usaTextColor ? (item.textColor || '#1A1A1A') : ((isFrame || isMap) ? (item.titleColor || '#1A1A1A') : '#1A1A1A')}
               onCambio={(c) => {

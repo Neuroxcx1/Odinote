@@ -3,8 +3,11 @@ const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('electronAPI', {
   selectFolder: () => ipcRenderer.invoke('select-folder'),
   readVault: (folderPath) => ipcRenderer.invoke('read-vault', folderPath),
-  writeVault: (folderPath, data) => ipcRenderer.invoke('write-vault', { folderPath, data }),
-  saveMedia: (folderPath, fileName, base64Data) => ipcRenderer.invoke('save-media', { folderPath, fileName, base64Data }),
+  // `carpetas` es el mapa id-de-proyecto → nombre de su carpeta. Lo calcula la
+  // aplicación (ver boveda.js) para que el disco y la pantalla estén de acuerdo
+  // sobre cómo se llama la carpeta de cada uno.
+  writeVault: (folderPath, data, carpetas) => ipcRenderer.invoke('write-vault', { folderPath, data, carpetas }),
+  saveMedia: (folderPath, fileName, base64Data, carpeta) => ipcRenderer.invoke('save-media', { folderPath, fileName, base64Data, carpeta }),
   getVaultPath: () => ipcRenderer.invoke('get-vault-path'),
   setVaultPath: (vaultPath) => ipcRenderer.invoke('set-vault-path', vaultPath),
   onShowContextMenu: (callback) => {
@@ -17,6 +20,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   setSpellcheckerLanguages: (langs) => ipcRenderer.invoke('set-spellchecker-languages', langs),
   openCustomDictionary: () => ipcRenderer.invoke('open-custom-dictionary'),
   openUserDataFolder: () => ipcRenderer.invoke('open-user-data-folder'),
+  // Enseñar en el explorador el archivo del que salió un nodo. Devuelve
+  // { ok, motivo }: 'no-esta' cuando la ruta ya no existe, que es lo normal
+  // cuando alguien mueve o borra el original meses después.
+  mostrarEnCarpeta: (datos) => ipcRenderer.invoke('mostrar-en-carpeta', datos),
   fetchImageBase64: (url) => ipcRenderer.invoke('fetch-image-base64', url),
   downloadMediaToVault: (folderPath, url, fileName) => ipcRenderer.invoke('download-media-to-vault', { folderPath, url, fileName }),
   getCustomDictionaryWords: () => ipcRenderer.invoke('get-custom-dictionary-words'),

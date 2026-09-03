@@ -1,7 +1,7 @@
 // =====================================================
 // Odinote — Home v4 (Miro-style with sidebar)
 // =====================================================
-const { useState: useStateHome, useMemo: useMemoHome } = React;
+const { useState: useStateHome, useMemo: useMemoHome, useRef: useRefHome } = React;
 
 function BrandMark() {
   // Original logo, shown without the black box (container background is transparent now)
@@ -28,9 +28,116 @@ const COVER_PRESETS = [
   'linear-gradient(135deg, #FFFFFF 0%, #E6544F 100%)',
   'linear-gradient(135deg, #FFFFFF 0%, #F7DA84 100%)',
 ];
-// Iconos de proyecto: Fluent Emoji 3D de Microsoft (licencia MIT, incluidos en
-// lib/project-icons — ver LICENSE.txt). Los proyectos antiguos con emojis o
-// nombres de Material Symbols se siguen mostrando tal cual.
+
+// ── La portada, moviéndose por un degradado ──
+//
+// Los doce de arriba se quedan: son parejas de colores ya escogidas. Debajo,
+// una barra por la que se pasea. Antes había un selector de colores fijos, y
+// para una portada no es lo que se quiere: nadie busca "el #7B3FE4", busca
+// "un poco más morado que eso", y eso se hace arrastrando, no eligiendo entre
+// cuatro casillas y una rueda del sistema que se abre en otra ventana.
+//
+// El tono se guarda dentro del propio degradado —en hsl, que se lee de vuelta—
+// así que no hace falta un campo nuevo en el proyecto: la portada sigue siendo
+// una sola cadena de CSS, como la de los doce.
+function portadaDeTono(tono) {
+  const t = ((Math.round(tono) % 360) + 360) % 360;
+  // El segundo color va veinte grados por detrás y mucho más oscuro: un
+  // degradado entre dos tonos vecinos parece profundidad; entre dos opuestos,
+  // un error de imprenta.
+  const sombra = (t + 340) % 360;
+  return 'linear-gradient(135deg, hsl(' + t + ', 72%, 62%) 0%, hsl(' + sombra + ', 62%, 32%) 100%)';
+}
+
+function tonoDePortada(cover) {
+  const m = /hsl\((\d+)/.exec(String(cover || ''));
+  return m ? Number(m[1]) : null;
+}
+
+// Una portada es "tuya" cuando no es ninguna de las doce. Da igual cómo se
+// hiciera: las hay de cuando se elegía un color suelto, y esas también.
+function esPortadaPropia(cover) {
+  return !!cover && COVER_PRESETS.indexOf(cover) === -1;
+}
+
+function BarraDegradado({ tono, onCambio }) {
+  const barra = useRefHome(null);
+
+  const desdeX = (clientX) => {
+    const r = barra.current.getBoundingClientRect();
+    const p = Math.min(1, Math.max(0, (clientX - r.left) / r.width));
+    onCambio(Math.round(p * 360));
+  };
+
+  return (
+    <div
+      ref={barra}
+      className="portada-barra"
+      role="slider"
+      tabIndex={0}
+      aria-label={window.t('Color de la portada', 'Cover colour')}
+      aria-valuemin={0}
+      aria-valuemax={360}
+      aria-valuenow={tono == null ? 0 : tono}
+      // Con captura del puntero: se sigue arrastrando aunque el ratón se salga
+      // de la barra, que es lo que hace todo el mundo al buscar un tono.
+      onPointerDown={(e) => { e.currentTarget.setPointerCapture(e.pointerId); desdeX(e.clientX); }}
+      onPointerMove={(e) => { if (e.currentTarget.hasPointerCapture(e.pointerId)) desdeX(e.clientX); }}
+      onKeyDown={(e) => {
+        const t = tono == null ? 0 : tono;
+        if (e.key === 'ArrowLeft')  { e.preventDefault(); onCambio((t + 355) % 360); }
+        if (e.key === 'ArrowRight') { e.preventDefault(); onCambio((t + 5) % 360); }
+      }}
+    >
+      {tono != null && (
+        <span className="portada-barra-tirador" style={{ left: (tono / 360 * 100) + '%' }} />
+      )}
+    </div>
+  );
+}
+
+// El mismo campo en las dos ventanas —crear y editar—, escrito una sola vez:
+// dos copias del mismo formulario acaban siempre con una arreglada y la otra no.
+function CampoPortada({ cover, onCambio }) {
+  const propia = esPortadaPropia(cover);
+  return (
+    <div className="field">
+      <label>{window.t('Portada', 'Cover')}</label>
+      <div className="cover-row">
+        {COVER_PRESETS.map(c => (
+          <button
+            key={c}
+            className={`cover-pick ${cover === c ? 'active' : ''}`}
+            style={{ background: c, border: '1.5px solid var(--line)' }}
+            onClick={() => onCambio(c)}
+          />
+        ))}
+        {/* La portada hecha a mano se pone la última, entre las demás y con su
+            aro. Sin ella, moverse por la barra no se veía por ninguna parte:
+            ningún recuadro quedaba marcado, y el degradado que iba a salir no
+            aparecía hasta después de crear el proyecto. */}
+        {propia && (
+          <button
+            className="cover-pick active"
+            style={{ background: cover, border: '1.5px solid var(--line)' }}
+            title={window.t('La tuya', 'Yours')}
+            onClick={() => onCambio(cover)}
+          />
+        )}
+      </div>
+      <div style={{ marginTop: '10px' }}>
+        <div style={{
+          fontSize: '10px', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase',
+          color: 'var(--ink-3, #8E8A8E)', marginBottom: '6px',
+        }}>
+          {window.t('O muévete por aquí', 'Or slide through here')}
+        </div>
+        <BarraDegradado tono={tonoDePortada(cover)} onCambio={(t) => onCambio(portadaDeTono(t))} />
+      </div>
+    </div>
+  );
+}
+
 const EMOJI_PRESETS = [
   'icon:video_game', 'icon:crossed_swords', 'icon:rocket', 'icon:artist_palette',
   'icon:paintbrush', 'icon:puzzle_piece', 'icon:game_die', 'icon:world_map',
@@ -208,7 +315,7 @@ function Home({ lang, setLang, theme, setTheme, onOpenProject, projects, onCreat
           <div className="kofi-card-title" style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--wine, #7B2D26)', fontWeight: '600', fontSize: '14px' }}>
             <span className="material-symbols-rounded" style={{ fontSize: '20px' }}>favorite</span>
             <span style={{ fontWeight: '600', fontSize: '14px' }}>
-              {window.t('Apoya Odinote', 'Support Odinote')}
+              {window.t('Apoya Oddinote', 'Support Oddinote')}
             </span>
           </div>
           
@@ -223,7 +330,7 @@ function Home({ lang, setLang, theme, setTheme, onOpenProject, projects, onCreat
           </div>
 
           <p style={{ fontSize: '11px', color: 'var(--text-soft, #595459)', margin: 0, lineHeight: '1.4' }}>
-            {window.t('Odinote es 100% gratuito. Si te ayuda en tus apuntes, considera hacernos una donación para apoyar el desarrollo independiente.', 'Odinote is 100% free. If it helps you with your notes, consider supporting independent development.')}
+            {window.t('Oddinote es 100% gratuito. Si te ayuda en tus apuntes, considera hacernos una donación para apoyar el desarrollo independiente.', 'Oddinote is 100% free. If it helps you with your notes, consider supporting independent development.')}
           </p>
 
           {/* El correo con el que hay que donar, dicho en el momento justo:
@@ -688,7 +795,11 @@ function ProjectCard({ project, lang, t, onOpen, onDelete, onRenameClick, onRest
 
 function NewProjectCard({ label, onClick, lang }) {
   return (
-    <div className="ms-project-card ms-new-project-card" onClick={onClick}>
+    // `position: relative` como en las tarjetas de proyecto de verdad, que lo
+    // llevan puesto. Era la única que no, y esa asimetría es la que dejaba
+    // suelta la textura de su portada: sin un antepasado colocado, lo que
+    // debía cubrir 84x60 píxeles se estiraba por toda el área de proyectos.
+    <div className="ms-project-card ms-new-project-card" onClick={onClick} style={{ position: 'relative' }}>
       <div className="ms-project-cover ms-new-cover">
         <div className="ms-new-plus">
           <span className="material-symbols-rounded">add</span>
@@ -748,19 +859,7 @@ function NewProjectModal({ lang, onClose, onCreate }) {
           </div>
         </div>
 
-        <div className="field">
-          <label>{window.t('Portada', 'Cover')}</label>
-          <div className="cover-row">
-            {COVER_PRESETS.map(c => (
-              <button
-                key={c}
-                className={`cover-pick ${cover===c?'active':''}`}
-                style={{background: c, border: '1.5px solid var(--line)'}}
-                onClick={()=>setCover(c)}
-              />
-            ))}
-          </div>
-        </div>
+        <CampoPortada cover={cover} onCambio={setCover} />
 
         <div className="modal-actions">
           <button className="btn btn-ghost" onClick={onClose}>{window.t('Cancelar', 'Cancel')}</button>
@@ -820,19 +919,7 @@ function RenameProjectModal({ project, lang, onClose, onSave, onTogglePublic, us
           </div>
         </div>
 
-        <div className="field">
-          <label>{window.t('Portada', 'Cover')}</label>
-          <div className="cover-row">
-            {COVER_PRESETS.map(c => (
-              <button
-                key={c}
-                className={`cover-pick ${cover===c?'active':''}`}
-                style={{background: c, border: '1.5px solid var(--line)'}}
-                onClick={()=>setCover(c)}
-              />
-            ))}
-          </div>
-        </div>
+        <CampoPortada cover={cover} onCambio={setCover} />
 
         {/* Cloud availability setting */}
         <div className="field" style={{ marginTop: '20px', borderTop: '1px solid var(--line-soft, #E5E1DD)', paddingTop: '16px' }}>
