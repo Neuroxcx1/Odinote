@@ -181,6 +181,14 @@ function createWindow() {
     }
 
     const decodedPath = decodeURIComponent(rawPath);
+    // El tipo que se declara aquí decide si el navegador PINTA el archivo o lo
+    // manda a descargar. Un .pdf que faltaba en esta tabla salía como
+    // 'application/octet-stream' — es decir, "un montón de bytes" — y entonces
+    // Chromium no lo pintaba en el <iframe> del nodo de archivo: lo trataba
+    // como una descarga, y Electron acababa sacando su ventana de "Guardar
+    // como". Se veía como una vista previa en blanco más un buscador de
+    // archivos que aparecía solo. Van también los tipos del resto de medios
+    // que puede haber en la bóveda, por el mismo motivo.
     const mimeTypes = {
       '.html': 'text/html; charset=utf-8',
       '.css': 'text/css; charset=utf-8',
@@ -191,11 +199,36 @@ function createWindow() {
       '.jpg': 'image/jpeg',
       '.jpeg': 'image/jpeg',
       '.gif': 'image/gif',
+      '.webp': 'image/webp',
+      '.bmp': 'image/bmp',
       '.svg': 'image/svg+xml',
       '.ico': 'image/x-icon',
       '.woff': 'font/woff',
       '.woff2': 'font/woff2',
-      '.ttf': 'font/ttf'
+      '.ttf': 'font/ttf',
+      '.pdf': 'application/pdf',
+      '.txt': 'text/plain; charset=utf-8',
+      '.md': 'text/plain; charset=utf-8',
+      '.csv': 'text/plain; charset=utf-8',
+      '.log': 'text/plain; charset=utf-8',
+      '.xml': 'text/xml; charset=utf-8',
+      '.yml': 'text/plain; charset=utf-8',
+      '.yaml': 'text/plain; charset=utf-8',
+      '.mp3': 'audio/mpeg',
+      '.wav': 'audio/wav',
+      '.ogg': 'audio/ogg',
+      '.m4a': 'audio/mp4',
+      '.flac': 'audio/flac',
+      '.mp4': 'video/mp4',
+      '.webm': 'video/webm',
+      '.mov': 'video/quicktime',
+      '.mkv': 'video/x-matroska',
+      '.doc': 'application/msword',
+      '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      '.xls': 'application/vnd.ms-excel',
+      '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      '.ppt': 'application/vnd.ms-powerpoint',
+      '.pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
     };
 
     if (decodedPath.startsWith('/vault-media/')) {

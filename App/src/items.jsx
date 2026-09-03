@@ -3697,10 +3697,8 @@ function FileItem({ item, lang, onUpdate, onOpenFile }) {
   // que si esa bandera volvía a valer true por cualquier motivo ajeno a la
   // creación (una recarga del proyecto, deshacer, sincronización) el efecto
   // se disparaba otra vez y reabría el selector de Windows sin que el usuario
-  // tocara nada — justo lo que se veía tras importar un PDF o al tocar
-  // cualquier otro botón del nodo. Con la referencia solo puede abrirse una
-  // vez por cada vez que el componente se monta de verdad, y solo si de
-  // verdad no hay archivo todavía.
+  // tocara nada. Con la referencia solo puede abrirse una vez por cada vez que
+  // el componente se monta de verdad, y solo si de verdad no hay archivo.
   const autoOpenedRef = React.useRef(false);
   React.useEffect(() => {
     if (autoOpenedRef.current) return;
@@ -3711,6 +3709,19 @@ function FileItem({ item, lang, onUpdate, onOpenFile }) {
     }
     // eslint-disable-next-line
   }, []);
+
+  // Cambiar el archivo es ahora una petición EXPLÍCITA desde la barra del nodo
+  // ("Cambiar archivo"). Antes la única forma era doble clic sobre la tarjeta,
+  // y ese gesto es el que uno hace para VER el archivo — además de ser el que
+  // se cuela solo: al elegir un archivo con doble clic en la ventana de
+  // Windows, el segundo clic aterriza en la tarjeta que acaba de aparecer
+  // debajo del cursor y volvía a abrir el selector.
+  React.useEffect(() => {
+    if (!item._replaceFile) return;
+    onUpdate({ _replaceFile: false });
+    fileInputRef.current?.click();
+    // eslint-disable-next-line
+  }, [item._replaceFile]);
 
   const kind = fileKind(ext);
   const REF = kind === 'excel' ? 1100 : 794; // excel is landscape/wide; docs are A4-portrait
@@ -3800,7 +3811,11 @@ function FileItem({ item, lang, onUpdate, onOpenFile }) {
           </div>
         )}
         {!showPreview && (
-          <div className="file-compact" onDoubleClick={(e)=>{ e.stopPropagation(); fileInputRef.current?.click(); }}>
+          <div
+            className="file-compact"
+            onDoubleClick={(e)=>{ e.stopPropagation(); onOpenFile && onOpenFile(item.id); }}
+            title={window.t('Doble clic para ver completo', 'Double-click to view full')}
+          >
             <div className="file-icon" style={{ '--file-accent': meta.color }}>
               <span className="file-icon-label">{meta.label}</span>
             </div>
@@ -3857,8 +3872,11 @@ function FileViewerModal({ fileItem, lang, onClose }) {
         <div className="file-viewer-head">
           <div className="file-icon file-icon-sm" style={{ '--file-accent': meta.color }}><span className="file-icon-label">{meta.label}</span></div>
           <span className="file-viewer-name" title={fileItem.name}>{fileItem.name}</span>
+          {/* El enlace tiene que pasar por resolveMediaSrc: un archivo de la
+              bóveda se guarda como "media/algo.docx", y así tal cual el
+              navegador lo buscaba donde no está y la descarga daba 404. */}
           {kind !== 'pdf' && (
-            <a className="btn btn-ghost" href={fileItem.src} download={fileItem.name}>
+            <a className="btn btn-ghost" href={window.resolveMediaSrc(fileItem.src)} download={fileItem.name}>
               <span className="material-symbols-rounded">download</span>
               {window.t('Descargar', 'Download')}
             </a>

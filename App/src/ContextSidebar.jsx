@@ -615,6 +615,18 @@ function ContextSidebar({
                 <span>Info</span>
               </button>
             )}
+            {/* Cambiar el archivo se pide desde aquí. El doble clic sobre la
+                tarjeta ahora abre el archivo, que es lo que uno espera. */}
+            {item.src && (
+              <button
+                className="ctx-btn"
+                onClick={()=>onUpdate({ _replaceFile: true })}
+                title={window.t('Cambiar archivo', 'Replace file')}
+              >
+                <span className="material-symbols-rounded">swap_horiz</span>
+                <span>{window.t('Cambiar', 'Replace')}</span>
+              </button>
+            )}
           </>
         )}
 
