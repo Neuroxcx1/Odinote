@@ -43,6 +43,26 @@ const TYPES = {
   '.woff2': 'font/woff2',
   '.mp3': 'audio/mpeg',
   '.mp4': 'video/mp4',
+  // Estos faltaban, y el tipo que se declara decide si el navegador PINTA el
+  // archivo o lo manda a descargar: sin '.pdf' aquí, un PDF servido en local
+  // sale en blanco igual que salía en el .exe. Se mantiene esta tabla a la par
+  // de la de main.js para que probar en el navegador se parezca a la realidad.
+  '.pdf': 'application/pdf',
+  '.txt': 'text/plain; charset=utf-8',
+  '.md': 'text/plain; charset=utf-8',
+  '.csv': 'text/plain; charset=utf-8',
+  '.webm': 'video/webm',
+  '.mov': 'video/quicktime',
+  '.wav': 'audio/wav',
+  '.ogg': 'audio/ogg',
+  '.m4a': 'audio/mp4',
+  '.flac': 'audio/flac',
+  '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  '.pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  '.odt': 'application/vnd.oasis.opendocument.text',
+  '.ods': 'application/vnd.oasis.opendocument.spreadsheet',
+  '.odp': 'application/vnd.oasis.opendocument.presentation',
 };
 
 // Etiqueta corta para el registro: interesa distinguir el móvil del PC.

@@ -3601,42 +3601,147 @@ function fileKind(ext) {
   const e = (ext || '').toLowerCase();
   if (['png','jpg','jpeg','gif','webp','svg','bmp'].includes(e)) return 'image';
   if (e === 'pdf') return 'pdf';
+  if (['mp4','webm','ogv','m4v','mov','mkv','avi'].includes(e)) return 'video';
+  if (['mp3','wav','ogg','oga','m4a','flac','aac'].includes(e)) return 'audio';
   if (e === 'docx' || e === 'doc') return 'docx';
   if (['xlsx','xls','ods'].includes(e)) return 'excel';   // SheetJS also reads .ods
-  if (['ppt','pptx','odp'].includes(e)) return 'pptx';     // no in-browser renderer
+  if (['pptx','odp'].includes(e)) return 'slides';        // son zip: se saca el texto de cada diapositiva
+  if (e === 'odt') return 'odt';                          // zip también: texto del documento
   if (['txt','md','csv','json','js','jsx','ts','tsx','html','css','xml','log','yml','yaml'].includes(e)) return 'text';
-  return 'other';
+  return 'other';   // .ppt y .doc viejos (binarios OLE) caen aquí: no hay con qué abrirlos
 }
-function dataUrlToArrayBuffer(src) {
-  const b64 = (src || '').split(',')[1] || '';
-  const bin = atob(b64);
-  const buf = new ArrayBuffer(bin.length);
-  const view = new Uint8Array(buf);
-  for (let i = 0; i < bin.length; i++) view[i] = bin.charCodeAt(i);
-  return buf;
+
+// Los bytes de un archivo de la bóveda.
+//
+// Antes esto decodificaba base64 del propio `src` dando por hecho que era una
+// data: URL. En la bóveda NO lo es: un archivo se guarda como
+// "media/algo.xlsx" (o "file:///…/media/algo.xlsx"), así que el decodificador
+// devolvía CERO bytes y las vistas de Word y Excel salían en blanco. `fetch`
+// sirve para los tres casos: data:, /vault-media/… y http(s).
+function fetchFileBytes(src) {
+  return fetch(window.resolveMediaSrc(src)).then(r => {
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    return r.arrayBuffer();
+  });
 }
-// docx → html (mammoth) · xlsx → html table (SheetJS); resolves null when unsupported/missing lib
-function renderOfficeFile(kind, src) {
-  return new Promise((resolve, reject) => {
-    try {
-      if (kind === 'docx') {
-        if (!window.mammoth) return resolve(null);
-        window.mammoth.convertToHtml({ arrayBuffer: dataUrlToArrayBuffer(src) })
-          .then(r => resolve(r.value || '<p></p>')).catch(reject);
-      } else if (kind === 'excel') {
-        if (!window.XLSX) return resolve(null);
-        const wb = window.XLSX.read(dataUrlToArrayBuffer(src), { type: 'array' });
-        const ws = wb.Sheets[wb.SheetNames[0]];
-        // Clip the range so a sheet with a huge declared area can't freeze the UI
-        if (ws && ws['!ref']) {
-          const r = window.XLSX.utils.decode_range(ws['!ref']);
-          r.e.r = Math.min(r.e.r, r.s.r + 200);
-          r.e.c = Math.min(r.e.c, r.s.c + 30);
-          ws['!ref'] = window.XLSX.utils.encode_range(r);
-        }
-        resolve(`<div class="file-xlsx">${ws ? window.XLSX.utils.sheet_to_html(ws) : ''}</div>`);
-      } else resolve(null);
-    } catch (err) { reject(err); }
+
+// Un pptx, un odt y un odp son carpetas comprimidas. La librería de Excel que
+// ya viaja dentro (SheetJS) sabe descomprimir, así que se aprovecha en vez de
+// añadir otra librería solo para esto.
+function zipEntries(buf) {
+  if (!window.XLSX || !window.XLSX.CFB) return null;
+  const cfb = window.XLSX.CFB.read(new Uint8Array(buf), { type: 'array' });
+  const out = {};
+  (cfb.FullPaths || []).forEach((full, i) => {
+    const f = cfb.FileIndex && cfb.FileIndex[i];
+    if (!f || !f.content) return;
+    out[String(full).replace(/^[^/]*\//, '')] = f.content;   // fuera el "Root Entry/"
+  });
+  return out;
+}
+function zipText(entries, name) {
+  const c = entries && entries[name];
+  if (!c) return '';
+  try { return new TextDecoder('utf-8').decode(new Uint8Array(c)); } catch (e) { return ''; }
+}
+function escapaHtml(s) {
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+// Deshace las entidades XML que salen del texto ya sin etiquetas.
+function desescapaXml(s) {
+  return String(s)
+    .replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"').replace(/&apos;/g, "'")
+    .replace(/&#(\d+);/g, (m, d) => String.fromCharCode(Number(d)))
+    .replace(/&amp;/g, '&');
+}
+
+// PowerPoint (.pptx): cada diapositiva es un XML con el texto en <a:t>.
+function renderPptx(entries) {
+  const nombres = Object.keys(entries)
+    .filter(n => /^ppt\/slides\/slide\d+\.xml$/.test(n))
+    .sort((a, b) => {
+      const na = Number(a.match(/(\d+)/)[1]), nb = Number(b.match(/(\d+)/)[1]);
+      return na - nb;
+    });
+  if (!nombres.length) return null;
+  const bloques = nombres.map((n, i) => {
+    const xml = zipText(entries, n);
+    // Los <a:t> de un mismo <a:p> son trozos de un mismo párrafo (cambios de
+    // formato dentro de la línea), así que se pegan por párrafo.
+    const parrafos = [...xml.matchAll(/<a:p\b[^>]*>([\s\S]*?)<\/a:p>/g)]
+      .map(m => [...m[1].matchAll(/<a:t>([\s\S]*?)<\/a:t>/g)].map(t => desescapaXml(t[1])).join(''))
+      .map(t => t.trim())
+      .filter(Boolean);
+    const cuerpo = parrafos.length
+      ? parrafos.map((p, j) => j === 0
+          ? `<h2>${escapaHtml(p)}</h2>`
+          : `<p>${escapaHtml(p)}</p>`).join('')
+      : '<p class="file-slide-vacia">(diapositiva sin texto)</p>';
+    return `<section class="file-slide"><div class="file-slide-num">${i + 1}</div>${cuerpo}</section>`;
+  });
+  return `<div class="file-slides">${bloques.join('')}</div>`;
+}
+
+// OpenDocument (.odt texto, .odp presentación): el contenido está en
+// content.xml, con los párrafos en <text:p> / <text:h>.
+function renderOdf(entries, kind) {
+  const xml = zipText(entries, 'content.xml');
+  if (!xml) return null;
+  const trozo = (frag) => [...frag.matchAll(/<text:(p|h)\b[^>]*>([\s\S]*?)<\/text:\1>/g)]
+    .map(m => desescapaXml(m[2].replace(/<[^>]+>/g, '')).trim())
+    .filter(Boolean);
+
+  if (kind === 'slides') {
+    // .odp: una <draw:page> por diapositiva.
+    const paginas = [...xml.matchAll(/<draw:page\b[^>]*>([\s\S]*?)<\/draw:page>/g)];
+    if (paginas.length) {
+      const bloques = paginas.map((pg, i) => {
+        const ps = trozo(pg[1]);
+        const cuerpo = ps.length
+          ? ps.map((p, j) => j === 0 ? `<h2>${escapaHtml(p)}</h2>` : `<p>${escapaHtml(p)}</p>`).join('')
+          : '<p class="file-slide-vacia">(diapositiva sin texto)</p>';
+        return `<section class="file-slide"><div class="file-slide-num">${i + 1}</div>${cuerpo}</section>`;
+      });
+      return `<div class="file-slides">${bloques.join('')}</div>`;
+    }
+  }
+  const parrafos = trozo(xml);
+  if (!parrafos.length) return null;
+  return parrafos.map(p => `<p>${escapaHtml(p)}</p>`).join('');
+}
+
+// docx → html (mammoth) · xlsx/ods → tabla (SheetJS) · pptx/odp → texto de las
+// diapositivas · odt → texto del documento. Resuelve null si no se puede.
+function renderOfficeFile(kind, src, ext) {
+  return fetchFileBytes(src).then(buf => {
+    if (kind === 'docx') {
+      if (!window.mammoth) return null;
+      return window.mammoth.convertToHtml({ arrayBuffer: buf }).then(r => r.value || '<p></p>');
+    }
+    if (kind === 'excel') {
+      if (!window.XLSX) return null;
+      const wb = window.XLSX.read(new Uint8Array(buf), { type: 'array' });
+      const nombre = wb.SheetNames[0];
+      const ws = wb.Sheets[nombre];
+      // Clip the range so a sheet with a huge declared area can't freeze the UI
+      if (ws && ws['!ref']) {
+        const r = window.XLSX.utils.decode_range(ws['!ref']);
+        r.e.r = Math.min(r.e.r, r.s.r + 200);
+        r.e.c = Math.min(r.e.c, r.s.c + 30);
+        ws['!ref'] = window.XLSX.utils.encode_range(r);
+      }
+      const otras = wb.SheetNames.length > 1 ? ` · +${wb.SheetNames.length - 1}` : '';
+      return `<div class="file-xlsx"><div class="file-hoja">${escapaHtml(nombre || '')}${otras}</div>${ws ? window.XLSX.utils.sheet_to_html(ws) : ''}</div>`;
+    }
+    if (kind === 'slides' || kind === 'odt') {
+      const entries = zipEntries(buf);
+      if (!entries) return null;
+      const e = (ext || '').toLowerCase();
+      if (e === 'pptx') return renderPptx(entries);
+      return renderOdf(entries, kind);
+    }
+    return null;
   });
 }
 
@@ -3662,6 +3767,7 @@ function FileItem({ item, lang, onUpdate, onOpenFile }) {
   const [uploading, setUploading] = React.useState(false);
   const [progress, setProgress] = React.useState(0);
   const [docHtml, setDocHtml] = React.useState(null); // rendered docx preview
+  const [mediaError, setMediaError] = React.useState(false); // vídeo que Chromium no sabe reproducir
   const hasFile = !!item.src;
   const ext = item.fileType || (item.name ? item.name.split('.').pop() : '');
   const meta = fileMeta(ext);
@@ -3684,7 +3790,37 @@ function FileItem({ item, lang, onUpdate, onOpenFile }) {
     reader.onprogress = (ev) => { if (ev.lengthComputable) setProgress(Math.round((ev.loaded / ev.total) * 100)); };
     reader.onload = () => {
       const fext = (file.name.split('.').pop() || '').toLowerCase();
-      onUpdate({ src: reader.result, name: file.name, size: file.size, fileType: fext });
+      const src = reader.result;
+      const base = { src, name: file.name, size: file.size, fileType: fext };
+      const k = fileKind(fext);
+
+      // Un nodo de archivo que recibe una imagen o un audio SE CONVIERTE en el
+      // nodo de imagen o de audio. Ahí la cosa se ve y se escucha de verdad,
+      // en vez de quedarse en una tarjeta con el nombre del fichero — y no hay
+      // que acordarse de elegir el nodo correcto antes de arrastrar nada.
+      // El resto (documentos, vídeo, comprimidos…) se queda como archivo.
+      if (k === 'image') {
+        const img = new Image();
+        const conRatio = (ratio) => {
+          const w = Math.max(item.w || 260, 200);
+          onUpdate({ ...base, type: 'image', naturalRatio: ratio,
+                     w, h: Math.max(60, Math.round(w / (ratio || 1))) });
+          setUploading(false); setProgress(100);
+        };
+        img.onload = () => conRatio(img.naturalWidth / img.naturalHeight);
+        img.onerror = () => conRatio(1);
+        img.src = src;
+        return;
+      }
+      if (k === 'audio') {
+        onUpdate({ ...base, type: 'audio',
+                   w: Math.max(item.w || 320, 300), h: 140,
+                   loop: false, autoplay: false });
+        setUploading(false); setProgress(100);
+        return;
+      }
+
+      onUpdate(base);
       setUploading(false); setProgress(100);
     };
     reader.onerror = () => setUploading(false);
@@ -3724,19 +3860,24 @@ function FileItem({ item, lang, onUpdate, onOpenFile }) {
   }, [item._replaceFile]);
 
   const kind = fileKind(ext);
+  const esOffice = kind === 'docx' || kind === 'excel' || kind === 'slides' || kind === 'odt';
   const REF = kind === 'excel' ? 1100 : 794; // excel is landscape/wide; docs are A4-portrait
   const scale = (item.w || 230) / REF;        // render at page width then scale to the node ("like an image")
 
-  // Render docx (mammoth) / excel (SheetJS) → html when previewing
+  // Render docx (mammoth) / excel (SheetJS) / pptx-odp-odt (zip) → html when previewing
   React.useEffect(() => {
     if (!showPreview || !item.src) return;
     let cancelled = false;
-    if (kind === 'docx' || kind === 'excel') {
+    if (esOffice) {
       setDocHtml('loading');
-      renderOfficeFile(kind, item.src).then(h => { if (!cancelled) setDocHtml(h); }).catch(() => { if (!cancelled) setDocHtml(null); });
+      renderOfficeFile(kind, item.src, ext).then(h => { if (!cancelled) setDocHtml(h); }).catch(() => { if (!cancelled) setDocHtml(null); });
     }
     return () => { cancelled = true; };
   }, [showPreview, kind, item.src]);
+
+  // Otro archivo, otra oportunidad: si se cambia el archivo del nodo, el aviso
+  // de "no se puede reproducir" del anterior no debe quedarse pegado.
+  React.useEffect(() => { setMediaError(false); }, [item.src]);
 
   // Uploading state
   if (uploading) {
@@ -3785,19 +3926,51 @@ function FileItem({ item, lang, onUpdate, onOpenFile }) {
         >
           {kind === 'image' && <img src={window.resolveMediaSrc(item.src)} alt={item.name} onError={driveImageFallback}/>}
           {kind === 'pdf' && <iframe title={item.name} src={window.resolveMediaSrc(item.src)}/>}
+          {/* Vídeo y audio se reproducen aquí mismo. El onMouseDown parado es
+              lo que permite usar los controles: sin eso, tocar "play" empezaba
+              a arrastrar el nodo por el lienzo. Si el formato no lo sabe
+              reproducir Chromium (un .mkv, un .avi), onError lo dice en vez de
+              dejar un reproductor roto. */}
+          {kind === 'video' && (
+            mediaError
+              ? <div className="file-preview-empty">
+                  <div className="file-icon" style={{ '--file-accent': meta.color }}><span className="file-icon-label">{meta.label}</span></div>
+                  <span>{window.t('Este vídeo no se puede reproducir aquí', 'This video cannot play here')}</span>
+                </div>
+              : <video
+                  className="file-media"
+                  src={window.resolveMediaSrc(item.src)}
+                  controls preload="metadata"
+                  onMouseDown={(e)=>e.stopPropagation()}
+                  onDoubleClick={(e)=>e.stopPropagation()}
+                  onError={()=>setMediaError(true)}
+                />
+          )}
+          {kind === 'audio' && (
+            <div className="file-audio-wrap">
+              <div className="file-icon" style={{ '--file-accent': meta.color }}><span className="file-icon-label">{meta.label}</span></div>
+              <audio
+                className="file-media"
+                src={window.resolveMediaSrc(item.src)}
+                controls preload="metadata"
+                onMouseDown={(e)=>e.stopPropagation()}
+                onDoubleClick={(e)=>e.stopPropagation()}
+              />
+            </div>
+          )}
           {kind === 'text' && (
             <div className="file-page-scale" style={{ width: REF, transform: `scale(${scale})`, transformOrigin: 'top left' }}>
               <FilePreviewText src={window.resolveMediaSrc(item.src)}/>
             </div>
           )}
-          {(kind === 'docx' || kind === 'excel') && (
+          {esOffice && (
             docHtml && docHtml !== 'loading'
               ? <div className="file-page-scale" style={{ width: REF, transform: `scale(${scale})`, transformOrigin: 'top left' }}>
                   <div className="file-doc-html" dangerouslySetInnerHTML={{ __html: docHtml }}/>
                 </div>
               : <div className="file-preview-empty"><span className="material-symbols-rounded">{docHtml==='loading'?'hourglass_top':'description'}</span><span>{docHtml==='loading'?(window.t('Generando vista…', 'Rendering…')):(window.t('Sin vista previa', 'No preview'))}</span></div>
           )}
-          {(kind === 'pptx' || kind === 'other') && (
+          {kind === 'other' && (
             <div className="file-preview-empty">
               <div className="file-icon" style={{ '--file-accent': meta.color }}><span className="file-icon-label">{meta.label}</span></div>
               <span>{window.t('Sin vista previa', 'No preview')}</span>
@@ -3834,14 +4007,22 @@ function FileItem({ item, lang, onUpdate, onOpenFile }) {
   );
 }
 
-// Decodes a base64 text dataURL for inline preview
+// El texto de un .txt/.md/.csv para la vista previa.
+//
+// Esto también daba por hecho que el src era una data: URL y decodificaba
+// base64 a mano; con un archivo de la bóveda ("media/notas.txt") no sacaba
+// nada y la vista salía vacía. Se pide con fetch, que vale para data:, para
+// /vault-media/… y para http(s). Se corta a 20.000 caracteres: un log de
+// varios megas no tiene por qué colgar el lienzo para una miniatura.
 function FilePreviewText({ src }) {
   const [txt, setTxt] = React.useState('');
   React.useEffect(() => {
-    try {
-      const b64 = src.split(',')[1] || '';
-      setTxt(decodeURIComponent(escape(atob(b64))));
-    } catch { setTxt(''); }
+    let cancelado = false;
+    fetch(src)
+      .then(r => r.ok ? r.text() : Promise.reject(new Error(`HTTP ${r.status}`)))
+      .then(t => { if (!cancelado) setTxt(t.length > 20000 ? t.slice(0, 20000) + '\n…' : t); })
+      .catch(() => { if (!cancelado) setTxt(''); });
+    return () => { cancelado = true; };
   }, [src]);
   return <pre className="file-text-preview">{txt}</pre>;
 }
@@ -3853,10 +4034,12 @@ function FileViewerModal({ fileItem, lang, onClose }) {
   const meta = fileMeta(ext);
   const [docHtml, setDocHtml] = React.useState(null);
 
+  const esOffice = kind === 'docx' || kind === 'excel' || kind === 'slides' || kind === 'odt';
+
   React.useEffect(() => {
-    if ((kind !== 'docx' && kind !== 'excel') || !fileItem.src) return;
+    if (!esOffice || !fileItem.src) return;
     let cancelled = false;
-    renderOfficeFile(kind, fileItem.src).then(h => { if (!cancelled) setDocHtml(h); }).catch(() => { if (!cancelled) setDocHtml(null); });
+    renderOfficeFile(kind, fileItem.src, ext).then(h => { if (!cancelled) setDocHtml(h); }).catch(() => { if (!cancelled) setDocHtml(null); });
     return () => { cancelled = true; };
   }, [kind, fileItem.src]);
 
@@ -3889,13 +4072,20 @@ function FileViewerModal({ fileItem, lang, onClose }) {
         <div className={`file-viewer-body kind-${kind}`}>
           {kind === 'image' && <img src={window.resolveMediaSrc(fileItem.src)} alt={fileItem.name} onError={driveImageFallback}/>}
           {kind === 'pdf' && <iframe title={fileItem.name} src={window.resolveMediaSrc(fileItem.src)}/>}
+          {kind === 'video' && <video src={window.resolveMediaSrc(fileItem.src)} controls autoPlay/>}
+          {kind === 'audio' && (
+            <div className="file-viewer-audio">
+              <div className="file-icon" style={{ '--file-accent': meta.color }}><span className="file-icon-label">{meta.label}</span></div>
+              <audio src={window.resolveMediaSrc(fileItem.src)} controls autoPlay/>
+            </div>
+          )}
           {kind === 'text' && <FilePreviewText src={window.resolveMediaSrc(fileItem.src)}/>}
-          {(kind === 'docx' || kind === 'excel') && (
+          {esOffice && (
             docHtml
               ? <div className="file-doc-html file-doc-page" dangerouslySetInnerHTML={{ __html: docHtml }}/>
               : <div className="file-preview-empty"><span className="material-symbols-rounded">hourglass_top</span><span>{window.t('Generando vista…', 'Rendering…')}</span></div>
           )}
-          {(kind === 'pptx' || kind === 'other') && (
+          {kind === 'other' && (
             <div className="file-preview-empty">
               <div className="file-icon" style={{ '--file-accent': meta.color }}><span className="file-icon-label">{meta.label}</span></div>
               <span>{window.t('Sin vista previa · usa Descargar', 'No preview · use Download')}</span>

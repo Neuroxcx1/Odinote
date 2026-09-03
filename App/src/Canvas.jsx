@@ -1853,10 +1853,15 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
           const img = new Image();
           img.onload = () => {
             const ratio = img.naturalWidth / img.naturalHeight;
-            if (targetItem && targetItem.type === 'image') {
+            // Soltar una imagen sobre un nodo de ARCHIVO lo convierte en nodo
+            // de imagen, igual que al elegirla desde el propio nodo: una
+            // imagen se mira, no se queda como una tarjeta con su nombre.
+            if (targetItem && (targetItem.type === 'image' || targetItem.type === 'file')) {
               // Replace existing image
               const w = targetItem.w || 260;
-              updateItem(targetId, { src, name: file.name, w, h: Math.max(60, Math.round(w / ratio)) });
+              const ext = (file.name.split('.').pop() || '').toLowerCase();
+              updateItem(targetId, { type: 'image', src, name: file.name, size: file.size, fileType: ext,
+                                     naturalRatio: ratio, w, h: Math.max(60, Math.round(w / ratio)) });
             } else {
               // Create a new image node at drop location
               const w = 300;
@@ -1883,9 +1888,13 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
         const fr = new FileReader();
         fr.onload = () => {
           const src = fr.result;
-          if (targetItem && targetItem.type === 'audio') {
+          // Igual que con las imágenes: un audio soltado sobre un nodo de
+          // archivo lo convierte en nodo de audio, que es donde se escucha.
+          if (targetItem && (targetItem.type === 'audio' || targetItem.type === 'file')) {
             // Replace existing audio
-            updateItem(targetId, { src, name: file.name, size: file.size });
+            const ext = (file.name.split('.').pop() || '').toLowerCase();
+            updateItem(targetId, { type: 'audio', src, name: file.name, size: file.size, fileType: ext,
+                                   h: targetItem.type === 'file' ? 140 : targetItem.h });
           } else {
             // Create a new audio node at drop location
             const w = 320;

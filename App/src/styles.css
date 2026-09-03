@@ -3299,6 +3299,22 @@ body.odi-busy iframe { pointer-events: none !important; }
 /* ============================================
    FILE NODE
    ============================================ */
+/* La tarjeta de un archivo se pinta SIEMPRE clara: su color base es el blanco,
+   elegido a propósito, no el papel del tema. Así que su texto tampoco puede
+   seguir al tema — en modo oscuro `--ink` es casi blanco y el nombre del
+   archivo desaparecía sobre el fondo blanco. Aquí se clavan los valores del
+   tema claro para todo lo que va dentro de la tarjeta, y con eso vale para el
+   nombre, el tamaño, la leyenda y los avisos de "sin vista previa". */
+.file-card {
+  --ink:       #1A1A1A;
+  --ink-2:     #595459;
+  --ink-3:     #8E8A8E;
+  --paper:     #FAF9F6;
+  --paper-2:   #F3F2EE;
+  --line:      #595459;
+  --line-soft: rgba(89,84,89,0.22);
+  --bg-2:      #E2E1E1;
+}
 .file-card .item-card { background: var(--paper); }
 .file-empty {
   width: 100%; height: 100%; display: flex; flex-direction: column;
@@ -3346,6 +3362,20 @@ body.odi-busy iframe { pointer-events: none !important; }
 .file-preview > * { pointer-events: none; }
 .file-preview img { width: 100%; height: 100%; object-fit: cover; object-position: top center; display: block; }
 .file-preview iframe { width: 100%; height: 100%; border: none; background: #fff; }
+/* Un reproductor SÍ tiene que recibir los clics, o no hay forma de darle a
+   "play" ni de mover la barra (el resto del contenido de la vista previa se
+   deja "sordo" a propósito, para que el doble clic abra el visor). */
+.file-preview .file-media { pointer-events: auto; }
+.file-preview video.file-media { width: 100%; height: 100%; display: block; background: #000; object-fit: contain; }
+.file-audio-wrap {
+  pointer-events: auto;
+  width: 100%; height: 100%; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 12px; padding: 14px;
+}
+.file-audio-wrap audio { width: 100%; max-width: 320px; }
+.file-viewer-audio { display: flex; flex-direction: column; align-items: center; gap: 18px; margin: auto; }
+.file-viewer-audio audio { width: min(460px, 80vw); }
+.file-viewer-body video { max-width: 100%; max-height: 100%; margin: auto; display: block; background: #000; }
 /* Office/text content is rendered at page width then scaled down to the node, like an image */
 .file-page-scale { transform-origin: top left; }
 .file-preview .file-page-scale { position: absolute; top: 0; left: 0; }
@@ -3353,6 +3383,23 @@ body.odi-busy iframe { pointer-events: none !important; }
 .file-doc-html { padding: 18px 22px; background: #fff; color: #1a1a1a; font-family: var(--font-body); font-size: 13px; line-height: 1.55; }
 .file-xlsx table { border-collapse: collapse; width: 100%; }
 .file-xlsx td, .file-xlsx th { border: 1px solid #d0d0d0; padding: 4px 8px; font-size: 12px; }
+.file-hoja { font-weight: 800; font-size: 12px; color: #217346; margin-bottom: 6px; letter-spacing: 0.02em; }
+/* PowerPoint / Impress: una ficha por diapositiva con su texto */
+.file-slides { display: flex; flex-direction: column; gap: 14px; }
+.file-slide {
+  position: relative; border: 1.5px solid #d8d5d8; border-radius: 4px;
+  padding: 14px 16px 14px 42px; background: #fff; min-height: 64px;
+}
+.file-slide-num {
+  position: absolute; left: 12px; top: 13px;
+  width: 20px; height: 20px; border-radius: 3px;
+  background: #D24726; color: #fff;
+  font-family: var(--font-display); font-weight: 800; font-size: 11px;
+  display: flex; align-items: center; justify-content: center;
+}
+.file-slide h2 { font-size: 15px; font-weight: 800; margin: 0 0 6px; color: #1a1a1a; }
+.file-slide p { margin: 0 0 4px; font-size: 12.5px; }
+.file-slide-vacia { color: #8E8A8E; font-style: italic; }
 .file-doc-html h1 { font-size: 18px; font-weight: 800; margin: 0 0 8px; color: #3d5a80; }
 .file-doc-html h2 { font-size: 15px; font-weight: 700; margin: 12px 0 6px; }
 .file-doc-html p { margin: 0 0 8px; }
