@@ -3643,12 +3643,26 @@ body.odi-busy iframe { pointer-events: none !important; }
   background: rgba(255,255,255,0.10); border: none; outline: none;
   border-radius: 4px; padding: 2px 6px; min-width: 0; flex: 1;
 }
+/* La insignia del lenguaje va en gris neutro y NO se tiñe con el color que se
+   le ponga a la barra: es un dato, no decoración, y con una barra amarilla o
+   verde se volvía ilegible. Lleva su propio fondo, oscuro sobre claro y claro
+   sobre oscuro, sin depender del color elegido. */
 .code-lang {
   margin-left: auto; flex: 0 0 auto;
   font-family: var(--font-mono); font-size: 10px; font-weight: 700;
   letter-spacing: 0.05em; text-transform: uppercase;
-  color: rgba(221,230,245,0.55);
-  border: 1px solid rgba(255,255,255,0.14); border-radius: 4px; padding: 2px 6px;
+  background: #E7E9EE;
+  color: #4A5566;
+  border: 1px solid rgba(0,0,0,0.10);
+  border-radius: 4px; padding: 2px 6px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .code-lang {
+    background: #2A3141; color: #A9B6CC; border-color: rgba(255,255,255,0.10);
+  }
+}
+:root[data-theme="dark"] .code-lang {
+  background: #2A3141; color: #A9B6CC; border-color: rgba(255,255,255,0.10);
 }
 /* El resaltado va detrás y el textarea encima, transparente: así se escribe
    con el cursor de siempre y a la vez se ven los colores. Las dos capas TIENEN
@@ -3684,16 +3698,70 @@ body.odi-busy iframe { pointer-events: none !important; }
 }
 .code-area::selection { background: rgba(159,196,110,0.30); }
 .code-area::placeholder { color: rgba(201,214,238,0.35); }
-/* Los colores del resaltador, en la gama del nodo. */
-.code-card .hljs-keyword, .code-card .hljs-selector-tag, .code-card .hljs-literal { color: #E88BC8; }
-.code-card .hljs-string, .code-card .hljs-meta .hljs-string { color: #9FC46E; }
-.code-card .hljs-number, .code-card .hljs-symbol { color: #E9B872; }
-.code-card .hljs-comment, .code-card .hljs-quote { color: #6E7E9B; font-style: italic; }
-.code-card .hljs-title, .code-card .hljs-name, .code-card .hljs-section { color: #78C6E8; }
-.code-card .hljs-attr, .code-card .hljs-attribute, .code-card .hljs-variable { color: #C7B6F0; }
-.code-card .hljs-built_in, .code-card .hljs-type { color: #6FD3C0; }
-.code-card .hljs-deletion { color: #E8706A; }
+/* Los colores del resaltador, en la gama del nodo.
+   Antes solo estaban cubiertas ocho clases y el resaltador emite muchas más,
+   así que casi todo caía en el color base y el código se veía de dos colores.
+   Aquí está la lista entera de highlight.js, repartida por familias: lo que
+   manda (palabras clave) en rosa, los valores en naranja, el texto en verde,
+   los nombres en azul, los tipos en turquesa y lo accesorio en gris. */
+.code-card .hljs-keyword,
+.code-card .hljs-selector-tag,
+.code-card .hljs-literal,
+.code-card .hljs-template-tag,
+.code-card .hljs-doctag { color: #E88BC8; }
+
+.code-card .hljs-string,
+.code-card .hljs-meta .hljs-string,
+.code-card .hljs-regexp,
+.code-card .hljs-char.escape_,
 .code-card .hljs-addition { color: #9FC46E; }
+
+.code-card .hljs-number,
+.code-card .hljs-symbol,
+.code-card .hljs-bullet,
+.code-card .hljs-quote,
+.code-card .hljs-selector-attr,
+.code-card .hljs-selector-pseudo { color: #E9B872; }
+
+.code-card .hljs-comment { color: #6E7E9B; font-style: italic; }
+
+.code-card .hljs-title,
+.code-card .hljs-title.function_,
+.code-card .hljs-title.function_.invoke__,
+.code-card .hljs-name,
+.code-card .hljs-section,
+.code-card .hljs-selector-id { color: #78C6E8; }
+
+.code-card .hljs-title.class_,
+.code-card .hljs-title.class_.inherited__,
+.code-card .hljs-built_in,
+.code-card .hljs-type,
+.code-card .hljs-selector-class { color: #6FD3C0; }
+
+.code-card .hljs-attr,
+.code-card .hljs-attribute,
+.code-card .hljs-property,
+.code-card .hljs-variable,
+.code-card .hljs-template-variable,
+.code-card .hljs-params,
+.code-card .hljs-subst { color: #C7B6F0; }
+
+.code-card .hljs-variable.language_,
+.code-card .hljs-variable.constant_,
+.code-card .hljs-operator,
+.code-card .hljs-punctuation { color: #F0A868; }
+
+.code-card .hljs-meta,
+.code-card .hljs-meta .hljs-keyword,
+.code-card .hljs-meta .hljs-prompt_,
+.code-card .hljs-tag,
+.code-card .hljs-link { color: #8FA6C8; }
+
+.code-card .hljs-deletion { color: #E8706A; }
+.code-card .hljs-emphasis { font-style: italic; }
+.code-card .hljs-strong { font-weight: 700; }
+.code-card .hljs-formula,
+.code-card .hljs-code { color: #B9C8E2; }
 /* Lista de lenguajes de la barra del nodo */
 .ctx-lang-list { display: flex; flex-direction: column; gap: 1px; max-height: 300px; overflow-y: auto; }
 .ctx-lang-item {
@@ -3702,7 +3770,19 @@ body.odi-busy iframe { pointer-events: none !important; }
   font-size: 12.5px; color: var(--ink); border-radius: 5px; text-align: left;
 }
 .ctx-lang-item:hover { background: var(--bg-2); }
-.ctx-lang-item.active { background: var(--olive-l, var(--bg-2)); font-weight: 700; }
+/* El elegido, con la pareja de colores puesta a mano y no con variables del
+   tema. `--olive-l` es un verde CLARO que no cambia en modo oscuro, mientras
+   `--ink` sí se vuelve casi blanco: el resultado era el nombre del lenguaje
+   en blanco sobre verde claro, es decir, invisible justo en el que estabas
+   usando. Aquí cada tema lleva su pareja. */
+.ctx-lang-item.active { background: #E8F0DA; color: #23331A; font-weight: 700; }
+.ctx-lang-item.active .material-symbols-rounded { color: #4E6B2E; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .ctx-lang-item.active { background: #324329; color: #DCEEC6; }
+  :root:not([data-theme="light"]) .ctx-lang-item.active .material-symbols-rounded { color: #9ECB75; }
+}
+:root[data-theme="dark"] .ctx-lang-item.active { background: #324329; color: #DCEEC6; }
+:root[data-theme="dark"] .ctx-lang-item.active .material-symbols-rounded { color: #9ECB75; }
 .ctx-lang-item .material-symbols-rounded { font-size: 15px; color: var(--olive); }
 
 /* ============================================

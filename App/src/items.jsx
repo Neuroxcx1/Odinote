@@ -3749,12 +3749,21 @@ function CodeItem({ item, lang, editing, onUpdate, callbacks }) {
   // El título se edita desde su propio botón de la barra del nodo, que además
   // abre SU menú (color, negrita…). Por eso el aviso viaja en el item y no en
   // un estado de aquí dentro: la barra lateral también tiene que verlo.
-  const editandoTitulo = item._editingCodeTitle === true;
+  const editandoTitulo = item._editingTitle === true;
 
   // El color del título y el de su barra sí se pueden cambiar; el del fondo no,
   // porque el azul oscuro con el degradado ES el nodo.
   const colorBarra = item.barColor || 'rgba(255,255,255,0.06)';
   const colorTitulo = item.titleColor && item.titleColor !== 'inherit' ? item.titleColor : '#DDE6F5';
+  // Los mismos campos que escribe la barra de texto en el marco y en el mapa,
+  // para que el titulo de aqui se comporte como los demas titulos.
+  const estiloTitulo = {
+    color: colorTitulo,
+    fontWeight: item.bold === false ? 500 : 700,
+    fontStyle: item.italic ? 'italic' : 'normal',
+    textDecoration: [item.underline ? 'underline' : '', item.strike ? 'line-through' : ''].filter(Boolean).join(' ') || 'none',
+    textAlign: item.titleAlign || 'left',
+  };
 
   // Comentar la selección se pide desde la barra del nodo, que no tiene acceso
   // al textarea: se deja aquí una función colgada del nodo mientras se edita.
@@ -3819,18 +3828,18 @@ function CodeItem({ item, lang, editing, onUpdate, callbacks }) {
           {editandoTitulo ? (
             <input
               className="code-title-input"
-              style={{ color: colorTitulo, fontWeight: item.titleBold === false ? 500 : 700, fontStyle: item.titleItalic ? 'italic' : 'normal' }}
+              style={estiloTitulo}
               defaultValue={titulo}
               autoFocus
               onMouseDown={(e)=>e.stopPropagation()}
-              onBlur={(e)=>{ onUpdate({ codeTitle: e.target.value, _editingCodeTitle: false }); }}
+              onBlur={(e)=>{ onUpdate({ codeTitle: e.target.value }); }}
               onKeyDown={(e)=>{ if (e.key === 'Enter' || e.key === 'Escape') e.currentTarget.blur(); }}
             />
           ) : (
             <span
               className={`code-title${titulo ? '' : ' vacio'}`}
-              style={{ color: colorTitulo, fontWeight: item.titleBold === false ? 500 : 700, fontStyle: item.titleItalic ? 'italic' : 'normal' }}
-              onDoubleClick={(e)=>{ e.stopPropagation(); onUpdate({ _editingCodeTitle: true }); }}
+              style={estiloTitulo}
+              onDoubleClick={(e)=>{ e.stopPropagation(); onUpdate({ _editingTitle: true }); }}
               title={window.t('Doble clic para ponerle nombre', 'Double-click to name it')}
             >
               {titulo || window.t('sin nombre', 'untitled')}

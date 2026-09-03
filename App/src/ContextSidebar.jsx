@@ -90,7 +90,7 @@ function ContextSidebar({
   // nodo o al entrar o salir de escribir. Antes se quedaba colgado ahí: elegías
   // un lenguaje, te ibas a otra cosa y la lista seguía puesta encima del
   // lienzo, tapando, sin nada que la cerrara.
-  const modo = `${item ? item.id : ''}|${editando ? 1 : 0}|${item && item._editingCodeTitle ? 1 : 0}`;
+  const modo = `${item ? item.id : ''}|${editando ? 1 : 0}|${item && item._editingTitle ? 1 : 0}`;
   const modoPrevio = React.useRef(modo);
   React.useEffect(() => {
     if (modoPrevio.current !== modo) {
@@ -124,7 +124,6 @@ function ContextSidebar({
   // eliminar) estorba con las manos en el teclado, y una de esas es
   // irreversible.
   const editandoCodigo = isCode && editando;
-  const editandoTituloCodigo = isCode && item._editingCodeTitle === true;
 
   // ── "Abrir la carpeta del archivo" ──
   //
@@ -245,9 +244,6 @@ function ContextSidebar({
             }
             // Step 1: if a sub-pane is open, just close it
             if (pane) { setPane(null); return; }
-            // Escribiendo el título de un bloque de código, "atrás" lo cierra
-            // y devuelve el menú normal del nodo, no cierra la barra entera.
-            if (editandoTituloCodigo) { onUpdate({ _editingCodeTitle: false }); return; }
             // Step 2: if a table cell is focused, deselect cell to go back to table-level menu
             if (tableCell && tableCell.clearCellSelection) { tableCell.clearCellSelection(); return; }
             // Step 3: otherwise close the sidebar entirely
@@ -258,37 +254,7 @@ function ContextSidebar({
           <span className="material-symbols-rounded">arrow_back</span>
         </button>
 
-        {editandoTituloCodigo ? (
-          /* Escribiendo el TÍTULO: aquí sí van sus letras — color, negrita y
-             cursiva. Es el otro menú del nodo, distinto del de escribir código
-             (donde estas opciones no pintan nada). */
-          <>
-            <button
-              className={`ctx-btn ${pane === 'codeTitleColor' ? 'active' : ''}`}
-              onClick={()=>setPane(pane === 'codeTitleColor' ? null : 'codeTitleColor')}
-              title={window.t('Color del título', 'Title colour')}
-            >
-              <div className="ctx-color-chip" style={{ background: item.titleColor && item.titleColor !== 'inherit' ? item.titleColor : '#DDE6F5', border: '1.5px solid var(--line-soft)' }}/>
-              <span>Color</span>
-            </button>
-            <button
-              className={`ctx-btn ${item.titleBold !== false ? 'active' : ''}`}
-              onClick={()=>onUpdate({ titleBold: item.titleBold === false })}
-              title={window.t('Negrita', 'Bold')}
-            >
-              <span className="ctx-letter" style={{ fontWeight: 800 }}>B</span>
-              <span>{window.t('Negrita', 'Bold')}</span>
-            </button>
-            <button
-              className={`ctx-btn ${item.titleItalic ? 'active' : ''}`}
-              onClick={()=>onUpdate({ titleItalic: !item.titleItalic })}
-              title={window.t('Cursiva', 'Italic')}
-            >
-              <span className="ctx-letter" style={{ fontStyle: 'italic', fontFamily: 'serif' }}>I</span>
-              <span>{window.t('Cursiva', 'Italic')}</span>
-            </button>
-          </>
-        ) : editandoCodigo ? (
+        {editandoCodigo ? (
           /* Escribiendo código: solo volver (el botón de arriba) y comentar.
              Nada más, que con las manos en el teclado el resto sobra. */
           <button
@@ -755,7 +721,7 @@ function ContextSidebar({
                 // Los dos modos no pueden estar a la vez: si se venía de
                 // escribir código, se sale de ahí antes de entrar al título.
                 callbacks && callbacks.endEdit && callbacks.endEdit();
-                onUpdate({ _editingCodeTitle: true });
+                onUpdate({ _editingTitle: true });
               }}
               title={window.t('Poner nombre al bloque', 'Name the block')}
             >
@@ -1316,20 +1282,6 @@ function ContextSidebar({
                 </button>
               ))}
             </div>
-          </div>
-        </div>
-      )}
-
-      {pane === 'codeTitleColor' && (
-        <div className="ctx-popout">
-          <div className="ctx-pop-section">
-            <div className="ctx-pop-title">{window.t('Color del título', 'Title colour')}</div>
-            <window.SelectorColor
-              valor={item.titleColor && item.titleColor !== 'inherit' ? item.titleColor : '#DDE6F5'}
-              onCambio={(c) => onUpdate({ titleColor: c })}
-              colores={window.COLORES_ODINOTE_TEXTO || window.COLORES_ODINOTE_FONDO}
-              tam={26}
-            />
           </div>
         </div>
       )}

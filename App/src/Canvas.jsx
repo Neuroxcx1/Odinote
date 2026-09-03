@@ -5339,23 +5339,29 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
       })()}
 
       {/* Text format sidebar (when editing a text-based item) */}
-      {((editing && editing === selected) || (selectedItem && selectedItem.type === 'map' && selectedItem._editingTitle)) && !captionFocusId && (() => {
+      {((editing && editing === selected)
+        || (selectedItem && (selectedItem.type === 'map' || selectedItem.type === 'code') && selectedItem._editingTitle)
+       ) && !captionFocusId && (() => {
         const it = selectedItem;
         if (!it) return null;
         const isEditingMapTitle = it.type === 'map' && it._editingTitle;
+        // El titulo de un bloque de codigo se edita como los demas titulos:
+        // con esta misma barra (color, negrita, cursiva...), no con un menu
+        // aparte inventado solo para el.
+        const isEditingCodeTitle = it.type === 'code' && it._editingTitle;
         // 'board' entró aquí porque, al empezar a escribir su título, el menú
         // contextual normal se ocultaba (se oculta siempre que editing===selected)
         // y esta barra de texto tampoco lo cubría: el panel de la izquierda
         // desaparecía entero mientras se cambiaba el nombre del tablero.
         const isEditingTextNode = editing && editing === selected && ['note','comment','bigtitle','frame','todo','board','shape'].includes(it.type);
-        if (!isEditingTextNode && !isEditingMapTitle) return null;
+        if (!isEditingTextNode && !isEditingMapTitle && !isEditingCodeTitle) return null;
         return (
           <window.TextFormatSidebar
             item={it}
             lang={lang}
             onUpdate={(patch)=>updateItem(it.id, patch)}
             onClose={()=>{
-              if (isEditingMapTitle) {
+              if (isEditingMapTitle || isEditingCodeTitle) {
                 updateItem(it.id, { _editingTitle: false });
               } else {
                 setEditing(null);
