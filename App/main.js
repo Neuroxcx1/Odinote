@@ -89,6 +89,12 @@ function createWindow() {
       nodeIntegration: false,
       contextIsolation: true,
       webSecurity: false,
+      // Sin esto Chromium no tiene con qué pintar un PDF dentro de un
+      // <iframe> (ni en la vista previa del nodo de archivo ni en el visor
+      // grande): lo trata como una descarga que nadie interceptó, y Electron
+      // termina mostrando su diálogo nativo de "Guardar como" en su lugar —
+      // eso es lo que parecía "se abre el buscador de archivos otra vez".
+      plugins: true,
       preload: path.join(__dirname, 'preload.js')
     }
   });
