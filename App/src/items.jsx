@@ -3618,6 +3618,11 @@ function ColorItem({ item, lang, onUpdate }) {
 
 // Lo que se ofrece en el menú, con el nombre que usa la gente y no el interno.
 const LENGUAJES_CODIGO = [
+  // El primero y el de por defecto: que lo adivine él. Nadie viene a un lienzo
+  // a decirle a un cuadro de texto en qué lenguaje está escribiendo, y si te
+  // equivocas de lenguaje el código sale sin colores y parece que está roto.
+  // highlight.js compara con los 34 y se queda con el que mejor encaja.
+  { id: 'auto',       nombre: 'Automático',  comentario: '// ' },
   { id: 'plaintext',  nombre: 'Texto plano', comentario: '# ' },
   { id: 'javascript', nombre: 'JavaScript',  comentario: '// ' },
   { id: 'typescript', nombre: 'TypeScript',  comentario: '// ' },
@@ -3669,12 +3674,30 @@ function coloreaCodigo(texto, lenguaje) {
   const hljs = window.hljs;
   if (!hljs || !lenguaje || lenguaje === 'plaintext') return escapado;
   try {
+    // Automático: se lo pregunta a la propia librería, que compara con los 34
+    // que trae y se queda con el que más encaja. Así el código sale coloreado
+    // aunque el lenguaje elegido no sea el que se está escribiendo.
+    if (lenguaje === 'auto') return hljs.highlightAuto(plano).value;
     if (hljs.listLanguages && hljs.listLanguages().indexOf(lenguaje) === -1) return escapado;
     return hljs.highlight(plano, { language: lenguaje, ignoreIllegals: true }).value;
   } catch (e) {
     return escapado;
   }
 }
+
+// Qué lenguaje ha adivinado, para poder enseñarlo en la barra del nodo: si no
+// se dice, "Automático" no informa de nada y no se sabe si acertó.
+function adivinaLenguaje(texto) {
+  const hljs = window.hljs;
+  if (!hljs || !hljs.highlightAuto || !String(texto || '').trim()) return null;
+  try {
+    const r = hljs.highlightAuto(String(texto));
+    if (!r.language) return null;
+    const conocido = LENGUAJES_CODIGO.find(l => l.id === r.language);
+    return conocido ? conocido.nombre : r.language;
+  } catch (e) { return null; }
+}
+window.adivinaLenguaje = adivinaLenguaje;
 window.coloreaCodigo = coloreaCodigo;
 
 // Comentar o descomentar las líneas que abarque la selección.
@@ -3721,9 +3744,12 @@ function CodeItem({ item, lang, editing, onUpdate, callbacks }) {
   const preRef = React.useRef(null);
   const cb = callbacks || {};
   const codigo = typeof item.code === 'string' ? item.code : '';
-  const lenguaje = lenguajeCodigo(item.codeLang || 'javascript');
+  const lenguaje = lenguajeCodigo(item.codeLang || 'auto');
   const titulo = item.codeTitle || '';
-  const [editandoTitulo, setEditandoTitulo] = React.useState(false);
+  // El título se edita desde su propio botón de la barra del nodo, que además
+  // abre SU menú (color, negrita…). Por eso el aviso viaja en el item y no en
+  // un estado de aquí dentro: la barra lateral también tiene que verlo.
+  const editandoTitulo = item._editingCodeTitle === true;
 
   // El color del título y el de su barra sí se pueden cambiar; el del fondo no,
   // porque el azul oscuro con el degradado ES el nodo.
@@ -3793,24 +3819,30 @@ function CodeItem({ item, lang, editing, onUpdate, callbacks }) {
           {editandoTitulo ? (
             <input
               className="code-title-input"
-              style={{ color: colorTitulo }}
+              style={{ color: colorTitulo, fontWeight: item.titleBold === false ? 500 : 700, fontStyle: item.titleItalic ? 'italic' : 'normal' }}
               defaultValue={titulo}
               autoFocus
               onMouseDown={(e)=>e.stopPropagation()}
-              onBlur={(e)=>{ onUpdate({ codeTitle: e.target.value }); setEditandoTitulo(false); }}
-              onKeyDown={(e)=>{ if (e.key === 'Enter') e.currentTarget.blur(); }}
+              onBlur={(e)=>{ onUpdate({ codeTitle: e.target.value, _editingCodeTitle: false }); }}
+              onKeyDown={(e)=>{ if (e.key === 'Enter' || e.key === 'Escape') e.currentTarget.blur(); }}
             />
           ) : (
             <span
               className={`code-title${titulo ? '' : ' vacio'}`}
-              style={{ color: colorTitulo }}
-              onDoubleClick={(e)=>{ e.stopPropagation(); setEditandoTitulo(true); }}
+              style={{ color: colorTitulo, fontWeight: item.titleBold === false ? 500 : 700, fontStyle: item.titleItalic ? 'italic' : 'normal' }}
+              onDoubleClick={(e)=>{ e.stopPropagation(); onUpdate({ _editingCodeTitle: true }); }}
               title={window.t('Doble clic para ponerle nombre', 'Double-click to name it')}
             >
               {titulo || window.t('sin nombre', 'untitled')}
             </span>
           )}
-          <span className="code-lang">{lenguaje.nombre}</span>
+          {/* En automático se enseña lo que ha adivinado, con un punto delante:
+              si solo pusiera "Automático" no habría forma de saber si acertó. */}
+          <span className="code-lang">
+            {lenguaje.id === 'auto'
+              ? (adivinaLenguaje(codigo) ? `• ${adivinaLenguaje(codigo)}` : window.t('Automático', 'Auto'))
+              : lenguaje.nombre}
+          </span>
         </div>
 
         {/* El código */}

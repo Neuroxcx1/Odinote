@@ -86,6 +86,19 @@ function ContextSidebar({
     return () => { window._notifyFocusedRowChanged = null; };
   }, []);
 
+  // El panel abierto (la lista de lenguajes, un color…) se cierra al cambiar de
+  // nodo o al entrar o salir de escribir. Antes se quedaba colgado ahí: elegías
+  // un lenguaje, te ibas a otra cosa y la lista seguía puesta encima del
+  // lienzo, tapando, sin nada que la cerrara.
+  const modo = `${item ? item.id : ''}|${editando ? 1 : 0}|${item && item._editingCodeTitle ? 1 : 0}`;
+  const modoPrevio = React.useRef(modo);
+  React.useEffect(() => {
+    if (modoPrevio.current !== modo) {
+      modoPrevio.current = modo;
+      setPane(null);
+    }
+  }, [modo]);
+
   if (!item || window._calendarDayMenuOpen) return null;
 
   const isText = ['note','comment','doc'].includes(item.type);
@@ -111,6 +124,7 @@ function ContextSidebar({
   // eliminar) estorba con las manos en el teclado, y una de esas es
   // irreversible.
   const editandoCodigo = isCode && editando;
+  const editandoTituloCodigo = isCode && item._editingCodeTitle === true;
 
   // ── "Abrir la carpeta del archivo" ──
   //
@@ -231,6 +245,9 @@ function ContextSidebar({
             }
             // Step 1: if a sub-pane is open, just close it
             if (pane) { setPane(null); return; }
+            // Escribiendo el título de un bloque de código, "atrás" lo cierra
+            // y devuelve el menú normal del nodo, no cierra la barra entera.
+            if (editandoTituloCodigo) { onUpdate({ _editingCodeTitle: false }); return; }
             // Step 2: if a table cell is focused, deselect cell to go back to table-level menu
             if (tableCell && tableCell.clearCellSelection) { tableCell.clearCellSelection(); return; }
             // Step 3: otherwise close the sidebar entirely
@@ -241,7 +258,37 @@ function ContextSidebar({
           <span className="material-symbols-rounded">arrow_back</span>
         </button>
 
-        {editandoCodigo ? (
+        {editandoTituloCodigo ? (
+          /* Escribiendo el TÍTULO: aquí sí van sus letras — color, negrita y
+             cursiva. Es el otro menú del nodo, distinto del de escribir código
+             (donde estas opciones no pintan nada). */
+          <>
+            <button
+              className={`ctx-btn ${pane === 'codeTitleColor' ? 'active' : ''}`}
+              onClick={()=>setPane(pane === 'codeTitleColor' ? null : 'codeTitleColor')}
+              title={window.t('Color del título', 'Title colour')}
+            >
+              <div className="ctx-color-chip" style={{ background: item.titleColor && item.titleColor !== 'inherit' ? item.titleColor : '#DDE6F5', border: '1.5px solid var(--line-soft)' }}/>
+              <span>Color</span>
+            </button>
+            <button
+              className={`ctx-btn ${item.titleBold !== false ? 'active' : ''}`}
+              onClick={()=>onUpdate({ titleBold: item.titleBold === false })}
+              title={window.t('Negrita', 'Bold')}
+            >
+              <span className="ctx-letter" style={{ fontWeight: 800 }}>B</span>
+              <span>{window.t('Negrita', 'Bold')}</span>
+            </button>
+            <button
+              className={`ctx-btn ${item.titleItalic ? 'active' : ''}`}
+              onClick={()=>onUpdate({ titleItalic: !item.titleItalic })}
+              title={window.t('Cursiva', 'Italic')}
+            >
+              <span className="ctx-letter" style={{ fontStyle: 'italic', fontFamily: 'serif' }}>I</span>
+              <span>{window.t('Cursiva', 'Italic')}</span>
+            </button>
+          </>
+        ) : editandoCodigo ? (
           /* Escribiendo código: solo volver (el botón de arriba) y comentar.
              Nada más, que con las manos en el teclado el resto sobra. */
           <button
@@ -695,12 +742,24 @@ function ContextSidebar({
               <span className="material-symbols-rounded">edit</span>
               <span>{window.t('Escribir', 'Edit')}</span>
             </button>
+            {/* El título tiene MENÚ PROPIO: se pulsa aquí y se pasa a
+                escribirlo, con su color y su negrita al lado. Antes había dos
+                botones de color sueltos en este mismo menú —uno para el título
+                y otro para la barra— y no se sabía cuál era cuál. Aquí queda
+                uno solo, el de la barra, y lo del título vive dentro del
+                título. */}
             <button
-              className={`ctx-btn ${pane === 'codeTitleColor' ? 'active' : ''}`}
-              onClick={()=>setPane(pane === 'codeTitleColor' ? null : 'codeTitleColor')}
-              title={window.t('Color del título', 'Title colour')}
+              className="ctx-btn"
+              onClick={()=>{
+                setPane(null);
+                // Los dos modos no pueden estar a la vez: si se venía de
+                // escribir código, se sale de ahí antes de entrar al título.
+                callbacks && callbacks.endEdit && callbacks.endEdit();
+                onUpdate({ _editingCodeTitle: true });
+              }}
+              title={window.t('Poner nombre al bloque', 'Name the block')}
             >
-              <div className="ctx-color-chip" style={{ background: item.titleColor && item.titleColor !== 'inherit' ? item.titleColor : '#DDE6F5', border: '1.5px solid var(--line-soft)' }}/>
+              <span className="material-symbols-rounded">label</span>
               <span>{window.t('Título', 'Title')}</span>
             </button>
             <button
@@ -709,7 +768,7 @@ function ContextSidebar({
               title={window.t('Color de la barra', 'Bar colour')}
             >
               <div className="ctx-color-chip" style={{ background: item.barColor || '#243352', border: '1.5px solid var(--line-soft)' }}/>
-              <span>{window.t('Barra', 'Bar')}</span>
+              <span>{window.t('Color', 'Colour')}</span>
             </button>
           </>
         )}
@@ -1247,7 +1306,10 @@ function ContextSidebar({
                 <button
                   key={l.id}
                   className={`ctx-lang-item ${(item.codeLang || 'javascript') === l.id ? 'active' : ''}`}
-                  onClick={()=>{ onUpdate({ codeLang: l.id }); window.playAudioTone && window.playAudioTone('click'); }}
+                  /* Se elige y se cierra, como cualquier desplegable. Dejarlo
+                     abierto lo convertía en un panel pegado encima del lienzo
+                     que no se sabía cómo quitar. */
+                  onClick={()=>{ onUpdate({ codeLang: l.id }); setPane(null); window.playAudioTone && window.playAudioTone('click'); }}
                 >
                   <span>{l.nombre}</span>
                   {(item.codeLang || 'javascript') === l.id && <span className="material-symbols-rounded">check</span>}

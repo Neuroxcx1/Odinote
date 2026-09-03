@@ -193,7 +193,7 @@ function makeNewItem(type, x, y, w, h, lang) {
       // Nace en JavaScript porque es lo que más se pega desde fuera, y con el
       // nombre vacío: el nombre se pone cuando ya sabes qué hay dentro.
       return { ...base, type: 'code', ...defaultSize(420, 260),
-        code: '', codeLang: 'javascript', codeTitle: '' };
+        code: '', codeLang: 'auto', codeTitle: '' };
     case 'bigtitle':
       return { ...base, type: 'bigtitle', ...defaultSize(300, 80),
         color: 'transparent',
