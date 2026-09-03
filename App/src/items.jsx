@@ -3667,6 +3667,7 @@ function FileItem({ item, lang, onUpdate, onOpenFile }) {
   const meta = fileMeta(ext);
   const showPreview = item.showPreview === true;
   const showInfo = item.showInfo === true;
+  const showCaption = item.showCaption === true;
 
   const fmtSize = (b) => {
     if (!b) return '';
@@ -3691,11 +3692,25 @@ function FileItem({ item, lang, onUpdate, onOpenFile }) {
     e.target.value = '';
   };
 
-  // Auto-open the picker right after the node is created
+  // Auto-open the picker right after the node is created — SOLO en el montaje.
+  // Antes dependía de `item._triggerFilePick` en el array de dependencias, así
+  // que si esa bandera volvía a valer true por cualquier motivo ajeno a la
+  // creación (una recarga del proyecto, deshacer, sincronización) el efecto
+  // se disparaba otra vez y reabría el selector de Windows sin que el usuario
+  // tocara nada — justo lo que se veía tras importar un PDF o al tocar
+  // cualquier otro botón del nodo. Con la referencia solo puede abrirse una
+  // vez por cada vez que el componente se monta de verdad, y solo si de
+  // verdad no hay archivo todavía.
+  const autoOpenedRef = React.useRef(false);
   React.useEffect(() => {
-    if (item._triggerFilePick) { fileInputRef.current?.click(); onUpdate({ _triggerFilePick: false }); }
+    if (autoOpenedRef.current) return;
+    autoOpenedRef.current = true;
+    if (item._triggerFilePick) {
+      if (!hasFile) fileInputRef.current?.click();
+      onUpdate({ _triggerFilePick: false });
+    }
     // eslint-disable-next-line
-  }, [item._triggerFilePick]);
+  }, []);
 
   const kind = fileKind(ext);
   const REF = kind === 'excel' ? 1100 : 794; // excel is landscape/wide; docs are A4-portrait
@@ -3745,48 +3760,57 @@ function FileItem({ item, lang, onUpdate, onOpenFile }) {
   return (
     <div className="file-card" style={{width:'100%', height:'100%'}}>
       <div className="item-card" style={{ display:'flex', flexDirection:'column', overflow:'hidden', backgroundColor: cardBg }}>
-        {showPreview ? (
-          <>
-            <div
-              className="file-preview"
-              onDoubleClick={(e)=>{ e.stopPropagation(); onOpenFile && onOpenFile(item.id); }}
-              title={window.t('Doble clic para ver completo', 'Double-click to view full')}
-            >
-              {kind === 'image' && <img src={window.resolveMediaSrc(item.src)} alt={item.name} onError={driveImageFallback}/>}
-              {kind === 'pdf' && <iframe title={item.name} src={window.resolveMediaSrc(item.src)}/>}
-              {kind === 'text' && (
-                <div className="file-page-scale" style={{ width: REF, transform: `scale(${scale})`, transformOrigin: 'top left' }}>
-                  <FilePreviewText src={window.resolveMediaSrc(item.src)}/>
-                </div>
-              )}
-              {(kind === 'docx' || kind === 'excel') && (
-                docHtml && docHtml !== 'loading'
-                  ? <div className="file-page-scale" style={{ width: REF, transform: `scale(${scale})`, transformOrigin: 'top left' }}>
-                      <div className="file-doc-html" dangerouslySetInnerHTML={{ __html: docHtml }}/>
-                    </div>
-                  : <div className="file-preview-empty"><span className="material-symbols-rounded">{docHtml==='loading'?'hourglass_top':'description'}</span><span>{docHtml==='loading'?(window.t('Generando vista…', 'Rendering…')):(window.t('Sin vista previa', 'No preview'))}</span></div>
-              )}
-              {(kind === 'pptx' || kind === 'other') && (
-                <div className="file-preview-empty">
-                  <div className="file-icon" style={{ '--file-accent': meta.color }}><span className="file-icon-label">{meta.label}</span></div>
-                  <span>{window.t('Sin vista previa', 'No preview')}</span>
-                </div>
-              )}
+        {/* La vista previa se queda SIEMPRE montada (solo se le cambia el
+            display) en vez de quitarla del DOM cuando showPreview es false.
+            Un PDF dentro de un <iframe> es frágil: desmontarlo y volver a
+            montarlo hacía que el visor de Chromium se quedara en blanco la
+            segunda vez que se activaba la vista previa. Ocultándolo con CSS
+            el <iframe> nunca se recarga. */}
+        <div
+          className="file-preview"
+          style={{ display: showPreview ? undefined : 'none' }}
+          onDoubleClick={(e)=>{ e.stopPropagation(); onOpenFile && onOpenFile(item.id); }}
+          title={window.t('Doble clic para ver completo', 'Double-click to view full')}
+        >
+          {kind === 'image' && <img src={window.resolveMediaSrc(item.src)} alt={item.name} onError={driveImageFallback}/>}
+          {kind === 'pdf' && <iframe title={item.name} src={window.resolveMediaSrc(item.src)}/>}
+          {kind === 'text' && (
+            <div className="file-page-scale" style={{ width: REF, transform: `scale(${scale})`, transformOrigin: 'top left' }}>
+              <FilePreviewText src={window.resolveMediaSrc(item.src)}/>
             </div>
-            {showInfo && (
-              <div className="file-info-row">
-                <span className="file-info-name" title={item.name}>{item.name}</span>
-                <span className="file-info-size">{fmtSize(item.size)}</span>
-              </div>
-            )}
-          </>
-        ) : (
+          )}
+          {(kind === 'docx' || kind === 'excel') && (
+            docHtml && docHtml !== 'loading'
+              ? <div className="file-page-scale" style={{ width: REF, transform: `scale(${scale})`, transformOrigin: 'top left' }}>
+                  <div className="file-doc-html" dangerouslySetInnerHTML={{ __html: docHtml }}/>
+                </div>
+              : <div className="file-preview-empty"><span className="material-symbols-rounded">{docHtml==='loading'?'hourglass_top':'description'}</span><span>{docHtml==='loading'?(window.t('Generando vista…', 'Rendering…')):(window.t('Sin vista previa', 'No preview'))}</span></div>
+          )}
+          {(kind === 'pptx' || kind === 'other') && (
+            <div className="file-preview-empty">
+              <div className="file-icon" style={{ '--file-accent': meta.color }}><span className="file-icon-label">{meta.label}</span></div>
+              <span>{window.t('Sin vista previa', 'No preview')}</span>
+            </div>
+          )}
+        </div>
+        {showPreview && showInfo && (
+          <div className="file-info-row">
+            <span className="file-info-name" title={item.name}>{item.name}</span>
+            <span className="file-info-size">{fmtSize(item.size)}</span>
+          </div>
+        )}
+        {!showPreview && (
           <div className="file-compact" onDoubleClick={(e)=>{ e.stopPropagation(); fileInputRef.current?.click(); }}>
             <div className="file-icon" style={{ '--file-accent': meta.color }}>
               <span className="file-icon-label">{meta.label}</span>
             </div>
             <div className="file-name" title={item.name}>{item.name}</div>
             <div className="file-size">{fmtSize(item.size)}</div>
+          </div>
+        )}
+        {showCaption && (
+          <div className="node-caption-row">
+            <NodeCaption item={item} lang={lang} onUpdate={onUpdate} autoGrow/>
           </div>
         )}
         <input ref={fileInputRef} type="file" style={{display:'none'}} onChange={onFileChange}/>

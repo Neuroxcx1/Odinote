@@ -636,8 +636,8 @@ function ContextSidebar({
           </>
         )}
 
-        {/* Caption ("leyenda") toggle for image / board / comment / calendar / color */}
-        {(isImage || isBoard || isComment || isCalendar || isColor) && (
+        {/* Caption ("leyenda") toggle for image / board / comment / calendar / color / file */}
+        {(isImage || isBoard || isComment || isCalendar || isColor || isFile) && (
           <button
             className={`ctx-btn ${item.showCaption === true ? 'active' : ''}`}
             onClick={()=>{
