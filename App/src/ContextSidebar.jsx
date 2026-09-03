@@ -1102,6 +1102,18 @@ function ContextSidebar({
 
         <div className="ctx-sep-h"/>
 
+        {/* Girar. El tirador redondo del nodo sirve para cualquier ángulo;
+            esto es para el caso de siempre — de 90 en 90 — sin pulso. Doble
+            clic vuelve a dejarlo derecho, igual que el tirador. */}
+        <button
+          className={`ctx-btn ${item.rot ? 'active' : ''}`}
+          onClick={()=>onUpdate({ rot: (((item.rot || 0) + 90) % 360) })}
+          onDoubleClick={()=>onUpdate({ rot: 0 })}
+          title={window.t('Girar 90° · doble clic lo endereza', 'Rotate 90° · double-click to straighten')}
+        >
+          <span className="material-symbols-rounded">rotate_right</span>
+          <span>{item.rot ? `${Math.round(item.rot)}°` : window.t('Girar', 'Rotate')}</span>
+        </button>
         <button className="ctx-btn" onClick={onDuplicate} title={window.t('Duplicar', 'Duplicate')}>
           <span className="material-symbols-rounded">content_copy</span>
           <span>{window.t('Duplicar', 'Duplicate')}</span>

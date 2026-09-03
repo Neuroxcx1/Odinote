@@ -2894,6 +2894,20 @@ body.odi-busy iframe { pointer-events: none !important; }
 .handle.tr { top: 0; right: 0; cursor: nesw-resize; }
 .handle.bl { bottom: 0; left: 0; cursor: nesw-resize; }
 .handle.br { bottom: 0; right: 0; cursor: nwse-resize; }
+/* Girar: va por fuera de la caja y por debajo a la izquierda, donde no pisa
+   ninguna esquina de redimensionado. Es redondo a propósito, para que no se
+   confunda con los cuadraditos que cambian el tamaño. */
+.handle.rot {
+  width: 22px; height: 22px;
+  left: -14px; bottom: -30px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  cursor: grab;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.18);
+}
+.handle.rot:active { cursor: grabbing; }
+.handle.rot .material-symbols-rounded { font-size: 15px; color: var(--olive); }
+.handle.rot::before { top: -10px; left: -10px; right: -10px; bottom: -10px; }
 
 /* ============================================
    Subtle enter animation (only the incoming page)

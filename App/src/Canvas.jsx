@@ -209,17 +209,34 @@ function makeNewItem(type, x, y, w, h, lang) {
   }
 }
 
+// Gira un punto alrededor de un centro. Se usa para todo lo que tiene que
+// seguir a un nodo girado: sus anclas y su redimensionado.
+function giraPunto(x, y, cx, cy, grados) {
+  if (!grados) return { x, y };
+  const r = grados * Math.PI / 180;
+  const dx = x - cx, dy = y - cy;
+  return {
+    x: cx + dx * Math.cos(r) - dy * Math.sin(r),
+    y: cy + dx * Math.sin(r) + dy * Math.cos(r),
+  };
+}
+
 // ───── anchor helper (must match Connector.jsx) ─────
 function anchorPos(item, anchor) {
   const cx = item.x + item.w / 2;
   const cy = item.y + item.h / 2;
+  let p;
   switch (anchor) {
-    case 'top':    return { x: cx, y: item.y };
-    case 'bottom': return { x: cx, y: item.y + item.h };
-    case 'left':   return { x: item.x, y: cy };
-    case 'right':  return { x: item.x + item.w, y: cy };
-    default:       return { x: cx, y: cy };
+    case 'top':    p = { x: cx, y: item.y }; break;
+    case 'bottom': p = { x: cx, y: item.y + item.h }; break;
+    case 'left':   p = { x: item.x, y: cy }; break;
+    case 'right':  p = { x: item.x + item.w, y: cy }; break;
+    default:       return { x: cx, y: cy };   // el centro no se mueve al girar
   }
+  // Un nodo girado tiene los lados girados con él. Sin esto, una flecha
+  // pegada a su borde derecho seguiría apuntando a donde ESTABA ese borde
+  // antes de girar el nodo, y se vería despegada.
+  return giraPunto(p.x, p.y, cx, cy, item.rot || 0);
 }
 function closestAnchor(item, x, y) {
   const opts = ['top','right','bottom','left'].map(a => ({ a, p: anchorPos(item, a) }));
@@ -4177,6 +4194,59 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
   const setItemColor = (itemId, color) => updateItem(itemId, { color });
 
   // ───── Resize ─────
+  // ───── Girar un nodo ─────
+  //
+  // Se gira arrastrando el tirador de abajo a la izquierda. El ángulo sale de
+  // la línea que va del centro del nodo al puntero, así que el nodo "sigue" al
+  // ratón sin saltos, empiece el gesto donde empiece.
+  //
+  // Enclaje: al pasar cerca de un múltiplo de 90° se pega a él (hay más
+  // tolerancia PARA entrar que para salir, si no el nodo se despega solo con
+  // el pulso de la mano). Con Shift se gira fino, sin enclajes.
+  const ANCLA_GIRO = 90;
+  const TOLERANCIA_GIRO = 7;      // grados para pegarse a un múltiplo de 90
+  const startRotate = (e, itemId) => {
+    e.stopPropagation(); e.preventDefault();
+    const item = current.items.find(i => i.id === itemId);
+    if (!item) return;
+    document.body.classList.add('odi-busy');
+
+    const w = item.w !== undefined ? item.w : defaultDims(item.type).w;
+    const h = item.h !== undefined ? item.h : defaultDims(item.type).h;
+    const cx = item.x + w / 2;
+    const cy = item.y + h / 2;
+    const rotInicial = item.rot || 0;
+
+    const anguloHacia = (clientX, clientY) => {
+      const p = screenToCanvas(clientX, clientY);
+      return Math.atan2(p.y - cy, p.x - cx) * 180 / Math.PI;
+    };
+    const anguloInicial = anguloHacia(e.clientX, e.clientY);
+    let ultimoRot = rotInicial;
+
+    const onMove = (ev) => {
+      let rot = rotInicial + (anguloHacia(ev.clientX, ev.clientY) - anguloInicial);
+      if (!ev.shiftKey) {
+        const cercano = Math.round(rot / ANCLA_GIRO) * ANCLA_GIRO;
+        if (Math.abs(rot - cercano) <= TOLERANCIA_GIRO) rot = cercano;
+      }
+      // Se normaliza a [0, 360) para que no se acumulen vueltas y "0" siga
+      // siendo 0 después de dar tres giros completos.
+      ultimoRot = ((Math.round(rot * 10) / 10) % 360 + 360) % 360;
+      updateItemSilent(itemId, { rot: ultimoRot });
+    };
+    const onUp = () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+      document.body.classList.remove('odi-busy');
+      // El giro entra en el historial como UN paso, no como cien: durante el
+      // arrastre se escribe en silencio y solo al soltar se apunta.
+      updateItem(itemId, { rot: ultimoRot });
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  };
+
   const startResize = (e, itemId, corner) => {
     e.stopPropagation(); e.preventDefault();
     const item = current.items.find(i => i.id === itemId);
@@ -4236,7 +4306,46 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
     let wasSnappedX = false;
     let wasSnappedY = false;
 
+    // Un nodo girado se redimensiona por su propio eje, no por el de la
+    // pantalla: tirando de la esquina de un nodo puesto de lado, "más ancho"
+    // va en la dirección en la que APUNTA el nodo. Se lleva el gesto al eje
+    // del nodo, se calcula el tamaño ahí, y luego se recoloca el centro para
+    // que la esquina de enfrente se quede clavada donde estaba. Las guías de
+    // alineación se saltan mientras está girado: comparan bordes rectos, y
+    // aquí ya no hay bordes rectos que comparar.
+    const rotGrados = item.rot || 0;
+    const girado = !!rotGrados;
+    const signoX = corner === 'tr' || corner === 'br' ? 1 : -1;
+    const signoY = corner === 'bl' || corner === 'br' ? 1 : -1;
+
+    const onMoveGirado = (ev) => {
+      const dxPantalla = (ev.clientX - startX) / scale;
+      const dyPantalla = (ev.clientY - startY) / scale;
+      const r = -rotGrados * Math.PI / 180;
+      const dxL = dxPantalla * Math.cos(r) - dyPantalla * Math.sin(r);
+      const dyL = dxPantalla * Math.sin(r) + dyPantalla * Math.cos(r);
+
+      let nw = Math.max(minW, sw + signoX * dxL);
+      let nh = Math.max(minH, sh + signoY * dyL);
+      if (ev.shiftKey || aspectLocked) {
+        if (Math.abs(dxL) >= Math.abs(dyL)) nh = Math.max(minH, nw / aspectRatio);
+        else nw = Math.max(minW, nh * aspectRatio);
+      }
+
+      // El centro se desplaza la mitad de lo que crece el nodo, en el eje del
+      // propio nodo; llevado a coordenadas del lienzo con el mismo giro.
+      const cxIni = sx + sw / 2, cyIni = sy + sh / 2;
+      const despl = giraPunto(signoX * (nw - sw) / 2, signoY * (nh - sh) / 2, 0, 0, rotGrados);
+      const cx = cxIni + despl.x, cy = cyIni + despl.y;
+
+      updateItemSilent(itemId, {
+        x: Math.round(cx - nw / 2), y: Math.round(cy - nh / 2),
+        w: Math.round(nw), h: Math.round(nh),
+      });
+    };
+
     const onMove = (ev) => {
+      if (girado && !isMulti) return onMoveGirado(ev);
       const dx = (ev.clientX - startX) / scale;
       const dy = (ev.clientY - startY) / scale;
       
@@ -5303,6 +5412,12 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
                     left: item.x, top: item.y,
                     width: item.w !== undefined ? item.w : def.w,
                     height: item.h !== undefined ? item.h : def.h,
+                    // El giro se pinta sobre el centro del nodo, que es lo que
+                    // uno espera al arrastrar el tirador: el nodo pivota, no
+                    // se va de paseo. x/y siguen siendo la esquina del nodo
+                    // SIN girar, así que mover, guardar y sincronizar no se
+                    // enteran de que esto existe.
+                    transform: item.rot ? `rotate(${item.rot}deg)` : undefined,
                     '--node-scale': nodeScale,
                     '--text-scale': textScale,
                     zIndex: (selected === item.id || selectedIds.includes(item.id))
@@ -5448,6 +5563,19 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
                       <div className="handle tr" onMouseDown={(e)=>startResize(e, item.id, 'tr')}/>
                       <div className="handle bl" onMouseDown={(e)=>startResize(e, item.id, 'bl')}/>
                       <div className="handle br" onMouseDown={(e)=>startResize(e, item.id, 'br')}/>
+                      {/* Girar. Va fuera de la caja y solo con un nodo
+                          seleccionado: en grupo, cada nodo giraría sobre su
+                          propio centro y el conjunto se desarmaría. */}
+                      {selected === item.id && selectedIds.length <= 1 && (
+                        <div
+                          className="handle rot"
+                          title={window.t('Girar · se pega cada 90°, con Shift gira fino', 'Rotate · snaps every 90°, hold Shift for fine')}
+                          onMouseDown={(e)=>startRotate(e, item.id)}
+                          onDoubleClick={(e)=>{ e.stopPropagation(); updateItem(item.id, { rot: 0 }); }}
+                        >
+                          <span className="material-symbols-rounded">rotate_right</span>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
