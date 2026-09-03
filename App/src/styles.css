@@ -3682,7 +3682,9 @@ body.odi-busy iframe { pointer-events: none !important; }
 }
 .code-pre {
   position: absolute; inset: 0;
-  overflow: auto;
+  /* Sin barra propia: a esta capa la desplaza el JS siguiendo a la de
+     escribir, y una barra suya cambiaba el ancho util y descuadraba las dos. */
+  overflow: hidden;
   color: #C9D6EE;
   background: none;
 }

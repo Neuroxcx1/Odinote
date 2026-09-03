@@ -1029,6 +1029,10 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
   const [selectedConn, setSelectedConn] = useStateCanvas(null);
   const [connLabelOpen, setConnLabelOpen] = useStateCanvas(false); // connector label input open
   const [editing, setEditing] = useStateCanvas(null);
+  // Qué nodo está abierto para escribir, consultable desde un controlador de
+  // teclado (que no se vuelve a crear en cada render).
+  const editingRef = useRefCanvas(null);
+  editingRef.current = editing;
   const [captionFocusId, setCaptionFocusId] = useStateCanvas(null); // node whose rich caption ("leyenda") is focused
   const [zOrder, setZOrder] = useStateCanvas([]); // node ids in the order they were last touched (last = top layer)
   const [search, setSearch] = useStateCanvas('');
@@ -2686,9 +2690,23 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
   // punto. Por eso se mira antes dónde está el foco. También se suelta al
   // perder la ventana, o al volver el espacio se habría quedado "pulsado".
   useEffectCanvas(() => {
+    // ¿Se está escribiendo DE VERDAD?
+    //
+    // No basta con mirar si el foco está en algo editable. Al seleccionar un
+    // nodo, el foco se queda dentro de él —en el div de su texto— aunque no
+    // se esté escribiendo nada, así que con la comprobación ingenua la barra
+    // espaciadora dejaba de funcionar en cuanto tocabas un nodo: era el caso
+    // normal, no el raro.
+    //
+    // Un campo de formulario (el buscador, un título) siempre manda: ahí el
+    // espacio es un espacio. Un texto de nodo solo manda si el nodo está
+    // ABIERTO para editar, que es cuando se está escribiendo.
     const escribiendo = () => {
       const ae = document.activeElement;
-      return !!(ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || ae.isContentEditable));
+      if (!ae) return false;
+      if (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA') return true;
+      if (ae.isContentEditable) return !!editingRef.current;
+      return false;
     };
     const bajar = (e) => {
       if (e.code !== 'Space' || e.repeat || escribiendo()) return;
@@ -5526,6 +5544,11 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
                     if (item.type === 'board') return;
                     if (['note','comment','todo','column','link','board','bigtitle','frame','shape','code'].includes(item.type)) {
                       e.stopPropagation();
+                      // Los dos modos del bloque de código son excluyentes: al
+                      // entrar a escribir código se cierra el del título. Si no,
+                      // quedaban los dos puestos y entrabas al código con la
+                      // barra del título — o sin barra ninguna.
+                      if (item.type === 'code' && item._editingTitle) updateItemSilent(item.id, { _editingTitle: false });
                       setSelected(item.id);
                       setSelectedIds([]);
                       setSelectedConn(null);

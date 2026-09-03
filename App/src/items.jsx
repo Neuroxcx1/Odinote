@@ -3859,10 +3859,18 @@ function CodeItem({ item, lang, editing, onUpdate, callbacks }) {
           <pre ref={preRef} className="code-pre" aria-hidden="true">
             <code
               className="hljs"
-              dangerouslySetInnerHTML={{ __html: coloreaCodigo(codigo, lenguaje.id) + '\n' }}
+              /* Ni un salto de línea de más: la capa de color y la de escribir
+                 tienen que medir EXACTAMENTE lo mismo. Con el '\n' que había
+                 aquí, la de color era una línea más alta, y al desplazarse
+                 hacia abajo las dos capas dejaban de coincidir — el texto de
+                 colores quedaba una línea por encima del cursor. */
+              dangerouslySetInnerHTML={{ __html: coloreaCodigo(codigo, lenguaje.id) }}
             />
           </pre>
-          {estaEditando && (
+          {/* Mientras se escribe el TÍTULO, el código no recibe nada: si no,
+              se podía picar dentro y acababas escribiendo en dos sitios a la
+              vez, o entrando al código sin que saliera su menú. */}
+          {estaEditando && !editandoTitulo && (
             <textarea
               ref={areaRef}
               className="code-area"
@@ -4201,6 +4209,31 @@ function FileItem({ item, lang, onUpdate, onOpenFile }) {
   // de "no se puede reproducir" del anterior no debe quedarse pegado.
   React.useEffect(() => { setMediaError(false); }, [item.src]);
 
+  // La vista previa no se monta hasta que se enseña por PRIMERA vez, y a
+  // partir de ahí ya no se desmonta.
+  //
+  // Las dos mitades importan. Sin la segunda, un PDF se quedaba en blanco al
+  // apagar y encender la vista. Y sin la PRIMERA pasaba algo peor: el
+  // <iframe> existía desde el arranque, así que al abrir un proyecto se pedían
+  // de golpe todos los archivos — y un PDF alojado en Google Drive lo sirve
+  // como descarga, con lo que Electron sacaba su ventana de "Guardar como"
+  // cada vez que se abría el proyecto, sin que nadie hubiera pedido nada.
+  const [yaSeMostro, setYaSeMostro] = React.useState(showPreview);
+  React.useEffect(() => { if (showPreview) setYaSeMostro(true); }, [showPreview]);
+
+  // Qué dirección se le da al visor.
+  //
+  // Primero la copia local de la bóveda (srcLocal): en el .exe está y evita
+  // ir a la nube para algo que ya está en el disco. Antes este nodo usaba
+  // siempre `item.src` y se saltaba esa copia, que existe precisamente para
+  // esto.
+  const srcVisor = window.displayMediaSrc ? window.displayMediaSrc(item) : window.resolveMediaSrc(item.src);
+  // Un PDF de Google Drive NO se puede meter en un <iframe>: Drive lo sirve
+  // como descarga, así que Chromium no lo pinta y Electron acaba sacando su
+  // ventana de "Guardar como". Se detecta y se enseña una tarjeta con un
+  // botón, en vez de disparar una descarga que nadie pidió.
+  const pdfRemoto = kind === 'pdf' && /^https?:\/\//i.test(String(srcVisor || ''));
+
   // Uploading state
   if (uploading) {
     return (
@@ -4246,8 +4279,15 @@ function FileItem({ item, lang, onUpdate, onOpenFile }) {
           onDoubleClick={(e)=>{ e.stopPropagation(); onOpenFile && onOpenFile(item.id); }}
           title={window.t('Doble clic para ver completo', 'Double-click to view full')}
         >
-          {kind === 'image' && <img src={window.resolveMediaSrc(item.src)} alt={item.name} onError={driveImageFallback}/>}
-          {kind === 'pdf' && <iframe title={item.name} src={window.resolveMediaSrc(item.src)}/>}
+          {kind === 'image' && <img src={srcVisor} alt={item.name} onError={driveImageFallback}/>}
+          {kind === 'pdf' && (
+            pdfRemoto
+              ? <div className="file-preview-empty">
+                  <div className="file-icon" style={{ '--file-accent': meta.color }}><span className="file-icon-label">{meta.label}</span></div>
+                  <span>{window.t('En la nube · doble clic para abrirlo', 'In the cloud · double-click to open')}</span>
+                </div>
+              : (yaSeMostro && <iframe title={item.name} src={srcVisor}/>)
+          )}
           {/* Vídeo y audio se reproducen aquí mismo, en el lienzo.
               El reparto del ratón tiene truco: el reproductor necesita los
               clics para que funcione "play", pero si se los queda TODOS el
@@ -4267,7 +4307,7 @@ function FileItem({ item, lang, onUpdate, onOpenFile }) {
               : <div className="file-video-wrap">
                   <video
                     className="file-media"
-                    src={window.resolveMediaSrc(item.src)}
+                    src={srcVisor}
                     controls preload="metadata" playsInline
                     onMouseDown={(e)=>e.stopPropagation()}
                     onDoubleClick={(e)=>e.stopPropagation()}
@@ -4285,14 +4325,14 @@ function FileItem({ item, lang, onUpdate, onOpenFile }) {
               <div className="file-icon" style={{ '--file-accent': meta.color }}><span className="file-icon-label">{meta.label}</span></div>
               <audio
                 className="file-media"
-                src={window.resolveMediaSrc(item.src)}
+                src={srcVisor}
                 controls preload="metadata"
               />
             </div>
           )}
           {kind === 'text' && (
             <div className="file-page-scale" style={{ width: REF, transform: `scale(${scale})`, transformOrigin: 'top left' }}>
-              <FilePreviewText src={window.resolveMediaSrc(item.src)}/>
+              <FilePreviewText src={srcVisor}/>
             </div>
           )}
           {esOffice && (
@@ -4567,7 +4607,16 @@ function FrameItem({ item, lang, editing, onUpdate, callbacks }) {
 // Ninguna forma es "la redonda" y "la ovalada" por separado: es la misma, y se
 // vuelve redonda con el botón de igualar de la barra de la derecha. Dos
 // entradas para la misma figura solo obligan a elegir dos veces.
-const FIGURAS = ['circulo', 'rectangulo', 'rombo', 'pildora', 'hexagono', 'triangulo', 'paralelogramo', 'estrella'];
+// Las ocho de siempre, y detras las que se piden a diario en un diagrama:
+// flechas para el sentido, cilindro para "datos", nube para "algo de fuera",
+// trapecio y galon para los pasos, cruz para "suma" y documento para "papel".
+const FIGURAS = [
+  'circulo', 'rectangulo', 'rombo', 'pildora', 'hexagono', 'triangulo',
+  'paralelogramo', 'estrella',
+  'flechaDerecha', 'flechaIzquierda', 'flechaDoble',
+  'pentagono', 'octogono', 'cruz', 'nube',
+  'cilindro', 'trapecio', 'galon', 'documento', 'escudo',
+];
 
 // Cuánto hay que meter el texto por cada lado, en porcentaje, para que no se
 // salga por donde la figura se estrecha. Un triángulo no tiene sitio arriba —
@@ -4581,6 +4630,18 @@ const HUECO_FIGURA = {
   triangulo:     { i: 22, d: 22, a: 38, b: 8 },
   paralelogramo: { i: 18, d: 18, a: 10, b: 10 },
   estrella:      { i: 28, d: 28, a: 30, b: 24 },
+  flechaDerecha:   { i: 10, d: 26, a: 14, b: 14 },
+  flechaIzquierda: { i: 26, d: 10, a: 14, b: 14 },
+  flechaDoble:     { i: 24, d: 24, a: 14, b: 14 },
+  pentagono:       { i: 16, d: 16, a: 22, b: 10 },
+  octogono:        { i: 15, d: 15, a: 15, b: 15 },
+  cruz:            { i: 26, d: 26, a: 26, b: 26 },
+  nube:            { i: 18, d: 18, a: 24, b: 20 },
+  cilindro:        { i: 10, d: 10, a: 22, b: 18 },
+  trapecio:        { i: 20, d: 20, a: 12, b: 8 },
+  galon:           { i: 18, d: 22, a: 12, b: 12 },
+  documento:       { i: 9,  d: 9,  a: 9,  b: 18 },
+  escudo:          { i: 14, d: 14, a: 10, b: 22 },
 };
 
 // Negro o blanco, según lo oscuro que sea el relleno. Y negro de verdad, no
@@ -4637,6 +4698,72 @@ function FiguraSVG({ figura, w, h, relleno, grosor = 1.5 }) {
     dibujo = <polygon points={`${k},${m} ${an - m},${m} ${an - k},${al - m} ${m},${al - m}`} style={pintura} />;
   } else if (figura === 'estrella') {
     dibujo = <polygon points={puntosEstrella(an, al, m)} style={pintura} />;
+  } else if (figura === 'flechaDerecha' || figura === 'flechaIzquierda') {
+    // El cuerpo ocupa dos tercios y la punta el resto; la punta no crece mas
+    // de la cuenta en un nodo muy ancho, o deja de parecer una flecha.
+    const punta = Math.min(an * 0.34, al * 0.9);
+    const grueso = al * 0.28;
+    const pts = figura === 'flechaDerecha'
+      ? `${m},${grueso} ${an - punta},${grueso} ${an - punta},${m} ${an - m},${al / 2} ${an - punta},${al - m} ${an - punta},${al - grueso} ${m},${al - grueso}`
+      : `${an - m},${grueso} ${punta},${grueso} ${punta},${m} ${m},${al / 2} ${punta},${al - m} ${punta},${al - grueso} ${an - m},${al - grueso}`;
+    dibujo = <polygon points={pts} style={pintura} />;
+  } else if (figura === 'flechaDoble') {
+    const punta = Math.min(an * 0.22, al * 0.9);
+    const grueso = al * 0.28;
+    dibujo = <polygon points={`${m},${al / 2} ${punta},${m} ${punta},${grueso} ${an - punta},${grueso} ${an - punta},${m} ${an - m},${al / 2} ${an - punta},${al - m} ${an - punta},${al - grueso} ${punta},${al - grueso} ${punta},${al - m}`} style={pintura} />;
+  } else if (figura === 'pentagono') {
+    const pts = [];
+    for (let i = 0; i < 5; i++) {
+      const ang = (Math.PI * 2 / 5) * i - Math.PI / 2;
+      pts.push(((an / 2) + Math.cos(ang) * (an / 2 - m)).toFixed(1) + ',' + ((al / 2) + Math.sin(ang) * (al / 2 - m)).toFixed(1));
+    }
+    dibujo = <polygon points={pts.join(' ')} style={pintura} />;
+  } else if (figura === 'octogono') {
+    const kx = an * 0.29, ky = al * 0.29;
+    dibujo = <polygon points={`${kx},${m} ${an - kx},${m} ${an - m},${ky} ${an - m},${al - ky} ${an - kx},${al - m} ${kx},${al - m} ${m},${al - ky} ${m},${ky}`} style={pintura} />;
+  } else if (figura === 'cruz') {
+    const bx = an * 0.32, by = al * 0.32;
+    dibujo = <polygon points={`${bx},${m} ${an - bx},${m} ${an - bx},${by} ${an - m},${by} ${an - m},${al - by} ${an - bx},${al - by} ${an - bx},${al - m} ${bx},${al - m} ${bx},${al - by} ${m},${al - by} ${m},${by} ${bx},${by}`} style={pintura} />;
+  } else if (figura === 'nube') {
+    // Cuatro bultos y una base recta: se dibuja en una caja de 100x60 y se
+    // estira con el viewBox, asi la nube se deforma con el nodo como el resto.
+    dibujo = (
+      <path
+        d="M25,52 A17,17 0 0,1 25,20 A15,15 0 0,1 50,10 A18,18 0 0,1 78,22 A16,16 0 0,1 78,52 Z"
+        style={pintura}
+        transform={`scale(${(an - 2 * m) / 100}, ${(al - 2 * m) / 60}) translate(${m}, ${m})`}
+      />
+    );
+  } else if (figura === 'cilindro') {
+    const rx = (an - 2 * m) / 2, ry = Math.min(al * 0.14, 22);
+    dibujo = (
+      <g style={pintura}>
+        <path d={`M${m},${m + ry} A${rx},${ry} 0 0,1 ${an - m},${m + ry} L${an - m},${al - m - ry} A${rx},${ry} 0 0,1 ${m},${al - m - ry} Z`} />
+        <ellipse cx={an / 2} cy={m + ry} rx={rx} ry={ry} style={{ ...pintura, fill: 'none' }} />
+      </g>
+    );
+  } else if (figura === 'trapecio') {
+    const k = Math.min(an * 0.18, 48);
+    dibujo = <polygon points={`${k},${m} ${an - k},${m} ${an - m},${al - m} ${m},${al - m}`} style={pintura} />;
+  } else if (figura === 'galon') {
+    const k = Math.min(an * 0.16, 40);
+    dibujo = <polygon points={`${m},${m} ${an - k},${m} ${an - m},${al / 2} ${an - k},${al - m} ${m},${al - m} ${k},${al / 2}`} style={pintura} />;
+  } else if (figura === 'documento') {
+    // El papel con la onda de abajo: el simbolo de "documento" de toda la vida.
+    const onda = al * 0.14;
+    dibujo = (
+      <path
+        d={`M${m},${m} L${an - m},${m} L${an - m},${al - m - onda} Q${an * 0.75},${al - m} ${an / 2},${al - m - onda * 0.6} T${m},${al - m - onda} Z`}
+        style={pintura}
+      />
+    );
+  } else if (figura === 'escudo') {
+    dibujo = (
+      <path
+        d={`M${m},${m} L${an - m},${m} L${an - m},${al * 0.58} Q${an - m},${al - m} ${an / 2},${al - m} Q${m},${al - m} ${m},${al * 0.58} Z`}
+        style={pintura}
+      />
+    );
   } else {
     dibujo = <ellipse cx={an / 2} cy={al / 2} rx={an / 2 - m} ry={al / 2 - m} style={pintura} />;
   }

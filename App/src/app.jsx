@@ -47,7 +47,7 @@ try {
 
 // Marcador de build: si la consola no muestra esta versión, el navegador está
 // sirviendo JS cacheado (subir ?v= en index.html invalida la caché)
-window.ODINOTE_BUILD = '1.0.8-171';
+window.ODINOTE_BUILD = '1.0.8-172';
 console.log('[ODINOTE] Código cargado: ' + window.ODINOTE_BUILD);
 
 // Global shortcuts configuration
@@ -89,7 +89,40 @@ function getDB() {
   });
 }
 
+// Campos del MOMENTO que no deben guardarse nunca.
+//
+// Son avisos de "esto está pasando ahora": que se abra el selector de
+// archivos, que este nodo se está arrastrando, que aquel se está editando.
+// Si se guardan, al abrir el proyecto la aplicación se cree que siguen
+// pasando — y eso es lo que hacía que **cada vez que abrías un proyecto
+// saliera el selector de archivos de Windows**: el nodo de archivo guardaba
+// `_triggerFilePick: true` y al cargarlo se disparaba otra vez, sin que
+// nadie hubiera pedido nada.
+//
+// La regla es la misma que ya usa la sincronización (App/src/sync.js): todo
+// lo que empieza por guion bajo es del momento y no viaja ni se guarda.
+function sinCamposDelMomento(estado) {
+  if (!estado || !estado.canvases) return estado;
+  let huboCambio = false;
+  const canvases = {};
+  for (const [cid, lienzo] of Object.entries(estado.canvases)) {
+    if (!lienzo || !Array.isArray(lienzo.items)) { canvases[cid] = lienzo; continue; }
+    const items = lienzo.items.map(item => {
+      const sucios = Object.keys(item).filter(k => k.charAt(0) === '_');
+      if (!sucios.length) return item;
+      huboCambio = true;
+      const limpio = {};
+      Object.keys(item).forEach(k => { if (k.charAt(0) !== '_') limpio[k] = item[k]; });
+      return limpio;
+    });
+    canvases[cid] = { ...lienzo, items };
+  }
+  return huboCambio ? { ...estado, canvases } : estado;
+}
+window.sinCamposDelMomento = sinCamposDelMomento;
+
 function saveStateToDB(state) {
+  state = sinCamposDelMomento(state);
   return getDB().then(db => {
     return new Promise((resolve, reject) => {
       const tx = db.transaction(STORE_NAME, 'readwrite');
@@ -121,7 +154,12 @@ function loadStateFromDB() {
 // Clean loaded canvases from ghost nodes (like the deleted title-1 node)
 function cleanCanvases(canvases) {
   if (!canvases) return canvases;
-  const next = { ...canvases };
+  // Lo primero, quitar los campos del momento: los proyectos guardados ANTES
+  // de este arreglo ya los llevan dentro, y sin esto seguirían sacando el
+  // selector de archivos al abrirlos por muy bien que se guarde de ahora en
+  // adelante.
+  const limpio = sinCamposDelMomento({ canvases }).canvases;
+  const next = { ...limpio };
   for (const [cid, canvas] of Object.entries(next)) {
     if (canvas) {
       let changed = false;
@@ -1813,7 +1851,7 @@ function App() {
       try {
         if (vaultPath && window.electronAPI) {
           const cleanCanvases = await saveBase64MediaLocally(canvases, vaultPath);
-          window.electronAPI.writeVault(vaultPath, { view, lang, theme, projects, canvases: cleanCanvases, templatesVersion: 2 }, carpetasProyecto);
+          window.electronAPI.writeVault(vaultPath, sinCamposDelMomento({ view, lang, theme, projects, canvases: cleanCanvases, templatesVersion: 2 }), carpetasProyecto);
         } else {
           saveStateToDB({ view, lang, theme, projects, canvases, templatesVersion: 2 });
         }
@@ -2020,7 +2058,7 @@ function App() {
     if (loading) return;
     const flush = () => {
       if (vaultPath && window.electronAPI) {
-        window.electronAPI.writeVault(vaultPath, { view, lang, theme, projects, canvases, templatesVersion: 2 }, carpetasProyecto);
+        window.electronAPI.writeVault(vaultPath, sinCamposDelMomento({ view, lang, theme, projects, canvases, templatesVersion: 2 }), carpetasProyecto);
       } else {
         saveStateToDB({ view, lang, theme, projects, canvases, templatesVersion: 2 });
       }
@@ -2053,7 +2091,7 @@ function App() {
         if (migrated.canvases) setCanvases(cleanCanvases(migrated.canvases));
       } else {
         // If empty / new folder, initialize it with the current active state
-        await window.electronAPI.writeVault(path, { view, lang, theme, projects, canvases, templatesVersion: 2 });
+        await window.electronAPI.writeVault(path, sinCamposDelMomento({ view, lang, theme, projects, canvases, templatesVersion: 2 }));
       }
     } catch (err) {
       alert(window.t('No se pudo leer la boveda seleccionada.', 'Could not read the selected vault.'));
