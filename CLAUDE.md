@@ -32,25 +32,26 @@ Después de juntar, comprueba que siguen existiendo: `CodeItem`, `TimerItem` y
 
 ## 2. Estado y qué falta
 
-- Versión **1.0.8**, marcador de caché **1.0.8-173** (el siguiente build va con 174).
-- Lista de tareas (28 de 35): https://claude.ai/code/artifact/4f27cc5e-75f9-4d0d-96a0-ce2003a7023d
+- Versión **1.0.8**, marcador de caché **1.0.8-174** (el siguiente build va con 175).
+- Lista de tareas (30 de 35): https://claude.ai/code/artifact/4f27cc5e-75f9-4d0d-96a0-ce2003a7023d
   Las casillas las marca Claude en el HTML del artefacto (`tarea hecha` +
   `checked`) y se republica con la **misma URL**.
 
-**Para la 1.0.8 quedan dos:**
-
-1. **Carpetas para agrupar proyectos** — es cosa de la pantalla de inicio de la
-   aplicación, **nada de Google Drive**: poder meter proyectos dentro de una
-   carpeta en vez de tenerlos todos sueltos. Sin tocar la sincronización.
-2. **La web** — corto y solo texto: repasar las comparativas (hay cosas que ya
-   no son verdad, como que no se puede dibujar a mano o exportar a JSON) y
-   **añadir lo de la corona**, para que se vea qué se llevan los que donan.
-
-El resto de la lista es 1.0.9.
+**La 1.0.8 está cerrada.** Todo lo que quedaba (nodo de tiempo, carpetas de
+proyectos y el repaso de la web) está hecho. El resto de la lista es 1.0.9:
+la ruleta, los cuatro nodos que quedaban, las plantillas de tablero, la flecha
+en modo recto y lo que falta del cambio de nombre.
 
 **A medias, hay que revisarlo:** la flecha en modo recto está escrita pero **sin
 probar con el ratón**; la terminal del nodo de código quedó fuera (era
 opcional).
+
+**Las carpetas de proyectos** no son un objeto que se guarde en ninguna lista:
+una carpeta existe porque hay proyectos que dicen estar dentro (`p.carpeta`, el
+nombre tal cual). Por eso agrupar **no toca la sincronización** — el campo viaja
+dentro del proyecto. Las vacías, que no se pueden deducir, van en localStorage
+(`odinote.carpetas_vacias`) y solo en este equipo. Quitar una carpeta **no borra
+nada**: sus proyectos vuelven a quedar sueltos.
 
 El **nodo de tiempo está cerrado**: el tiempo se escribe en el propio reloj, la
 barra de arriba lleva color y nombre (con la barra de texto de siempre), el
@@ -60,6 +61,13 @@ vive en `siguienteFasePomodoro`, fuera de React, para poder probarla sin
 esperar los minutos de verdad. Sigue **sin verse en el .exe**, solo en el
 servidor de pruebas.
 
+**La web** (`D:\Documentos\Proyectos\Oddinote\Website`, **fuera de este
+repositorio, con su propio git**): las comparativas ya no dicen que la
+colaboración sean carpetas de Drive —hay sesiones en vivo entre navegadores— ni
+que haya 16 tipos de nodo (son 19, más conectores y dibujo a mano), y la
+portada explica qué se lleva quien dona. Ese repositorio tenía **cambios sin
+commitear de antes**; los míos van encima, sin commitear tampoco.
+
 ## 3. Reglas de la casa
 
 - **Colores de los botones: solo gris, blanco, verde y rojo.**
@@ -67,6 +75,12 @@ servidor de pruebas.
   van en **CRLF**.
 - Un **commit por cambio coherente**: asunto en inglés, cuerpo en español con el
   porqué y **qué se comprobó**.
+- **Al terminar cualquier tanda de cambios se compila el `.exe`**, sin que haga
+  falta pedirlo. Dicho por el usuario con todas las letras.
+- En la barra de nodos y en el menú del **+**, el color dice de qué es cada
+  nodo y van **agrupados por color**: verde lo que se escribe, gris los medios
+  y archivos, rojo la estructura, blanco las dos de trazo. Un nodo nuevo se
+  coloca en su grupo, no al final.
 - **No renombrar lo interno.** `%APPDATA%\Odinote` cuelga del `name` de
   `App/package.json`; si cambia, Electron mira en otra carpeta y la gente creerá
   que perdió sus notas. Tampoco: la carpeta "Odinote" de Google Drive,
@@ -96,7 +110,7 @@ npx electron-packager . Odinote-pre --platform=win32 --arch=x64 --out="D:/Docume
 
 ## 5. Cómo comprobar antes de decir "listo"
 
-- `npm test` desde `App/` → **431 comprobaciones**, todas deben pasar.
+- `npm test` desde `App/` → **502 comprobaciones**, todas deben pasar.
 - Los .jsx no los valida nadie: compilarlos con el Babel que viaja dentro —
   `node -e "const B=require('./App/lib/babel.min.js');const Babel=B.transform?B:global.Babel;Babel.transform(require('fs').readFileSync('App/src/X.jsx','utf8'),{presets:['react'],filename:'X.jsx'})"`
 - Para ver cosas de verdad: `node dev-server.js` desde `App/` (puerto 4173).
