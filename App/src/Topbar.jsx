@@ -33,16 +33,24 @@ function esMovil() {
 // Las de más van en el desplegable y no en la barra: en una pantalla de 1080
 // entran quince botones justos, y meter el dieciséis a la fuerza deja la barra
 // con desplazamiento, que es peor que un clic de más.
+// El mismo orden por colores que la barra de arriba, que es de donde cuelga
+// este menú: primero lo que se escribe (verde), luego los medios y archivos
+// (gris) y al final la estructura (rojo). Estaban en el orden en que se
+// fueron añadiendo —rojo, rojo, verde, gris, gris, verde, rojo— y el menú se
+// leía como un cajón de sastre al lado de una barra ordenada.
 const EXTRA_TOOLS = [
-  { id: 'shape',    icon: 'category',      label: 'tool_shape',    bg: '#E6544F', fg: 'white' },
-  { id: 'calendar', icon: 'calendar_month',label: 'tool_calendar', bg: '#E6544F', fg: 'white' },
+  // Texto / contenido → verde
   { id: 'comment',  icon: 'forum',         label: 'tool_comment',  bg: '#90B968', fg: 'white' },
-  { id: 'file',     icon: 'draft',         label: 'tool_file',     bg: '#E1DFE3', fg: '#1A1A1A' },
-  { id: 'map',      icon: 'map',           label: 'tool_map',      bg: '#E1DFE3', fg: '#1A1A1A' },
   // Verde, como el resto de lo que se escribe (nota, to-do, documento,
   // título). El azul oscuro que tenía era el del PROPIO nodo, y aquí arriba
   // rompía la baraja: en esta barra solo hay gris, blanco, verde y rojo.
   { id: 'code',     icon: 'code',          label: 'tool_code',     bg: '#90B968', fg: 'white' },
+  // Medios / archivos → gris
+  { id: 'file',     icon: 'draft',         label: 'tool_file',     bg: '#E1DFE3', fg: '#1A1A1A' },
+  { id: 'map',      icon: 'map',           label: 'tool_map',      bg: '#E1DFE3', fg: '#1A1A1A' },
+  // Estructura y herramientas → rojo
+  { id: 'shape',    icon: 'category',      label: 'tool_shape',    bg: '#E6544F', fg: 'white' },
+  { id: 'calendar', icon: 'calendar_month',label: 'tool_calendar', bg: '#E6544F', fg: 'white' },
   { id: 'timer',    icon: 'timer',         label: 'tool_timer',    bg: '#E6544F', fg: 'white' },
 ];
 

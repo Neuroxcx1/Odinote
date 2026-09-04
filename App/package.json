@@ -10,7 +10,7 @@
     "test:search": "node scripts/test-search.js",
     "test:links": "node scripts/test-links.js",
     "test:graph": "node scripts/test-graph.js",
-    "test": "node scripts/test-search.js && node scripts/test-links.js && node scripts/test-graph.js && node scripts/test-draw.js && node scripts/test-sync.js && node scripts/test-sala.js && node scripts/test-nube.js && node scripts/test-drive.js && node scripts/test-oauth.js && node scripts/test-todo.js && node scripts/test-connector.js && node scripts/test-patrocinio.js && node scripts/test-reclamacion.js && node scripts/test-boveda.js && node scripts/test-tiempo.js",
+    "test": "node scripts/test-search.js && node scripts/test-links.js && node scripts/test-graph.js && node scripts/test-draw.js && node scripts/test-sync.js && node scripts/test-sala.js && node scripts/test-nube.js && node scripts/test-drive.js && node scripts/test-oauth.js && node scripts/test-todo.js && node scripts/test-connector.js && node scripts/test-patrocinio.js && node scripts/test-reclamacion.js && node scripts/test-boveda.js && node scripts/test-tiempo.js && node scripts/test-paleta.js",
     "build:pre": "node scripts/build-pre.js",
     "build:exe": "electron-packager . Odinote --platform=win32 --arch=x64 --out=dist --overwrite --icon=Icon/Icon.ico && node scripts/build-zip.js",
     "build:exe-only": "electron-packager . Odinote --platform=win32 --arch=x64 --out=dist --overwrite --icon=Icon/Icon.ico",
@@ -22,7 +22,8 @@
     "test:patrocinio": "node scripts/test-patrocinio.js",
     "test:reclamacion": "node scripts/test-reclamacion.js",
     "test:boveda": "node scripts/test-boveda.js",
-    "test:tiempo": "node scripts/test-tiempo.js"
+    "test:tiempo": "node scripts/test-tiempo.js",
+    "test:paleta": "node scripts/test-paleta.js"
   },
   "devDependencies": {
     "archiver": "^5.3.2",
