@@ -272,19 +272,59 @@ function Home({ lang, setLang, theme, setTheme, onOpenProject, projects, onCreat
   // En cuanto un proyecto la nombra, se deduce sola y hay que soltarla: si
   // no, esa lista va creciendo con nombres duplicados que ya no hacen falta.
   const guardaVacias = (siguiente) => { setCarpetasVacias(siguiente); guardaCarpetasVacias(siguiente); };
-  const olvidaVacia = (nombre) => guardaVacias(carpetasVacias.filter(c => c !== nombre));
+
+  // Recalcula la lista de vacías de una sola vez: la carpeta a la que entra
+  // algo sale de ella (ya se deduce sola) y las que se quedan sin nada entran.
+  //
+  // Lo segundo es lo que faltaba: al sacar el último proyecto de una carpeta,
+  // nadie la volvía a apuntar y la carpeta desaparecía con él. Una carpeta la
+  // crea una persona a propósito; que se esfume sola es tirarle su trabajo sin
+  // avisar. Ahora solo la quita quien pulsa «quitar la carpeta».
+  //
+  // `salen` dice cuántos proyectos abandonan cada carpeta, porque `cuentas` es
+  // de antes del cambio: sacando dos de una carpeta que tenía dos, se queda a
+  // cero aunque la cuenta diga dos.
+  const ajustaVacias = (entra, salen) => {
+    let lista = carpetasVacias.filter(c => c !== entra);
+    for (const nombre of Object.keys(salen || {})) {
+      if (!nombre || nombre === entra) continue;
+      if ((cuentas[nombre] || 0) > salen[nombre]) continue;   // todavía queda gente dentro
+      lista = [...lista, nombre];
+    }
+    guardaVacias([...new Set(lista)]);
+  };
+
+  // De qué carpeta sale cada uno de esos proyectos.
+  const carpetasQueDejan = (ids) => {
+    const salen = {};
+    for (const id of ids) {
+      const p = projects.find(x => x.id === id);
+      const c = p ? carpetaDe(p) : '';
+      if (c) salen[c] = (salen[c] || 0) + 1;
+    }
+    return salen;
+  };
 
   const mueveACarpeta = (projectId, nombre) => {
+    const salen = carpetasQueDejan([projectId]);
     onSetFolder && onSetFolder(projectId, nombre);
-    if (nombre) olvidaVacia(nombre);
+    ajustaVacias(nombre, salen);
     window.playAudioTone && window.playAudioTone('click');
   };
   // Varios de una vez, en un solo cambio de estado: moviéndolos de uno en uno
   // se repintaba la pantalla una vez por proyecto.
   const anadeACarpeta = (ids, nombre) => {
+    const salen = carpetasQueDejan(ids);
     onSetFolderMany && onSetFolderMany(ids, nombre);
-    if (nombre) olvidaVacia(nombre);
+    ajustaVacias(nombre, salen);
     window.playAudioTone && window.playAudioTone('click');
+  };
+  // Mandar un proyecto a la papelera tampoco puede llevarse su carpeta por
+  // delante, y es el mismo caso: el último que había dentro se va.
+  const borraProyecto = (projectId) => {
+    const salen = carpetasQueDejan([projectId]);
+    onDelete(projectId);
+    ajustaVacias(null, salen);
   };
   const creaCarpeta = (nombre) => {
     guardaVacias([...new Set([...carpetasVacias, nombre])]);
@@ -299,7 +339,8 @@ function Home({ lang, setLang, theme, setTheme, onOpenProject, projects, onCreat
   // Quitar la carpeta no borra nada: sus proyectos vuelven a quedar sueltos.
   const quitaCarpeta = (nombre) => {
     onDeleteFolder && onDeleteFolder(nombre);
-    olvidaVacia(nombre);
+    // Esta sí se olvida: la está quitando una persona a propósito.
+    guardaVacias(carpetasVacias.filter(c => c !== nombre));
     if (carpetaAbierta === nombre) setCarpetaAbierta(null);
     window.playAudioTone && window.playAudioTone('delete');
   };
@@ -785,7 +826,7 @@ function Home({ lang, setLang, theme, setTheme, onOpenProject, projects, onCreat
               <ProjectCard key={p.id} project={p} lang={lang} t={t}
                 isTrash={section==='trash'}
                 onOpen={()=>onOpenProject(p.id)}
-                onDelete={()=>onDelete(p.id)}
+                onDelete={()=>borraProyecto(p.id)}
                 onRenameClick={setEditProject}
                 onRestore={()=>onRestore(p.id)}
                 onPurge={()=>onPurge(p.id)}
@@ -795,8 +836,11 @@ function Home({ lang, setLang, theme, setTheme, onOpenProject, projects, onCreat
                 dentroDe={carpetaAbierta}
               />
             ))}
+            {section === 'all' && carpetaAbierta && (
+              <SacarDeCarpetaCard carpeta={carpetaAbierta} lang={lang} onSacar={(id)=>mueveACarpeta(id, '')}/>
+            )}
             {section === 'all' && carpetaAbierta && filtered.length === 0 && (
-              <div className="ms-empty-hint">{window.t('Esta carpeta está vacía. Muévele proyectos con el botón de la carpeta que hay en cada tarjeta.', 'This folder is empty. Move projects in with the folder button on each card.')}</div>
+              <div className="ms-empty-hint">{window.t('Esta carpeta está vacía. Métele proyectos arrastrándolos aquí, o con el botón «Añadir proyectos» de arriba.', 'This folder is empty. Drag projects in here, or use the «Add projects» button above.')}</div>
             )}
             {section==='trash' && filtered.length === 0 && (
               <div className="ms-empty-hint">{window.t('La papelera está vacía', 'Trash is empty')}</div>
@@ -1087,6 +1131,34 @@ function FolderCard({ nombre, cuantos, portadas, onOpen, onRename, onDelete, onS
         <div className="ms-project-meta">
           <span>{cuantos} {cuantos === 1 ? window.t('proyecto', 'project') : window.t('proyectos', 'projects')}</span>
         </div>
+      </div>
+    </div>
+  );
+}
+
+// Donde se sueltan los proyectos para sacarlos de la carpeta. Se pinta como
+// una tarjeta más porque está en la rejilla de las tarjetas, pero con el borde
+// de puntos que dice "aquí se suelta, esto no se abre".
+function SacarDeCarpetaCard({ carpeta, lang, onSacar }) {
+  const [encima, setEncima] = useStateHome(false);
+  return (
+    <div
+      className={`ms-project-card ms-sacar-card${encima ? ' soltando' : ''}`}
+      onDragOver={(e)=>{ e.preventDefault(); e.dataTransfer.dropEffect = 'move'; if (!encima) setEncima(true); }}
+      onDragLeave={()=>setEncima(false)}
+      onDrop={(e)=>{
+        e.preventDefault();
+        setEncima(false);
+        document.body.classList.remove('arrastrando-proyecto');
+        const id = e.dataTransfer.getData('text/plain');
+        if (id && onSacar) onSacar(id);
+      }}
+      title={window.t('Arrastra aquí un proyecto para sacarlo de la carpeta', 'Drag a project here to take it out of the folder')}
+    >
+      <div className="ms-sacar-cuerpo">
+        <span className="material-symbols-rounded">move_up</span>
+        <div className="ms-sacar-tit">{window.t('Sacar de la carpeta', 'Take out of the folder')}</div>
+        <div className="ms-sacar-pie">{window.t('Suelta aquí un proyecto', 'Drop a project here')}</div>
       </div>
     </div>
   );

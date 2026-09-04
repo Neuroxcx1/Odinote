@@ -115,8 +115,11 @@ check('la flecha de volver saca de la carpeta', home.indexOf("if (id) mueveACarp
 // Al soltar, React quita esa tarjeta de la lista y el dragend llega cuando su
 // elemento ya no está en la página: si la marca solo se limpiara ahí, se
 // quedaría puesta y todas las carpetas con el borde de puntos para siempre.
-check('la marca de arrastrar se limpia también al soltar',
-  home.split("classList.remove('arrastrando-proyecto')").length - 1 === 3);
+// Uno por cada sitio donde se puede soltar —la carpeta, la flecha de volver y
+// el cuadrado de sacar— más el dragend de la propia tarjeta. Si aparece otro
+// sitio donde soltar y no limpia, esta cuenta lo canta.
+check('cada sitio donde se suelta limpia la marca de arrastrar',
+  home.split("classList.remove('arrastrando-proyecto')").length - 1 === 4);
 check('hay botón para añadir proyectos dentro de la carpeta', home.indexOf('Meter aquí proyectos que ya existen') !== -1);
 check('la ventana solo ofrece los que están fuera',
   home.indexOf("projects.filter(p => !p.deleted && window.carpetaDe(p) !== carpeta)") !== -1);
@@ -124,6 +127,31 @@ check('varios de golpe se mueven en un solo cambio de estado',
   app.indexOf('const setProjectFolderMany = (ids, carpeta) =>') !== -1 && app.indexOf('cuales.has(x.id)') !== -1);
 check('dentro de su propia carpeta la tarjeta no repite la chapa',
   home.indexOf('window.carpetaDe(project) !== dentroDe') !== -1);
+
+// ── La carpeta vacía no puede desaparecer sola ──
+//
+// Al meter un proyecto, la carpeta salía de la lista de vacías porque ya se
+// deducía de él. Al sacarlo, nadie la volvía a poner: la carpeta se esfumaba
+// con el último proyecto que salía. La crea una persona a propósito y solo
+// ella debe poder quitarla.
+check('sacar el último proyecto vuelve a apuntar la carpeta como vacía',
+  home.indexOf('const ajustaVacias = (entra, salen)') !== -1 &&
+  home.indexOf('lista = [...lista, nombre];') !== -1);
+check('se mira cuántos salen, no solo la cuenta de antes',
+  home.indexOf('const carpetasQueDejan = (ids)') !== -1 &&
+  home.indexOf('if ((cuentas[nombre] || 0) > salen[nombre]) continue;') !== -1);
+check('mandar a la papelera el último tampoco se lleva la carpeta',
+  home.indexOf('const borraProyecto = (projectId)') !== -1);
+check('la carpeta solo se olvida cuando una persona la quita',
+  home.indexOf('// Esta sí se olvida: la está quitando una persona a propósito.') !== -1);
+
+// ── El cuadrado de sacar ──
+// La flecha de volver ya recibía, pero eso no lo adivina nadie: es una flecha
+// de navegar. Metiendo un proyecto se aprende que se puede meter; para sacarlo
+// hacía falta que se viera.
+check('hay un sitio visible donde soltar para sacar', home.indexOf('function SacarDeCarpetaCard(') !== -1);
+check('solo aparece dentro de una carpeta',
+  home.indexOf("{section === 'all' && carpetaAbierta && (") !== -1);
 
 console.log(fallos ? `\n${fallos} FALLOS` : '\nTodo en orden.');
 process.exit(fallos ? 1 : 0);
