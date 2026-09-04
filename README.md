@@ -2,7 +2,7 @@
 
 <img src="App/Icon/Icon.png" width="110" alt="Odinote logo" />
 
-# Odinote
+# Oddinote
 
 **A free, open-source infinite canvas for people whose ideas don't fit on one screen.**
 
@@ -27,15 +27,15 @@ Nested boards, unlimited notes, offline-first. A [Milanote](https://odinote-web.
 
 ---
 
-## Why Odinote exists
+## Why Oddinote exists
 
 Visual canvas tools are wonderful for planning games, novels and creative projects — but the popular ones cap how much you can create (Milanote stops at 100 notes, Miro at 3 editable boards), lock the useful parts behind subscriptions, or keep your work in their cloud.
 
-Odinote was built by one developer who kept hitting those ceilings while organising game design documents, art references and task boards. It has the same spatial feel, none of the limits, and your files stay on your machine.
+Oddinote was built by one developer who kept hitting those ceilings while organising game design documents, art references and task boards. It has the same spatial feel, none of the limits, and your files stay on your machine.
 
 ## What makes it different: real recursion
 
-A board in Odinote isn't a folder — it's a **complete canvas**, and any canvas inside it can hold more boards, forever.
+A board in Oddinote isn't a folder — it's a **complete canvas**, and any canvas inside it can hold more boards, forever.
 
 ```
 Root canvas — pitch, core loop, roadmap
@@ -125,7 +125,7 @@ Issues and pull requests are genuinely welcome — bug reports especially.
 - 💡 [Suggest a feature or ask a question](https://github.com/Neuroxcx1/Odinote/discussions)
 - ☕ [Support development on Ko-fi](https://ko-fi.com/neuroxcx)
 
-If Odinote is useful to you, a ⭐ on the repo genuinely helps other people find it.
+If Oddinote is useful to you, a ⭐ on the repo genuinely helps other people find it.
 
 ## License
 
