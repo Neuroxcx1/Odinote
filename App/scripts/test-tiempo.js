@@ -137,6 +137,10 @@ check('con sitio para la barra y el interruptor',
 // aplicación con los dos nodos antes de tocar el código.
 check('el título del reloj se guarda según se escribe',
   /className="timer-title-input"[\s\S]{0,600}value=\{titulo\}[\s\S]{0,400}onChange=\{\(e\)=>onUpdate\(\{ timerTitle: e\.target\.value \}\)\}/.test(items));
+check('y el del bloque de código también',
+  /className="code-title-input"[\s\S]{0,600}value=\{titulo\}[\s\S]{0,400}onChange=\{\(e\)=>onUpdate\(\{ codeTitle: e\.target\.value \}\)\}/.test(items));
+check('ninguno de los dos se queda esperando al blur',
+  !/onBlur=\{\(e\)=>\{ onUpdate\(\{ (codeTitle|timerTitle): e\.target\.value \}\); \}\}/.test(items));
 
 // ── Detalles de idioma ──
 check('una ronda se dice en singular',

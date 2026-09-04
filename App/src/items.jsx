@@ -4217,10 +4217,14 @@ function CodeItem({ item, lang, editing, onUpdate, callbacks }) {
             <input
               className="code-title-input"
               style={estiloTitulo}
-              defaultValue={titulo}
+              /* Se guarda según se escribe. Guardándolo solo al perder el
+                 foco se perdía entero: la barra de texto se cierra con su
+                 flecha de volver, eso desmonta este campo, y de un campo
+                 desmontado el navegador no manda ningún blur. */
+              value={titulo}
               autoFocus
               onMouseDown={(e)=>e.stopPropagation()}
-              onBlur={(e)=>{ onUpdate({ codeTitle: e.target.value }); }}
+              onChange={(e)=>onUpdate({ codeTitle: e.target.value })}
               onKeyDown={(e)=>{ if (e.key === 'Enter' || e.key === 'Escape') e.currentTarget.blur(); }}
             />
           ) : (
