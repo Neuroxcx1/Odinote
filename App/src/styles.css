@@ -6101,3 +6101,91 @@ html[data-touch="1"] .ms-grid-list .ms-card-actions { opacity: 1; }
   box-shadow: 1px 1px 0 var(--line);
 }
 .ms-invitado-chip .material-symbols-rounded { font-size: 13px; }
+
+/* ============================================
+   CARPETAS DE PROYECTOS (pantalla de inicio)
+   ============================================
+   Una carpeta se pinta como una tarjeta de proyecto más —mismo tamaño, mismo
+   sitio en la rejilla— porque en esa pantalla se usan igual: se abren con un
+   clic. Lo único que la distingue es la portada, que en vez de un color y un
+   emoji enseña los colores de lo que guarda dentro. */
+.ms-folder-card .ms-folder-cover {
+  background: var(--bg);
+  border-bottom: 1.5px solid var(--line);
+  display: grid; place-items: center;
+}
+.ms-folder-peek {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 5px;
+  width: 62%; max-width: 120px;
+}
+.ms-folder-peek > i {
+  display: block; height: 26px; border-radius: 3px;
+  border: 1.5px solid rgba(0, 0, 0, 0.10);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+/* Con un solo proyecto dentro, su color ocupa la portada entera en vez de
+   quedarse en un cuadradito arriba a la izquierda. */
+.ms-folder-peek > i:only-child { grid-column: span 2; height: 58px; }
+.ms-folder-vacia { font-size: 40px; color: var(--ink-3); opacity: 0.55; }
+
+/* El botón de crear carpeta, en la fila del título. */
+.ms-carpeta-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  margin-left: auto; margin-right: 8px;
+  padding: 5px 10px;
+  font-size: 12px; font-weight: 700;
+  background: var(--paper); color: var(--ink);
+  border: 1.5px solid var(--line); border-radius: 2px;
+  cursor: pointer; transition: background 100ms;
+}
+.ms-carpeta-btn:hover { background: var(--bg); }
+.ms-carpeta-btn .material-symbols-rounded { font-size: 16px; }
+
+/* Migas de pan al entrar en una carpeta. */
+.ms-carpeta-migas { display: inline-flex; align-items: center; gap: 8px; }
+.ms-carpeta-migas button {
+  display: grid; place-items: center;
+  width: 26px; height: 26px;
+  border: 1.5px solid var(--line); border-radius: 2px;
+  background: var(--paper); cursor: pointer; transition: background 100ms;
+}
+.ms-carpeta-migas button:hover { background: var(--bg); }
+.ms-carpeta-migas .material-symbols-rounded { font-size: 18px; }
+
+/* En qué carpeta vive un proyecto, cuando se ve fuera de ella. */
+.ms-carpeta-chip {
+  display: inline-flex; align-items: center; gap: 3px;
+  max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  padding: 1px 6px; border-radius: 99px;
+  background: var(--bg); border: 1px solid var(--line-soft);
+  color: var(--ink-3);
+}
+.ms-carpeta-chip .material-symbols-rounded { font-size: 13px; }
+
+/* La lista de la ventana de mover. */
+.ms-carpeta-lista {
+  display: flex; flex-direction: column; gap: 3px;
+  max-height: 220px; overflow-y: auto;
+  margin-bottom: 14px;
+  padding: 4px; border: 1.5px solid var(--line); border-radius: 2px;
+  background: var(--paper-2);
+}
+.ms-carpeta-op {
+  display: flex; align-items: center; gap: 8px;
+  width: 100%; text-align: left;
+  padding: 8px 10px; border: none; border-radius: 2px;
+  background: transparent; color: var(--ink);
+  font-family: var(--font-body); font-size: 13px; cursor: pointer;
+  transition: background 100ms;
+}
+.ms-carpeta-op:hover { background: var(--bg); }
+.ms-carpeta-op.active { background: var(--olive); color: white; font-weight: 700; }
+.ms-carpeta-op .material-symbols-rounded { font-size: 18px; flex-shrink: 0; }
+.ms-carpeta-op .tic { margin-left: auto; }
+.ms-carpeta-nueva-fila { display: flex; gap: 8px; }
+.ms-carpeta-nueva-fila input { flex: 1; min-width: 0; }
+.ms-carpeta-nueva-fila .btn { flex-shrink: 0; }
+.ms-carpeta-aviso {
+  color: var(--wine); font-size: 12px; font-weight: 600;
+  margin: -4px 0 8px !important;
+}

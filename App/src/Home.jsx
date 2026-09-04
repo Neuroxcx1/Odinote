@@ -3,6 +3,84 @@
 // =====================================================
 const { useState: useStateHome, useMemo: useMemoHome, useRef: useRefHome } = React;
 
+// ──────────────── CARPETAS DE PROYECTOS ────────────────
+//
+// Agrupar los proyectos de la pantalla de inicio, que estaban todos sueltos
+// uno detrás de otro. Es cosa de esta pantalla y de nadie más: NO se toca la
+// sincronización, ni Google Drive, ni dónde vive cada archivo.
+//
+// Una carpeta no es un objeto que se guarde en ninguna lista maestra: existe
+// porque hay proyectos que dicen estar dentro de ella (`p.carpeta`, el nombre
+// tal cual). Eso tiene dos ventajas que se notan: viaja sola con el proyecto
+// —va dentro de él, así que aparece igual en otro equipo sin escribir ni una
+// línea de sincronización— y no puede quedarse una carpeta "fantasma"
+// apuntando a proyectos que ya no están.
+//
+// El único caso que no se puede deducir de los proyectos es una carpeta VACÍA,
+// que por definición no tiene a nadie que la nombre. Esas se apuntan aparte y
+// solo en este equipo: son un cajón que acabas de crear y todavía no has
+// llenado, no información que merezca viajar.
+const CARPETAS_VACIAS_KEY = 'odinote.carpetas_vacias';
+
+function leeCarpetasVacias() {
+  try {
+    const crudo = JSON.parse(localStorage.getItem(CARPETAS_VACIAS_KEY) || '[]');
+    return Array.isArray(crudo) ? crudo.filter(x => typeof x === 'string' && x.trim()) : [];
+  } catch (e) { return []; }
+}
+
+function guardaCarpetasVacias(nombres) {
+  try { localStorage.setItem(CARPETAS_VACIAS_KEY, JSON.stringify(nombres)); } catch (e) {}
+}
+
+// El nombre de la carpeta de un proyecto, ya limpio. Vale '' si no tiene.
+function carpetaDe(p) {
+  return typeof p.carpeta === 'string' ? p.carpeta.trim() : '';
+}
+
+// Todas las carpetas que hay que enseñar: las que nombran los proyectos vivos
+// más las vacías de este equipo. Ordenadas como las ordenaría una persona
+// (localeCompare, para que "Ávila" no acabe detrás de "Zamora").
+function carpetasVisibles(projects, vacias) {
+  const nombres = new Set();
+  for (const n of vacias || []) if (String(n).trim()) nombres.add(String(n).trim());
+  for (const p of projects || []) {
+    if (p.deleted) continue;
+    const c = carpetaDe(p);
+    if (c) nombres.add(c);
+  }
+  return [...nombres].sort((a, b) => a.localeCompare(b));
+}
+
+// Cuántos proyectos vivos hay en cada carpeta.
+function cuentaPorCarpeta(projects) {
+  const cuenta = {};
+  for (const p of projects || []) {
+    if (p.deleted) continue;
+    const c = carpetaDe(p);
+    if (c) cuenta[c] = (cuenta[c] || 0) + 1;
+  }
+  return cuenta;
+}
+
+// Un nombre libre para la carpeta nueva: "Carpeta", "Carpeta 2", "Carpeta 3"…
+// Repetir nombre no es un detalle estético: como la carpeta ES su nombre, dos
+// carpetas iguales serían la misma y los proyectos se mezclarían.
+function nombreLibreDeCarpeta(existentes, base) {
+  const usados = new Set((existentes || []).map(n => n.toLowerCase()));
+  if (!usados.has(base.toLowerCase())) return base;
+  for (let i = 2; i < 500; i++) {
+    const intento = base + ' ' + i;
+    if (!usados.has(intento.toLowerCase())) return intento;
+  }
+  return base + ' ' + Date.now();
+}
+
+window.carpetasVisibles = carpetasVisibles;
+window.cuentaPorCarpeta = cuentaPorCarpeta;
+window.nombreLibreDeCarpeta = nombreLibreDeCarpeta;
+window.carpetaDe = carpetaDe;
+
 function BrandMark() {
   // Original logo, shown without the black box (container background is transparent now)
   return (
@@ -158,7 +236,7 @@ function renderProjectIcon(icon) {
 }
 window.renderProjectIcon = renderProjectIcon;
 
-function Home({ lang, setLang, theme, setTheme, onOpenProject, projects, onCreate, onDelete, onRename, onRestore, onPurge, onToggleStar, onExport, onImport, vaultPath, onOpenVault, onCloseVault, updateAvailable, onUpdateClick, onSettingsClick, userProfile, esPatrocinador, onAbrirCorona, onUserClick, onJoinProjectClick, onTogglePublic, onManualSync, isSyncingDrive, needsDriveAuth }) {
+function Home({ lang, setLang, theme, setTheme, onOpenProject, projects, onCreate, onDelete, onRename, onRestore, onPurge, onToggleStar, onExport, onImport, vaultPath, onOpenVault, onCloseVault, updateAvailable, onUpdateClick, onSettingsClick, userProfile, esPatrocinador, onAbrirCorona, onUserClick, onJoinProjectClick, onTogglePublic, onManualSync, isSyncingDrive, needsDriveAuth, onSetFolder, onRenameFolder, onDeleteFolder }) {
   const t = window.TRANSLATIONS[lang];
   const [query, setQuery] = useStateHome('');
   const [modal, setModal] = useStateHome(false);
@@ -180,19 +258,69 @@ function Home({ lang, setLang, theme, setTheme, onOpenProject, projects, onCreat
   // se abre como cajón desde el botón ☰. En escritorio esto no se usa.
   const [sideOpen, setSideOpen] = useStateHome(false);
 
+  // ── Carpetas ──
+  const [carpetaAbierta, setCarpetaAbierta] = useStateHome(null);
+  const [carpetasVacias, setCarpetasVacias] = useStateHome(leeCarpetasVacias);
+  const [moviendo, setMoviendo] = useStateHome(null);      // proyecto que se está moviendo
+  const [nombrando, setNombrando] = useStateHome(null);    // { inicial } al crear o renombrar
 
+  const carpetas = useMemoHome(() => carpetasVisibles(projects, carpetasVacias), [projects, carpetasVacias]);
+  const cuentas = useMemoHome(() => cuentaPorCarpeta(projects), [projects]);
+
+  // La lista de vacías es solo para las que todavía no tiene nadie dentro.
+  // En cuanto un proyecto la nombra, se deduce sola y hay que soltarla: si
+  // no, esa lista va creciendo con nombres duplicados que ya no hacen falta.
+  const guardaVacias = (siguiente) => { setCarpetasVacias(siguiente); guardaCarpetasVacias(siguiente); };
+  const olvidaVacia = (nombre) => guardaVacias(carpetasVacias.filter(c => c !== nombre));
+
+  const mueveACarpeta = (projectId, nombre) => {
+    onSetFolder && onSetFolder(projectId, nombre);
+    if (nombre) olvidaVacia(nombre);
+    window.playAudioTone && window.playAudioTone('click');
+  };
+  const creaCarpeta = (nombre) => {
+    guardaVacias([...new Set([...carpetasVacias, nombre])]);
+    window.playAudioTone && window.playAudioTone('click');
+  };
+  const renombraCarpeta = (viejo, nuevo) => {
+    if (!nuevo || nuevo === viejo) return;
+    onRenameFolder && onRenameFolder(viejo, nuevo);
+    guardaVacias(carpetasVacias.map(c => (c === viejo ? nuevo : c)));
+    if (carpetaAbierta === viejo) setCarpetaAbierta(nuevo);
+  };
+  // Quitar la carpeta no borra nada: sus proyectos vuelven a quedar sueltos.
+  const quitaCarpeta = (nombre) => {
+    onDeleteFolder && onDeleteFolder(nombre);
+    olvidaVacia(nombre);
+    if (carpetaAbierta === nombre) setCarpetaAbierta(null);
+    window.playAudioTone && window.playAudioTone('delete');
+  };
+
+
+
+  const buscando = !!query.trim();
 
   const filtered = useMemoHome(() => {
     let list = projects;
     if (section === 'starred') list = list.filter(p => p.starred);
     if (section === 'trash') list = list.filter(p => p.deleted);
     else list = list.filter(p => !p.deleted);
-    if (query.trim()) {
+    if (buscando) {
+      // Buscando NO se agrupa: quien escribe un nombre quiere ese proyecto,
+      // no que le recuerden en qué cajón lo dejó.
       const q = query.toLowerCase();
-      list = list.filter(p => window.pickLang(p.name, lang).toLowerCase().includes(q));
+      return list.filter(p => window.pickLang(p.name, lang).toLowerCase().includes(q));
+    }
+    // Sin buscar, en "Todos" la rejilla enseña las carpetas y SOLO los
+    // proyectos sueltos; dentro de una carpeta, los suyos. Favoritos y
+    // papelera se quedan planos: ahí lo que importa es la lista corta.
+    if (section === 'all') {
+      list = carpetaAbierta
+        ? list.filter(p => carpetaDe(p) === carpetaAbierta)
+        : list.filter(p => !carpetaDe(p));
     }
     return list;
-  }, [query, lang, projects, section]);
+  }, [query, lang, projects, section, carpetaAbierta, buscando]);
 
   const recents = projects.filter(p => !p.deleted).slice(0, 4);
 
@@ -585,8 +713,24 @@ function Home({ lang, setLang, theme, setTheme, onOpenProject, projects, onCreat
               {section === 'recent' ? (window.t('Recientes', 'Recent')) :
                section === 'starred' ? (window.t('Favoritos', 'Favorites')) :
                section === 'trash' ? (window.t('Papelera', 'Trash')) :
+               carpetaAbierta ? (
+                 <span className="ms-carpeta-migas">
+                   <button onClick={()=>setCarpetaAbierta(null)} title={window.t('Volver a todos', 'Back to all')}>
+                     <span className="material-symbols-rounded">arrow_back</span>
+                   </button>
+                   <span className="material-symbols-rounded">folder</span>
+                   {carpetaAbierta}
+                 </span>
+               ) :
                (window.t('Todos los proyectos', 'All projects'))}
             </h2>
+            {section === 'all' && !carpetaAbierta && !buscando && (
+              <button className="ms-carpeta-btn" onClick={()=>setNombrando({ inicial: '' })}
+                title={window.t('Agrupar proyectos en una carpeta', 'Group projects into a folder')}>
+                <span className="material-symbols-rounded">create_new_folder</span>
+                <span>{window.t('Carpeta', 'Folder')}</span>
+              </button>
+            )}
             <div className="ms-view-toggle">
               <button className={viewMode==='grid'?'active':''} onClick={()=>cambiaVista('grid')} title={window.t('Cuadrícula', 'Grid')}>
                 <span className="material-symbols-rounded">grid_view</span>
@@ -598,6 +742,14 @@ function Home({ lang, setLang, theme, setTheme, onOpenProject, projects, onCreat
           </div>
           <div className={`ms-grid ${viewMode==='list'?'ms-grid-list':''}`}>
             {section === 'all' && <NewProjectCard label={t.new_project} onClick={()=>setModal(true)} lang={lang}/>}
+            {section === 'all' && !carpetaAbierta && !buscando && carpetas.map(c => (
+              <FolderCard key={'carpeta-' + c} nombre={c} cuantos={cuentas[c] || 0} lang={lang}
+                portadas={projects.filter(p => !p.deleted && carpetaDe(p) === c).slice(0, 4).map(p => p.cover)}
+                onOpen={()=>{ setCarpetaAbierta(c); window.playAudioTone && window.playAudioTone('board_open'); }}
+                onRename={()=>setNombrando({ inicial: c })}
+                onDelete={()=>quitaCarpeta(c)}
+              />
+            ))}
              {filtered.map(p => (
               <ProjectCard key={p.id} project={p} lang={lang} t={t}
                 isTrash={section==='trash'}
@@ -608,8 +760,12 @@ function Home({ lang, setLang, theme, setTheme, onOpenProject, projects, onCreat
                 onPurge={()=>onPurge(p.id)}
                 onToggleStar={()=>onToggleStar(p.id)}
                 onTogglePublic={()=>onTogglePublic(p.id)}
+                onMoveClick={()=>setMoviendo(p)}
               />
             ))}
+            {section === 'all' && carpetaAbierta && filtered.length === 0 && (
+              <div className="ms-empty-hint">{window.t('Esta carpeta está vacía. Muévele proyectos con el botón de la carpeta que hay en cada tarjeta.', 'This folder is empty. Move projects in with the folder button on each card.')}</div>
+            )}
             {section==='trash' && filtered.length === 0 && (
               <div className="ms-empty-hint">{window.t('La papelera está vacía', 'Trash is empty')}</div>
             )}
@@ -621,7 +777,25 @@ function Home({ lang, setLang, theme, setTheme, onOpenProject, projects, onCreat
         <NewProjectModal
           lang={lang}
           onClose={()=>setModal(false)}
-          onCreate={(p)=>{ onCreate(p); setModal(false); onOpenProject(p.id); }}
+          onCreate={(p)=>{ onCreate(carpetaAbierta ? { ...p, carpeta: carpetaAbierta } : p); setModal(false); onOpenProject(p.id); }}
+        />
+      )}
+      {moviendo && (
+        <MoverACarpetaModal
+          project={projects.find(p => p.id === moviendo.id) || moviendo}
+          carpetas={carpetas}
+          lang={lang}
+          onClose={()=>setMoviendo(null)}
+          onElegir={(nombre)=>mueveACarpeta(moviendo.id, nombre)}
+        />
+      )}
+      {nombrando && (
+        <NombrarCarpetaModal
+          inicial={nombrando.inicial}
+          carpetas={carpetas}
+          lang={lang}
+          onClose={()=>setNombrando(null)}
+          onGuardar={(nombre)=>{ if (nombrando.inicial) renombraCarpeta(nombrando.inicial, nombre); else creaCarpeta(nombre); }}
         />
       )}
       {editProject && (
@@ -703,7 +877,7 @@ function RecentCard({ project, lang, t, onOpen, onDelete, onRenameClick, onToggl
   );
 }
 
-function ProjectCard({ project, lang, t, onOpen, onDelete, onRenameClick, onRestore, onPurge, onToggleStar, isTrash }) {
+function ProjectCard({ project, lang, t, onOpen, onDelete, onRenameClick, onRestore, onPurge, onToggleStar, isTrash, onMoveClick }) {
   const handleContextMenu = (e) => {
     if (isTrash) return;
     e.preventDefault();
@@ -750,6 +924,12 @@ function ProjectCard({ project, lang, t, onOpen, onDelete, onRenameClick, onRest
                 onClick={(e)=>{ e.stopPropagation(); onToggleStar && onToggleStar(); }}>
                 <span className="material-symbols-rounded">{project.starred?'star':'star_border'}</span>
               </button>
+              {onMoveClick && (
+                <button className="ms-card-btn" title={window.t('Mover a una carpeta', 'Move to a folder')}
+                  onClick={(e)=>{ e.stopPropagation(); onMoveClick(); }}>
+                  <span className="material-symbols-rounded">drive_file_move</span>
+                </button>
+              )}
               <button className="ms-card-btn danger" title={window.t('Mover a papelera', 'Move to trash')}
                 onClick={(e)=>{ e.stopPropagation(); onDelete && onDelete(); }}>
                 <span className="material-symbols-rounded">delete</span>
@@ -787,6 +967,155 @@ function ProjectCard({ project, lang, t, onOpen, onDelete, onRenameClick, onRest
           <span>{project.items} {t.items_count}</span>
           <span className="dot"/>
           <span>{window.pickLang(project.updated, lang) || (window.t('recién', 'recent'))}</span>
+          {/* Buscando y en Favoritos las tarjetas salen fuera de su carpeta;
+              sin esto no había forma de saber dónde vive cada una. */}
+          {window.carpetaDe(project) && (
+            <span className="ms-carpeta-chip" title={window.t('Está en esta carpeta', 'It lives in this folder')}>
+              <span className="material-symbols-rounded">folder</span>
+              {window.carpetaDe(project)}
+            </span>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Una carpeta en la rejilla. Se abre con un clic, como un proyecto, y enseña
+// los colores de portada de lo que guarda: de un vistazo se reconoce el cajón
+// sin tener que leer el nombre.
+function FolderCard({ nombre, cuantos, portadas, onOpen, onRename, onDelete, lang }) {
+  return (
+    <div
+      className="ms-project-card ms-folder-card"
+      onClick={onOpen}
+      onContextMenu={(e)=>{ e.preventDefault(); onRename && onRename(); }}
+      style={{position:'relative'}}
+    >
+      <div className="ms-project-cover ms-folder-cover">
+        <div className="ms-folder-peek">
+          {portadas.length === 0
+            ? <span className="material-symbols-rounded ms-folder-vacia">folder_open</span>
+            : portadas.map((c, i) => <i key={i} style={{ background: c }}/>)}
+        </div>
+        <div className="ms-card-actions" onClick={(e)=>e.stopPropagation()}>
+          <button className="ms-card-btn" title={window.t('Cambiar el nombre', 'Rename')}
+            onClick={(e)=>{ e.stopPropagation(); onRename && onRename(); }}>
+            <span className="material-symbols-rounded">edit</span>
+          </button>
+          {/* Quitar la carpeta NO borra nada de dentro: sus proyectos vuelven a
+              quedar sueltos. Por eso no lleva el rojo de los botones que sí
+              destruyen algo. */}
+          <button className="ms-card-btn" title={window.t('Quitar la carpeta (los proyectos se quedan)', 'Remove the folder (projects stay)')}
+            onClick={(e)=>{ e.stopPropagation(); onDelete && onDelete(); }}>
+            <span className="material-symbols-rounded">folder_off</span>
+          </button>
+        </div>
+      </div>
+      <div className="ms-project-body">
+        <div className="ms-project-title" style={{ display:'flex', alignItems:'center', gap:6 }}>
+          <span className="material-symbols-rounded" style={{ fontSize:18, flexShrink:0 }}>folder</span>
+          <span style={{ overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{nombre}</span>
+        </div>
+        <div className="ms-project-meta">
+          <span>{cuantos} {cuantos === 1 ? window.t('proyecto', 'project') : window.t('proyectos', 'projects')}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Elegir carpeta para un proyecto. Ventana y no menú flotante porque la
+// tarjeta puede estar en cualquier parte de la rejilla —y en la vista de lista
+// mide cuarenta píxeles de alto—: un desplegable ahí se sale de la pantalla en
+// la última fila.
+function MoverACarpetaModal({ project, carpetas, lang, onClose, onElegir }) {
+  const actual = window.carpetaDe(project);
+  const [nueva, setNueva] = useStateHome('');
+  const elige = (nombre) => { onElegir(nombre); onClose(); };
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="modal" onClick={(e)=>e.stopPropagation()}>
+        <h2>{window.t('Mover a una carpeta', 'Move to a folder')}</h2>
+        <p>{window.pickLang(project.name, lang)}</p>
+
+        <div className="ms-carpeta-lista">
+          <button className={`ms-carpeta-op ${!actual ? 'active' : ''}`} onClick={()=>elige('')}>
+            <span className="material-symbols-rounded">folder_off</span>
+            <span>{window.t('Sin carpeta', 'No folder')}</span>
+            {!actual && <span className="material-symbols-rounded tic">check</span>}
+          </button>
+          {carpetas.map(c => (
+            <button key={c} className={`ms-carpeta-op ${actual === c ? 'active' : ''}`} onClick={()=>elige(c)}>
+              <span className="material-symbols-rounded">folder</span>
+              <span>{c}</span>
+              {actual === c && <span className="material-symbols-rounded tic">check</span>}
+            </button>
+          ))}
+        </div>
+
+        {/* Crear la carpeta desde aquí mismo: querer meter un proyecto en una
+            carpeta que todavía no existe es justo cuando se crea la primera. */}
+        <div className="field ms-carpeta-nueva">
+          <label>{window.t('O una carpeta nueva', 'Or a new folder')}</label>
+          <div className="ms-carpeta-nueva-fila">
+            <input
+              type="text"
+              value={nueva}
+              placeholder={window.t('Trabajo, Personal, Novela…', 'Work, Personal, Novel…')}
+              onChange={(e)=>setNueva(e.target.value)}
+              onKeyDown={(e)=>{ if (e.key === 'Enter' && nueva.trim()) elige(nueva.trim()); }}
+            />
+            <button className="btn btn-primary" disabled={!nueva.trim()}
+              style={{opacity: nueva.trim() ? 1 : 0.5}}
+              onClick={()=>{ if (nueva.trim()) elige(nueva.trim()); }}>
+              {window.t('Crear y mover', 'Create & move')}
+            </button>
+          </div>
+        </div>
+
+        <div className="modal-actions">
+          <button className="btn btn-ghost" onClick={onClose}>{window.t('Cancelar', 'Cancel')}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Poner o cambiar el nombre de una carpeta.
+function NombrarCarpetaModal({ inicial, carpetas, lang, onClose, onGuardar }) {
+  const [nombre, setNombre] = useStateHome(inicial || '');
+  const limpio = nombre.trim();
+  // Dos carpetas con el mismo nombre serían la misma carpeta —el nombre ES la
+  // carpeta—, así que se avisa antes de dejar guardar.
+  const repetido = !!limpio && limpio.toLowerCase() !== String(inicial || '').toLowerCase()
+    && carpetas.some(c => c.toLowerCase() === limpio.toLowerCase());
+  const guarda = () => { if (limpio && !repetido) { onGuardar(limpio); onClose(); } };
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="modal" onClick={(e)=>e.stopPropagation()}>
+        <h2>{inicial ? window.t('Cambiar el nombre', 'Rename folder') : window.t('Carpeta nueva', 'New folder')}</h2>
+        <p>{window.t('Las carpetas solo agrupan la pantalla de inicio. No mueven ningún archivo ni cambian dónde se guarda nada.', 'Folders only group the home screen. They move no files and change nothing about where anything is stored.')}</p>
+        <div className="field">
+          <label>{window.t('Nombre', 'Name')}</label>
+          <input
+            type="text"
+            autoFocus
+            value={nombre}
+            placeholder={window.t('Trabajo, Personal, Novela…', 'Work, Personal, Novel…')}
+            onChange={(e)=>setNombre(e.target.value)}
+            onKeyDown={(e)=>{ if (e.key === 'Enter') guarda(); }}
+          />
+        </div>
+        {repetido && (
+          <p className="ms-carpeta-aviso">{window.t('Ya hay una carpeta con ese nombre', 'There is already a folder with that name')}</p>
+        )}
+        <div className="modal-actions">
+          <button className="btn btn-ghost" onClick={onClose}>{window.t('Cancelar', 'Cancel')}</button>
+          <button className="btn btn-primary" disabled={!limpio || repetido}
+            style={{opacity: (limpio && !repetido) ? 1 : 0.5}} onClick={guarda}>
+            {window.t('Guardar', 'Save')}
+          </button>
         </div>
       </div>
     </div>

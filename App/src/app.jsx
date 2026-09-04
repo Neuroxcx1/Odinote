@@ -2310,6 +2310,30 @@ function App() {
     setProjects(p => p.map(x => x.id === projectId ? { ...x, deleted: false } : x));
   };
 
+  // ── Carpetas de la pantalla de inicio ──
+  //
+  // Una carpeta no es un objeto que se guarde en ninguna parte: es el nombre
+  // que lleva escrito el propio proyecto. Por eso agrupar no toca ni la
+  // sincronización, ni Google Drive, ni dónde vive ningún archivo — el campo
+  // viaja dentro del proyecto como el nombre o el color de la portada.
+  const setProjectFolder = (projectId, carpeta) => {
+    const limpio = String(carpeta || '').trim();
+    setProjects(p => p.map(x => x.id === projectId ? { ...x, carpeta: limpio || null } : x));
+  };
+
+  const renameFolder = (viejo, nuevo) => {
+    const de = String(viejo || '').trim(), a = String(nuevo || '').trim();
+    if (!de || !a || de === a) return;
+    setProjects(p => p.map(x => (String(x.carpeta || '').trim() === de ? { ...x, carpeta: a } : x)));
+  };
+
+  // Quitar la carpeta NO borra ni un proyecto: vuelven a quedar sueltos.
+  const removeFolder = (nombre) => {
+    const de = String(nombre || '').trim();
+    if (!de) return;
+    setProjects(p => p.map(x => (String(x.carpeta || '').trim() === de ? { ...x, carpeta: null } : x)));
+  };
+
   const toggleStarProject = (projectId) => {
     setProjects(p => p.map(x => x.id === projectId ? { ...x, starred: !x.starred } : x));
   };
@@ -2819,6 +2843,9 @@ function App() {
       onUserClick={() => setUserModalOpen(true)}
       onJoinProjectClick={() => setJoiningModalOpen(true)}
       onTogglePublic={togglePublicProject}
+      onSetFolder={setProjectFolder}
+      onRenameFolder={renameFolder}
+      onDeleteFolder={removeFolder}
       onManualSync={manualDriveRefresh}
       isSyncingDrive={isSyncingDrive}
       needsDriveAuth={!!(userProfile && !userProfile.accessToken)}
