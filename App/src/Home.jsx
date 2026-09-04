@@ -236,7 +236,7 @@ function renderProjectIcon(icon) {
 }
 window.renderProjectIcon = renderProjectIcon;
 
-function Home({ lang, setLang, theme, setTheme, onOpenProject, projects, onCreate, onDelete, onRename, onRestore, onPurge, onToggleStar, onExport, onImport, vaultPath, onOpenVault, onCloseVault, updateAvailable, onUpdateClick, onSettingsClick, userProfile, esPatrocinador, onAbrirCorona, onUserClick, onJoinProjectClick, onTogglePublic, onManualSync, isSyncingDrive, needsDriveAuth, onSetFolder, onRenameFolder, onDeleteFolder }) {
+function Home({ lang, setLang, theme, setTheme, onOpenProject, projects, onCreate, onDelete, onRename, onRestore, onPurge, onToggleStar, onExport, onImport, vaultPath, onOpenVault, onCloseVault, updateAvailable, onUpdateClick, onSettingsClick, userProfile, esPatrocinador, onAbrirCorona, onUserClick, onJoinProjectClick, onTogglePublic, onManualSync, isSyncingDrive, needsDriveAuth, onSetFolder, onSetFolderMany, onRenameFolder, onDeleteFolder }) {
   const t = window.TRANSLATIONS[lang];
   const [query, setQuery] = useStateHome('');
   const [modal, setModal] = useStateHome(false);
@@ -263,6 +263,7 @@ function Home({ lang, setLang, theme, setTheme, onOpenProject, projects, onCreat
   const [carpetasVacias, setCarpetasVacias] = useStateHome(leeCarpetasVacias);
   const [moviendo, setMoviendo] = useStateHome(null);      // proyecto que se está moviendo
   const [nombrando, setNombrando] = useStateHome(null);    // { inicial } al crear o renombrar
+  const [anadiendo, setAnadiendo] = useStateHome(null);    // carpeta a la que se meten varios
 
   const carpetas = useMemoHome(() => carpetasVisibles(projects, carpetasVacias), [projects, carpetasVacias]);
   const cuentas = useMemoHome(() => cuentaPorCarpeta(projects), [projects]);
@@ -275,6 +276,13 @@ function Home({ lang, setLang, theme, setTheme, onOpenProject, projects, onCreat
 
   const mueveACarpeta = (projectId, nombre) => {
     onSetFolder && onSetFolder(projectId, nombre);
+    if (nombre) olvidaVacia(nombre);
+    window.playAudioTone && window.playAudioTone('click');
+  };
+  // Varios de una vez, en un solo cambio de estado: moviéndolos de uno en uno
+  // se repintaba la pantalla una vez por proyecto.
+  const anadeACarpeta = (ids, nombre) => {
+    onSetFolderMany && onSetFolderMany(ids, nombre);
     if (nombre) olvidaVacia(nombre);
     window.playAudioTone && window.playAudioTone('click');
   };
@@ -715,7 +723,19 @@ function Home({ lang, setLang, theme, setTheme, onOpenProject, projects, onCreat
                section === 'trash' ? (window.t('Papelera', 'Trash')) :
                carpetaAbierta ? (
                  <span className="ms-carpeta-migas">
-                   <button onClick={()=>setCarpetaAbierta(null)} title={window.t('Volver a todos', 'Back to all')}>
+                   {/* Y también saca: soltar aquí un proyecto lo devuelve a la
+                       lista de sueltos. Entrar tenía gesto y salir no. */}
+                   <button
+                     onClick={()=>setCarpetaAbierta(null)}
+                     title={window.t('Volver a todos (o suelta aquí un proyecto para sacarlo)', 'Back to all (or drop a project here to take it out)')}
+                     onDragOver={(e)=>{ e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }}
+                     onDrop={(e)=>{
+                       e.preventDefault();
+                       document.body.classList.remove('arrastrando-proyecto');
+                       const id = e.dataTransfer.getData('text/plain');
+                       if (id) mueveACarpeta(id, '');
+                     }}
+                   >
                      <span className="material-symbols-rounded">arrow_back</span>
                    </button>
                    <span className="material-symbols-rounded">folder</span>
@@ -729,6 +749,16 @@ function Home({ lang, setLang, theme, setTheme, onOpenProject, projects, onCreat
                 title={window.t('Agrupar proyectos en una carpeta', 'Group projects into a folder')}>
                 <span className="material-symbols-rounded">create_new_folder</span>
                 <span>{window.t('Carpeta', 'Folder')}</span>
+              </button>
+            )}
+            {/* Dentro de una carpeta, meter proyectos que ya existen. Dentro
+                de una vacía no hay nada que arrastrar: lo que quieres meter
+                está fuera, en la lista que no estás viendo. */}
+            {section === 'all' && carpetaAbierta && (
+              <button className="ms-carpeta-btn" onClick={()=>setAnadiendo(carpetaAbierta)}
+                title={window.t('Meter aquí proyectos que ya existen', 'Bring existing projects in here')}>
+                <span className="material-symbols-rounded">library_add</span>
+                <span>{window.t('Añadir proyectos', 'Add projects')}</span>
               </button>
             )}
             <div className="ms-view-toggle">
@@ -748,6 +778,7 @@ function Home({ lang, setLang, theme, setTheme, onOpenProject, projects, onCreat
                 onOpen={()=>{ setCarpetaAbierta(c); window.playAudioTone && window.playAudioTone('board_open'); }}
                 onRename={()=>setNombrando({ inicial: c })}
                 onDelete={()=>quitaCarpeta(c)}
+                onSoltar={(id)=>mueveACarpeta(id, c)}
               />
             ))}
              {filtered.map(p => (
@@ -761,6 +792,7 @@ function Home({ lang, setLang, theme, setTheme, onOpenProject, projects, onCreat
                 onToggleStar={()=>onToggleStar(p.id)}
                 onTogglePublic={()=>onTogglePublic(p.id)}
                 onMoveClick={()=>setMoviendo(p)}
+                dentroDe={carpetaAbierta}
               />
             ))}
             {section === 'all' && carpetaAbierta && filtered.length === 0 && (
@@ -787,6 +819,15 @@ function Home({ lang, setLang, theme, setTheme, onOpenProject, projects, onCreat
           lang={lang}
           onClose={()=>setMoviendo(null)}
           onElegir={(nombre)=>mueveACarpeta(moviendo.id, nombre)}
+        />
+      )}
+      {anadiendo && (
+        <AnadirACarpetaModal
+          carpeta={anadiendo}
+          projects={projects}
+          lang={lang}
+          onClose={()=>setAnadiendo(null)}
+          onAnadir={(ids)=>anadeACarpeta(ids, anadiendo)}
         />
       )}
       {nombrando && (
@@ -877,7 +918,7 @@ function RecentCard({ project, lang, t, onOpen, onDelete, onRenameClick, onToggl
   );
 }
 
-function ProjectCard({ project, lang, t, onOpen, onDelete, onRenameClick, onRestore, onPurge, onToggleStar, isTrash, onMoveClick }) {
+function ProjectCard({ project, lang, t, onOpen, onDelete, onRenameClick, onRestore, onPurge, onToggleStar, isTrash, onMoveClick, dentroDe }) {
   const handleContextMenu = (e) => {
     if (isTrash) return;
     e.preventDefault();
@@ -890,6 +931,15 @@ function ProjectCard({ project, lang, t, onOpen, onDelete, onRenameClick, onRest
          vive en su equipo y desaparece cuando cierra la sesión. Sin esa señal
          se confunde con los propios y da un susto al no encontrarlo luego. */
       className={`ms-project-card ${project.invitado ? 'es-invitado' : ''}`}
+      /* Se arrastra a una carpeta. El navegador ya distingue arrastrar de
+         hacer clic, así que soltar sin moverse sigue abriendo el proyecto. */
+      draggable={!isTrash}
+      onDragStart={(e)=>{
+        e.dataTransfer.setData('text/plain', project.id);
+        e.dataTransfer.effectAllowed = 'move';
+        document.body.classList.add('arrastrando-proyecto');
+      }}
+      onDragEnd={()=>document.body.classList.remove('arrastrando-proyecto')}
       onClick={isTrash ? undefined : onOpen}
       onContextMenu={handleContextMenu}
       style={{position:'relative'}}
@@ -968,8 +1018,10 @@ function ProjectCard({ project, lang, t, onOpen, onDelete, onRenameClick, onRest
           <span className="dot"/>
           <span>{window.pickLang(project.updated, lang) || (window.t('recién', 'recent'))}</span>
           {/* Buscando y en Favoritos las tarjetas salen fuera de su carpeta;
-              sin esto no había forma de saber dónde vive cada una. */}
-          {window.carpetaDe(project) && (
+              sin esto no había forma de saber dónde vive cada una. Dentro de
+              esa misma carpeta no se enseña: ahí lo dicen ya las migas de
+              arriba, y repetirlo en cada tarjeta es ruido. */}
+          {window.carpetaDe(project) && window.carpetaDe(project) !== dentroDe && (
             <span className="ms-carpeta-chip" title={window.t('Está en esta carpeta', 'It lives in this folder')}>
               <span className="material-symbols-rounded">folder</span>
               {window.carpetaDe(project)}
@@ -984,12 +1036,27 @@ function ProjectCard({ project, lang, t, onOpen, onDelete, onRenameClick, onRest
 // Una carpeta en la rejilla. Se abre con un clic, como un proyecto, y enseña
 // los colores de portada de lo que guarda: de un vistazo se reconoce el cajón
 // sin tener que leer el nombre.
-function FolderCard({ nombre, cuantos, portadas, onOpen, onRename, onDelete, lang }) {
+function FolderCard({ nombre, cuantos, portadas, onOpen, onRename, onDelete, onSoltar, lang }) {
+  // Solo para pintar el borde mientras tienes algo encima: sin esa señal no
+  // se sabe si vas a soltarlo dentro o al lado.
+  const [encima, setEncima] = useStateHome(false);
   return (
     <div
-      className="ms-project-card ms-folder-card"
+      className={`ms-project-card ms-folder-card${encima ? ' soltando' : ''}`}
       onClick={onOpen}
       onContextMenu={(e)=>{ e.preventDefault(); onRename && onRename(); }}
+      onDragOver={(e)=>{ e.preventDefault(); e.dataTransfer.dropEffect = 'move'; if (!encima) setEncima(true); }}
+      onDragLeave={()=>setEncima(false)}
+      onDrop={(e)=>{
+        e.preventDefault();
+        setEncima(false);
+        // Se limpia aqui y no solo en el dragend: al soltar, React quita esa
+        // tarjeta de la lista y el dragend llega cuando su elemento ya no
+        // esta en la pagina, asi que no se ejecuta nunca.
+        document.body.classList.remove('arrastrando-proyecto');
+        const id = e.dataTransfer.getData('text/plain');
+        if (id && onSoltar) onSoltar(id);
+      }}
       style={{position:'relative'}}
     >
       <div className="ms-project-cover ms-folder-cover">
@@ -1076,6 +1143,89 @@ function MoverACarpetaModal({ project, carpetas, lang, onClose, onElegir }) {
 
         <div className="modal-actions">
           <button className="btn btn-ghost" onClick={onClose}>{window.t('Cancelar', 'Cancel')}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Meter en la carpeta proyectos que ya existen, varios de una vez. Hace falta
+// aunque se puedan arrastrar: dentro de una carpeta vacía no hay nada que
+// arrastrar —lo que quieres meter está fuera, en la lista que no estás viendo—
+// y con veinte proyectos, arrastrar de uno en uno es un castigo.
+function AnadirACarpetaModal({ carpeta, projects, lang, onClose, onAnadir }) {
+  const fuera = projects.filter(p => !p.deleted && window.carpetaDe(p) !== carpeta);
+  const [elegidos, setElegidos] = useStateHome([]);
+  const [busca, setBusca] = useStateHome('');
+  const q = busca.trim().toLowerCase();
+  const lista = q
+    ? fuera.filter(p => window.pickLang(p.name, lang).toLowerCase().includes(q))
+    : fuera;
+  const alterna = (id) => setElegidos(prev => prev.indexOf(id) === -1 ? [...prev, id] : prev.filter(x => x !== id));
+
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="modal" onClick={(e)=>e.stopPropagation()}>
+        <h2>{window.t('Añadir a', 'Add to')} «{carpeta}»</h2>
+        <p>{window.t('Marca los proyectos que quieras meter aquí. Los que ya estén en otra carpeta se cambian a esta.', 'Tick the projects you want in here. Any already in another folder move to this one.')}</p>
+
+        {fuera.length === 0 ? (
+          <p className="ms-carpeta-aviso">{window.t('No queda ningún proyecto fuera de esta carpeta.', 'No projects left outside this folder.')}</p>
+        ) : (
+          <>
+            {/* El buscador solo aparece cuando hay bastantes: con cuatro
+                proyectos es un campo de más que estorba. */}
+            {fuera.length > 6 && (
+              <div className="field">
+                <input
+                  type="text"
+                  autoFocus
+                  value={busca}
+                  placeholder={window.t('Buscar entre tus proyectos…', 'Search your projects…')}
+                  onChange={(e)=>setBusca(e.target.value)}
+                />
+              </div>
+            )}
+            <div className="ms-carpeta-lista">
+              {lista.length === 0 && (
+                <div className="ms-carpeta-op" style={{opacity:0.6, cursor:'default'}}>
+                  <span className="material-symbols-rounded">search_off</span>
+                  <span>{window.t('Nada con ese nombre', 'Nothing by that name')}</span>
+                </div>
+              )}
+              {lista.map(p => {
+                const marcado = elegidos.indexOf(p.id) !== -1;
+                const suya = window.carpetaDe(p);
+                return (
+                  <button key={p.id} className={`ms-carpeta-op ${marcado ? 'active' : ''}`} onClick={()=>alterna(p.id)}>
+                    <span className="material-symbols-rounded">{marcado ? 'check_box' : 'check_box_outline_blank'}</span>
+                    <span className="ms-anadir-nombre">{window.pickLang(p.name, lang)}</span>
+                    {/* Si ya está en otra, se dice: mover no es copiar, y desde
+                        aquí no se ve de dónde sale. */}
+                    {suya && !marcado && (
+                      <span className="ms-anadir-donde">
+                        <span className="material-symbols-rounded">folder</span>{suya}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </>
+        )}
+
+        <div className="modal-actions">
+          <button className="btn btn-ghost" onClick={onClose}>{window.t('Cancelar', 'Cancel')}</button>
+          <button
+            className="btn btn-primary"
+            disabled={elegidos.length === 0}
+            style={{opacity: elegidos.length ? 1 : 0.5}}
+            onClick={()=>{ onAnadir(elegidos); onClose(); }}
+          >
+            {elegidos.length <= 1
+              ? window.t('Añadir', 'Add')
+              : window.t('Añadir ' + elegidos.length, 'Add ' + elegidos.length)}
+          </button>
         </div>
       </div>
     </div>

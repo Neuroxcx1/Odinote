@@ -103,5 +103,27 @@ check('cada tarjeta tiene su botón de mover',
 check('y se ve en qué carpeta vive cuando sale fuera de ella',
   /className="ms-carpeta-chip"/.test(home));
 
+// ── Meter proyectos en una carpeta que ya tiene cosas fuera ──
+//
+// Dos caminos, porque uno solo no bastaba: arrastrar la tarjeta a la carpeta,
+// y un botón dentro de la carpeta para traer varios de fuera. Dentro de una
+// carpeta vacía no hay nada que arrastrar — lo que quieres meter está en la
+// lista que no estás viendo.
+check('la tarjeta de un proyecto se puede arrastrar', home.indexOf('draggable={!isTrash}') !== -1);
+check('y la carpeta recibe lo que le sueltes', home.indexOf('if (id && onSoltar) onSoltar(id);') !== -1);
+check('la flecha de volver saca de la carpeta', home.indexOf("if (id) mueveACarpeta(id, '');") !== -1);
+// Al soltar, React quita esa tarjeta de la lista y el dragend llega cuando su
+// elemento ya no está en la página: si la marca solo se limpiara ahí, se
+// quedaría puesta y todas las carpetas con el borde de puntos para siempre.
+check('la marca de arrastrar se limpia también al soltar',
+  home.split("classList.remove('arrastrando-proyecto')").length - 1 === 3);
+check('hay botón para añadir proyectos dentro de la carpeta', home.indexOf('Meter aquí proyectos que ya existen') !== -1);
+check('la ventana solo ofrece los que están fuera',
+  home.indexOf("projects.filter(p => !p.deleted && window.carpetaDe(p) !== carpeta)") !== -1);
+check('varios de golpe se mueven en un solo cambio de estado',
+  app.indexOf('const setProjectFolderMany = (ids, carpeta) =>') !== -1 && app.indexOf('cuales.has(x.id)') !== -1);
+check('dentro de su propia carpeta la tarjeta no repite la chapa',
+  home.indexOf('window.carpetaDe(project) !== dentroDe') !== -1);
+
 console.log(fallos ? `\n${fallos} FALLOS` : '\nTodo en orden.');
 process.exit(fallos ? 1 : 0);

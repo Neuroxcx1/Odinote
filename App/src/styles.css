@@ -6189,3 +6189,24 @@ html[data-touch="1"] .ms-grid-list .ms-card-actions { opacity: 1; }
   color: var(--wine); font-size: 12px; font-weight: 600;
   margin: -4px 0 8px !important;
 }
+
+/* Arrastrar un proyecto a una carpeta. Mientras se arrastra, las carpetas se
+   marcan un poco para que se vea que son las que reciben; la que tiene el
+   proyecto encima se marca del todo. Sin esa senal no se sabe si vas a
+   soltarlo dentro o al lado. */
+body.arrastrando-proyecto .ms-folder-card { outline: 2px dashed var(--line); outline-offset: 3px; }
+.ms-folder-card.soltando {
+  outline: 2.5px solid var(--olive) !important; outline-offset: 3px;
+  transform: translate(-1px, -3px);
+}
+.ms-folder-card.soltando .ms-folder-cover { background: var(--olive-l, #E8F0DA); }
+/* La flecha de volver tambien recibe: soltar ahi saca el proyecto. */
+body.arrastrando-proyecto .ms-carpeta-migas button { outline: 2px dashed var(--line); outline-offset: 2px; }
+
+/* La lista de "anadir proyectos". */
+.ms-anadir-nombre { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ms-anadir-donde {
+  display: inline-flex; align-items: center; gap: 3px; flex-shrink: 0;
+  font-size: 11px; color: var(--ink-3);
+}
+.ms-anadir-donde .material-symbols-rounded { font-size: 13px; }

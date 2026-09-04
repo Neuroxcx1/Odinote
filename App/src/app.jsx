@@ -2321,6 +2321,15 @@ function App() {
     setProjects(p => p.map(x => x.id === projectId ? { ...x, carpeta: limpio || null } : x));
   };
 
+  // Varios de golpe, en un solo cambio de estado: llamando al de arriba en
+  // bucle se repintaba la pantalla entera una vez por proyecto.
+  const setProjectFolderMany = (ids, carpeta) => {
+    const limpio = String(carpeta || '').trim() || null;
+    const cuales = new Set(ids || []);
+    if (!cuales.size) return;
+    setProjects(p => p.map(x => (cuales.has(x.id) ? { ...x, carpeta: limpio } : x)));
+  };
+
   const renameFolder = (viejo, nuevo) => {
     const de = String(viejo || '').trim(), a = String(nuevo || '').trim();
     if (!de || !a || de === a) return;
@@ -2844,6 +2853,7 @@ function App() {
       onJoinProjectClick={() => setJoiningModalOpen(true)}
       onTogglePublic={togglePublicProject}
       onSetFolder={setProjectFolder}
+      onSetFolderMany={setProjectFolderMany}
       onRenameFolder={renameFolder}
       onDeleteFolder={removeFolder}
       onManualSync={manualDriveRefresh}
