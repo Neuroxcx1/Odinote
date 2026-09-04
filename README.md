@@ -136,7 +136,7 @@ return is **credit**:
 
 - If you redistribute Oddinote — as source, as a build, or inside something you made — keep the
   [NOTICE](NOTICE) file readable in your distribution and say that your work is based on
-  **Oddinote by Neuroxcx1**, with a link back to this repository. A line in your README, your
+  **Oddinote by Neuroxcx**, with a link back to this repository. A line in your README, your
   about screen or your credits is the normal way to do it.
 - If you changed files, say which ones you changed, so people can tell your work from the
   original.

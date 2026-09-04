@@ -42,3 +42,6 @@ App/google-oauth.json
 .firebase/
 firebase-debug.log
 firebase-debug.*.log
+
+# Notas de trabajo del asistente. Se quedan en el equipo, no en el repositorio.
+CLAUDE.md
