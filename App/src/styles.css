@@ -3607,10 +3607,77 @@ body.odi-busy iframe { pointer-events: none !important; }
 /* ============================================
    NODO DE TIEMPO
    ============================================ */
+/* Semitransparente y desenfocando lo de detrás. Un reloj no es un papel más
+   pegado al tablero: es un cacharro que se deja ENCIMA, y opaco tapaba las
+   notas sobre las que se posaba. El desenfoque no es adorno — sin él los
+   números se leían sobre el texto de lo que hubiera debajo. */
 .timer-body {
   display: flex; flex-direction: column;
+  backdrop-filter: blur(9px) saturate(1.2);
+  -webkit-backdrop-filter: blur(9px) saturate(1.2);
+}
+/* La barra de arriba, con color de verdad: es lo que separa el nombre del
+   reloj y lo que le da al nodo una cabecera como la de los demás. */
+.timer-bar {
+  flex: 0 0 auto;
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 9px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.10);
+}
+.timer-title {
+  flex: 1; min-width: 0;
+  font-family: var(--font-display), system-ui, sans-serif;
+  font-size: calc(12px * var(--node-scale, 1));
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  cursor: text;
+}
+.timer-title.vacio { opacity: 0.5; font-style: italic; font-weight: 500; }
+.timer-title-input {
+  flex: 1; min-width: 0;
+  font-family: var(--font-display), system-ui, sans-serif;
+  font-size: calc(12px * var(--node-scale, 1));
+  background: rgba(255, 255, 255, 0.22); border: none; outline: none;
+  border-radius: 4px; padding: 2px 6px;
+}
+.timer-modo {
+  flex: 0 0 auto;
+  display: flex; align-items: center; gap: 1px;
+  font-family: var(--font-mono); font-size: 9.5px; font-weight: 700;
+  letter-spacing: 0.05em; text-transform: uppercase;
+  background: rgba(255, 255, 255, 0.16);
+  border: 1px solid currentColor; border-radius: 99px;
+  padding: 2px 3px 2px 8px; cursor: pointer;
+  transition: background 120ms;
+}
+.timer-modo:hover { background: rgba(255, 255, 255, 0.34); }
+.timer-modo .material-symbols-rounded { font-size: 14px; }
+/* La tapa recoge el clic de fuera para cerrar la lista. Va dentro del nodo
+   porque la tarjeta recorta lo que sobresale. */
+.timer-modos-tapa { position: absolute; inset: 0; z-index: 3; }
+.timer-modos {
+  position: absolute; z-index: 4; right: 8px; top: 30px;
+  min-width: 146px; padding: 4px;
+  background: var(--paper); color: var(--ink);
+  border: 1.5px solid var(--line); border-radius: 8px;
+  box-shadow: var(--pop-hover);
+  display: flex; flex-direction: column; gap: 2px;
+}
+.timer-modo-item {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  padding: 6px 8px; border: none; border-radius: 5px;
+  background: none; color: inherit; cursor: pointer; text-align: left;
+  font-family: var(--font-body); font-size: 12px;
+}
+.timer-modo-item:hover { background: rgba(0, 0, 0, 0.06); }
+[data-theme="dark"] .timer-modo-item:hover { background: rgba(255, 255, 255, 0.08); }
+.timer-modo-item.activo { font-weight: 700; }
+.timer-modo-item .material-symbols-rounded { font-size: 15px; color: var(--olive); }
+
+.timer-cuerpo {
+  flex: 1; min-height: 0;
+  display: flex; flex-direction: column;
   align-items: center; justify-content: center;
-  gap: 10px; padding: 14px;
+  gap: 9px; padding: 10px 12px 12px;
 }
 .timer-fase {
   font-family: var(--font-mono); font-size: 10.5px; font-weight: 700;
@@ -3624,8 +3691,31 @@ body.odi-busy iframe { pointer-events: none !important; }
   font-family: var(--font-display), 'Bricolage Grotesque', system-ui, sans-serif;
   font-variant-numeric: tabular-nums;
   font-weight: 800; letter-spacing: -0.02em; line-height: 1;
-  font-size: calc(42px * var(--node-scale, 1));
+  font-size: calc(40px * var(--node-scale, 1));
 }
+/* El tiempo se escribe aquí, en el reloj. El subrayado punteado al pasar por
+   encima es lo único que lo cuenta: un número grande no parece un campo. */
+.timer-reloj.ajustable { cursor: text; }
+.timer-reloj.ajustable:hover {
+  text-decoration: underline dotted; text-underline-offset: 7px;
+  text-decoration-thickness: 2px; opacity: 0.9;
+}
+.timer-reloj.editando { display: flex; align-items: baseline; gap: 1px; }
+.timer-num {
+  font: inherit; color: inherit; font-variant-numeric: tabular-nums;
+  background: none; border: none; outline: none;
+  border-bottom: 2px solid currentColor;
+  padding: 0; margin: 0;
+}
+/* El móvil obliga a 16px a TODO campo de texto, para que el navegador no dé
+   el zoom que da al escribir en letra pequeña. Esa regla lleva cinco clases
+   de especificidad y le gana a cualquier cosa sensata de aquí: sin ganarle,
+   las casillas del reloj salían a 16px pegadas a unos números de 40. Aquí no
+   hay zoom que evitar, porque la letra ya es enorme. */
+.timer-reloj .timer-num { font-size: calc(40px * var(--node-scale, 1)) !important; }
+.timer-num:first-of-type { width: 3ch; text-align: right; }
+.timer-num:last-of-type { width: 2.4ch; text-align: left; }
+.timer-dosp { opacity: 0.5; }
 .timer-barra {
   width: 82%; height: 6px; border-radius: 99px;
   border: 1.5px solid currentColor; opacity: 0.55; overflow: hidden;
@@ -3642,17 +3732,28 @@ body.odi-busy iframe { pointer-events: none !important; }
 .timer-btn:active { transform: translateY(1px); }
 .timer-btn.principal { width: 40px; height: 40px; opacity: 0.95; }
 .timer-btn .material-symbols-rounded { font-size: 19px; }
-/* Los campos de minutos y segundos del menú */
-.ctx-duracion { display: flex; flex-direction: column; gap: 8px; }
-.ctx-campo { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--ink); }
-.ctx-campo span { flex: 1; }
-.ctx-campo em { font-style: normal; color: var(--ink-3); font-size: 11px; }
-.ctx-campo input {
-  width: 62px; padding: 5px 7px; font-size: 12.5px;
-  font-family: var(--font-mono); text-align: right;
-  border: 1.5px solid var(--line-soft); border-radius: 5px;
-  background: var(--paper); color: var(--ink);
+/* El interruptor del encadenado. Es un interruptor y no un botón más porque
+   no hace nada ahora: dice cómo se va a portar el nodo cuando acabe la fase,
+   y eso se enseña encendido o apagado, no pulsado. */
+.timer-auto {
+  display: flex; align-items: center; gap: 7px;
+  background: none; border: none; padding: 0; cursor: pointer;
+  font-family: var(--font-body); font-size: 10.5px; font-weight: 600;
+  opacity: 0.6; transition: opacity 120ms;
 }
+.timer-auto:hover, .timer-auto.on { opacity: 0.95; }
+.timer-auto-carril {
+  flex: 0 0 auto;
+  width: 26px; height: 15px; border-radius: 99px;
+  border: 1.5px solid currentColor; box-sizing: border-box;
+  display: flex; align-items: center; padding: 1.5px;
+  transition: background 140ms;
+}
+.timer-auto-carril > i {
+  display: block; width: 9px; height: 9px; border-radius: 50%;
+  transition: transform 140ms var(--e-out, ease);
+}
+.timer-auto.on .timer-auto-carril > i { transform: translateX(11px); }
 
 /* ============================================
    NODO DE CÓDIGO

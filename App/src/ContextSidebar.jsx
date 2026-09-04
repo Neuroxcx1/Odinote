@@ -688,8 +688,11 @@ function ContextSidebar({
           </button>
         )}
 
-        {/* Nodo de tiempo: cuál de los tres, cuánto dura, y el color de los
-            números. El del fondo es el de siempre y ya está arriba. */}
+        {/* Nodo de tiempo: qué cuenta, el nombre, y los dos colores que se
+            tocan. La DURACIÓN ya no está aquí a propósito: se escribe en el
+            propio reloj del nodo. Poner tres minutos es lo más corto que se
+            hace con este nodo y mandarlo a un panel lateral lo convertía en
+            lo más largo. */}
         {isTimer && (
           <>
             <button
@@ -700,16 +703,28 @@ function ContextSidebar({
               <span className="material-symbols-rounded">timer</span>
               <span>{window.nombreModoTiempo ? window.nombreModoTiempo(item.modoTiempo) : 'Tiempo'}</span>
             </button>
-            {(item.modoTiempo || 'cuentaAtras') !== 'cronometro' && (
-              <button
-                className={`ctx-btn ${pane === 'timerDuracion' ? 'active' : ''}`}
-                onClick={()=>setPane(pane === 'timerDuracion' ? null : 'timerDuracion')}
-                title={window.t('Cuánto dura', 'How long')}
-              >
-                <span className="material-symbols-rounded">schedule</span>
-                <span>{window.t('Duración', 'Length')}</span>
-              </button>
-            )}
+            {/* El título tiene MENÚ PROPIO, como el del bloque de código: se
+                pulsa aquí, se pasa a escribirlo, y al lado salen su color, su
+                negrita y su alineación. */}
+            <button
+              className="ctx-btn"
+              onClick={()=>{
+                setPane(null);
+                onUpdate({ _editingTitle: true });
+              }}
+              title={window.t('Poner nombre al reloj', 'Name the timer')}
+            >
+              <span className="material-symbols-rounded">label</span>
+              <span>{window.t('Título', 'Title')}</span>
+            </button>
+            <button
+              className={`ctx-btn ${pane === 'timerBarColor' ? 'active' : ''}`}
+              onClick={()=>setPane(pane === 'timerBarColor' ? null : 'timerBarColor')}
+              title={window.t('Color de la barra', 'Bar colour')}
+            >
+              <div className="ctx-color-chip" style={{ background: item.barColor || '#E6544F', border: '1.5px solid var(--line-soft)' }}/>
+              <span>{window.t('Barra', 'Bar')}</span>
+            </button>
             <button
               className={`ctx-btn ${pane === 'timerNumeros' ? 'active' : ''}`}
               onClick={()=>setPane(pane === 'timerNumeros' ? null : 'timerNumeros')}
@@ -1318,43 +1333,16 @@ function ContextSidebar({
         </div>
       )}
 
-      {pane === 'timerDuracion' && (
+      {pane === 'timerBarColor' && (
         <div className="ctx-popout">
           <div className="ctx-pop-section">
-            <div className="ctx-pop-title">{window.t('Duración', 'Length')}</div>
-            {(item.modoTiempo || 'cuentaAtras') === 'pomodoro' ? (
-              <div className="ctx-duracion">
-                <label className="ctx-campo">
-                  <span>{window.t('Trabajo', 'Focus')}</span>
-                  <input type="number" min="1" max="180"
-                    value={item.minutosTrabajo != null ? item.minutosTrabajo : 25}
-                    onChange={(e)=>onUpdate({ minutosTrabajo: Math.max(1, Math.min(180, +e.target.value || 1)), arrancadoEn: null, acumulado: 0 })}/>
-                  <em>min</em>
-                </label>
-                <label className="ctx-campo">
-                  <span>{window.t('Descanso', 'Break')}</span>
-                  <input type="number" min="1" max="60"
-                    value={item.minutosDescanso != null ? item.minutosDescanso : 5}
-                    onChange={(e)=>onUpdate({ minutosDescanso: Math.max(1, Math.min(60, +e.target.value || 1)), arrancadoEn: null, acumulado: 0 })}/>
-                  <em>min</em>
-                </label>
-              </div>
-            ) : (
-              <div className="ctx-duracion">
-                <label className="ctx-campo">
-                  <span>{window.t('Minutos', 'Minutes')}</span>
-                  <input type="number" min="0" max="600"
-                    value={item.minutos != null ? item.minutos : 5}
-                    onChange={(e)=>onUpdate({ minutos: Math.max(0, Math.min(600, +e.target.value || 0)), arrancadoEn: null, acumulado: 0 })}/>
-                </label>
-                <label className="ctx-campo">
-                  <span>{window.t('Segundos', 'Seconds')}</span>
-                  <input type="number" min="0" max="59"
-                    value={item.segundos != null ? item.segundos : 0}
-                    onChange={(e)=>onUpdate({ segundos: Math.max(0, Math.min(59, +e.target.value || 0)), arrancadoEn: null, acumulado: 0 })}/>
-                </label>
-              </div>
-            )}
+            <div className="ctx-pop-title">{window.t('Color de la barra', 'Bar colour')}</div>
+            <window.SelectorColor
+              valor={item.barColor || '#E6544F'}
+              onCambio={(c) => onUpdate({ barColor: c })}
+              colores={window.COLORES_ODINOTE_FONDO}
+              tam={26}
+            />
           </div>
         </div>
       )}

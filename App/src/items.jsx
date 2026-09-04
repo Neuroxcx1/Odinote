@@ -3643,8 +3643,11 @@ function duracionFase(item) {
   const modo = item.modoTiempo || 'cuentaAtras';
   if (modo === 'cronometro') return 0;   // hacia arriba, sin final
   if (modo === 'pomodoro') {
-    const trabajo = (item.minutosTrabajo != null ? item.minutosTrabajo : 25) * 60000;
-    const descanso = (item.minutosDescanso != null ? item.minutosDescanso : 5) * 60000;
+    // El pomodoro también cuenta segundos: el reloj se edita en el propio
+    // nodo con dos casillas (mm:ss) y sería raro que una de las dos no se
+    // guardara según en qué fase estuvieras.
+    const trabajo = ((item.minutosTrabajo != null ? item.minutosTrabajo : 25) * 60 + (item.segundosTrabajo || 0)) * 1000;
+    const descanso = ((item.minutosDescanso != null ? item.minutosDescanso : 5) * 60 + (item.segundosDescanso || 0)) * 1000;
     return item.faseDescanso ? descanso : trabajo;
   }
   const min = item.minutos != null ? item.minutos : 5;
@@ -3653,11 +3656,33 @@ function duracionFase(item) {
 }
 window.duracionFase = duracionFase;
 
+// Qué toca al terminar una fase del pomodoro. Vive aquí fuera, sin tocar el
+// reloj ni React, por una razón concreta: el salto de trabajo a descanso solo
+// se podía ver esperando los minutos de verdad, así que nunca se comprobó.
+// Siendo una función aparte se le pueden pasar los cuatro casos y medirlos.
+//
+// `sigueCorriendo` distingue las dos formas de cambiar de fase: encadenando
+// sola (arranca la siguiente) y a mano (arranca solo si ya estaba en marcha).
+function siguienteFasePomodoro(item, ahora, sigueCorriendo) {
+  const enDescanso = !!item.faseDescanso;
+  return {
+    faseDescanso: !enDescanso,
+    // La ronda se cuenta al acabar el TRABAJO, no al acabar el descanso: lo
+    // que uno cuenta al final del día son los ratos trabajados.
+    rondas: enDescanso ? (item.rondas || 0) : (item.rondas || 0) + 1,
+    arrancadoEn: sigueCorriendo ? ahora : null,
+    acumulado: 0,
+  };
+}
+window.siguienteFasePomodoro = siguienteFasePomodoro;
+
 function TimerItem({ item, lang, onUpdate }) {
   const modo = MODOS_TIEMPO.indexOf(item.modoTiempo) !== -1 ? item.modoTiempo : 'cuentaAtras';
   const enMarcha = !!item.arrancadoEn;
   const acumulado = item.acumulado || 0;      // lo que ya corrió antes de la última pausa
   const duracion = duracionFase(item);
+  // El cronómetro no tiene nada que poner: cuenta desde cero hacia arriba.
+  const seAjusta = modo !== 'cronometro';
 
   // Solo sirve para repintar: la cuenta de verdad sale del reloj, no de aquí.
   const [, repinta] = React.useState(0);
@@ -3666,6 +3691,13 @@ function TimerItem({ item, lang, onUpdate }) {
     const id = setInterval(() => repinta(n => n + 1), 250);
     return () => clearInterval(id);
   }, [enMarcha]);
+
+  // El reloj se escribe EN EL NODO, no en el menú de la izquierda: poner tres
+  // minutos es lo que más se hace con este nodo y mandarte a un panel lateral
+  // para eso convertía el gesto más corto en el más largo.
+  const [borrador, setBorrador] = React.useState(null);
+  // Qué modo se enseña al pulsar la insignia de la barra.
+  const [eligiendoModo, setEligiendoModo] = React.useState(false);
 
   const transcurrido = acumulado + (enMarcha ? Date.now() - item.arrancadoEn : 0);
   const restante = Math.max(0, duracion - transcurrido);
@@ -3678,15 +3710,10 @@ function TimerItem({ item, lang, onUpdate }) {
     if (yaSono.current) return;
     yaSono.current = true;
     window.playAudioTone && window.playAudioTone('alarma');
-    if (modo === 'pomodoro') {
-      // El pomodoro encadena solo: se acaba el trabajo y empieza el descanso,
-      // que es justo lo que uno quiere no tener que recordar.
-      onUpdate({
-        faseDescanso: !item.faseDescanso,
-        arrancadoEn: Date.now(),
-        acumulado: 0,
-        rondas: item.faseDescanso ? (item.rondas || 0) : (item.rondas || 0) + 1,
-      });
+    if (modo === 'pomodoro' && item.autoCambio !== false) {
+      // Encadenar solo es lo que uno quiere no tener que recordar… pero solo
+      // si lo ha pedido: con el interruptor apagado se para y espera.
+      onUpdate(siguienteFasePomodoro(item, Date.now(), true));
     } else {
       onUpdate({ arrancadoEn: null, acumulado: duracion });
     }
@@ -3705,61 +3732,262 @@ function TimerItem({ item, lang, onUpdate }) {
     window.playAudioTone && window.playAudioTone('delete');
     onUpdate({ arrancadoEn: null, acumulado: 0, faseDescanso: false, rondas: 0 });
   };
+  const cambiaFase = () => {
+    window.playAudioTone && window.playAudioTone('click');
+    onUpdate(siguienteFasePomodoro(item, Date.now(), enMarcha));
+  };
+
+  // ── Escribir el tiempo en el propio reloj ──
+  const abreReloj = () => {
+    if (!seAjusta) return;
+    const total = Math.round(duracion / 1000);
+    setBorrador({ min: String(Math.floor(total / 60)), seg: String(total % 60).padStart(2, '0') });
+  };
+  const guardaReloj = () => {
+    if (!borrador) return;
+    const min = Math.max(0, Math.min(600, parseInt(borrador.min, 10) || 0));
+    const seg = Math.max(0, Math.min(59, parseInt(borrador.seg, 10) || 0));
+    setBorrador(null);
+    // Un reloj a cero no cuenta nada, y casi siempre es una casilla que se
+    // vació para escribir y se dejó a medias: se queda como estaba.
+    if (min === 0 && seg === 0) return;
+    const patch = { arrancadoEn: null, acumulado: 0 };
+    if (modo === 'pomodoro') {
+      if (item.faseDescanso) { patch.minutosDescanso = min; patch.segundosDescanso = seg; }
+      else { patch.minutosTrabajo = min; patch.segundosTrabajo = seg; }
+    } else {
+      patch.minutos = min; patch.segundos = seg;
+    }
+    onUpdate(patch);
+  };
 
   // Lo que se enseña en grande.
   const mostrado = modo === 'cronometro' ? transcurrido : restante;
   // Cuánto queda, de 0 a 1, para el aro de progreso.
   const avance = duracion > 0 ? Math.min(1, transcurrido / duracion) : 0;
 
-  const colorFondo = item.color && item.color !== 'white'
+  const colorSolido = item.color && item.color !== 'white'
     ? (window.resolveStickyColor ? window.resolveStickyColor(item.color) : item.color)
     : '#FFFFFF';
+  // Semitransparente y desenfocando lo de detrás: un reloj es un cacharro que
+  // se pone ENCIMA del tablero, no un papel más pegado al tablero. Opaco
+  // tapaba las notas sobre las que uno lo deja.
+  const colorFondo = window.conAlfa ? window.conAlfa(colorSolido, 0.58) : colorSolido;
   // El color de los números lo elige el usuario; si no ha elegido, se saca del
-  // fondo para que siempre se lea (el mismo criterio que las figuras).
-  const colorNumeros = item.numberColor || (window.tintaLegible ? window.tintaLegible(colorFondo) : '#1A1A1A');
+  // fondo SÓLIDO —no del transparente— para que siempre se lea.
+  const colorNumeros = item.numberColor || (window.tintaLegible ? window.tintaLegible(colorSolido) : '#1A1A1A');
 
-  const faseTexto = modo === 'pomodoro'
-    ? (item.faseDescanso ? window.t('Descanso', 'Break') : window.t('Trabajo', 'Focus'))
-    : nombreModoTiempo(modo);
+  // La barra de arriba lleva color de verdad, que es lo que la separa del
+  // cuerpo translúcido y le da sitio al nombre. Nace en el rojo del propio
+  // nodo, el mismo de su botón en la barra de herramientas.
+  const colorBarra = item.barColor || '#E6544F';
+  const titulo = item.timerTitle || '';
+  // El título se edita desde su propio botón del menú del nodo, igual que el
+  // del bloque de código: el aviso viaja en el item porque la barra lateral
+  // también tiene que verlo para enseñar las opciones de texto.
+  const editandoTitulo = item._editingTitle === true;
+  const colorTitulo = item.titleColor && item.titleColor !== 'inherit'
+    ? item.titleColor
+    : (window.tintaLegible ? window.tintaLegible(colorBarra) : '#FFFFFF');
+  // Los mismos campos que escribe la barra de texto en el marco, el mapa y el
+  // bloque de código, para que este título se comporte como los demás.
+  const estiloTitulo = {
+    color: colorTitulo,
+    fontWeight: item.bold === false ? 500 : 700,
+    fontStyle: item.italic ? 'italic' : 'normal',
+    textDecoration: [item.underline ? 'underline' : '', item.strike ? 'line-through' : ''].filter(Boolean).join(' ') || 'none',
+    textAlign: item.titleAlign || 'left',
+  };
+
+  const faseTexto = item.faseDescanso ? window.t('Descanso', 'Break') : window.t('Trabajo', 'Focus');
 
   return (
     <div className="timer-card" style={{ width: '100%', height: '100%' }}>
-      <div className="item-card timer-body" style={{ backgroundColor: colorFondo }}>
-        <div className="timer-fase" style={{ color: colorNumeros, opacity: 0.65 }}>
-          {faseTexto}
-          {modo === 'pomodoro' && (item.rondas || 0) > 0 && (
-            <span className="timer-rondas">{'·'} {item.rondas} {window.t('rondas', 'rounds')}</span>
+      <div
+        className="item-card timer-body"
+        style={{ background: colorFondo, borderColor: window.conAlfa ? window.conAlfa(colorNumeros, 0.22) : undefined }}
+      >
+        {/* La barra de arriba: el nombre y qué está contando */}
+        <div className="timer-bar" style={{ background: colorBarra }}>
+          {editandoTitulo ? (
+            <input
+              className="timer-title-input"
+              style={estiloTitulo}
+              /* Se guarda según se escribe y no al perder el foco: la barra
+                 de texto se cierra con su propia flecha, y eso desmonta este
+                 campo sin que llegue a haber un blur — lo tecleado se perdía
+                 sin decir nada. */
+              value={titulo}
+              autoFocus
+              onMouseDown={(e)=>e.stopPropagation()}
+              onChange={(e)=>onUpdate({ timerTitle: e.target.value })}
+              onKeyDown={(e)=>{ if (e.key === 'Enter' || e.key === 'Escape') e.currentTarget.blur(); }}
+            />
+          ) : (
+            <span
+              className={`timer-title${titulo ? '' : ' vacio'}`}
+              style={estiloTitulo}
+              onDoubleClick={(e)=>{ e.stopPropagation(); onUpdate({ _editingTitle: true }); }}
+              title={window.t('Doble clic para ponerle nombre', 'Double-click to name it')}
+            >
+              {titulo || window.t('sin nombre', 'untitled')}
+            </span>
           )}
+          {/* La insignia dice qué de los tres es Y sirve para cambiarlo: el
+              modo es lo primero que se toca al poner el nodo, y tenerlo solo
+              en el menú de la izquierda lo escondía. */}
+          <button
+            className="timer-modo"
+            style={{ color: colorTitulo, borderColor: window.conAlfa ? window.conAlfa(colorTitulo, 0.45) : colorTitulo }}
+            onMouseDown={(e)=>e.stopPropagation()}
+            onClick={(e)=>{ e.stopPropagation(); setEligiendoModo(v => !v); }}
+            title={window.t('Cuenta atrás, cronómetro o pomodoro', 'Countdown, stopwatch or pomodoro')}
+          >
+            {nombreModoTiempo(modo)}
+            <span className="material-symbols-rounded">expand_more</span>
+          </button>
         </div>
 
-        <div className="timer-reloj" style={{ color: colorNumeros }}>
-          {formateaTiempo(mostrado)}
-        </div>
-
-        {/* La barra de avance solo tiene sentido si hay un final al que llegar. */}
-        {modo !== 'cronometro' && (
-          <div className="timer-barra" style={{ borderColor: colorNumeros }}>
-            <i style={{ width: `${avance * 100}%`, background: colorNumeros }}/>
-          </div>
+        {eligiendoModo && (
+          <>
+            {/* Una tapa por debajo para que el siguiente clic cierre la lista,
+                sin salirse del nodo (la tarjeta recorta lo que sobresale). */}
+            <div className="timer-modos-tapa" onMouseDown={(e)=>e.stopPropagation()} onClick={()=>setEligiendoModo(false)}/>
+            <div className="timer-modos" onMouseDown={(e)=>e.stopPropagation()}>
+              {MODOS_TIEMPO.map(m => (
+                <button
+                  key={m}
+                  className={`timer-modo-item ${modo === m ? 'activo' : ''}`}
+                  /* Cambiar de modo pone el reloj a cero: dejar corriendo la
+                     cuenta de otro modo enseñaría un número que no significa
+                     nada en el que acabas de elegir. */
+                  onClick={()=>{
+                    setEligiendoModo(false);
+                    setBorrador(null);
+                    window.playAudioTone && window.playAudioTone('click');
+                    onUpdate({ modoTiempo: m, arrancadoEn: null, acumulado: 0, faseDescanso: false, rondas: 0 });
+                  }}
+                >
+                  <span>{nombreModoTiempo(m)}</span>
+                  {modo === m && <span className="material-symbols-rounded">check</span>}
+                </button>
+              ))}
+            </div>
+          </>
         )}
 
-        <div className="timer-botones" onMouseDown={(e)=>e.stopPropagation()}>
-          <button
-            className="timer-btn principal"
-            style={{ borderColor: colorNumeros, color: colorNumeros }}
-            onClick={enMarcha ? pausa : arranca}
-            title={enMarcha ? window.t('Pausar', 'Pause') : window.t('Empezar', 'Start')}
-          >
-            <span className="material-symbols-rounded">{enMarcha ? 'pause' : 'play_arrow'}</span>
-          </button>
-          <button
-            className="timer-btn"
-            style={{ borderColor: colorNumeros, color: colorNumeros }}
-            onClick={reinicia}
-            title={window.t('Volver a empezar', 'Reset')}
-          >
-            <span className="material-symbols-rounded">refresh</span>
-          </button>
+        <div className="timer-cuerpo">
+          {/* Solo en el pomodoro: en los otros dos modos esta fila repetía
+              letra por letra la insignia de la barra de arriba. */}
+          {modo === 'pomodoro' && (
+            <div className="timer-fase" style={{ color: colorNumeros, opacity: 0.65 }}>
+              {faseTexto}
+              {(item.rondas || 0) > 0 && (
+                <span className="timer-rondas">
+                  {'·'} {item.rondas} {item.rondas === 1 ? window.t('ronda', 'round') : window.t('rondas', 'rounds')}
+                </span>
+              )}
+            </div>
+          )}
+
+          {borrador ? (
+            <div className="timer-reloj editando" style={{ color: colorNumeros }} onMouseDown={(e)=>e.stopPropagation()}>
+              <input
+                className="timer-num"
+                type="text"
+                inputMode="numeric"
+                value={borrador.min}
+                autoFocus
+                onFocus={(e)=>e.target.select()}
+                onChange={(e)=>setBorrador(b => ({ ...b, min: e.target.value.replace(/\D/g, '').slice(0, 3) }))}
+                onKeyDown={(e)=>{ if (e.key === 'Enter') guardaReloj(); if (e.key === 'Escape') setBorrador(null); }}
+                onBlur={(e)=>{ if (!e.relatedTarget || !e.relatedTarget.classList.contains('timer-num')) guardaReloj(); }}
+              />
+              <span className="timer-dosp">:</span>
+              <input
+                className="timer-num"
+                type="text"
+                inputMode="numeric"
+                value={borrador.seg}
+                onFocus={(e)=>e.target.select()}
+                onChange={(e)=>setBorrador(b => ({ ...b, seg: e.target.value.replace(/\D/g, '').slice(0, 2) }))}
+                onKeyDown={(e)=>{ if (e.key === 'Enter') guardaReloj(); if (e.key === 'Escape') setBorrador(null); }}
+                onBlur={(e)=>{ if (!e.relatedTarget || !e.relatedTarget.classList.contains('timer-num')) guardaReloj(); }}
+              />
+            </div>
+          ) : (
+            <div
+              className={`timer-reloj${seAjusta ? ' ajustable' : ''}`}
+              style={{ color: colorNumeros }}
+              onMouseDown={(e)=>{ if (seAjusta) e.stopPropagation(); }}
+              onClick={abreReloj}
+              title={seAjusta ? window.t('Clic para poner el tiempo', 'Click to set the time') : undefined}
+            >
+              {formateaTiempo(mostrado)}
+            </div>
+          )}
+
+          {/* La barra de avance solo tiene sentido si hay un final al que llegar. */}
+          {modo !== 'cronometro' && (
+            <div className="timer-barra" style={{ borderColor: colorNumeros }}>
+              <i style={{ width: `${avance * 100}%`, background: colorNumeros }}/>
+            </div>
+          )}
+
+          <div className="timer-botones" onMouseDown={(e)=>e.stopPropagation()}>
+            <button
+              className="timer-btn principal"
+              style={{ borderColor: colorNumeros, color: colorNumeros }}
+              onClick={enMarcha ? pausa : arranca}
+              title={enMarcha ? window.t('Pausar', 'Pause') : window.t('Empezar', 'Start')}
+            >
+              <span className="material-symbols-rounded">{enMarcha ? 'pause' : 'play_arrow'}</span>
+            </button>
+            <button
+              className="timer-btn"
+              style={{ borderColor: colorNumeros, color: colorNumeros }}
+              onClick={reinicia}
+              title={window.t('Volver a empezar', 'Reset')}
+            >
+              <span className="material-symbols-rounded">refresh</span>
+            </button>
+            {/* Pasar a descanso (o volver al trabajo) a mano. Hace falta
+                incluso con el encadenado puesto: se acaba antes de tiempo, o
+                se alarga, y hasta ahora la única salida era reiniciarlo todo. */}
+            {modo === 'pomodoro' && (
+              <button
+                className="timer-btn"
+                style={{ borderColor: colorNumeros, color: colorNumeros }}
+                onClick={cambiaFase}
+                title={item.faseDescanso
+                  ? window.t('Pasar a trabajo', 'Switch to focus')
+                  : window.t('Pasar a descanso', 'Switch to break')}
+              >
+                <span className="material-symbols-rounded">{item.faseDescanso ? 'work' : 'coffee'}</span>
+              </button>
+            )}
+          </div>
+
+          {modo === 'pomodoro' && (
+            <button
+              className={`timer-auto${item.autoCambio === false ? '' : ' on'}`}
+              style={{ color: colorNumeros }}
+              role="switch"
+              aria-checked={item.autoCambio !== false}
+              onMouseDown={(e)=>e.stopPropagation()}
+              onClick={()=>{
+                window.playAudioTone && window.playAudioTone('click');
+                onUpdate({ autoCambio: item.autoCambio === false });
+              }}
+              title={window.t('Al acabar, empezar la fase siguiente sin preguntar',
+                              'When one phase ends, start the next on its own')}
+            >
+              <span className="timer-auto-carril" style={{ borderColor: colorNumeros, background: item.autoCambio !== false ? colorNumeros : 'transparent' }}>
+                <i style={{ background: item.autoCambio !== false ? colorSolido : colorNumeros }}/>
+              </span>
+              <span>{window.t('Encadenar solo', 'Auto switch')}</span>
+            </button>
+          )}
         </div>
       </div>
     </div>

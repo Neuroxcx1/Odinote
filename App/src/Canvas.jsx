@@ -65,7 +65,7 @@ function defaultDims(type) {
     case 'frame':    return { w: 400, h: 400 };
     case 'shape':    return { w: 200, h: 160 };
     case 'code':     return { w: 420, h: 260 };
-    case 'timer':    return { w: 260, h: 220 };
+    case 'timer':    return { w: 260, h: 252 };
     case 'bigtitle': return { w: 300, h: 80 };
     case 'map':      return { w: 340, h: 280 };
     case 'draw':     return { w: 420, h: 300 };
@@ -193,11 +193,16 @@ function makeNewItem(type, x, y, w, h, lang) {
     case 'timer':
       // Nace en cuenta atras de cinco minutos, que es para lo que la coge uno
       // sin pensarlo. El pomodoro y el cronometro estan a un clic en su menu.
-      return { ...base, type: 'timer', ...defaultSize(260, 220),
+      return { ...base, type: 'timer', ...defaultSize(260, 252),
         modoTiempo: 'cuentaAtras', minutos: 5, segundos: 0,
-        minutosTrabajo: 25, minutosDescanso: 5,
+        minutosTrabajo: 25, segundosTrabajo: 0,
+        minutosDescanso: 5, segundosDescanso: 0,
         acumulado: 0, arrancadoEn: null, faseDescanso: false, rondas: 0,
-        color: 'white' };
+        // Encadena solo, que es lo que hace un pomodoro de toda la vida.
+        // El interruptor del nodo lo apaga para quien prefiera decidir
+        // cuándo empieza el descanso.
+        autoCambio: true,
+        timerTitle: '', color: 'white' };
     case 'code':
       // Nace en JavaScript porque es lo que más se pega desde fuera, y con el
       // nombre vacío: el nombre se pone cuando ya sabes qué hay dentro.
@@ -5367,7 +5372,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
 
       {/* Text format sidebar (when editing a text-based item) */}
       {((editing && editing === selected)
-        || (selectedItem && (selectedItem.type === 'map' || selectedItem.type === 'code') && selectedItem._editingTitle)
+        || (selectedItem && (selectedItem.type === 'map' || selectedItem.type === 'code' || selectedItem.type === 'timer') && selectedItem._editingTitle)
        ) && !captionFocusId && (() => {
         const it = selectedItem;
         if (!it) return null;
@@ -5376,19 +5381,22 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
         // con esta misma barra (color, negrita, cursiva...), no con un menu
         // aparte inventado solo para el.
         const isEditingCodeTitle = it.type === 'code' && it._editingTitle;
+        // Y el del reloj igual: es un título como el del bloque de código,
+        // guardado en su propio campo y no dentro del texto del nodo.
+        const isEditingTimerTitle = it.type === 'timer' && it._editingTitle;
         // 'board' entró aquí porque, al empezar a escribir su título, el menú
         // contextual normal se ocultaba (se oculta siempre que editing===selected)
         // y esta barra de texto tampoco lo cubría: el panel de la izquierda
         // desaparecía entero mientras se cambiaba el nombre del tablero.
         const isEditingTextNode = editing && editing === selected && ['note','comment','bigtitle','frame','todo','board','shape'].includes(it.type);
-        if (!isEditingTextNode && !isEditingMapTitle && !isEditingCodeTitle) return null;
+        if (!isEditingTextNode && !isEditingMapTitle && !isEditingCodeTitle && !isEditingTimerTitle) return null;
         return (
           <window.TextFormatSidebar
             item={it}
             lang={lang}
             onUpdate={(patch)=>updateItem(it.id, patch)}
             onClose={()=>{
-              if (isEditingMapTitle || isEditingCodeTitle) {
+              if (isEditingMapTitle || isEditingCodeTitle || isEditingTimerTitle) {
                 updateItem(it.id, { _editingTitle: false });
               } else {
                 setEditing(null);

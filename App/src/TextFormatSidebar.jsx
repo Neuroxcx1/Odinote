@@ -13,6 +13,9 @@ function TextFormatSidebar({ item, lang, onUpdate, onClose, variant }) {
   // El bloque de codigo lleva su titulo aparte del cuerpo, igual que el marco
   // y el mapa: su color va en item.titleColor y no dentro del texto.
   const isCode = item.type === 'code';
+  // El reloj lleva su título en la barra de arriba, igual que el bloque de
+  // código: en item.timerTitle, con el formato como propiedades del nodo.
+  const isTimer = item.type === 'timer';
   const isTodo = item.type === 'todo';
   const isBoard = item.type === 'board';
   // Estos tipos guardan el formato como propiedades del nodo en vez de HTML, así
@@ -26,7 +29,7 @@ function TextFormatSidebar({ item, lang, onUpdate, onClose, variant }) {
   // propiedades del NODO entero, no de la selección —un pie de tablero con
   // dos tamaños de letra en dos palabras se vería mal—, pero sin alineación,
   // que ahí no significa nada (es una barra icono+texto+contador, no un bloque).
-  const isCustomPropType = isBigTitle || isFrame || isMap || isBoard || isCode;
+  const isCustomPropType = isBigTitle || isFrame || isMap || isBoard || isCode || isTimer;
   // Ambos guardan el color en el mismo campo (item.textColor); frame y map
   // usan uno propio (item.titleColor) porque su titulo vive aparte del cuerpo.
   const usaTextColor = isBigTitle || isBoard;
@@ -81,12 +84,29 @@ function TextFormatSidebar({ item, lang, onUpdate, onClose, variant }) {
     // El tablero también guarda su formato como propiedades: su título es un
     // campo de texto plano, no HTML editable, así que B/I/S/U valen para el
     // título entero. Se lee igual que el del Título grande.
-    if (item.type === 'board' || item.type === 'code') {
+    if (item.type === 'board') {
       return {
         bold: item.bold !== false,
         italic: !!item.italic,
         strike: !!item.strike,
         underline: !!item.underline,
+      };
+    }
+    // El bloque de código y el reloj guardan TODO el formato de su título
+    // como propiedades del nodo: negrita y compañía, y también la
+    // alineación. La alineación ya se escribía en item.titleAlign pero no
+    // se leía de vuelta, así que su botón no se encendía nunca aunque
+    // estuviera puesta.
+    if (item.type === 'code' || item.type === 'timer') {
+      return {
+        bold: item.bold !== false,
+        italic: !!item.italic,
+        strike: !!item.strike,
+        underline: !!item.underline,
+        alignLeft: (item.titleAlign || 'left') === 'left',
+        alignCenter: (item.titleAlign || 'left') === 'center',
+        alignRight: (item.titleAlign || 'left') === 'right',
+        alignJustify: (item.titleAlign || 'left') === 'justify',
       };
     }
     if (item.type === 'frame' || item.type === 'map') {
@@ -175,7 +195,7 @@ function TextFormatSidebar({ item, lang, onUpdate, onClose, variant }) {
         <div className="ctx-letter" style={{
           fontWeight: 800,
           fontSize: 14,
-          color: usaTextColor ? (item.textColor || '#1A1A1A') : ((isFrame || isMap || isCode) ? (item.titleColor || '#1A1A1A') : '#E6544F'),
+          color: usaTextColor ? (item.textColor || '#1A1A1A') : ((isFrame || isMap || isCode || isTimer) ? (item.titleColor || '#1A1A1A') : '#E6544F'),
           background: isCustomPropType && (usaTextColor ? item.textColor : item.titleColor) && (usaTextColor ? item.textColor : item.titleColor) !== 'inherit' ? 'none' : 'linear-gradient(90deg, #1A1A1A, #E6544F, #90B968)',
           WebkitBackgroundClip: isCustomPropType && (usaTextColor ? item.textColor : item.titleColor) && (usaTextColor ? item.textColor : item.titleColor) !== 'inherit' ? 'none' : 'text',
           WebkitTextFillColor: isCustomPropType && (usaTextColor ? item.textColor : item.titleColor) && (usaTextColor ? item.textColor : item.titleColor) !== 'inherit' ? 'none' : 'transparent',
@@ -207,26 +227,26 @@ function TextFormatSidebar({ item, lang, onUpdate, onClose, variant }) {
         </>
       )}
 
-      {(!isCustomPropType || isBigTitle || isBoard || isCode) && (
+      {(!isCustomPropType || isBigTitle || isBoard || isCode || isTimer) && (
         <>
           {/* En el título y en las tareas, B/I/S/U son toggles de propiedad
               (texto plano); en las notas usan execCommand por selección. */}
-          <button className={`ctx-btn ${shown.bold ? 'active' : ''}`} onClick={()=> (isBigTitle || isBoard || isCode) ? onUpdate({ bold: item.bold === false }) : exec('bold')}>
+          <button className={`ctx-btn ${shown.bold ? 'active' : ''}`} onClick={()=> (isBigTitle || isBoard || isCode || isTimer) ? onUpdate({ bold: item.bold === false }) : exec('bold')}>
             <div className="ctx-letter" style={{fontWeight: 800}}>B</div>
             <span>{lang==='es'?'Negrita':'Bold'}</span>
           </button>
 
-          <button className={`ctx-btn ${shown.italic ? 'active' : ''}`} onClick={()=> (isBigTitle || isBoard || isCode) ? onUpdate({ italic: !item.italic }) : exec('italic')}>
+          <button className={`ctx-btn ${shown.italic ? 'active' : ''}`} onClick={()=> (isBigTitle || isBoard || isCode || isTimer) ? onUpdate({ italic: !item.italic }) : exec('italic')}>
             <div className="ctx-letter" style={{fontStyle: 'italic', fontWeight: 700}}>I</div>
             <span>{lang==='es'?'Cursiva':'Italic'}</span>
           </button>
 
-          <button className={`ctx-btn ${shown.strike ? 'active' : ''}`} onClick={()=> (isBigTitle || isBoard || isCode) ? onUpdate({ strike: !item.strike }) : exec('strikeThrough')}>
+          <button className={`ctx-btn ${shown.strike ? 'active' : ''}`} onClick={()=> (isBigTitle || isBoard || isCode || isTimer) ? onUpdate({ strike: !item.strike }) : exec('strikeThrough')}>
             <div className="ctx-letter" style={{textDecoration: 'line-through', fontWeight: 700}}>S</div>
             <span>{lang==='es'?'Tachado':'Strike'}</span>
           </button>
 
-          <button className={`ctx-btn ${shown.underline ? 'active' : ''}`} onClick={()=> (isBigTitle || isBoard || isCode) ? onUpdate({ underline: !item.underline }) : exec('underline')}>
+          <button className={`ctx-btn ${shown.underline ? 'active' : ''}`} onClick={()=> (isBigTitle || isBoard || isCode || isTimer) ? onUpdate({ underline: !item.underline }) : exec('underline')}>
             <div className="ctx-letter" style={{textDecoration: 'underline', fontWeight: 700}}>U</div>
             <span>{lang==='es'?'Subrayado':'Underline'}</span>
           </button>
@@ -243,7 +263,7 @@ function TextFormatSidebar({ item, lang, onUpdate, onClose, variant }) {
             onClick={()=>{
               if (isBigTitle) {
                 onUpdate({ align: 'left' });
-              } else if (isFrame || isMap || isCode) {
+              } else if (isFrame || isMap || isCode || isTimer) {
                 onUpdate({ titleAlign: 'left' });
               } else {
                 exec('justifyLeft');
@@ -260,7 +280,7 @@ function TextFormatSidebar({ item, lang, onUpdate, onClose, variant }) {
             onClick={()=>{
               if (isBigTitle) {
                 onUpdate({ align: 'center' });
-              } else if (isFrame || isMap || isCode) {
+              } else if (isFrame || isMap || isCode || isTimer) {
                 onUpdate({ titleAlign: 'center' });
               } else {
                 exec('justifyCenter');
@@ -277,7 +297,7 @@ function TextFormatSidebar({ item, lang, onUpdate, onClose, variant }) {
             onClick={()=>{
               if (isBigTitle) {
                 onUpdate({ align: 'right' });
-              } else if (isFrame || isMap || isCode) {
+              } else if (isFrame || isMap || isCode || isTimer) {
                 onUpdate({ titleAlign: 'right' });
               } else {
                 exec('justifyRight');
@@ -294,7 +314,7 @@ function TextFormatSidebar({ item, lang, onUpdate, onClose, variant }) {
             onClick={()=>{
               if (isBigTitle) {
                 onUpdate({ align: 'justify' });
-              } else if (isFrame || isMap || isCode) {
+              } else if (isFrame || isMap || isCode || isTimer) {
                 onUpdate({ titleAlign: 'justify' });
               } else {
                 exec('justifyFull');
@@ -367,11 +387,11 @@ function TextFormatSidebar({ item, lang, onUpdate, onClose, variant }) {
               las demás pantallas va en horizontal. */}
           <div>
             <window.SelectorColor
-              valor={usaTextColor ? (item.textColor || '#1A1A1A') : ((isFrame || isMap || isCode) ? (item.titleColor || '#1A1A1A') : '#1A1A1A')}
+              valor={usaTextColor ? (item.textColor || '#1A1A1A') : ((isFrame || isMap || isCode || isTimer) ? (item.titleColor || '#1A1A1A') : '#1A1A1A')}
               onCambio={(c) => {
                 if (usaTextColor) {
                   onUpdate({ textColor: c });
-                } else if (isFrame || isMap || isCode) {
+                } else if (isFrame || isMap || isCode || isTimer) {
                   onUpdate({ titleColor: c });
                 } else {
                   exec('foreColor', c);
@@ -395,7 +415,7 @@ function TextFormatSidebar({ item, lang, onUpdate, onClose, variant }) {
                 applyTodoStyle({ color: null, bold: false, italic: false, underline: false, strike: false });
               } else if (usaTextColor) {
                 onUpdate({ textColor: 'inherit' });
-              } else if (isFrame || isMap || isCode) {
+              } else if (isFrame || isMap || isCode || isTimer) {
                 onUpdate({ titleColor: 'inherit' });
               } else {
                 exec('removeFormat');
