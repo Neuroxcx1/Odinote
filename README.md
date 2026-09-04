@@ -10,7 +10,7 @@ Nested boards, unlimited notes, offline-first. A [Milanote](https://odinote-web.
 
 [**▶ Try it in your browser**](https://odinote-web.vercel.app/#try-web) · [**⬇ Download for Windows**](https://github.com/Neuroxcx1/Odinote/releases/latest) · [**📖 User guide**](https://odinote-web.vercel.app/guide.html) · [**🌐 Website**](https://odinote-web.vercel.app)
 
-![License](https://img.shields.io/badge/license-MIT-90B968?style=flat-square)
+![License](https://img.shields.io/badge/license-Apache%202.0-90B968?style=flat-square)
 ![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Web-595459?style=flat-square)
 ![Price](https://img.shields.io/badge/price-free%20forever-E6544F?style=flat-square)
 ![Stars](https://img.shields.io/github/stars/Neuroxcx1/Odinote?style=flat-square&color=F7DA84)
@@ -51,9 +51,12 @@ Breadcrumbs always show where you are, so you never lose context and never run o
 | | |
 |---|---|
 | 🌀 **Nested canvases** | Boards inside boards, infinitely recursive |
-| 🧩 **16+ node types** | Notes, to-dos, documents, images, audio, links, tables, calendars, columns, frames, comments, colour palettes |
+| 🧩 **19 node types** | Notes, to-dos, documents, images, audio, links, tables, calendars, columns, frames, comments, colour palettes, twenty geometric shapes with text inside, syntax-highlighted code blocks, a pomodoro and countdown timer, any file with its preview, and embedded maps |
+| ✏️ **Freehand drawing** | Draw straight on the canvas, with colours and an eraser |
 | ↗ **Connectors** | Link any two nodes — curved or right-angle routing, labels and styles |
 | 🔒 **Offline & private** | No account required; data lives on your device |
+| 📁 **Folders** | Group projects on the home screen — drag a project onto a folder, or bring several in at once. Nothing moves on disk |
+| 👥 **Live sessions** | Several people on one canvas, each cursor visible. The browsers talk **directly to each other**; the canvas never passes through a server of ours |
 | ☁️ **Optional sync** | Put a workspace online and it syncs through **your own** Google Drive — no server of ours involved |
 | ⚡ **Instant sync** | Off by default, per project. Turn it on and note text and positions sync through our server so edits land at once, with nobody hosting — images stay in your Drive |
 | 🎨 **Themes & polish** | Dark mode, per-canvas backgrounds, snapping guides, interface sounds |
@@ -79,7 +82,9 @@ npm install
 npm start
 ```
 
-Build a Windows executable with `npm run build:exe`, or an installer with `npm run build:installer`.
+Build a Windows executable with `npm run build:exe` (it also writes the release ZIP), or an
+installer with `npm run build:installer`. `npm test` runs the test suite — 510 checks, no
+framework, plain Node.
 
 ## Tech
 
@@ -124,6 +129,23 @@ If Odinote is useful to you, a ⭐ on the repo genuinely helps other people find
 
 ## License
 
-MIT — see [LICENSE](App/LICENSE). Free to use, copy, modify and distribute.
+**Apache License 2.0** — see [LICENSE](LICENSE) and [NOTICE](NOTICE).
 
-Project icons are [Fluent Emoji](https://github.com/microsoft/fluentui-emoji) (© Microsoft, MIT); interface icons are [Material Symbols](https://fonts.google.com/icons) (Apache 2.0).
+Use it, study it, change it, build on it, ship it in something commercial. What is asked in
+return is **credit**:
+
+- If you redistribute Oddinote — as source, as a build, or inside something you made — keep the
+  [NOTICE](NOTICE) file readable in your distribution and say that your work is based on
+  **Oddinote by Neuroxcx1**, with a link back to this repository. A line in your README, your
+  about screen or your credits is the normal way to do it.
+- If you changed files, say which ones you changed, so people can tell your work from the
+  original.
+
+That is all section 4 of the licence asks. Contributions back to the project are welcome and
+always credited, but they are not a condition.
+
+Third-party components keep their own licences — React and Babel (MIT), highlight.js
+(BSD-3-Clause), SheetJS (Apache 2.0), Mammoth.js (BSD-2-Clause), html2pdf.js (MIT), project
+icons from [Fluent Emoji](https://github.com/microsoft/fluentui-emoji) (© Microsoft, MIT) and
+interface icons from [Material Symbols](https://fonts.google.com/icons) (Apache 2.0). The full
+list is in [NOTICE](NOTICE).

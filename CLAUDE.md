@@ -33,9 +33,9 @@ Después de juntar, comprueba que siguen existiendo: `CodeItem`, `TimerItem` y
 ## 2. Estado y qué falta
 
 - Versión **1.0.8**, marcador de caché **1.0.8-174** (el siguiente build va con 175).
-- Lista de tareas (30 de 35): https://claude.ai/code/artifact/4f27cc5e-75f9-4d0d-96a0-ce2003a7023d
-  Las casillas las marca Claude en el HTML del artefacto (`tarea hecha` +
-  `checked`) y se republica con la **misma URL**.
+- La lista de tareas vive en un artefacto privado del mantenedor; pídele el
+  enlace si lo necesitas. Las casillas se marcan en el HTML de ese artefacto
+  (`tarea hecha` + `checked`) y se republica con la **misma URL**.
 
 **La 1.0.8 está cerrada.** Todo lo que quedaba (nodo de tiempo, carpetas de
 proyectos y el repaso de la web) está hecho. El resto de la lista es 1.0.9:
@@ -61,8 +61,8 @@ vive en `siguienteFasePomodoro`, fuera de React, para poder probarla sin
 esperar los minutos de verdad. Sigue **sin verse en el .exe**, solo en el
 servidor de pruebas.
 
-**La web** (`D:\Documentos\Proyectos\Oddinote\Website`, **fuera de este
-repositorio, con su propio git**): las comparativas ya no dicen que la
+**La web** (carpeta `Website/` junto a este repositorio, **fuera de él y con su
+propio git**: `Neuroxcx1/Odinote-web`, que es lo que sirve Vercel): las comparativas ya no dicen que la
 colaboración sean carpetas de Drive —hay sesiones en vivo entre navegadores— ni
 que haya 16 tipos de nodo (son 19, más conectores y dibujo a mano), y la
 portada explica qué se lleva quien dona. Ese repositorio tenía **cambios sin
@@ -92,7 +92,7 @@ commitear de antes**; los míos van encima, sin commitear tampoco.
 Desde `App/`:
 
 ```bash
-npx electron-packager . Odinote-pre --platform=win32 --arch=x64 --out="D:/Documentos/Proyectos/Oddinote/App/dist/pre-release" --overwrite --icon=Icon/Icon.ico --ignore="^/dist($|/)"
+npx electron-packager . Odinote-pre --platform=win32 --arch=x64 --out=dist/pre-release --overwrite --icon=Icon/Icon.ico --ignore="^/dist($|/)"
 ```
 
 - Cerrar antes: `Get-Process -Name "Odinote-pre" | Stop-Process -Force`. **Nunca**
@@ -104,9 +104,10 @@ npx electron-packager . Odinote-pre --platform=win32 --arch=x64 --out="D:/Docume
 - **Subir el marcador de caché en cada build**: `?v=NNN` en `App/index.html` (29
   apariciones) y `window.ODINOTE_BUILD` en `App/src/app.jsx`. Sin eso se sirve la
   versión cacheada y parece que nada cambió.
-- El worktree necesita prestado del checkout principal: `App/node_modules` y
+- Un worktree necesita prestado del checkout principal: `App/node_modules` y
   `functions/node_modules` (enlaces con `New-Item -ItemType Junction`) y
-  `App/google-oauth.json` (está en .gitignore; sin él Google falla).
+  `App/google-oauth.json` (está en .gitignore; sin él Google falla). Ver
+  `App/google-oauth.example.json` para conseguir el tuyo.
 
 ## 5. Cómo comprobar antes de decir "listo"
 

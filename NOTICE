@@ -1,0 +1,42 @@
+Oddinote
+Copyright 2026 Jose Manuel Arango (Neuroxcx1)
+
+This product includes software developed by Jose Manuel Arango (Neuroxcx1) for the Oddinote project
+(https://github.com/Neuroxcx1/Odinote).
+
+ATTRIBUTION
+-----------
+
+Oddinote is free and open source: you may use it, study it, change it and build
+on it. What is asked in return is credit.
+
+If you redistribute Oddinote — as source, as a build, or inside something else
+you made — section 4 of the Apache License 2.0 requires you to keep this NOTICE
+file readable in your distribution, and to state clearly that your work is based
+on Oddinote by Neuroxcx1, with a link to the project:
+
+    https://github.com/Neuroxcx1/Odinote
+
+A visible mention in your README, your about screen or your credits is the
+normal way to do that. If you changed the code, section 4(b) also asks you to
+say which files you changed, so people can tell your work from the original.
+
+Contributions back to the project are welcome and always credited, but they are
+not a condition of the licence.
+
+
+THIRD-PARTY COMPONENTS
+----------------------
+
+The following are bundled in App/lib/ and remain under their own licences:
+
+  React and React DOM        (c) Facebook, Inc. and its affiliates    — MIT
+  Babel standalone           (c) The Babel Authors                    — MIT
+  highlight.js               (c) Ivan Sagalaev and contributors       — BSD-3-Clause
+  SheetJS (xlsx)             (c) SheetJS LLC                          — Apache-2.0
+  Mammoth.js                 (c) Michael Williamson                   — BSD-2-Clause
+  html2pdf.js                (c) Erik Koopmans                        — MIT
+  Material Symbols Rounded   (c) Google                               — Apache-2.0
+  Bricolage Grotesque, Geist, JetBrains Mono                          — SIL OFL 1.1
+  Fluent Emoji (project icons) (c) Microsoft                          — MIT
+    see App/lib/project-icons/LICENSE.txt
