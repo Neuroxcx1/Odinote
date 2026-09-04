@@ -33,7 +33,7 @@ Después de juntar, comprueba que siguen existiendo: `CodeItem`, `TimerItem` y
 ## 2. Estado y qué falta
 
 - Versión **1.0.8**, marcador de caché **1.0.8-173** (el siguiente build va con 174).
-- Lista de tareas (27 de 35): https://claude.ai/code/artifact/4f27cc5e-75f9-4d0d-96a0-ce2003a7023d
+- Lista de tareas (28 de 35): https://claude.ai/code/artifact/4f27cc5e-75f9-4d0d-96a0-ce2003a7023d
   Las casillas las marca Claude en el HTML del artefacto (`tarea hecha` +
   `checked`) y se republica con la **misma URL**.
 
@@ -49,9 +49,16 @@ Después de juntar, comprueba que siguen existiendo: `CodeItem`, `TimerItem` y
 El resto de la lista es 1.0.9.
 
 **A medias, hay que revisarlo:** la flecha en modo recto está escrita pero **sin
-probar con el ratón**; el salto de trabajo a descanso del pomodoro no se pudo
-medir (60 s reales de espera); la terminal del nodo de código quedó fuera (era
+probar con el ratón**; la terminal del nodo de código quedó fuera (era
 opcional).
+
+El **nodo de tiempo está cerrado**: el tiempo se escribe en el propio reloj, la
+barra de arriba lleva color y nombre (con la barra de texto de siempre), el
+fondo va al 58% con desenfoque, y el pomodoro tiene botón de cambiar de fase e
+interruptor de encadenado. El salto de fase **ya está medido**: la decisión
+vive en `siguienteFasePomodoro`, fuera de React, para poder probarla sin
+esperar los minutos de verdad. Sigue **sin verse en el .exe**, solo en el
+servidor de pruebas.
 
 ## 3. Reglas de la casa
 
@@ -89,7 +96,7 @@ npx electron-packager . Odinote-pre --platform=win32 --arch=x64 --out="D:/Docume
 
 ## 5. Cómo comprobar antes de decir "listo"
 
-- `npm test` desde `App/` → **383 comprobaciones**, todas deben pasar.
+- `npm test` desde `App/` → **431 comprobaciones**, todas deben pasar.
 - Los .jsx no los valida nadie: compilarlos con el Babel que viaja dentro —
   `node -e "const B=require('./App/lib/babel.min.js');const Babel=B.transform?B:global.Babel;Babel.transform(require('fs').readFileSync('App/src/X.jsx','utf8'),{presets:['react'],filename:'X.jsx'})"`
 - Para ver cosas de verdad: `node dev-server.js` desde `App/` (puerto 4173).
@@ -117,6 +124,14 @@ npx electron-packager . Odinote-pre --platform=win32 --arch=x64 --out="D:/Docume
 - La caché de medios de la nube guarda con la extensión de verdad (nombre → tipo
   del servidor → primeras letras del archivo). No volver al `.png` por defecto:
   un PDF guardado como `.png` no se puede pintar.
+- En **móvil** la app fuerza `font-size: 16px` a todo campo de texto (para que
+  el navegador no dé el zoom que da al escribir en letra pequeña) con una regla
+  de cinco clases de especificidad. Le gana a cualquier cosa razonable: las
+  casillas del reloj salían a 16px al lado de unos números de 40. Si un campo
+  tuyo tiene que ser grande, hay que ganarle a esa regla a propósito.
+- Un `<input>` que solo guarda **al perder el foco** pierde lo escrito cuando la
+  barra de texto se cierra con su flecha: eso lo desmonta, y de un campo
+  desmontado no sale ningún blur. Los títulos se guardan **según se escriben**.
 - La herramienta Bash **se come las comillas invertidas y las barras invertidas**
   dentro de un heredoc. Para archivos con plantillas de JS, usar Write o un
   script de node aparte. Y cuidado con dejar LF donde va CRLF.
