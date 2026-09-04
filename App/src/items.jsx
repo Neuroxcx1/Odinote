@@ -2181,6 +2181,9 @@ function CalendarItem({ item, lang, onUpdate, editing }) {
   const events = item.events || {};
   const images = item.images || {};
   const todayKey = `${today.getFullYear()}-${today.getMonth()}-${today.getDate()}`;
+  // Marcar hoy en verde está bien casi siempre, pero en un calendario que se
+  // usa para planear otro mes es una mancha que no dice nada. Se puede quitar.
+  const claveHoy = item.hoyMarcado === false ? null : todayKey;
 
   const cells = [];
   for (let i = 0; i < start; i++) cells.push({ muted: true });
@@ -2246,7 +2249,18 @@ function CalendarItem({ item, lang, onUpdate, editing }) {
   const DAY_COLORS = ['#FFFFFF','#F7DA84','#90B968','#E6544F','#3D5A80','#955BA5','#595459'];
 
   return (
-    <div className="cal-mb" style={{width:'100%', height:'100%'}}>
+    <div
+      className="cal-mb"
+      style={{
+        width:'100%', height:'100%',
+        // Multiplican al --node-scale que ya tiene el nodo: uno para lo que se
+        // lee dentro de los días y otro para la cabecera del mes y el año,
+        // que se piden por separado porque se leen a distancias distintas.
+        '--cal-texto': item.textScale || 1,
+        '--cal-cabecera': item.headScale || 1,
+        ...(item.numberColor ? { '--cal-numero': item.numberColor } : null),
+      }}
+    >
       <div className="item-card" style={{padding: 10, display:'flex', flexDirection:'column', background: bg, color: window.nodeInk(item)}}>
         <div className="cal-mb-head">
           <span className="material-symbols-rounded" style={{color:'var(--wine)'}}>calendar_month</span>
@@ -2350,7 +2364,7 @@ function CalendarItem({ item, lang, onUpdate, editing }) {
             return (
               <div
                 key={i}
-                className={`cal-mb-cell ${c.muted ? 'muted' : ''} ${c.key === todayKey ? 'today' : ''} ${c.key === selectedKey && c.key !== todayKey ? 'selected-day' : ''} ${hasImg ? 'has-image' : ''}`}
+                className={`cal-mb-cell ${c.muted ? 'muted' : ''} ${c.key === claveHoy ? 'today' : ''} ${c.key === selectedKey && c.key !== claveHoy ? 'selected-day' : ''} ${hasImg ? 'has-image' : ''}`}
                 style={dayBg ? { background: dayBg, borderColor: dayBg } : null}
                 onClick={(e)=>{
                   e.stopPropagation();

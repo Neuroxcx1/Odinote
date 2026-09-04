@@ -736,6 +736,62 @@ function ContextSidebar({
           </>
         )}
 
+        {/* Nodo de calendario: lo que se puede ajustar a gusto. El tamaño del
+            texto de los días usa el mismo botón que las notas (item.textScale);
+            el del mes y el año va aparte porque se leen a distancias distintas
+            —los días de cerca, la cabecera de un vistazo desde lejos. */}
+        {isCalendar && (
+          <>
+            <button
+              className="ctx-btn"
+              onClick={() => {
+                const pasos = [0.8, 0.9, 1, 1.15, 1.35, 1.6, 1.9, 2.3, 2.8];
+                const cur = item.headScale || 1;
+                const idx = pasos.findIndex(s => Math.abs(s - cur) < 0.001);
+                onUpdate({ headScale: idx === -1 ? 1.15 : pasos[Math.min(pasos.length - 1, idx + 1)] });
+                window.playAudioTone && window.playAudioTone('click');
+              }}
+              title={window.t('Mes y año más grandes', 'Bigger month and year')}
+            >
+              <span className="material-symbols-rounded">calendar_month</span>
+              <span>{window.t('Mes +', 'Month +')}</span>
+            </button>
+            <button
+              className="ctx-btn"
+              onClick={() => {
+                const pasos = [0.8, 0.9, 1, 1.15, 1.35, 1.6, 1.9, 2.3, 2.8];
+                const cur = item.headScale || 1;
+                const idx = pasos.findIndex(s => Math.abs(s - cur) < 0.001);
+                onUpdate({ headScale: idx === -1 ? 0.9 : pasos[Math.max(0, idx - 1)] });
+                window.playAudioTone && window.playAudioTone('click');
+              }}
+              title={window.t('Mes y año más pequeños', 'Smaller month and year')}
+            >
+              <span className="material-symbols-rounded">calendar_view_month</span>
+              <span>{window.t('Mes −', 'Month −')}</span>
+            </button>
+            <button
+              className={`ctx-btn ${pane === 'calNumeros' ? 'active' : ''}`}
+              onClick={()=>setPane(pane === 'calNumeros' ? null : 'calNumeros')}
+              title={window.t('Color de los números de los días', 'Day numbers colour')}
+            >
+              <div className="ctx-color-chip" style={{ background: item.numberColor || '#595459', border: '1.5px solid var(--line-soft)' }}/>
+              <span>{window.t('Números', 'Numbers')}</span>
+            </button>
+            {/* Encendido por defecto, como estaba. Quitarlo deja el día de hoy
+                como cualquier otro: en un calendario que se usa para planear
+                otro mes, ese verde es una mancha que no dice nada. */}
+            <button
+              className={`ctx-btn ${item.hoyMarcado !== false ? 'active' : ''}`}
+              onClick={()=>{ onUpdate({ hoyMarcado: item.hoyMarcado === false }); window.playAudioTone && window.playAudioTone('click'); }}
+              title={window.t('Marcar el día de hoy en verde', 'Highlight today in green')}
+            >
+              <span className="material-symbols-rounded">today</span>
+              <span>{window.t('Hoy', 'Today')}</span>
+            </button>
+          </>
+        )}
+
         {/* Nodo de código: el lenguaje, y los dos colores que sí se tocan.
             El del fondo no está a propósito: el azul oscuro con su degradado
             ES el nodo, y dejarlo cambiar lo convierte en otra cosa. */}
@@ -1191,7 +1247,7 @@ function ContextSidebar({
 
         {/* Tamaño del texto del nodo (A+ / A−). Multiplica todo el texto, así que
             convive con Título/Subtítulo, negritas y demás formato. */}
-        {['note','comment','todo'].includes(item.type) && (
+        {['note','comment','todo','calendar'].includes(item.type) && (
           <>
             <button
               className="ctx-btn"
@@ -1333,6 +1389,28 @@ function ContextSidebar({
         </div>
       )}
 
+      {pane === 'calNumeros' && (
+        <div className="ctx-popout">
+          <div className="ctx-pop-section">
+            <div className="ctx-pop-title">{window.t('Color de los números', 'Numbers colour')}</div>
+            <window.SelectorColor
+              valor={item.numberColor || '#595459'}
+              onCambio={(c) => onUpdate({ numberColor: c })}
+              colores={window.COLORES_ODINOTE_FONDO}
+              tam={26}
+            />
+            <button
+              className="btn"
+              style={{marginTop: 8, width: '100%', justifyContent: 'center', fontSize: 11.5}}
+              onClick={()=>{ onUpdate({ numberColor: null }); window.playAudioTone && window.playAudioTone('click'); }}
+              title={window.t('Volver al color de siempre', 'Back to the default colour')}
+            >
+              {window.t('Color por defecto', 'Default colour')}
+            </button>
+          </div>
+        </div>
+      )}
+
       {pane === 'timerBarColor' && (
         <div className="ctx-popout">
           <div className="ctx-pop-section">
@@ -1357,6 +1435,14 @@ function ContextSidebar({
               colores={window.COLORES_ODINOTE_TEXTO || window.COLORES_ODINOTE_FONDO}
               tam={26}
             />
+            <button
+              className="btn"
+              style={{marginTop: 8, width: '100%', justifyContent: 'center', fontSize: 11.5}}
+              onClick={()=>{ onUpdate({ numberColor: null }); window.playAudioTone && window.playAudioTone('click'); }}
+              title={window.t('Sacarlo otra vez del color del fondo', 'Back to the default colour')}
+            >
+              {window.t('Color por defecto', 'Default colour')}
+            </button>
           </div>
         </div>
       )}

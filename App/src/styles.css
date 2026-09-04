@@ -2117,16 +2117,16 @@ body.odi-busy iframe { pointer-events: none !important; }
 
 /* Calendar (Miro-style) */
 .cal-mb .item-card { padding: 0 !important; display: flex; flex-direction: column; }
-.cal-mb-head { display: flex; align-items: center; gap: calc(8px * var(--node-scale, 1)); padding: calc(10px * var(--node-scale, 1)) calc(12px * var(--node-scale, 1)) calc(8px * var(--node-scale, 1)); font-family: var(--font-display); font-weight: 700; font-size: calc(14px * var(--node-scale, 1)); letter-spacing: 0; }
-.cal-mb-head .material-symbols-rounded { font-size: calc(18px * var(--node-scale, 1)); }
+.cal-mb-head { display: flex; align-items: center; gap: calc(8px * var(--node-scale, 1)); padding: calc(10px * var(--node-scale, 1)) calc(12px * var(--node-scale, 1)) calc(8px * var(--node-scale, 1)); font-family: var(--font-display); font-weight: 700; font-size: calc(14px * var(--node-scale, 1) * var(--cal-cabecera, 1)); letter-spacing: 0; }
+.cal-mb-head .material-symbols-rounded { font-size: calc(18px * var(--node-scale, 1) * var(--cal-cabecera, 1)); }
 .cal-mb-title { flex: 1; }
-.cal-mb-nav { padding: calc(4px * var(--node-scale, 1)) calc(8px * var(--node-scale, 1)); border-radius: 2px; font-size: calc(11px * var(--node-scale, 1)); font-weight: 600; border: 1.5px solid var(--line); background: var(--paper-2); transition: background 100ms; }
+.cal-mb-nav { padding: calc(4px * var(--node-scale, 1)) calc(8px * var(--node-scale, 1)); border-radius: 2px; font-size: calc(11px * var(--node-scale, 1) * var(--cal-cabecera, 1)); font-weight: 600; border: 1.5px solid var(--line); background: var(--paper-2); transition: background 100ms; }
 .cal-mb-nav:hover { background: var(--bg); }
-.cal-mb-nav .material-symbols-rounded { font-size: calc(14px * var(--node-scale, 1)); }
+.cal-mb-nav .material-symbols-rounded { font-size: calc(14px * var(--node-scale, 1) * var(--cal-cabecera, 1)); }
 .cal-mb-dows { display: grid; grid-template-columns: repeat(7, 1fr); padding: 0 calc(12px * var(--node-scale, 1)) calc(4px * var(--node-scale, 1)); gap: 2px; }
-.cal-mb-dow { font-size: calc(10px * var(--node-scale, 1)); font-family: var(--font-mono); color: var(--ink-3); font-weight: 600; text-transform: uppercase; padding: 2px 4px; }
+.cal-mb-dow { font-size: calc(10px * var(--node-scale, 1) * var(--cal-texto, 1)); font-family: var(--font-mono); color: var(--ink-3); font-weight: 600; text-transform: uppercase; padding: 2px 4px; }
 .cal-mb-grid { display: grid; grid-template-columns: repeat(7, 1fr); grid-auto-rows: 1fr; gap: 2px; padding: 0 calc(12px * var(--node-scale, 1)) calc(8px * var(--node-scale, 1)); flex: 1; min-height: 0; }
-.cal-mb-cell { background: var(--paper-2); border: 1.5px solid var(--line-soft); border-radius: 2px; padding: calc(4px * var(--node-scale, 1)) calc(5px * var(--node-scale, 1)); display: flex; flex-direction: column; gap: 2px; overflow: hidden; min-height: 36px; position: relative; cursor: pointer; transition: background 100ms; }
+.cal-mb-cell { background: var(--paper-2); border: 1.5px solid var(--line-soft); border-radius: 2px; padding: calc(4px * var(--node-scale, 1)) calc(5px * var(--node-scale, 1)); display: flex; flex-direction: column; gap: 2px; overflow: hidden; min-height: calc(36px * var(--cal-texto, 1)); position: relative; cursor: pointer; transition: background 100ms; }
 .cal-mb-cell:hover { background: var(--bg); }
 .cal-mb-cell.muted { background: transparent; border-color: transparent; cursor: default; }
 .cal-mb-cell.muted:hover { background: transparent; }
@@ -2148,25 +2148,25 @@ body.odi-busy iframe { pointer-events: none !important; }
   background: var(--bg-main, var(--bg));
   border: 1px solid var(--line-soft);
   border-radius: 999px;
-  font-size: calc(10.5px * var(--node-scale, 1));
+  font-size: calc(10.5px * var(--node-scale, 1) * var(--cal-texto, 1));
   font-weight: 600;
   color: var(--text-soft, #595459);
   letter-spacing: -0.01em;
 }
-.cal-mb-day { font-family: var(--font-mono); font-size: calc(11px * var(--node-scale, 1)); font-weight: 700; color: var(--ink-2); }
-.cal-mb-event { font-size: calc(9.5px * var(--node-scale, 1)); padding: 2px 5px; color: white; border-radius: 2px; font-weight: 600; line-height: 1.15; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; border: 1px solid rgba(0,0,0,0.15); transition: filter 100ms; }
+.cal-mb-day { font-family: var(--font-mono); font-size: calc(11px * var(--node-scale, 1) * var(--cal-texto, 1)); font-weight: 700; color: var(--cal-numero, var(--ink-2)); }
+.cal-mb-event { font-size: calc(9.5px * var(--node-scale, 1) * var(--cal-texto, 1)); padding: 2px 5px; color: white; border-radius: 2px; font-weight: 600; line-height: 1.15; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; border: 1px solid rgba(0,0,0,0.15); transition: filter 100ms; }
 .cal-mb-event:hover { filter: brightness(1.08); box-shadow: 0 0 0 2px rgba(255,255,255,0.6) inset; }
 .cal-mb-event-edit { display: flex; gap: 2px; align-items: center; position: relative; z-index: 4; }
 .cal-mb-event-edit .cal-mb-input { flex: 1; min-width: 0; }
 .cal-mb-event-del { background: var(--wine); border: 1px solid var(--wine-2); border-radius: 2px; width: 18px; height: 18px; display: grid; place-items: center; cursor: pointer; padding: 0; flex-shrink: 0; }
 .cal-mb-event-del .material-symbols-rounded { font-size: 12px; color: white; }
-.cal-mb-input { font-size: calc(10px * var(--node-scale, 1)); padding: 2px 5px; background: var(--paper); border: 1.5px solid var(--olive); border-radius: 2px; color: var(--ink); width: 100%; }
+.cal-mb-input { font-size: calc(10px * var(--node-scale, 1) * var(--cal-texto, 1)); padding: 2px 5px; background: var(--paper); border: 1.5px solid var(--olive); border-radius: 2px; color: var(--ink); width: 100%; }
 
 /* Day/Month/Year picker buttons in calendar header */
 .cal-mb-pick-btn {
   display: inline-flex; align-items: center; gap: 2px;
   padding: calc(3px * var(--node-scale, 1)) calc(7px * var(--node-scale, 1));
-  font-size: calc(12px * var(--node-scale, 1));
+  font-size: calc(12px * var(--node-scale, 1) * var(--cal-cabecera, 1));
   font-weight: 700;
   background: var(--paper-2);
   border: 1.5px solid var(--line-soft);
@@ -2191,7 +2191,7 @@ body.odi-busy iframe { pointer-events: none !important; }
 .cal-mb-drop-item {
   display: block; width: 100%; text-align: left;
   padding: 5px 10px;
-  font-size: calc(12px * var(--node-scale, 1));
+  font-size: calc(12px * var(--node-scale, 1) * var(--cal-cabecera, 1));
   font-family: var(--font-body);
   background: transparent; border: none;
   cursor: pointer;
