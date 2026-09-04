@@ -65,6 +65,7 @@ function defaultDims(type) {
     case 'frame':    return { w: 400, h: 400 };
     case 'shape':    return { w: 200, h: 160 };
     case 'code':     return { w: 420, h: 260 };
+    case 'timer':    return { w: 260, h: 220 };
     case 'bigtitle': return { w: 300, h: 80 };
     case 'map':      return { w: 340, h: 280 };
     case 'draw':     return { w: 420, h: 300 };
@@ -189,6 +190,14 @@ function makeNewItem(type, x, y, w, h, lang) {
         // recién puesta no se parecía a nada de lo que ya había en el lienzo.
         color: 'white',
         content: { es: '', en: '' } };
+    case 'timer':
+      // Nace en cuenta atras de cinco minutos, que es para lo que la coge uno
+      // sin pensarlo. El pomodoro y el cronometro estan a un clic en su menu.
+      return { ...base, type: 'timer', ...defaultSize(260, 220),
+        modoTiempo: 'cuentaAtras', minutos: 5, segundos: 0,
+        minutosTrabajo: 25, minutosDescanso: 5,
+        acumulado: 0, arrancadoEn: null, faseDescanso: false, rondas: 0,
+        color: 'white' };
     case 'code':
       // Nace en JavaScript porque es lo que más se pega desde fuera, y con el
       // nombre vacío: el nombre se pone cuando ya sabes qué hay dentro.

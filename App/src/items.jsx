@@ -3606,6 +3606,166 @@ function ColorItem({ item, lang, onUpdate }) {
   );
 }
 
+// ──────────────── TIEMPO ────────────────
+//
+// Tres en uno: cuenta atrás, cronómetro y pomodoro. Cuál de los tres se elige
+// desde la barra del nodo.
+//
+// El tiempo NO se cuenta sumando en un intervalo: un intervalo se retrasa en
+// cuanto la pestaña pierde el foco o el lienzo va cargado, y a los diez
+// minutos la cuenta va desfasada. Se guarda el instante en que se puso en
+// marcha y se resta del reloj — así da igual que el intervalo llegue tarde,
+// porque solo sirve para repintar.
+
+const MODOS_TIEMPO = ['cuentaAtras', 'cronometro', 'pomodoro'];
+
+function nombreModoTiempo(modo) {
+  if (modo === 'cronometro') return window.t('Cronómetro', 'Stopwatch');
+  if (modo === 'pomodoro') return window.t('Pomodoro', 'Pomodoro');
+  return window.t('Cuenta atrás', 'Countdown');
+}
+window.MODOS_TIEMPO = MODOS_TIEMPO;
+window.nombreModoTiempo = nombreModoTiempo;
+
+// De milisegundos a "12:34" (o "1:02:03" si pasa de una hora).
+function formateaTiempo(ms) {
+  const total = Math.max(0, Math.round(ms / 1000));
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const s = total % 60;
+  const dos = (n) => (n < 10 ? '0' : '') + n;
+  return h > 0 ? `${h}:${dos(m)}:${dos(s)}` : `${m}:${dos(s)}`;
+}
+window.formateaTiempo = formateaTiempo;
+
+// Cuánto dura la fase actual, en milisegundos.
+function duracionFase(item) {
+  const modo = item.modoTiempo || 'cuentaAtras';
+  if (modo === 'cronometro') return 0;   // hacia arriba, sin final
+  if (modo === 'pomodoro') {
+    const trabajo = (item.minutosTrabajo != null ? item.minutosTrabajo : 25) * 60000;
+    const descanso = (item.minutosDescanso != null ? item.minutosDescanso : 5) * 60000;
+    return item.faseDescanso ? descanso : trabajo;
+  }
+  const min = item.minutos != null ? item.minutos : 5;
+  const seg = item.segundos != null ? item.segundos : 0;
+  return (min * 60 + seg) * 1000;
+}
+window.duracionFase = duracionFase;
+
+function TimerItem({ item, lang, onUpdate }) {
+  const modo = MODOS_TIEMPO.indexOf(item.modoTiempo) !== -1 ? item.modoTiempo : 'cuentaAtras';
+  const enMarcha = !!item.arrancadoEn;
+  const acumulado = item.acumulado || 0;      // lo que ya corrió antes de la última pausa
+  const duracion = duracionFase(item);
+
+  // Solo sirve para repintar: la cuenta de verdad sale del reloj, no de aquí.
+  const [, repinta] = React.useState(0);
+  React.useEffect(() => {
+    if (!enMarcha) return;
+    const id = setInterval(() => repinta(n => n + 1), 250);
+    return () => clearInterval(id);
+  }, [enMarcha]);
+
+  const transcurrido = acumulado + (enMarcha ? Date.now() - item.arrancadoEn : 0);
+  const restante = Math.max(0, duracion - transcurrido);
+  const seAcabo = modo !== 'cronometro' && duracion > 0 && restante <= 0;
+
+  // Que suene UNA vez por vencimiento, no en cada repintado.
+  const yaSono = React.useRef(false);
+  React.useEffect(() => {
+    if (!seAcabo) { yaSono.current = false; return; }
+    if (yaSono.current) return;
+    yaSono.current = true;
+    window.playAudioTone && window.playAudioTone('alarma');
+    if (modo === 'pomodoro') {
+      // El pomodoro encadena solo: se acaba el trabajo y empieza el descanso,
+      // que es justo lo que uno quiere no tener que recordar.
+      onUpdate({
+        faseDescanso: !item.faseDescanso,
+        arrancadoEn: Date.now(),
+        acumulado: 0,
+        rondas: item.faseDescanso ? (item.rondas || 0) : (item.rondas || 0) + 1,
+      });
+    } else {
+      onUpdate({ arrancadoEn: null, acumulado: duracion });
+    }
+    // eslint-disable-next-line
+  }, [seAcabo]);
+
+  const arranca = () => {
+    window.playAudioTone && window.playAudioTone('click');
+    onUpdate({ arrancadoEn: Date.now() });
+  };
+  const pausa = () => {
+    window.playAudioTone && window.playAudioTone('click');
+    onUpdate({ arrancadoEn: null, acumulado: transcurrido });
+  };
+  const reinicia = () => {
+    window.playAudioTone && window.playAudioTone('delete');
+    onUpdate({ arrancadoEn: null, acumulado: 0, faseDescanso: false, rondas: 0 });
+  };
+
+  // Lo que se enseña en grande.
+  const mostrado = modo === 'cronometro' ? transcurrido : restante;
+  // Cuánto queda, de 0 a 1, para el aro de progreso.
+  const avance = duracion > 0 ? Math.min(1, transcurrido / duracion) : 0;
+
+  const colorFondo = item.color && item.color !== 'white'
+    ? (window.resolveStickyColor ? window.resolveStickyColor(item.color) : item.color)
+    : '#FFFFFF';
+  // El color de los números lo elige el usuario; si no ha elegido, se saca del
+  // fondo para que siempre se lea (el mismo criterio que las figuras).
+  const colorNumeros = item.numberColor || (window.tintaLegible ? window.tintaLegible(colorFondo) : '#1A1A1A');
+
+  const faseTexto = modo === 'pomodoro'
+    ? (item.faseDescanso ? window.t('Descanso', 'Break') : window.t('Trabajo', 'Focus'))
+    : nombreModoTiempo(modo);
+
+  return (
+    <div className="timer-card" style={{ width: '100%', height: '100%' }}>
+      <div className="item-card timer-body" style={{ backgroundColor: colorFondo }}>
+        <div className="timer-fase" style={{ color: colorNumeros, opacity: 0.65 }}>
+          {faseTexto}
+          {modo === 'pomodoro' && (item.rondas || 0) > 0 && (
+            <span className="timer-rondas">{'·'} {item.rondas} {window.t('rondas', 'rounds')}</span>
+          )}
+        </div>
+
+        <div className="timer-reloj" style={{ color: colorNumeros }}>
+          {formateaTiempo(mostrado)}
+        </div>
+
+        {/* La barra de avance solo tiene sentido si hay un final al que llegar. */}
+        {modo !== 'cronometro' && (
+          <div className="timer-barra" style={{ borderColor: colorNumeros }}>
+            <i style={{ width: `${avance * 100}%`, background: colorNumeros }}/>
+          </div>
+        )}
+
+        <div className="timer-botones" onMouseDown={(e)=>e.stopPropagation()}>
+          <button
+            className="timer-btn principal"
+            style={{ borderColor: colorNumeros, color: colorNumeros }}
+            onClick={enMarcha ? pausa : arranca}
+            title={enMarcha ? window.t('Pausar', 'Pause') : window.t('Empezar', 'Start')}
+          >
+            <span className="material-symbols-rounded">{enMarcha ? 'pause' : 'play_arrow'}</span>
+          </button>
+          <button
+            className="timer-btn"
+            style={{ borderColor: colorNumeros, color: colorNumeros }}
+            onClick={reinicia}
+            title={window.t('Volver a empezar', 'Reset')}
+          >
+            <span className="material-symbols-rounded">refresh</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ──────────────── CÓDIGO ────────────────
 //
 // Un bloque de código de verdad: fondo azul oscuro, el texto coloreado solo
@@ -4227,7 +4387,18 @@ function FileItem({ item, lang, onUpdate, onOpenFile }) {
   // ir a la nube para algo que ya está en el disco. Antes este nodo usaba
   // siempre `item.src` y se saltaba esa copia, que existe precisamente para
   // esto.
-  const srcVisor = window.displayMediaSrc ? window.displayMediaSrc(item) : window.resolveMediaSrc(item.src);
+  // La copia local solo vale si es del MISMO tipo que el archivo.
+  //
+  // Las copias guardadas antes de arreglar la caché llevan extensión `.png`
+  // aunque dentro haya un PDF: el servidor las sirve como imagen y el visor
+  // no puede pintarlas. Cuando la extensión no cuadra con el tipo del nodo,
+  // se tira de la dirección original en vez de enseñar una vista rota — y así
+  // las notas que ya estaban guardadas se arreglan solas, sin tocar el disco.
+  const extLocal = item.srcLocal ? String(item.srcLocal).split('.').pop().toLowerCase() : '';
+  const copiaLocalSirve = !!item.srcLocal && (!ext || fileKind(extLocal) === fileKind(ext));
+  const srcVisor = (window.displayMediaSrc && copiaLocalSirve)
+    ? window.displayMediaSrc(item)
+    : window.resolveMediaSrc(item.src);
   // Un PDF de Google Drive NO se puede meter en un <iframe>: Drive lo sirve
   // como descarga, así que Chromium no lo pinta y Electron acaba sacando su
   // ventana de "Guardar como". Se detecta y se enseña una tarjeta con un
@@ -4672,6 +4843,8 @@ function puntosEstrella(w, h, m) {
   }
   return puntos.join(' ');
 }
+
+window.tintaLegible = tintaLegible;
 
 function FiguraSVG({ figura, w, h, relleno, grosor = 1.5 }) {
   // El trazo se pinta centrado en el borde, así que sin este margen se vería la
@@ -5287,6 +5460,7 @@ function ItemRenderer({ item, lang, editing, callbacks }) {
     case 'audio':    return <AudioItem item={item} lang={lang} onUpdate={onUpdate}/>;
     case 'color':    return <ColorItem item={item} lang={lang} onUpdate={onUpdate}/>;
     case 'code':     return <CodeItem  item={item} lang={lang} editing={editing} onUpdate={onUpdate} callbacks={cb}/>;
+    case 'timer':    return <TimerItem item={item} lang={lang} onUpdate={onUpdate}/>;
     case 'file':     return <FileItem  item={item} lang={lang} onUpdate={onUpdate} onOpenFile={cb.openFile}/>;
     case 'title':    return <TitleItem item={item} lang={lang}/>;
     case 'swatch':   return <SwatchItem item={item} lang={lang}/>;

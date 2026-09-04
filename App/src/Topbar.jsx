@@ -39,7 +39,11 @@ const EXTRA_TOOLS = [
   { id: 'comment',  icon: 'forum',         label: 'tool_comment',  bg: '#90B968', fg: 'white' },
   { id: 'file',     icon: 'draft',         label: 'tool_file',     bg: '#E1DFE3', fg: '#1A1A1A' },
   { id: 'map',      icon: 'map',           label: 'tool_map',      bg: '#E1DFE3', fg: '#1A1A1A' },
-  { id: 'code',     icon: 'code',          label: 'tool_code',     bg: '#1E2B45', fg: '#FFFFFF' },
+  // Verde, como el resto de lo que se escribe (nota, to-do, documento,
+  // título). El azul oscuro que tenía era el del PROPIO nodo, y aquí arriba
+  // rompía la baraja: en esta barra solo hay gris, blanco, verde y rojo.
+  { id: 'code',     icon: 'code',          label: 'tool_code',     bg: '#90B968', fg: 'white' },
+  { id: 'timer',    icon: 'timer',         label: 'tool_timer',    bg: '#E6544F', fg: 'white' },
 ];
 
 function Topbar({

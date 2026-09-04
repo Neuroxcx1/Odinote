@@ -3605,6 +3605,56 @@ body.odi-busy iframe { pointer-events: none !important; }
 .ctx-hex-input { flex: 1; min-width: 0; font-family: var(--font-mono); font-size: 12.5px; padding: 6px 8px; border: 1.5px solid var(--line-soft); border-radius: 4px; text-transform: uppercase; }
 
 /* ============================================
+   NODO DE TIEMPO
+   ============================================ */
+.timer-body {
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 10px; padding: 14px;
+}
+.timer-fase {
+  font-family: var(--font-mono); font-size: 10.5px; font-weight: 700;
+  letter-spacing: 0.1em; text-transform: uppercase;
+  display: flex; gap: 6px; align-items: baseline;
+}
+.timer-rondas { font-weight: 500; letter-spacing: 0.04em; }
+/* Los números en cifras de ancho fijo: sin eso el reloj “baila” a cada
+   segundo, porque el 1 es más estrecho que el 8. */
+.timer-reloj {
+  font-family: var(--font-display), 'Bricolage Grotesque', system-ui, sans-serif;
+  font-variant-numeric: tabular-nums;
+  font-weight: 800; letter-spacing: -0.02em; line-height: 1;
+  font-size: calc(42px * var(--node-scale, 1));
+}
+.timer-barra {
+  width: 82%; height: 6px; border-radius: 99px;
+  border: 1.5px solid currentColor; opacity: 0.55; overflow: hidden;
+}
+.timer-barra > i { display: block; height: 100%; border-radius: 99px; transition: width 240ms linear; }
+.timer-botones { display: flex; gap: 8px; }
+.timer-btn {
+  width: 34px; height: 34px; border-radius: 50%;
+  border: 1.5px solid currentColor; background: none;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; opacity: 0.7; transition: opacity 120ms, transform 90ms;
+}
+.timer-btn:hover { opacity: 1; }
+.timer-btn:active { transform: translateY(1px); }
+.timer-btn.principal { width: 40px; height: 40px; opacity: 0.95; }
+.timer-btn .material-symbols-rounded { font-size: 19px; }
+/* Los campos de minutos y segundos del menú */
+.ctx-duracion { display: flex; flex-direction: column; gap: 8px; }
+.ctx-campo { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--ink); }
+.ctx-campo span { flex: 1; }
+.ctx-campo em { font-style: normal; color: var(--ink-3); font-size: 11px; }
+.ctx-campo input {
+  width: 62px; padding: 5px 7px; font-size: 12.5px;
+  font-family: var(--font-mono); text-align: right;
+  border: 1.5px solid var(--line-soft); border-radius: 5px;
+  background: var(--paper); color: var(--ink);
+}
+
+/* ============================================
    NODO DE CÓDIGO
    ============================================ */
 /* El azul oscuro con el degradado radial ES este nodo: por eso su fondo no se

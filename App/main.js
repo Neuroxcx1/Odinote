@@ -779,18 +779,52 @@ ipcMain.handle('download-media-to-vault', async (event, { folderPath, url, fileN
     const crypto = require('crypto');
     const hash = crypto.createHash('sha256').update(buffer).digest('hex').slice(0, 16);
     
-    const contentType = response.headers.get('content-type') || 'image/png';
-    let fileExt = '.png';
-    if (contentType.includes('jpeg') || contentType.includes('jpg')) fileExt = '.jpg';
-    else if (contentType.includes('gif')) fileExt = '.gif';
-    else if (contentType.includes('webp')) fileExt = '.webp';
-    else if (contentType.includes('svg')) fileExt = '.svg';
-    else if (contentType.includes('png')) fileExt = '.png';
-    else {
-      fileExt = path.extname(fileName) || '.png';
+    // Con qué extensión se guarda la copia local.
+    //
+    // Esto estaba escrito solo para imágenes: cualquier otra cosa acababa
+    // con `.png` puesto a la fuerza. Un PDF traído de Drive se guardaba como
+    // `cloud_….png`, el servidor interno lo servía como `image/png` y el
+    // visor no podía pintarlo: vista previa en blanco, con el icono de imagen
+    // rota. Ahora manda, por este orden: la extensión que venga en el nombre
+    // (el que la pide sabe qué es), luego el tipo que declare el servidor, y
+    // por último las primeras letras del propio archivo.
+    const contentType = (response.headers.get('content-type') || '').toLowerCase();
+    const EXT_POR_TIPO = {
+      'application/pdf': '.pdf',
+      'image/jpeg': '.jpg', 'image/jpg': '.jpg', 'image/png': '.png',
+      'image/gif': '.gif', 'image/webp': '.webp', 'image/svg+xml': '.svg', 'image/bmp': '.bmp',
+      'video/mp4': '.mp4', 'video/webm': '.webm', 'video/quicktime': '.mov',
+      'audio/mpeg': '.mp3', 'audio/wav': '.wav', 'audio/ogg': '.ogg', 'audio/mp4': '.m4a', 'audio/flac': '.flac',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document': '.docx',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': '.xlsx',
+      'application/vnd.openxmlformats-officedocument.presentationml.presentation': '.pptx',
+      'application/vnd.oasis.opendocument.text': '.odt',
+      'application/vnd.oasis.opendocument.spreadsheet': '.ods',
+      'application/vnd.oasis.opendocument.presentation': '.odp',
+      'application/zip': '.zip', 'text/plain': '.txt', 'text/csv': '.csv',
+    };
+    // Las primeras letras del archivo, que no mienten aunque el servidor sí.
+    const porLasPrimerasLetras = () => {
+      const cabecera = buffer.slice(0, 12);
+      const texto = cabecera.toString('latin1');
+      if (texto.startsWith('%PDF')) return '.pdf';
+      if (texto.startsWith('\x89PNG')) return '.png';
+      if (texto.startsWith('GIF8')) return '.gif';
+      if (cabecera[0] === 0xFF && cabecera[1] === 0xD8) return '.jpg';
+      if (texto.startsWith('ID3') || (cabecera[0] === 0xFF && (cabecera[1] & 0xE0) === 0xE0)) return '.mp3';
+      if (texto.slice(4, 8) === 'ftyp') return '.mp4';
+      if (texto.startsWith('RIFF')) return '.wav';
+      if (texto.startsWith('OggS')) return '.ogg';
+      if (texto.startsWith('PK')) return '.zip';   // también docx/xlsx/pptx/odt
+      return null;
+    };
+    let fileExt = path.extname(fileName || '');
+    if (!fileExt) {
+      const conocido = Object.keys(EXT_POR_TIPO).find(t => contentType.includes(t));
+      fileExt = conocido ? EXT_POR_TIPO[conocido] : (porLasPrimerasLetras() || '.dat');
     }
 
-    const baseName = path.basename(fileName, path.extname(fileName) || '.png').replace(/[^a-zA-Z0-9._-]/g, '_');
+    const baseName = path.basename(fileName, path.extname(fileName)).replace(/[^a-zA-Z0-9._-]/g, '_');
     const finalName = `${baseName}_${hash}${fileExt}`;
     const destPath = path.join(mediaDir, finalName);
     

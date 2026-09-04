@@ -119,6 +119,7 @@ function ContextSidebar({
   const isMap = item.type === 'map';
   const isShape = item.type === 'shape';
   const isCode = item.type === 'code';
+  const isTimer = item.type === 'timer';
   // Mientras se escribe código, la barra se queda en lo justo: volver, y
   // comentar lo que esté seleccionado. Todo lo demás (colores, duplicar,
   // eliminar) estorba con las manos en el teclado, y una de esas es
@@ -685,6 +686,39 @@ function ContextSidebar({
             <span className="material-symbols-rounded">title</span>
             <span>{window.t('Título', 'Title')}</span>
           </button>
+        )}
+
+        {/* Nodo de tiempo: cuál de los tres, cuánto dura, y el color de los
+            números. El del fondo es el de siempre y ya está arriba. */}
+        {isTimer && (
+          <>
+            <button
+              className={`ctx-btn ${pane === 'timerModo' ? 'active' : ''}`}
+              onClick={()=>setPane(pane === 'timerModo' ? null : 'timerModo')}
+              title={window.t('Cuenta atrás, cronómetro o pomodoro', 'Countdown, stopwatch or pomodoro')}
+            >
+              <span className="material-symbols-rounded">timer</span>
+              <span>{window.nombreModoTiempo ? window.nombreModoTiempo(item.modoTiempo) : 'Tiempo'}</span>
+            </button>
+            {(item.modoTiempo || 'cuentaAtras') !== 'cronometro' && (
+              <button
+                className={`ctx-btn ${pane === 'timerDuracion' ? 'active' : ''}`}
+                onClick={()=>setPane(pane === 'timerDuracion' ? null : 'timerDuracion')}
+                title={window.t('Cuánto dura', 'How long')}
+              >
+                <span className="material-symbols-rounded">schedule</span>
+                <span>{window.t('Duración', 'Length')}</span>
+              </button>
+            )}
+            <button
+              className={`ctx-btn ${pane === 'timerNumeros' ? 'active' : ''}`}
+              onClick={()=>setPane(pane === 'timerNumeros' ? null : 'timerNumeros')}
+              title={window.t('Color de los números', 'Numbers colour')}
+            >
+              <div className="ctx-color-chip" style={{ background: item.numberColor || '#1A1A1A', border: '1.5px solid var(--line-soft)' }}/>
+              <span>{window.t('Números', 'Numbers')}</span>
+            </button>
+          </>
         )}
 
         {/* Nodo de código: el lenguaje, y los dos colores que sí se tocan.
@@ -1255,6 +1289,84 @@ function ContextSidebar({
               onCambio={(c) => onUpdate({ color: c })}
               colores={window.COLORES_ODINOTE_FONDO}
               incluirTransparente={!!(isFrame || isBigTitle)}
+              tam={26}
+            />
+          </div>
+        </div>
+      )}
+
+      {pane === 'timerModo' && (
+        <div className="ctx-popout">
+          <div className="ctx-pop-section">
+            <div className="ctx-pop-title">{window.t('Qué cuenta', 'What it counts')}</div>
+            <div className="ctx-lang-list">
+              {(window.MODOS_TIEMPO || []).map(m => (
+                <button
+                  key={m}
+                  className={`ctx-lang-item ${(item.modoTiempo || 'cuentaAtras') === m ? 'active' : ''}`}
+                  /* Cambiar de modo pone el reloj a cero: dejar corriendo la
+                     cuenta de otro modo enseñaría un número que no significa
+                     nada en el que acabas de elegir. */
+                  onClick={()=>{ onUpdate({ modoTiempo: m, arrancadoEn: null, acumulado: 0, faseDescanso: false, rondas: 0 }); setPane(null); window.playAudioTone && window.playAudioTone('click'); }}
+                >
+                  <span>{window.nombreModoTiempo ? window.nombreModoTiempo(m) : m}</span>
+                  {(item.modoTiempo || 'cuentaAtras') === m && <span className="material-symbols-rounded">check</span>}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {pane === 'timerDuracion' && (
+        <div className="ctx-popout">
+          <div className="ctx-pop-section">
+            <div className="ctx-pop-title">{window.t('Duración', 'Length')}</div>
+            {(item.modoTiempo || 'cuentaAtras') === 'pomodoro' ? (
+              <div className="ctx-duracion">
+                <label className="ctx-campo">
+                  <span>{window.t('Trabajo', 'Focus')}</span>
+                  <input type="number" min="1" max="180"
+                    value={item.minutosTrabajo != null ? item.minutosTrabajo : 25}
+                    onChange={(e)=>onUpdate({ minutosTrabajo: Math.max(1, Math.min(180, +e.target.value || 1)), arrancadoEn: null, acumulado: 0 })}/>
+                  <em>min</em>
+                </label>
+                <label className="ctx-campo">
+                  <span>{window.t('Descanso', 'Break')}</span>
+                  <input type="number" min="1" max="60"
+                    value={item.minutosDescanso != null ? item.minutosDescanso : 5}
+                    onChange={(e)=>onUpdate({ minutosDescanso: Math.max(1, Math.min(60, +e.target.value || 1)), arrancadoEn: null, acumulado: 0 })}/>
+                  <em>min</em>
+                </label>
+              </div>
+            ) : (
+              <div className="ctx-duracion">
+                <label className="ctx-campo">
+                  <span>{window.t('Minutos', 'Minutes')}</span>
+                  <input type="number" min="0" max="600"
+                    value={item.minutos != null ? item.minutos : 5}
+                    onChange={(e)=>onUpdate({ minutos: Math.max(0, Math.min(600, +e.target.value || 0)), arrancadoEn: null, acumulado: 0 })}/>
+                </label>
+                <label className="ctx-campo">
+                  <span>{window.t('Segundos', 'Seconds')}</span>
+                  <input type="number" min="0" max="59"
+                    value={item.segundos != null ? item.segundos : 0}
+                    onChange={(e)=>onUpdate({ segundos: Math.max(0, Math.min(59, +e.target.value || 0)), arrancadoEn: null, acumulado: 0 })}/>
+                </label>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {pane === 'timerNumeros' && (
+        <div className="ctx-popout">
+          <div className="ctx-pop-section">
+            <div className="ctx-pop-title">{window.t('Color de los números', 'Numbers colour')}</div>
+            <window.SelectorColor
+              valor={item.numberColor || '#1A1A1A'}
+              onCambio={(c) => onUpdate({ numberColor: c })}
+              colores={window.COLORES_ODINOTE_TEXTO || window.COLORES_ODINOTE_FONDO}
               tam={26}
             />
           </div>

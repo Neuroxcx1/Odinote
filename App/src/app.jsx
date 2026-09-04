@@ -47,7 +47,7 @@ try {
 
 // Marcador de build: si la consola no muestra esta versión, el navegador está
 // sirviendo JS cacheado (subir ?v= en index.html invalida la caché)
-window.ODINOTE_BUILD = '1.0.8-172';
+window.ODINOTE_BUILD = '1.0.8-173';
 console.log('[ODINOTE] Código cargado: ' + window.ODINOTE_BUILD);
 
 // Global shortcuts configuration
@@ -2477,9 +2477,26 @@ function App() {
             const jobs = [[item.id, item]];
             (item.children || []).forEach(ch => jobs.push([`${item.id}::${ch.id}`, ch]));
             for (const [key, node] of jobs) {
-              if (!node.src || !/^https?:\/\//.test(node.src) || node.srcLocal) continue;
+              if (!node.src || !/^https?:\/\//.test(node.src)) continue;
+              // Con copia local ya no hay nada que traer… salvo que esa copia
+              // sea de otro tipo que el archivo. Las que se guardaron antes de
+              // arreglar la caché llevan `.png` aunque dentro haya un PDF, y
+              // esas hay que volver a bajarlas o el nodo se queda para siempre
+              // con una vista previa que no se puede pintar.
+              if (node.srcLocal) {
+                const kLocal = window.fileKind ? window.fileKind(String(node.srcLocal).split('.').pop()) : null;
+                const kNodo = window.fileKind ? window.fileKind(node.fileType || String(node.name || '').split('.').pop()) : null;
+                if (!kLocal || !kNodo || kLocal === kNodo) continue;
+              }
               try {
-                const localPath = await window.electronAPI.downloadMediaToVault(vaultPath, node.src, `cloud_${node.id}`);
+                // Se manda la extensión de verdad en el nombre. Sin ella, la
+                // copia local se guardaba SIEMPRE como .png —daba igual que
+                // fuera un PDF, un vídeo o un Word—, el servidor interno la
+                // servía como imagen y la vista previa salía en blanco.
+                const extNodo = (node.fileType || (node.name ? String(node.name).split('.').pop() : '') || '')
+                  .toLowerCase().replace(/[^a-z0-9]/g, '');
+                const nombreCache = extNodo ? `cloud_${node.id}.${extNodo}` : `cloud_${node.id}`;
+                const localPath = await window.electronAPI.downloadMediaToVault(vaultPath, node.src, nombreCache);
                 if (localPath) (cached[cid] = cached[cid] || {})[key] = localPath;
               } catch (err) {
                 // Sin internet o URL rota: se reintentará en el próximo ciclo

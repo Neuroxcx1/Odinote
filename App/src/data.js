@@ -25,7 +25,7 @@ const TRANSLATIONS = {
     tool_image: 'Imagen', tool_doc: 'Documento', tool_calendar: 'Calendario',
     tool_table: 'Tabla', tool_audio: 'Audio',
     tool_color: 'Color', tool_file: 'Archivo',
-    tool_frame: 'Marco', tool_bigtitle: 'Título', tool_map: 'Mapa', tool_shape: 'Figura', tool_code: 'Código',
+    tool_frame: 'Marco', tool_bigtitle: 'Título', tool_map: 'Mapa', tool_shape: 'Figura', tool_code: 'Código', tool_timer: 'Tiempo',
     search_canvas: 'Buscar en este canvas…',
     new_canvas: 'Nuevo canvas',
   },
@@ -44,7 +44,7 @@ const TRANSLATIONS = {
     tool_image: 'Image', tool_doc: 'Document', tool_calendar: 'Calendar',
     tool_table: 'Table', tool_audio: 'Audio',
     tool_color: 'Color', tool_file: 'File',
-    tool_frame: 'Frame', tool_bigtitle: 'Title', tool_map: 'Map', tool_shape: 'Shape', tool_code: 'Code',
+    tool_frame: 'Frame', tool_bigtitle: 'Title', tool_map: 'Map', tool_shape: 'Shape', tool_code: 'Code', tool_timer: 'Timer',
     search_canvas: 'Search this canvas…',
     new_canvas: 'New canvas',
   },
@@ -2010,6 +2010,19 @@ window.playAudioTone = function(type) {
       tone({ wave: 'triangle', from: 659.25, at: 0.07, dur: 0.32, gain: 0.032 }); // E5
       tone({ wave: 'triangle', from: 783.99, at: 0.14, dur: 0.30, gain: 0.034 }); // G5
       tone({ wave: 'sine',     from: 1046.5, at: 0.21, dur: 0.42, gain: 0.030 }); // C6
+    } else if (type === 'alarma') {
+      // Se acabó el tiempo. Dos toques y se calla: una alarma en bucle dentro
+      // de un lienzo lleno de nodos es una tortura, y quien la puso ya sabe
+      // que ha sonado. Dos notas por toque, la segunda más aguda, para que se
+      // distinga del resto de sonidos de la aplicación.
+      for (const retardo of [0, 0.62]) {
+        tone({ wave: 'triangle', from: 880,  at: retardo,        dur: 0.20, gain: 0.055 }); // A5
+        tone({ wave: 'triangle', from: 1174.7, at: retardo + 0.18, dur: 0.26, gain: 0.050 }); // D6
+      }
+    } else if (type === 'tic') {
+      // El segundero de la cuenta atrás en sus últimos segundos: muy corto y
+      // muy flojo, que acompaña sin taladrar.
+      tone({ wave: 'square', from: 1200, dur: 0.012, gain: 0.012 });
     }
   } catch (e) {
     // Fail silently if browser audio context blocked
