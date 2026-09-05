@@ -47,7 +47,7 @@ try {
 
 // Marcador de build: si la consola no muestra esta versión, el navegador está
 // sirviendo JS cacheado (subir ?v= en index.html invalida la caché)
-window.ODINOTE_BUILD = '1.0.8-177';
+window.ODINOTE_BUILD = '1.0.8-178';
 console.log('[ODINOTE] Código cargado: ' + window.ODINOTE_BUILD);
 
 // Global shortcuts configuration
@@ -3673,7 +3673,16 @@ function App() {
         const conCuenta = !!userProfile;
         const conDrive = !!(userProfile && userProfile.accessToken);
         const enLinea = !!project.isPublic;
-        const puedeCompartir = conCuenta && conDrive && enLinea;
+        // 'Online' es una marca guardada en el proyecto, pero sin cuenta de
+        // Google detrás no significa NADA: no se puede subir, ni invitar, ni
+        // abrir una sesión. Mostrarla igual producía una ventana que se
+        // contradecía sola — arriba "1 · ONLINE EN TU DRIVE" y tres líneas más
+        // abajo "inicia sesión con tu cuenta de Google" sin marcar.
+        //
+        // Así que todo lo que dependa de la cuenta se mira contra esto, no
+        // contra la marca del proyecto.
+        const operativo = conCuenta && conDrive && enLinea;
+        const puedeCompartir = operativo;
         return (
           <div className="doc-modal-overlay" style={{ zIndex: 10000, display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.45)' }} onClick={() => setSharingModalOpen(false)}>
             <div className="odi-dialog" style={{ width: '480px', background: 'var(--bg, #FAF9F6)', border: '1.5px solid var(--line, #595459)', padding: '24px', borderRadius: '12px', boxShadow: 'var(--pop-md)' }} onClick={(e) => e.stopPropagation()}>
@@ -3741,337 +3750,63 @@ function App() {
                 </div>
               )}
 
-              {/* ── 2. Abrir este escritorio a los demás ── */}
+              {/* ── Guardar en Drive: una cosa por sí sola ──
+                  Antes esto era "el paso 1" de compartir, y no lo es: guardar
+                  tu proyecto en tu nube tiene valor aunque no se lo enseñes a
+                  nadie nunca. Que además sea IMPRESCINDIBLE para compartir es
+                  una consecuencia, no su motivo — y por eso se dice aquí, en
+                  una línea, en vez de convertirlo en un escalón numerado. */}
               <div style={{
-                border: '1.5px solid ' + (salaCodigo ? 'var(--brand-green, #90B968)' : 'var(--line-soft, #D5D1CD)'),
-                borderRadius: '10px', padding: '14px', marginBottom: '18px',
-                background: salaCodigo ? 'rgba(144, 185, 104, 0.08)' : 'var(--bg-card, #FFFFFF)',
+                border: '1.5px solid ' + (enLinea ? 'var(--brand-green, #90B968)' : 'var(--line-soft, #D5D1CD)'),
+                borderRadius: '10px', padding: '14px', marginBottom: '14px',
+                background: enLinea ? 'rgba(144, 185, 104, 0.08)' : 'var(--bg-card, #FFFFFF)',
               }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                  <span className="material-symbols-rounded" style={{ fontSize: 20, color: salaCodigo ? 'var(--brand-green, #90B968)' : 'var(--text-soft)' }}>
-                    {salaCodigo ? 'sensors' : 'share'}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <span className="material-symbols-rounded" style={{ fontSize: 22, color: enLinea ? 'var(--brand-green, #90B968)' : 'var(--text-soft)' }}>
+                    {enLinea ? 'cloud_done' : 'cloud_upload'}
                   </span>
-                  <strong style={{ fontSize: '13.5px' }}>
-                    {salaCodigo && !salaAnfitrion
-                      ? window.t('Sesión en vivo', 'Live session')
-                      : window.t('Compartir este escritorio', 'Share this workspace')}
-                  </strong>
-                </div>
-
-                {/* Estar DENTRO de una sesión manda sobre todo lo demás — de
-                    ahí el `&& !salaCodigo`. Sin él, quien hubiera entrado en la
-                    sesión de otro desde un proyecto suyo sin subir a Drive
-                    vería la lista de requisitos pendientes y ni rastro del
-                    botón de salir de donde está. */}
-                {(!puedeCompartir && !salaCodigo) ? (
-                  <>
-                    <p style={{ margin: '0 0 10px 0', fontSize: '11.5px', color: 'var(--text-soft)', lineHeight: 1.45 }}>
-                      {window.t(
-                        'Para dejar entrar a alguien, este puesto tiene que estar guardado en tu Google Drive. Es lo que permite que vea las imágenes y los audios, y no unos recuadros vacíos.',
-                        'To let anyone in, this workspace has to be saved in your Google Drive. That is what lets them see the images and audio instead of empty frames.'
-                      )}
-                    </p>
-
-                    {/* Los pasos, en orden y con su estado a la vista. Antes
-                        esto eran errores sueltos que aparecían al pulsar, así
-                        que no había forma de saber cuánto faltaba. */}
-                    {[
-                      {
-                        hecho: conCuenta,
-                        texto: window.t('Inicia sesión con tu cuenta de Google', 'Sign in with your Google account'),
-                        accion: window.t('Iniciar sesión', 'Sign in'),
-                        alPulsar: () => { setSharingModalOpen(false); setUserModalOpen(true); },
-                      },
-                      {
-                        hecho: conCuenta && conDrive,
-                        texto: window.t('Autoriza el acceso a tu Google Drive', 'Authorise access to your Google Drive'),
-                        accion: window.t('Autorizar', 'Authorise'),
-                        alPulsar: () => { setSharingModalOpen(false); startGoogleAuthFlow(true); },
-                      },
-                      {
-                        hecho: enLinea,
-                        texto: window.t('Pon el puesto online (se sube a tu carpeta Odinote)', 'Put the workspace online (uploaded to your Odinote folder)'),
-                        accion: window.t('Poner Online', 'Put Online'),
-                        alPulsar: () => { togglePublicProject(project.id); window.playAudioTone && window.playAudioTone('click'); },
-                      },
-                    ].map((paso, i, todos) => {
-                      // Solo se ofrece el botón del primer paso que falta: los
-                      // de más abajo no se pueden dar todavía.
-                      const primeroPendiente = todos.findIndex(p => !p.hecho);
-                      return (
-                        <div key={i} style={{
-                          display: 'flex', alignItems: 'center', gap: '8px',
-                          padding: '7px 9px', marginBottom: '6px', borderRadius: '7px',
-                          background: paso.hecho ? 'rgba(144, 185, 104, 0.12)' : 'var(--bg-main, #F1EEEA)',
-                          opacity: (!paso.hecho && i !== primeroPendiente) ? 0.55 : 1,
-                        }}>
-                          <span className="material-symbols-rounded" style={{
-                            fontSize: 17, color: paso.hecho ? 'var(--brand-green, #90B968)' : 'var(--text-soft)',
-                          }}>
-                            {paso.hecho ? 'check_circle' : 'radio_button_unchecked'}
-                          </span>
-                          <span style={{ flex: 1, fontSize: '11.5px', fontWeight: paso.hecho ? 500 : 700, lineHeight: 1.35 }}>
-                            {paso.texto}
-                          </span>
-                          {!paso.hecho && i === primeroPendiente && (
-                            <button
-                              className="btn lift"
-                              onClick={paso.alPulsar}
-                              style={{
-                                padding: '5px 10px', fontSize: '11px', fontWeight: 700,
-                                background: 'var(--olive, #6A8546)', color: 'white',
-                                border: 'none', borderRadius: '6px', cursor: 'pointer', flexShrink: 0,
-                              }}
-                            >
-                              {paso.accion}
-                            </button>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </>
-                ) : !salaCodigo ? (
-                  <>
-                    <p style={{ margin: '0 0 10px 0', fontSize: '11.5px', color: 'var(--text-soft)', lineHeight: 1.45 }}>
-                      {window.t(
-                        'Se genera un código; quien lo tenga ve este mismo lienzo a la vez que tú, cada quien con su cursor de color. Los cambios viajan directo entre los dos equipos, sin pasar por ningún servidor.',
-                        'A code is generated; whoever has it sees this same canvas at the same time as you, each with a coloured cursor. Changes travel straight between the two machines, through no server.'
-                      )}
-                    </p>
-
-                    {/* El papel se elige ANTES de dar el código: es el único
-                        momento en que uno sabe a quién se lo va a dar. */}
-                    <div style={{ marginBottom: '10px' }}>
-                      <label style={{ display: 'block', fontSize: '10.5px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-soft)', marginBottom: '5px' }}>
-                        {window.t('Quien entre con el código podrá:', 'Whoever joins with the code will be able to:')}
-                      </label>
-                      <div style={{ display: 'flex', gap: '6px' }}>
-                        {[
-                          { id: 'editor', icono: 'edit', texto: window.t('Editar', 'Edit'), pie: window.t('toca el lienzo', 'can change things') },
-                          { id: 'lector', icono: 'visibility', texto: window.t('Solo mirar', 'Only look'), pie: window.t('no cambia nada', 'changes nothing') },
-                        ].map(op => (
-                          <button
-                            key={op.id}
-                            className="btn"
-                            onClick={() => { setSalaRolNuevos(op.id); window.playAudioTone && window.playAudioTone('click'); }}
-                            style={{
-                              flex: 1, padding: '7px 8px', borderRadius: '7px', cursor: 'pointer',
-                              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px',
-                              border: '1.5px solid ' + (salaRolNuevos === op.id ? 'var(--olive, #6A8546)' : 'var(--line-soft, #D5D1CD)'),
-                              background: salaRolNuevos === op.id ? 'rgba(106, 133, 70, 0.12)' : 'transparent',
-                              color: 'var(--ink)', fontWeight: 700, fontSize: '11.5px',
-                            }}
-                          >
-                            <span className="material-symbols-rounded" style={{ fontSize: 15 }}>{op.icono}</span>
-                            <span>{op.texto}</span>
-                            <span style={{ fontWeight: 500, fontSize: '10px', color: 'var(--text-soft)' }}>· {op.pie}</span>
-                          </button>
-                        ))}
-                      </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <strong style={{ fontSize: '13.5px' }}>
+                      {window.t('Guardar en tu Google Drive', 'Save to your Google Drive')}
+                    </strong>
+                    <div style={{ fontSize: '11.5px', color: 'var(--text-soft)', lineHeight: 1.4 }}>
+                      {enLinea
+                        ? window.t('Se guarda en tu carpeta "Odinote". Ocupa espacio de tus 15 GB.', 'Saved in your "Odinote" folder. It uses space from your 15 GB.')
+                        : window.t('Tus notas dejan de estar solo en este equipo. Se guardan en tu carpeta "Odinote" y ocupan espacio de tus 15 GB.', 'Your notes stop living only on this machine. They go to your "Odinote" folder and use space from your 15 GB.')}
                     </div>
+                  </div>
 
+                  {!conCuenta ? (
                     <button
                       className="btn lift"
-                      disabled={salaOcupada}
-                      onClick={abreSalaEnVivo}
-                      style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', background: 'var(--olive, #6A8546)', color: 'white', border: 'none', fontWeight: 700, fontSize: '12.5px', cursor: 'pointer', opacity: salaOcupada ? 0.6 : 1 }}
+                      onClick={() => { setSharingModalOpen(false); setUserModalOpen(true); }}
+                      style={{ padding: '7px 12px', fontSize: '11.5px', fontWeight: 700, borderRadius: '7px', border: 'none', background: 'var(--olive, #6A8546)', color: 'white', cursor: 'pointer', flexShrink: 0 }}
                     >
-                      {salaOcupada ? window.t('Abriendo…', 'Opening…') : window.t('Empezar sesión y crear el código', 'Start session and create the code')}
+                      {window.t('Iniciar sesión', 'Sign in')}
                     </button>
-                  </>
-                ) : (
-                  <>
-                    <p style={{ margin: '0 0 8px 0', fontSize: '11.5px', color: 'var(--text-soft)' }}>
-                      {salaAnfitrion
-                        ? window.t('Dale este código a quien quieras invitar:', 'Give this code to whoever you want to invite:')
-                        : window.t('Estás dentro de esta sesión:', 'You are inside this session:')}
-                    </p>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <code style={{
-                        flex: 1, fontFamily: 'var(--font-mono, monospace)', fontSize: '22px', fontWeight: 800,
-                        letterSpacing: '0.16em', textAlign: 'center', padding: '10px',
-                        background: 'var(--bg-main, #E5E1DD)', borderRadius: '8px', color: 'var(--ink)',
-                      }}>{salaCodigo}</code>
-                      <button
-                        className="btn"
-                        onClick={() => {
-                          copiaAlPortapapeles(salaCodigo);
-                          window.playAudioTone && window.playAudioTone('click');
-                          setCodigoCopiado(true);
-                          setTimeout(() => setCodigoCopiado(false), 1800);
-                        }}
-                        style={{
-                          display: 'flex', alignItems: 'center', gap: '5px',
-                          padding: '9px 12px', borderRadius: '8px',
-                          border: '1.5px solid ' + (codigoCopiado ? 'var(--brand-green, #90B968)' : 'var(--line-soft)'),
-                          color: codigoCopiado ? 'var(--brand-green, #90B968)' : 'inherit',
-                          cursor: 'pointer', fontSize: '12px', fontWeight: 700,
-                          transition: 'color 120ms, border-color 120ms',
-                        }}
-                      >
-                        <span className="material-symbols-rounded" style={{ fontSize: 16 }}>
-                          {codigoCopiado ? 'check' : 'content_copy'}
-                        </span>
-                        <span>{codigoCopiado ? window.t('Copiado', 'Copied') : window.t('Copiar', 'Copy')}</span>
-                      </button>
-                    </div>
-
-                    {/* Aquí vivían dos cosas más: mandar el código por correo
-                        y elegir el papel del PRÓXIMO que entrara.
-
-                        El correo era un mailto que se parecía como una gota de
-                        agua al de "Colaboradores Invitados" de más abajo —misma
-                        casilla, mismo botón verde "Invitar"— y hacía algo
-                        completamente distinto. Dos invitaciones idénticas a la
-                        vista no dan opciones, dan dudas. Para pasar seis letras
-                        ya está el botón de copiar, que es lo que hace todo el
-                        mundo de todas formas.
-
-                        Y lo del papel del próximo sobraba: cuando entra, ahí
-                        abajo está su nombre y se le cambia en un clic, sabiendo
-                        ya quién es. Decidirlo a ciegas antes era una fila más
-                        de letras mayúsculas para el mismo resultado. */}
-
-                    {/* ── Quién hay dentro AHORA MISMO ──
-                        Ojo, esta lista no es la de abajo. Abajo están las
-                        cuentas de Google con las que se ha compartido la
-                        carpeta, que es algo permanente; aquí están las personas
-                        conectadas en este instante, con o sin cuenta. Confundir
-                        las dos era lo que hacía imposible echar a alguien: se
-                        buscaba en la lista equivocada. */}
-                    <div style={{ marginTop: '12px', borderTop: '1px solid var(--line-soft, #E5E1DD)', paddingTop: '10px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '7px' }}>
-                        <span style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-soft)' }}>
-                          {window.t('En la sesión ahora', 'In the session now')}
-                        </span>
-                        <span style={{ fontSize: '10.5px', color: 'var(--text-soft)' }}>
-                          {salaGente.length === 1
-                            ? window.t('solo tú, de momento', 'just you, for now')
-                            : window.t(`${salaGente.length} personas`, `${salaGente.length} people`)}
-                        </span>
-                      </div>
-
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '170px', overflowY: 'auto' }}>
-                        {salaGente.map(persona => {
-                          const soyYo = window.__odiVivo && window.__odiVivo.miUid() === persona.uid;
-                          const rol = persona.rol || 'editor';
-                          return (
-                            <div key={persona.uid} style={{
-                              display: 'flex', alignItems: 'center', gap: '8px',
-                              padding: '6px 9px', borderRadius: '7px',
-                              background: 'var(--bg-card, #FFFFFF)', border: '1px solid var(--line-soft, #E5E1DD)',
-                            }}>
-                              <span style={{
-                                width: '10px', height: '10px', borderRadius: '50%', flexShrink: 0,
-                                background: persona.color || 'var(--line, #595459)',
-                              }}/>
-                              <span style={{ flex: 1, fontSize: '12px', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                {persona.nombre}
-                                {soyYo && <span style={{ fontWeight: 500, color: 'var(--text-soft)' }}> {window.t('(tú)', '(you)')}</span>}
-                              </span>
-
-                              {persona.anfitrion ? (
-                                <span style={{ fontSize: '10px', padding: '2px 6px', background: 'var(--olive-l, #EAEFE2)', color: 'var(--olive)', borderRadius: '4px', fontWeight: 700 }}>
-                                  {window.t('Anfitrión', 'Host')}
-                                </span>
-                              ) : salaAnfitrion ? (
-                                <>
-                                  {/* Un interruptor de dos posiciones, no un
-                                      desplegable. El <select> lo dibuja el
-                                      sistema operativo con su propia tipografía
-                                      y su propio menú gris: entre botones
-                                      redondeados y hechos a mano cantaba como
-                                      una pieza de otro programa. Y para dos
-                                      opciones, un desplegable son dos clics y
-                                      un menú que tapa la lista; así es uno. */}
-                                  <div style={{
-                                    display: 'flex', borderRadius: '999px', overflow: 'hidden',
-                                    border: '1.5px solid var(--line-soft, #D5D1CD)', flexShrink: 0,
-                                  }}>
-                                    {[
-                                      { id: 'editor', icono: 'edit', texto: window.t('Editor', 'Editor') },
-                                      { id: 'lector', icono: 'visibility', texto: window.t('Lector', 'Reader') },
-                                    ].map(op => (
-                                      <button
-                                        key={op.id}
-                                        className="btn"
-                                        title={op.id === 'editor'
-                                          ? window.t('Puede cambiar el lienzo', 'Can change the canvas')
-                                          : window.t('Solo puede mirar', 'Can only look')}
-                                        onClick={() => { if (rol !== op.id) cambiaRolEnSala(persona.uid, op.id); }}
-                                        style={{
-                                          display: 'flex', alignItems: 'center', gap: '3px',
-                                          padding: '3px 9px', border: 'none', cursor: 'pointer',
-                                          fontSize: '10.5px', fontWeight: 700,
-                                          background: rol === op.id ? 'var(--olive, #6A8546)' : 'transparent',
-                                          color: rol === op.id ? '#FFFFFF' : 'var(--text-soft)',
-                                        }}
-                                      >
-                                        <span className="material-symbols-rounded" style={{ fontSize: 13 }}>{op.icono}</span>
-                                        <span>{op.texto}</span>
-                                      </button>
-                                    ))}
-                                  </div>
-                                  <button
-                                    className="icon-btn danger"
-                                    title={window.t('Sacar de la sesión', 'Remove from session')}
-                                    onClick={() => expulsaDeSala(persona)}
-                                    style={{ padding: '3px' }}
-                                  >
-                                    <span className="material-symbols-rounded" style={{ fontSize: 16 }}>person_remove</span>
-                                  </button>
-                                </>
-                              ) : (
-                                <span style={{ fontSize: '10px', padding: '2px 6px', background: 'var(--bg-main, #E5E1DD)', color: 'var(--text-soft)', borderRadius: '4px', fontWeight: 700 }}>
-                                  {rol === 'lector' ? window.t('Solo lectura', 'Read only') : window.t('Editor', 'Editor')}
-                                </span>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-
+                  ) : !conDrive ? (
                     <button
-                      className="btn"
-                      onClick={cierraSalaEnVivo}
-                      style={{ marginTop: '10px', width: '100%', padding: '7px', borderRadius: '8px', border: '1px solid var(--wine)', color: 'var(--wine)', background: 'transparent', cursor: 'pointer', fontSize: '11.5px', fontWeight: 700 }}
+                      className="btn lift"
+                      onClick={() => { setSharingModalOpen(false); startGoogleAuthFlow(true); }}
+                      style={{ padding: '7px 12px', fontSize: '11.5px', fontWeight: 700, borderRadius: '7px', border: 'none', background: 'var(--olive, #6A8546)', color: 'white', cursor: 'pointer', flexShrink: 0 }}
                     >
-                      {salaAnfitrion
-                        ? window.t('Terminar sesión en vivo', 'End live session')
-                        : window.t('Salir de la sesión', 'Leave the session')}
+                      {window.t('Autorizar Drive', 'Authorise Drive')}
                     </button>
-                  </>
-                )}
-
-                {salaError && (
-                  <p style={{ margin: '10px 0 0 0', fontSize: '11.5px', color: 'var(--wine, #E6544F)', lineHeight: 1.4 }}>
-                    {salaError}
-                  </p>
-                )}
-              </div>
-
-              {/* ── 3. La carpeta en Drive: quién más la tiene ──
-                  Solo aparece cuando el puesto ya está online, porque antes de
-                  eso no hay ninguna carpeta que compartir. */}
-              {enLinea && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                  <div style={{ padding: '12px', background: 'rgba(144, 185, 104, 0.1)', border: '1.5px solid var(--brand-green, #90B968)', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <span className="material-symbols-rounded" style={{ color: 'var(--brand-green, #90B968)' }}>cloud_done</span>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: '12px', fontWeight: '700', color: 'var(--brand-green, #90B968)' }}>
-                        {window.t('ONLINE, EN TU GOOGLE DRIVE', 'ONLINE, IN YOUR GOOGLE DRIVE')}
-                      </div>
-                      <div style={{ fontSize: '11px', color: 'var(--text-soft)' }}>
-                        {window.t('Se guarda en tu carpeta "Odinote". Ocupa espacio de tus 15 GB.', 'Saved in your "Odinote" folder. It uses space from your 15 GB.')}
-                      </div>
-                    </div>
+                  ) : !enLinea ? (
+                    <button
+                      className="btn lift"
+                      onClick={() => { togglePublicProject(project.id); window.playAudioTone && window.playAudioTone('click'); }}
+                      style={{ padding: '7px 12px', fontSize: '11.5px', fontWeight: 700, borderRadius: '7px', border: 'none', background: 'var(--olive, #6A8546)', color: 'white', cursor: 'pointer', flexShrink: 0 }}
+                    >
+                      {window.t('Guardar', 'Save')}
+                    </button>
+                  ) : (
                     <button
                       className="btn lift"
                       onClick={() => {
                         window.customConfirm(window.t(
-                          '¿Poner este puesto offline?\n\n· Deja de subirse a tu Drive (lo que ya está subido se queda ahí).\n· Los colaboradores pierden el acceso.\n· Y no podrás abrir sesiones en vivo desde aquí hasta que lo vuelvas a poner online.',
-                          'Take this workspace offline?\n\n· It stops uploading to your Drive (whatever is already there stays).\n· Collaborators lose access.\n· And you will not be able to open live sessions from here until you put it back online.'
+                          '¿Dejar de guardarlo en tu Drive?\n\n· Lo que ya está subido se queda ahí.\n· Los colaboradores pierden el acceso.\n· Y no podrás compartirlo con nadie hasta que lo vuelvas a activar.',
+                          'Stop saving it to your Drive?\n\n· What is already uploaded stays there.\n· Collaborators lose access.\n· And you will not be able to share it with anyone until you turn this back on.'
                         )).then((accepted) => {
                           if (!accepted) return;
                           if (salaCodigo) cierraSalaEnVivo();
@@ -4079,220 +3814,345 @@ function App() {
                           window.playAudioTone && window.playAudioTone('click');
                         });
                       }}
-                      style={{ padding: '6px 12px', fontSize: '11px', border: '1px solid var(--wine)', color: 'var(--wine)', borderRadius: '6px', background: 'transparent', cursor: 'pointer', fontWeight: '700' }}
+                      style={{ padding: '7px 12px', fontSize: '11.5px', fontWeight: 700, borderRadius: '7px', border: '1px solid var(--wine)', color: 'var(--wine)', background: 'transparent', cursor: 'pointer', flexShrink: 0 }}
                     >
-                      {window.t('Poner Offline', 'Take Offline')}
+                      {window.t('Quitar', 'Remove')}
+                    </button>
+                  )}
+                </div>
+
+                {!enLinea && (
+                  <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px dashed var(--line-soft)', fontSize: '11px', color: 'var(--text-soft)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span className="material-symbols-rounded" style={{ fontSize: 15 }}>group</span>
+                    <span>{window.t(
+                      'Si además quieres compartirlo con alguien, esto hace falta sí o sí: es lo que permite que vean tus imágenes y no recuadros vacíos.',
+                      'If you also want to share it with someone, this is required: it is what lets them see your images instead of empty frames.'
+                    )}</span>
+                  </div>
+                )}
+
+                {/* Un proyecto guardado con una versión vieja podía quedarse sin
+                    la marca de Drive. Se arregla de un botón. */}
+                {enLinea && !project.useGoogleDrive && (
+                  <div style={{ marginTop: '10px', padding: '8px 10px', background: 'rgba(230, 84, 79, 0.06)', border: '1px solid var(--wine, #E6544F)', borderRadius: '7px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span className="material-symbols-rounded" style={{ color: 'var(--wine, #E6544F)', fontSize: '17px' }}>sync_problem</span>
+                    <span style={{ flex: 1, fontSize: '11px', lineHeight: 1.35 }}>
+                      {window.t('No se está subiendo a Drive: los invitados verían recuadros vacíos donde hay imágenes.', 'It is not uploading to Drive: guests would see empty frames where the images are.')}
+                    </span>
+                    <button
+                      className="btn lift"
+                      onClick={() => {
+                        setProjects(prev => prev.map(p => p.id === project.id ? { ...p, useGoogleDrive: true } : p));
+                        if (userProfile && userProfile.accessToken) {
+                          uploadToGoogleDriveReal({ ...project, useGoogleDrive: true }, canvases, userProfile.accessToken)
+                            .then(folderId => showToast(folderId
+                              ? window.t('Proyecto sincronizado con tu Google Drive.', 'Project synced with your Google Drive.')
+                              : window.t('No se pudo subir a Google Drive.', 'Could not upload to Google Drive.'), folderId ? 'success' : 'error'));
+                        }
+                        window.playAudioTone && window.playAudioTone('click');
+                      }}
+                      style={{ padding: '4px 9px', fontSize: '10.5px', fontWeight: 700, background: 'var(--olive)', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer', flexShrink: 0 }}
+                    >
+                      {window.t('Arreglar', 'Fix')}
+                    </button>
+                  </div>
+                )}
+              </div>
+              {/* ── Compartir: UN interruptor, y con él la sesión viva ──
+                  Todo lo anterior fallaba por lo mismo: presentaba las piezas
+                  sueltas y dejaba al usuario adivinar cuáles se necesitan entre
+                  sí. Aquí hay una sola pregunta —¿lo comparto o no?— y en cuanto
+                  se dice que sí, el código EXISTE. No hay un segundo botón de
+                  "empezar sesión": compartir es tener la sesión abierta.
+
+                  Y el papel de cada persona se decide donde está esa persona,
+                  con sus botones al lado, no eligiendo a ciegas antes de que
+                  llegue nadie. */}
+              {operativo && (() => {
+                const sinAnfitrion = !!project.sincroInstantanea;
+                const compartiendo = !!salaCodigo || sinAnfitrion;
+
+                const enciende = () => {
+                  window.playAudioTone && window.playAudioTone('click');
+                  if (!sinAnfitrion) abreSalaEnVivo();
+                };
+                const apaga = () => {
+                  window.playAudioTone && window.playAudioTone('click');
+                  if (salaCodigo) cierraSalaEnVivo();
+                  if (sinAnfitrion) setProjects(prev => prev.map(p => p.id === project.id ? { ...p, sincroInstantanea: false } : p));
+                };
+
+                return (
+                <div style={{
+                  border: '1.5px solid ' + (compartiendo ? 'var(--brand-green, #90B968)' : 'var(--line-soft, #D5D1CD)'),
+                  borderRadius: '10px', padding: '14px',
+                  background: compartiendo ? 'rgba(144, 185, 104, 0.08)' : 'var(--bg-card, #FFFFFF)',
+                }}>
+                  {/* El interruptor */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <span className="material-symbols-rounded" style={{ fontSize: 22, color: compartiendo ? 'var(--brand-green, #90B968)' : 'var(--text-soft)' }}>
+                      {compartiendo ? 'group' : 'group_off'}
+                    </span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <strong style={{ fontSize: '13.5px' }}>{window.t('Compartir este proyecto', 'Share this project')}</strong>
+                      <div style={{ fontSize: '11.5px', color: 'var(--text-soft)', lineHeight: 1.4 }}>
+                        {compartiendo
+                          ? window.t('Está abierto: quien tenga el código puede entrar.', 'It is open: anyone with the code can come in.')
+                          : window.t('Ahora mismo no lo ve nadie más que tú.', 'Right now nobody but you can see it.')}
+                      </div>
+                    </div>
+                    <button
+                      className="btn lift"
+                      disabled={salaOcupada}
+                      onClick={compartiendo ? apaga : enciende}
+                      style={{
+                        padding: '7px 14px', fontSize: '11.5px', fontWeight: 700, borderRadius: '999px',
+                        cursor: 'pointer', flexShrink: 0, opacity: salaOcupada ? 0.6 : 1,
+                        border: '1.5px solid ' + (compartiendo ? 'var(--wine)' : 'var(--olive, #6A8546)'),
+                        background: compartiendo ? 'transparent' : 'var(--olive, #6A8546)',
+                        color: compartiendo ? 'var(--wine)' : 'white',
+                      }}
+                    >
+                      {salaOcupada ? window.t('Abriendo…', 'Opening…')
+                        : compartiendo ? window.t('Dejar de compartir', 'Stop sharing')
+                        : window.t('Compartir', 'Share')}
                     </button>
                   </div>
 
-                  {/* ── Sincronización instantánea ──
-                      Apagada de fábrica y a propósito. Con ella, el texto y las
-                      posiciones de las notas se guardan en el servidor de
-                      Oddinote para que los cambios lleguen al instante sin que
-                      nadie tenga que estar de anfitrión. Quien no la encienda
-                      no manda ni un byte de contenido a ningún servidor, y por
-                      eso lo que dice el interruptor está escrito sin rodeos:
-                      quien acepta esto merece saber exactamente qué acepta. */}
-                  <div style={{
-                    border: '1.5px solid ' + (project.sincroInstantanea ? 'var(--brand-green, #90B968)' : 'var(--line-soft, #D5D1CD)'),
-                    borderRadius: '8px', padding: '12px',
-                    background: project.sincroInstantanea ? 'rgba(144, 185, 104, 0.08)' : 'transparent',
-                  }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      <span className="material-symbols-rounded" style={{
-                        fontSize: 20, color: project.sincroInstantanea ? 'var(--brand-green, #90B968)' : 'var(--text-soft)',
-                      }}>bolt</span>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <strong style={{ fontSize: '12.5px' }}>{window.t('Sincronización instantánea', 'Instant sync')}</strong>
-                        <div style={{ fontSize: '11px', color: 'var(--text-soft)', lineHeight: 1.4 }}>
-                          {window.t(
-                            'Los cambios llegan al momento, sin que nadie tenga que abrir una sesión.',
-                            'Changes arrive at once, with nobody having to open a session.'
-                          )}
-                        </div>
-                      </div>
-                      <button
-                        className="btn lift"
-                        onClick={() => {
-                          if (project.sincroInstantanea) {
-                            setProjects(prev => prev.map(p => p.id === project.id ? { ...p, sincroInstantanea: false } : p));
-                            window.playAudioTone && window.playAudioTone('click');
-                            return;
-                          }
-                          window.customConfirm(window.t(
-                            '¿Encender la sincronización instantánea para este proyecto?\n\n· El TEXTO de las notas y dónde está cada una se guardan en el servidor de Oddinote, no solo en tu Drive. Es lo que permite que los cambios lleguen al instante.\n· Las imágenes y los audios NO: esos siguen en tu Google Drive.\n· Solo pueden verlo las cuentas a las que ya compartiste el proyecto.\n· Puedes apagarla cuando quieras.\n\nEl resto de tus proyectos no se ven afectados.',
-                            'Turn on instant sync for this project?\n\n· The TEXT of the notes and where each one sits are stored on Oddinote\'s server, not only in your Drive. That is what makes changes arrive at once.\n· Images and audio are NOT: those stay in your Google Drive.\n· Only the accounts you already shared the project with can see it.\n· You can turn it off whenever you like.\n\nYour other projects are not affected.'
-                          )).then((acepta) => {
-                            if (!acepta) return;
-                            setProjects(prev => prev.map(p => p.id === project.id ? { ...p, sincroInstantanea: true } : p));
-                            window.playAudioTone && window.playAudioTone('click');
-                          });
-                        }}
-                        style={{
-                          padding: '6px 12px', fontSize: '11px', fontWeight: 700, borderRadius: '6px',
-                          cursor: 'pointer', flexShrink: 0,
-                          border: '1.5px solid ' + (project.sincroInstantanea ? 'var(--wine)' : 'var(--olive, #6A8546)'),
-                          background: project.sincroInstantanea ? 'transparent' : 'var(--olive, #6A8546)',
-                          color: project.sincroInstantanea ? 'var(--wine)' : 'white',
-                        }}
-                      >
-                        {project.sincroInstantanea ? window.t('Apagar', 'Turn off') : window.t('Encender', 'Turn on')}
-                      </button>
-                    </div>
-                    {project.sincroInstantanea && (
-                      <div style={{ marginTop: '8px', fontSize: '10.5px', color: 'var(--text-soft)', lineHeight: 1.4 }}>
-                        {window.t(
-                          'El texto de este proyecto se guarda en el servidor de Oddinote. Las imágenes y los audios siguen solo en tu Drive.',
-                          'This project\'s text is stored on Oddinote\'s server. Images and audio remain only in your Drive.'
-                        )}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Un proyecto puesto online con una versión vieja podía
-                      quedarse sin la marca de Drive. Aquí se arregla de un
-                      botón, en vez de dejar un estado imposible a la vista. */}
-                  {!project.useGoogleDrive && (
-                    <div style={{ padding: '10px', background: 'rgba(230, 84, 79, 0.06)', border: '1.5px solid var(--wine, #E6544F)', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <span className="material-symbols-rounded" style={{ color: 'var(--wine, #E6544F)', fontSize: '18px' }}>sync_problem</span>
-                      <span style={{ flex: 1, fontSize: '11.5px', lineHeight: 1.4 }}>
-                        {window.t('Este puesto está online pero no se está subiendo a Drive: los invitados verán recuadros vacíos donde haya imágenes.', 'This workspace is online but is not uploading to Drive: guests will see empty frames where the images are.')}
-                      </span>
-                      <button
-                        className="btn lift"
-                        onClick={() => {
-                          setProjects(prev => prev.map(p => p.id === project.id ? { ...p, useGoogleDrive: true } : p));
-                          if (userProfile && userProfile.accessToken) {
-                            uploadToGoogleDriveReal({ ...project, useGoogleDrive: true }, canvases, userProfile.accessToken)
-                              .then(folderId => {
-                                if (folderId) showToast(window.t('Proyecto sincronizado con tu Google Drive (carpeta Odinote).', 'Project synced with your Google Drive (Odinote folder).'));
-                                else showToast(window.t('No se pudo subir a Google Drive.', 'Could not upload to Google Drive.'), 'error');
-                              });
-                          }
-                          window.playAudioTone && window.playAudioTone('click');
-                        }}
-                        style={{ padding: '5px 10px', fontSize: '11px', fontWeight: 700, background: 'var(--olive)', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', flexShrink: 0 }}
-                      >
-                        {window.t('Sincronizar', 'Sync')}
-                      </button>
-                    </div>
-                  )}
-
-                  <div style={{ borderTop: '1px solid var(--line-soft, #E5E1DD)', paddingTop: '16px' }}>
-                    <h4 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: '700', color: 'var(--text-soft)' }}>
-                      {window.t('Colaboradores Invitados', 'Invited Collaborators')}
-                    </h4>
-                    <p style={{ margin: '0 0 10px 0', fontSize: '10.5px', color: 'var(--text-soft, #595459)', lineHeight: 1.4 }}>
-                      {window.t(
-                        'Esto es permanente y va por cuenta de Google: se comparte la carpeta del proyecto en tu Drive y el invitado recibe un correo. No es lo mismo que la sesión en vivo de arriba, que dura lo que dure la conexión.',
-                        'This is permanent and goes by Google account: the project folder in your Drive is shared and the guest gets an email. It is not the same as the live session above, which lasts as long as the connection does.'
-                      )}
-                    </p>
-                    <div style={{ display: 'flex', gap: '6px', marginBottom: '12px' }}>
-                      <input
-                        type="email"
-                        value={inviteEmail}
-                        onChange={(e) => setInviteEmail(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' && !inviteBusy) {
-                            setInviteBusy(true);
-                            inviteCollaboratorByGoogle(project, inviteEmail).then(ok => {
-                              setInviteBusy(false);
-                              if (ok) setInviteEmail('');
-                            });
-                          }
-                        }}
-                        placeholder={window.t('correo@gmail.com del invitado', 'guest email@gmail.com')}
-                        style={{ flex: 1, padding: '7px 10px', fontSize: '12px', border: '1.5px solid var(--line-soft, #D5D1CD)', borderRadius: '6px', background: 'var(--bg-card, #FFFFFF)', color: 'var(--ink, #1A1A1A)' }}
-                      />
-                      <button
-                        className="btn lift"
-                        disabled={inviteBusy}
-                        onClick={() => {
-                          if (inviteBusy) return;
-                          setInviteBusy(true);
-                          inviteCollaboratorByGoogle(project, inviteEmail).then(ok => {
-                            setInviteBusy(false);
-                            if (ok) setInviteEmail('');
-                          });
-                          window.playAudioTone && window.playAudioTone('click');
-                        }}
-                        style={{ padding: '4px 10px', fontSize: '11px', background: 'var(--olive)', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontWeight: '700', opacity: inviteBusy ? 0.6 : 1 }}
-                      >
-                        <span className="material-symbols-rounded" style={{ fontSize: 13 }}>{inviteBusy ? 'hourglass_top' : 'person_add'}</span>
-                        <span>{inviteBusy ? window.t('Invitando...', 'Inviting...') : window.t('Invitar por Google', 'Invite via Google')}</span>
-                      </button>
-                    </div>
-
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '150px', overflowY: 'auto' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 10px', background: 'var(--bg-card)', borderRadius: '6px', border: '1px solid var(--line-soft)' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: 'var(--olive)', color: 'white', display: 'grid', placeItems: 'center', fontSize: '11px', fontWeight: '700' }}>
-                            {userProfile?.name?.charAt(0).toUpperCase() || 'U'}
+                  {compartiendo && (
+                    <>
+                      {/* ── El código, que existe desde el momento en que se comparte ── */}
+                      {!sinAnfitrion && salaCodigo && (
+                        <div style={{ marginTop: '14px' }}>
+                          <div style={{ fontSize: '10.5px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-soft)', marginBottom: '7px' }}>
+                            {window.t('Dale este código a quien quieras', 'Give this code to whoever you want')}
                           </div>
-                          <div>
-                            <span style={{ fontSize: '12px', fontWeight: '700' }}>{userProfile?.name || 'Tú'}</span>
-                            <span style={{ marginLeft: '6px', fontSize: '10px', padding: '1px 4px', background: 'var(--olive-l, #EAEFE2)', color: 'var(--olive)', borderRadius: '3px', fontWeight: '700' }}>
-                              {window.t('Propietario', 'Owner')}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-
-                      {(project.collaborators || []).map((col, cIdx) => (
-                        <div key={cIdx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 10px', background: 'var(--bg-card)', borderRadius: '6px', border: '1px solid var(--line-soft)' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: 'var(--line-soft, #D5D1CD)', color: 'var(--text-soft)', display: 'grid', placeItems: 'center', fontSize: '11px', fontWeight: '700' }}>
-                              {col.name.charAt(0).toUpperCase()}
-                            </div>
-                            <div style={{ display: 'flex', flexDirection: 'column' }}>
-                              <span style={{ fontSize: '12px', fontWeight: '700' }}>{col.name}</span>
-                              <span style={{ fontSize: '9px', color: 'var(--text-soft)' }}>{col.id}</span>
-                            </div>
-                          </div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            <select
-                              value={col.role}
-                              onChange={(e) => {
-                                const nextRole = e.target.value;
-                                setProjects(prev => prev.map(p => {
-                                  if (p.id === project.id) {
-                                    return {
-                                      ...p,
-                                      collaborators: p.collaborators.map(c => c.id === col.id ? { ...c, role: nextRole } : c)
-                                    };
-                                  }
-                                  return p;
-                                }));
-                              }}
-                              style={{ fontSize: '11px', padding: '3px', borderRadius: '4px', border: '1px solid var(--line-soft)' }}
-                            >
-                              <option value="editor">{window.t('Editor', 'Editor')}</option>
-                              <option value="viewer">{window.t('Lector', 'Viewer')}</option>
-                            </select>
+                            <code style={{
+                              flex: 1, fontFamily: 'var(--font-mono, monospace)', fontSize: '20px', fontWeight: 800,
+                              letterSpacing: '0.16em', textAlign: 'center', padding: '9px',
+                              background: 'var(--bg-main, #E5E1DD)', borderRadius: '8px', color: 'var(--ink)',
+                            }}>{salaCodigo}</code>
                             <button
-                              className="icon-btn danger"
+                              className="btn"
                               onClick={() => {
-                                window.customConfirm(window.t('¿Eliminar a este colaborador? También se revocará su acceso a la carpeta de Drive.', 'Remove this collaborator? Their access to the Drive folder will also be revoked.'))
-                                  .then((accepted) => {
-                                    if (accepted) {
-                                      removeCollaboratorByGoogle(project, col);
-                                      window.playAudioTone && window.playAudioTone('click');
-                                    }
-                                  });
+                                copiaAlPortapapeles(salaCodigo);
+                                window.playAudioTone && window.playAudioTone('click');
+                                setCodigoCopiado(true);
+                                setTimeout(() => setCodigoCopiado(false), 1800);
                               }}
-                              style={{ padding: '3px' }}
+                              style={{
+                                display: 'flex', alignItems: 'center', gap: '5px', padding: '9px 12px', borderRadius: '8px',
+                                border: '1.5px solid ' + (codigoCopiado ? 'var(--brand-green, #90B968)' : 'var(--line-soft)'),
+                                color: codigoCopiado ? 'var(--brand-green, #90B968)' : 'inherit',
+                                cursor: 'pointer', fontSize: '12px', fontWeight: 700,
+                              }}
                             >
-                              <span className="material-symbols-rounded" style={{ fontSize: 15 }}>delete</span>
+                              <span className="material-symbols-rounded" style={{ fontSize: 16 }}>{codigoCopiado ? 'check' : 'content_copy'}</span>
+                              <span>{codigoCopiado ? window.t('Copiado', 'Copied') : window.t('Copiar', 'Copy')}</span>
                             </button>
                           </div>
                         </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              )}
+                      )}
 
+                      {/* ── Quién hay dentro, con sus permisos al lado ── */}
+                      {!sinAnfitrion && salaCodigo && (
+                        <div style={{ marginTop: '12px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '7px' }}>
+                            <span style={{ fontSize: '10.5px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-soft)' }}>
+                              {window.t('Dentro ahora', 'In right now')}
+                            </span>
+                            <span style={{ fontSize: '10.5px', color: 'var(--text-soft)' }}>
+                              {salaGente.length <= 1
+                                ? window.t('solo tú, de momento', 'just you, for now')
+                                : window.t(`${salaGente.length} personas`, `${salaGente.length} people`)}
+                            </span>
+                          </div>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', maxHeight: '160px', overflowY: 'auto' }}>
+                            {salaGente.map(persona => {
+                              const soyYo = window.__odiVivo && window.__odiVivo.miUid() === persona.uid;
+                              const rol = persona.rol || 'editor';
+                              return (
+                                <div key={persona.uid} style={{ display: 'flex', alignItems: 'center', gap: '7px', padding: '6px 8px', borderRadius: '7px', background: 'var(--bg-card, #FFFFFF)', border: '1px solid var(--line-soft)' }}>
+                                  <span style={{ width: '9px', height: '9px', borderRadius: '50%', flexShrink: 0, background: (persona.cosmetica && persona.cosmetica.cursor) || persona.color || 'var(--line)' }}/>
+                                  <span style={{ flex: 1, fontSize: '11.5px', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                    {persona.nombre}{soyYo && <span style={{ fontWeight: 500, color: 'var(--text-soft)' }}> {window.t('(tú)', '(you)')}</span>}
+                                  </span>
+                                  {persona.anfitrion ? (
+                                    <span style={{ fontSize: '9.5px', padding: '2px 6px', background: 'var(--olive-l, #EAEFE2)', color: 'var(--olive)', borderRadius: '4px', fontWeight: 700 }}>
+                                      {window.t('Anfitrión', 'Host')}
+                                    </span>
+                                  ) : salaAnfitrion ? (
+                                    <>
+                                      {/* Aquí es donde se decide el permiso: al lado de la
+                                          persona a la que se le está dando, no a ciegas
+                                          antes de que llegue nadie. */}
+                                      <div style={{ display: 'flex', borderRadius: '999px', overflow: 'hidden', border: '1.5px solid var(--line-soft, #D5D1CD)', flexShrink: 0 }}>
+                                        {[
+                                          { id: 'editor', icono: 'edit', texto: window.t('Editor', 'Editor') },
+                                          { id: 'lector', icono: 'visibility', texto: window.t('Lector', 'Reader') },
+                                        ].map(op => (
+                                          <button
+                                            key={op.id}
+                                            className="btn"
+                                            onClick={() => { if (rol !== op.id) cambiaRolEnSala(persona.uid, op.id); }}
+                                            style={{
+                                              display: 'flex', alignItems: 'center', gap: '3px', padding: '2px 8px',
+                                              border: 'none', cursor: 'pointer', fontSize: '10px', fontWeight: 700,
+                                              background: rol === op.id ? 'var(--olive, #6A8546)' : 'transparent',
+                                              color: rol === op.id ? '#FFFFFF' : 'var(--text-soft)',
+                                            }}
+                                          >
+                                            <span className="material-symbols-rounded" style={{ fontSize: 12 }}>{op.icono}</span>
+                                            <span>{op.texto}</span>
+                                          </button>
+                                        ))}
+                                      </div>
+                                      <button className="icon-btn danger" title={window.t('Sacar de la sesión', 'Remove from session')} onClick={() => expulsaDeSala(persona)} style={{ padding: '2px' }}>
+                                        <span className="material-symbols-rounded" style={{ fontSize: 15 }}>person_remove</span>
+                                      </button>
+                                    </>
+                                  ) : (
+                                    <span style={{ fontSize: '9.5px', padding: '2px 6px', background: 'var(--bg-main, #E5E1DD)', color: 'var(--text-soft)', borderRadius: '4px', fontWeight: 700 }}>
+                                      {rol === 'lector' ? window.t('Solo lectura', 'Read only') : window.t('Editor', 'Editor')}
+                                    </span>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* ── El segundo interruptor: sin anfitrión ── */}
+                      <div style={{
+                        marginTop: '14px', padding: '11px', borderRadius: '8px',
+                        border: '1.5px solid ' + (sinAnfitrion ? 'var(--brand-green, #90B968)' : 'var(--line-soft, #D5D1CD)'),
+                        background: sinAnfitrion ? 'rgba(144, 185, 104, 0.10)' : 'transparent',
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span className="material-symbols-rounded" style={{ fontSize: 18, color: sinAnfitrion ? 'var(--brand-green, #90B968)' : 'var(--text-soft)' }}>bolt</span>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <strong style={{ fontSize: '12.5px' }}>{window.t('Sin anfitrión', 'No host')}</strong>
+                            <div style={{ fontSize: '11px', color: 'var(--text-soft)', lineHeight: 1.4 }}>
+                              {sinAnfitrion
+                                ? window.t('Está siempre abierto. No hace falta que tú estés, pero no se ven los cursores.', 'Always open. You do not need to be here, but cursors are not shown.')
+                                : window.t('Para que siga abierto aunque tú cierres Odinote. A cambio, no se ven los cursores.', 'So it stays open even when you close Odinote. In exchange, no cursors.')}
+                            </div>
+                          </div>
+                          <button
+                            className="btn lift"
+                            onClick={() => {
+                              if (sinAnfitrion) {
+                                // Vuelve a la sesión normal, con su código.
+                                setProjects(prev => prev.map(p => p.id === project.id ? { ...p, sincroInstantanea: false } : p));
+                                window.playAudioTone && window.playAudioTone('click');
+                                abreSalaEnVivo();
+                                return;
+                              }
+                              window.customConfirm(window.t(
+                                '¿Dejarlo abierto sin anfitrión?\n\n· Se cierra la sesión con código y en su lugar el proyecto queda siempre disponible.\n· El TEXTO de las notas y dónde está cada una se guardan en el servidor de Odinote, no solo en tu Drive. Es lo que permite que siga abierto sin ti.\n· Las imágenes y los audios NO: esos siguen en tu Google Drive.\n· Dejan de verse los cursores.\n· Puedes volver atrás cuando quieras.',
+                                'Leave it open with no host?\n\n· The code session closes and instead the project stays available at all times.\n· The TEXT of the notes and where each one sits are stored on Odinote\'s server, not only in your Drive. That is what keeps it open without you.\n· Images and audio are NOT: those stay in your Google Drive.\n· Cursors stop being shown.\n· You can go back whenever you like.'
+                              )).then((acepta) => {
+                                if (!acepta) return;
+                                if (salaCodigo) cierraSalaEnVivo();
+                                setProjects(prev => prev.map(p => p.id === project.id ? { ...p, sincroInstantanea: true } : p));
+                                window.playAudioTone && window.playAudioTone('click');
+                              });
+                            }}
+                            style={{
+                              padding: '6px 12px', fontSize: '11px', fontWeight: 700, borderRadius: '999px', cursor: 'pointer', flexShrink: 0,
+                              border: '1.5px solid ' + (sinAnfitrion ? 'var(--wine)' : 'var(--olive, #6A8546)'),
+                              background: sinAnfitrion ? 'transparent' : 'transparent',
+                              color: sinAnfitrion ? 'var(--wine)' : 'var(--olive, #6A8546)',
+                            }}
+                          >
+                            {sinAnfitrion ? window.t('Volver a la sesión', 'Back to session') : window.t('Encender', 'Turn on')}
+                          </button>
+                        </div>
+                        <div style={{ marginTop: '7px', fontSize: '10.5px', color: 'var(--text-soft)', lineHeight: 1.4, display: 'flex', alignItems: 'flex-start', gap: '6px' }}>
+                          <span className="material-symbols-rounded" style={{ fontSize: 14, marginTop: 1 }}>dns</span>
+                          <span>{sinAnfitrion
+                            ? window.t('El texto de este proyecto está en el servidor de Odinote. Las imágenes siguen solo en tu Drive.', 'This project\'s text is on Odinote\'s server. Images remain only in your Drive.')
+                            : window.t('Esto usa el servidor de Odinote. Sin encenderlo, nada sale de tu Drive ni de tu equipo.', 'This uses Odinote\'s server. Left off, nothing leaves your Drive or your machine.')}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* ── Y por último, el acceso permanente por cuenta de Google ── */}
+                      <div style={{ marginTop: '14px', paddingTop: '12px', borderTop: '1px solid var(--line-soft)' }}>
+                        <div style={{ fontSize: '10.5px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-soft)', marginBottom: '7px' }}>
+                          {window.t('Además, acceso permanente por Google', 'Also, permanent access by Google')}
+                        </div>
+                        <div style={{ display: 'flex', gap: '6px', marginBottom: '6px' }}>
+                          <input
+                            type="email"
+                            value={inviteEmail}
+                            onChange={(e) => setInviteEmail(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' && !inviteBusy) {
+                                setInviteBusy(true);
+                                inviteCollaboratorByGoogle(project, inviteEmail).then(ok => { setInviteBusy(false); if (ok) setInviteEmail(''); });
+                              }
+                            }}
+                            placeholder={window.t('correo@gmail.com del invitado', 'guest email@gmail.com')}
+                            style={{ flex: 1, padding: '7px 10px', fontSize: '12px', border: '1.5px solid var(--line-soft, #D5D1CD)', borderRadius: '6px', background: 'var(--bg-card, #FFFFFF)', color: 'var(--ink, #1A1A1A)' }}
+                          />
+                          <button
+                            className="btn lift"
+                            disabled={inviteBusy}
+                            onClick={() => {
+                              if (inviteBusy) return;
+                              setInviteBusy(true);
+                              inviteCollaboratorByGoogle(project, inviteEmail).then(ok => { setInviteBusy(false); if (ok) setInviteEmail(''); });
+                              window.playAudioTone && window.playAudioTone('click');
+                            }}
+                            style={{ padding: '4px 10px', fontSize: '11px', background: 'var(--olive)', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 700, opacity: inviteBusy ? 0.6 : 1 }}
+                          >
+                            <span className="material-symbols-rounded" style={{ fontSize: 13 }}>{inviteBusy ? 'hourglass_top' : 'person_add'}</span>
+                            <span>{inviteBusy ? window.t('Invitando…', 'Inviting…') : window.t('Invitar', 'Invite')}</span>
+                          </button>
+                        </div>
+                        <p style={{ margin: '0 0 8px 0', fontSize: '10.5px', color: 'var(--text-soft)', lineHeight: 1.4 }}>
+                          {window.t(
+                            'Esto no caduca con la sesión: se comparte la carpeta en tu Drive y esa cuenta entra siempre, hasta que se lo quites.',
+                            'This does not expire with the session: the folder in your Drive is shared and that account can always get in, until you take it away.'
+                          )}
+                        </p>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', maxHeight: '120px', overflowY: 'auto' }}>
+                          {(project.collaborators || []).map((col, cIdx) => (
+                            <div key={cIdx} style={{ display: 'flex', alignItems: 'center', gap: '7px', padding: '6px 8px', borderRadius: '7px', background: 'var(--bg-card, #FFFFFF)', border: '1px solid var(--line-soft)' }}>
+                              <div style={{ width: '20px', height: '20px', borderRadius: '50%', background: 'var(--line-soft, #D5D1CD)', color: 'var(--text-soft)', display: 'grid', placeItems: 'center', fontSize: '9.5px', fontWeight: 700, flexShrink: 0 }}>
+                                {col.name.charAt(0).toUpperCase()}
+                              </div>
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ fontSize: '11.5px', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{col.name}</div>
+                                <div style={{ fontSize: '9px', color: 'var(--text-soft)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{col.id}</div>
+                              </div>
+                              <button
+                                className="icon-btn danger"
+                                title={window.t('Quitarle el acceso', 'Remove their access')}
+                                onClick={() => {
+                                  window.customConfirm(window.t('¿Eliminar a este colaborador? También se revocará su acceso a la carpeta de Drive.', 'Remove this collaborator? Their access to the Drive folder will also be revoked.'))
+                                    .then((accepted) => { if (accepted) { removeCollaboratorByGoogle(project, col); window.playAudioTone && window.playAudioTone('click'); } });
+                                }}
+                                style={{ padding: '2px', flexShrink: 0 }}
+                              >
+                                <span className="material-symbols-rounded" style={{ fontSize: 15 }}>delete</span>
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </>
+                  )}
+
+                  {salaError && (
+                    <p style={{ margin: '10px 0 0 0', fontSize: '11.5px', color: 'var(--wine, #E6544F)', lineHeight: 1.4 }}>{salaError}</p>
+                  )}
+                </div>
+                );
+              })()}
               <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '20px', borderTop: '1px solid var(--line-soft)', paddingTop: '12px' }}>
                 <button
                   className="btn btn-ghost"
