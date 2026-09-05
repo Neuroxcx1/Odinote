@@ -1,6 +1,6 @@
 {
   "name": "odinote",
-  "version": "1.0.8",
+  "version": "1.0.8.1",
   "description": "Tu mente, ordenada en canvases anidados libres e infinitos.",
   "main": "main.js",
   "scripts": {
