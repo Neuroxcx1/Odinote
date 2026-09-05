@@ -1435,7 +1435,6 @@ function RenameProjectModal({ project, lang, onClose, onSave, onTogglePublic, us
   // Derivado del proyecto real: poner Online es asíncrono (sube a Drive primero),
   // así que un estado local aquí se quedaba desfasado y mostraba "Offline" a proyectos online
   const isPublic = !!project.isPublic;
-  const [copied, setCopied] = useStateHome(false);
 
   const submit = () => {
     const trimmed = name.trim();
@@ -1530,46 +1529,6 @@ function RenameProjectModal({ project, lang, onClose, onSave, onTogglePublic, us
               {isPublic ? window.t('Poner Offline', 'Put Offline') : window.t('Poner Online', 'Put Online')}
             </button>
           </div>
-          
-          {isPublic && (
-            <div style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '6px', textAlign: 'left' }}>
-              <label style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-soft, #595459)' }}>
-                {window.t('Token de invitación (Comparte esto)', 'Invitation Token (Share this)')}
-              </label>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 12px', background: 'var(--bg-main, #FAF9F6)', border: '1.5px solid var(--line-soft, #E5E1DD)', borderRadius: '8px' }}>
-                <code style={{ flex: 1, fontFamily: 'monospace', fontSize: '12px', fontWeight: '700', color: 'var(--ink, #1A1A1A)', overflowX: 'auto', whiteSpace: 'nowrap' }}>
-                  {project.shareToken || project.id}
-                </code>
-                <button
-                  className="btn lift"
-                  onClick={() => {
-                    navigator.clipboard.writeText(project.shareToken || project.id);
-                    setCopied(true);
-                    window.playAudioTone && window.playAudioTone('click');
-                    setTimeout(() => setCopied(false), 2000);
-                  }}
-                  style={{
-                    padding: '6px 12px',
-                    fontSize: '11px',
-                    fontWeight: '700',
-                    border: '1.5px solid var(--line)',
-                    borderRadius: '6px',
-                    cursor: 'pointer',
-                    background: copied ? '#6A8546' : '#FFFFFF',
-                    color: copied ? '#FFFFFF' : '#1A1A1A',
-                    transition: 'all 0.2s ease'
-                  }}
-                >
-                  {copied ? window.t('¡Copiado!', 'Copied!') : window.t('Copiar', 'Copy')}
-                </button>
-              </div>
-              {copied && (
-                <div style={{ fontSize: '11px', color: '#6A8546', fontWeight: '700', marginTop: '4px', textAlign: 'left', animation: 'fadeIn 0.2s ease' }}>
-                  ✓ {window.t('Copiado al portapapeles', 'Copied to clipboard')}
-                </div>
-              )}
-            </div>
-          )}
         </div>
 
         <div className="modal-actions" style={{ marginTop: '20px' }}>
