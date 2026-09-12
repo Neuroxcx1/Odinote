@@ -169,22 +169,14 @@ function GraphView({ open, onClose, projects, canvases, projectId, lang, onGoTo 
     return () => window.removeEventListener('keydown', onKey);
   }, [open, onClose]);
 
-  if (!open) return null;
-
-  const pos = posRef.current;
-  const porId = new Map(pos.map(p => [p.id, p]));
-  const nodoPorId = new Map(grafo.nodes.map(n => [n.id, n]));
-  const radio = (n) => 4.5 + Math.min(13, Math.sqrt(n.degree) * 3.4) + (n.isBoard ? 2 : 0);
-
-  // Un color por capa de anidamiento. La escala va de cálido a frío según se
-  // baja: lo de arriba pesa y salta a la vista, lo enterrado se retira. Antes
-  // todo era lavanda salvo los tableros en rojo, y no se veía a qué nivel
-  // pertenecía cada bola.
-  const color = (n) => CAPAS[(n.depth || 0) % CAPAS.length];
-  // Qué capas hay de verdad en este proyecto, para no pintar una leyenda con
-  // siete colores cuando solo se usan dos.
-  const capasUsadas = Array.from(new Set(grafo.nodes.map(n => n.depth || 0))).sort((a, b) => a - b);
-
+  // ── Todo lo que sea un hook, POR ENCIMA del return de abajo ──
+  //
+  // React exige que en cada repintado se llamen los mismos hooks y en el mismo
+  // orden. Si uno se cuela detrás del "return null" de más abajo, con la vista
+  // cerrada no se llama, y al abrirla React se encuentra con más hooks de los
+  // que tenía: revienta con el error 310 y se lleva por delante la aplicación
+  // entera, no solo el grafo. Pasó de verdad al meter aquí el cálculo de los
+  // vecinos. Lo vigila una comprobación en scripts/test-graph.js.
   // ── Los vecinos, calculados una vez y no una vez por bola ──
   //
   // Esto es lo que hacía que la vista se atascara JUSTO al pasar el ratón por
@@ -205,6 +197,23 @@ function GraphView({ open, onClose, projects, canvases, projectId, lang, onGoTo 
   }, [hover, grafo]);
 
   const conectado = (id) => !hover || hover === id || vecinosDelSenalado.has(id);
+
+  if (!open) return null;
+
+  const pos = posRef.current;
+  const porId = new Map(pos.map(p => [p.id, p]));
+  const nodoPorId = new Map(grafo.nodes.map(n => [n.id, n]));
+  const radio = (n) => 4.5 + Math.min(13, Math.sqrt(n.degree) * 3.4) + (n.isBoard ? 2 : 0);
+
+  // Un color por capa de anidamiento. La escala va de cálido a frío según se
+  // baja: lo de arriba pesa y salta a la vista, lo enterrado se retira. Antes
+  // todo era lavanda salvo los tableros en rojo, y no se veía a qué nivel
+  // pertenecía cada bola.
+  const color = (n) => CAPAS[(n.depth || 0) % CAPAS.length];
+  // Qué capas hay de verdad en este proyecto, para no pintar una leyenda con
+  // siete colores cuando solo se usan dos.
+  const capasUsadas = Array.from(new Set(grafo.nodes.map(n => n.depth || 0))).sort((a, b) => a - b);
+
 
   // ── Por qué el brillo cambia de técnica en los grafos grandes ──
   //

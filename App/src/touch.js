@@ -72,6 +72,38 @@
     if (mq.addEventListener) mq.addEventListener('change', applyEnvFlags);
   }
 
+  // ── Al volver a la aplicación desde otra ──
+  //
+  // Dentro de un APK esto pasa constantemente: sales a WhatsApp, vuelves, y la
+  // interfaz aparece descolocada —la barra de búsqueda en su sitio de antes—
+  // hasta que tocas la pantalla y algo la obliga a recolocarse.
+  //
+  // El motivo es que mientras la aplicación está en segundo plano Android puede
+  // cambiarle el tamaño a la ventana (la barra de estado, la de navegación, un
+  // teclado que se quedó abierto) y al volver no siempre llega un `resize`: la
+  // página se despierta creyendo que mide lo que medía al salir.
+  //
+  // Así que al volver se vuelven a mirar las medidas. El `resize` de mentira es
+  // para los trozos de la aplicación que se apuntaron al evento en vez de a
+  // estas banderas, y el doble aviso —al momento y medio segundo después— es
+  // porque el teléfono tarda un poco en dar las medidas definitivas: preguntar
+  // solo al instante devuelve las de antes.
+  const alVolver = () => {
+    applyEnvFlags();
+    try { window.dispatchEvent(new Event('resize')); } catch (e) {}
+    setTimeout(() => {
+      applyEnvFlags();
+      try { window.dispatchEvent(new Event('resize')); } catch (e) {}
+    }, 450);
+  };
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) alVolver(); });
+  window.addEventListener('pageshow', alVolver);
+  window.addEventListener('focus', alVolver);
+  // Capacitor avisa con los suyos propios, que llegan antes que visibilitychange
+  // cuando la aplicación se restaura desde la lista de recientes.
+  document.addEventListener('resume', alVolver);
+  document.addEventListener('deviceready', alVolver);
+
   window.odiIsMobile = isMobile;
   window.odiIsTouch = isCoarse;
 

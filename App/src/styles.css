@@ -2491,6 +2491,18 @@ body.odi-busy iframe { pointer-events: none !important; }
 .connector-handle.anchor-slide:hover { r: 8; }
 .connector-handle.seg-move { fill: var(--paper); stroke: var(--wine); stroke-width: 2.5; }
 .connector-handle.seg-move:hover { fill: var(--wine); }
+
+/* ── Las líneas, con el dedo ──
+   Un tirador de 8px de radio se apunta bien con un ratón, que señala un punto
+   exacto. Con el dedo es imposible: la yema cubre unos 40px y tapa justo lo que
+   quiere tocar. Aquí crecen los tiradores y, sobre todo, la franja invisible con
+   la que se agarra la línea — que es lo que quita la necesidad de puntería. En
+   el escritorio no cambia nada. */
+html[data-mobile="1"] .connector-handle { r: 13; stroke-width: 2.5; }
+html[data-mobile="1"] .connector-handle.waypoint { r: 12; }
+html[data-mobile="1"] .connector-handle.anchor-slide,
+html[data-mobile="1"] .connector-handle.anchor-slide:hover { r: 12; }
+html[data-mobile="1"] .connector-hit { stroke-width: 40; }
 .arrowhead { fill: var(--ink); }
 .connector-path.selected ~ .arrowhead { fill: var(--olive); }
 /* Dotted "covered" segment (center → node edge), drawn on top of the node */
@@ -5005,7 +5017,13 @@ html[data-mobile="1"] .tools {
   top: auto;
   right: max(6px, env(safe-area-inset-right));
   bottom: calc(78px + env(safe-area-inset-bottom));
-  max-height: calc(100dvh - 148px);
+  /* Tope de altura: el raíl crece hacia arriba desde donde llega el pulgar, y
+     en horizontal la pantalla es tan baja que acababa montándose sobre la barra
+     de búsqueda. La cuenta reserva lo de abajo (78 de separación) y lo de arriba
+     (la barra de búsqueda con su aire), más lo que se quede el sistema por los
+     dos lados. Si no caben todas las herramientas el raíl se desplaza, que para
+     eso lleva overflow. */
+  max-height: calc(100dvh - 140px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
   flex-direction: column;
   align-items: center;
   gap: 4px;
@@ -5111,10 +5129,15 @@ html[data-mobile="1"] .status-bar .status-pill:not(.privacy-status-pill):not(.ac
    terminar antes o queda medio tapado (y parecía que se salía del marco). */
 html[data-mobile="1"] .mini-search {
   width: auto;
-  left: 8px;
+  left: max(8px, env(safe-area-inset-left));
   right: 76px;
   transform: none;
-  top: 8px;
+  /* Por DEBAJO de la barra de estado del teléfono, no detrás de ella.
+     Android dibuja la aplicación de borde a borde, así que con top:8px la barra
+     de búsqueda quedaba tapada por el reloj y la batería: se veía, pero el dedo
+     no llegaba, porque quien recibe el toque ahí arriba es el sistema. Lo mismo
+     valdrá el día que alguien la abra en un iPhone con muesca. */
+  top: calc(8px + env(safe-area-inset-top));
 }
 html[data-mobile="1"] .place-hint {
   top: auto;
@@ -5461,7 +5484,7 @@ html[data-mobile="1"][data-orient="landscape"] .ctx-side .ctx-btn {
 html[data-mobile="1"][data-orient="landscape"] .ctx-side .ctx-btn > span:not(.material-symbols-rounded) {
   display: none;
 }
-html[data-mobile="1"][data-orient="landscape"] .mini-search { top: 6px; }
+html[data-mobile="1"][data-orient="landscape"] .mini-search { top: calc(6px + env(safe-area-inset-top)); }
 /* Los desplegables de la barra del nodo (paleta, emoji…) se abren hacia arriba
    para no salirse por abajo. */
 html[data-mobile="1"][data-orient="landscape"] .ctx-side .ctx-popout {

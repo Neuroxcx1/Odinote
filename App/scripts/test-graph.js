@@ -306,6 +306,25 @@ check('un nodo borrado desaparece de las posiciones',
 
 check('acomodar aguanta que no le den nada', G.acomoda({}).length === 0);
 
+
+// ══ Que ningún hook se cuele por debajo del "return null" ══
+//
+// Esto se añade porque pasó: al mover el cálculo de los vecinos, el useMemo
+// quedó DEBAJO del "if (!open) return null" de GraphView. Con la vista cerrada
+// ese hook no se llama; al abrirla, React se encuentra con más hooks que en el
+// repintado anterior y revienta con el error 310 — y no se cae solo el grafo, se
+// cae la aplicación entera.
+//
+// No lo pilló ninguna prueba porque el banco de pruebas siempre dibujaba la
+// vista ABIERTA, y así el fallo no existe. Se mira el texto del archivo, que es
+// lo único que se puede mirar sin montar React entero.
+const fuente = require('fs').readFileSync(path.join(__dirname, '..', 'src', 'GraphView.jsx'), 'utf-8');
+const corte = fuente.indexOf('if (!open) return null;');
+check('GraphView sigue teniendo su salida temprana', corte > 0);
+const colados = (fuente.slice(corte).match(/React\.(useMemo|useState|useEffect|useRef|useCallback|useReducer)/g) || []);
+check('ningún hook por debajo del return null (si no, error 310 al abrir el grafo)',
+  colados.length === 0, colados.length ? 'colados: ' + colados.join(', ') : 'ninguno');
+
 console.log(fallos ? `\n${fallos} FALLOS` : '\nTodo correcto');
 
 process.exit(fallos ? 1 : 0);
