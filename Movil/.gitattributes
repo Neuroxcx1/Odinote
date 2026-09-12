@@ -1,0 +1,5 @@
+# gradlew es un script de shell. Si git lo pasa a finales de linea de Windows,
+# en Linux o Mac no arranca y el error no menciona nada de esto. Aqui se compila
+# en Windows con gradlew.bat, pero el dia que alguien clone el repositorio en
+# otro sistema, esto le ahorra media hora.
+android/gradlew text eol=lf
