@@ -444,7 +444,25 @@
       ctrlKey: false, shiftKey: false, altKey: false, metaKey: false,
     });
     ev.odiSynthetic = true;
-    target.dispatchEvent(ev);
+
+    // ── Si el elemento de donde salió el dedo ya no existe ──
+    //
+    // Un evento lanzado sobre un elemento que React ya ha quitado de la página
+    // no sube a ninguna parte: no llega al documento ni a window. Y quien
+    // estuviera esperando el "soltar" allí arriba se queda esperando para
+    // siempre.
+    //
+    // Así se quedaba trabado el lienzo al arrastrar una herramienta: al empezar
+    // el arrastre se cierra el menú del que la sacaste, con lo que el botón
+    // desaparece; al levantar el dedo, el mouseup se lanzaba sobre ese botón
+    // fantasma y no lo oía nadie. El resultado: la herramienta armada para
+    // siempre, el fantasma pegado al dedo y el lienzo sin responder.
+    //
+    // Con el ratón esto no pasa nunca, porque el navegador reparte sus eventos
+    // a lo que hay debajo del cursor en ese momento. Aquí se hace lo mismo.
+    let destino = target;
+    if (destino && destino.isConnected === false) destino = targetUnder(touch) || document;
+    destino.dispatchEvent(ev);
     return ev;
   }
 

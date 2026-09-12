@@ -5114,8 +5114,21 @@ html[data-mobile="1"] .zoom-ctrls {
   border-radius: 10px;
 }
 html[data-mobile="1"] .zoom-ctrls button { padding: 9px 12px; font-size: 14px; }
+/* Fuera el menos y el más: en un teléfono se acerca y se aleja pellizcando, que
+   es más rápido y más fino que dar toques de diez en diez. Queda el porcentaje,
+   que además sigue sirviendo de botón para volver al 100%. */
+html[data-mobile="1"] .zoom-ctrls button:not(.zoom-level) { display: none; }
+html[data-mobile="1"] .zoom-ctrls .zoom-level { border-right: none; }
 /* Lleva la posición en estilo inline (right:160px), así que hace falta
    !important para sacarlo de en medio de las pastillas. */
+/* El desplegable se abre hacia la IZQUIERDA (right:0 en su estilo), y en el
+   móvil el botón está pegado al borde izquierdo: la paleta se salía de la
+   pantalla y se veía cortada por la mitad. Aquí se abre hacia la derecha, que
+   es donde hay sitio. */
+html[data-mobile="1"] .canvas-bg-selector .ctx-popout {
+  left: 0 !important;
+  right: auto !important;
+}
 html[data-mobile="1"] .canvas-bg-selector {
   left: 156px !important;
   right: auto !important;
@@ -5140,6 +5153,31 @@ html[data-mobile="1"] .status-bar .status-pill:not(.privacy-status-pill):not(.ac
 }
 /* El raíl flota sobre el lienzo por la derecha: el buscador tiene que
    terminar antes o queda medio tapado (y parecía que se salía del marco). */
+/* ── El buscador, plegado hasta que se necesita ──
+   En un teléfono esta barra se comía todo el ancho de arriba a todas horas para
+   algo que se usa de vez en cuando. Plegada es solo la lupa; se toca y se abre,
+   se toca fuera o la lupa otra vez y se cierra. En el escritorio no se pliega:
+   allí sobra sitio, y tenerla a la vista es lo que hace que se use. */
+.mini-search-lupa {
+  display: inline-flex; align-items: center; justify-content: center;
+  flex: 0 0 auto;
+  background: none; border: 0; padding: 0; margin: 0;
+  cursor: pointer; color: inherit;
+}
+html[data-mobile="1"] .mini-search.plegada {
+  right: auto;
+  width: 46px;
+  padding: 5px;
+  gap: 0;
+  justify-content: center;
+}
+html[data-mobile="1"] .mini-search.plegada input,
+html[data-mobile="1"] .mini-search.plegada .mini-search-global,
+html[data-mobile="1"] .mini-search.plegada > button:not(.mini-search-lupa) {
+  display: none;
+}
+html[data-mobile="1"] .mini-search.plegada .mini-search-lupa { padding: 4px; }
+
 html[data-mobile="1"] .mini-search {
   width: auto;
   left: max(8px, env(safe-area-inset-left));
@@ -5152,12 +5190,28 @@ html[data-mobile="1"] .mini-search {
      valdrá el día que alguien la abra en un iPhone con muesca. */
   top: calc(8px + env(safe-area-inset-top));
 }
+/* El aviso de "arrastra para darle tamaño" salía como un cartelón en mitad de
+   la pantalla, tapando justo el sitio donde ibas a poner el nodo. Abajo y
+   pequeño: se lee igual y no estorba. */
 html[data-mobile="1"] .place-hint {
   top: auto;
-  bottom: calc(150px + env(safe-area-inset-bottom));
+  bottom: calc(96px + env(safe-area-inset-bottom));
   left: 8px; right: 76px;
   transform: none;
   justify-content: center;
+  font-size: 11.5px;
+  padding: 6px 10px;
+  gap: 7px;
+  border: 0;
+  opacity: 0.94;
+}
+/* En horizontal sobra ancho y falta alto: se queda centrado abajo, sin llegar
+   ni al zoom de la izquierda ni al botón de añadir de la derecha. */
+html[data-mobile="1"][data-orient="landscape"] .place-hint {
+  bottom: calc(8px + env(safe-area-inset-bottom));
+  left: 50%; right: auto;
+  transform: translateX(-50%);
+  max-width: min(70vw, 420px);
 }
 
 /* La barra de formato/acciones del nodo seleccionado era una columna estrecha
@@ -5476,8 +5530,20 @@ html[data-mobile="1"][data-orient="landscape"] .canvas-bg-selector {
   bottom: calc(52px + env(safe-area-inset-bottom)) !important;
 }
 /* Las pastillas de estado son puramente informativas: en horizontal el alto es
-   demasiado escaso para gastarlo en ellas. */
-html[data-mobile="1"][data-orient="landscape"] .status-bar { display: none; }
+   demasiado escaso para gastarlo en ellas.
+   Pero el botón de conexiones vive en esa misma barra y NO es informativo: es
+   la única puerta a la vista de conexiones, así que escondiendo la barra entera
+   se perdía. Se esconde lo informativo y él se queda, abajo a la derecha, al
+   lado del botón de añadir. */
+html[data-mobile="1"][data-orient="landscape"] .status-bar {
+  display: flex;
+  left: auto;
+  right: 76px;
+  bottom: calc(8px + env(safe-area-inset-bottom));
+  pointer-events: none;
+}
+html[data-mobile="1"][data-orient="landscape"] .status-bar > *:not(.odi-graph-btn) { display: none; }
+html[data-mobile="1"][data-orient="landscape"] .status-bar .odi-graph-btn { pointer-events: auto; }
 
 html[data-mobile="1"][data-orient="landscape"] .ctx-side,
 html[data-mobile="1"][data-orient="landscape"] .ctx-side.text-format,

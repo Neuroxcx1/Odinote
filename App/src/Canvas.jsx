@@ -1050,6 +1050,30 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
   const [captionFocusId, setCaptionFocusId] = useStateCanvas(null); // node whose rich caption ("leyenda") is focused
   const [zOrder, setZOrder] = useStateCanvas([]); // node ids in the order they were last touched (last = top layer)
   const [search, setSearch] = useStateCanvas('');
+
+  // ── El buscador del lienzo, plegado en el móvil ──
+  //
+  // En un teléfono la barra ocupaba todo el ancho de arriba a todas horas, para
+  // algo que se usa de vez en cuando. Plegada es solo una lupa; se toca y se
+  // abre, se toca fuera (o la lupa otra vez) y se cierra, como en Windows.
+  //
+  // En el escritorio no cambia nada: allí sobra sitio y tenerla siempre a la
+  // vista es lo que hace que se use.
+  const [buscadorAbierto, setBuscadorAbierto] = useStateCanvas(false);
+  const buscadorRef = useRefCanvas(null);
+  const buscadorInputRef = useRefCanvas(null);
+
+  useEffectCanvas(() => {
+    if (!buscadorAbierto) return;
+    if (buscadorInputRef.current) buscadorInputRef.current.focus();
+    // Tocar fuera lo cierra. En captura, para enterarse aunque quien reciba el
+    // toque lo detenga (el lienzo para de propagar casi todo).
+    const fuera = (e) => {
+      if (buscadorRef.current && !buscadorRef.current.contains(e.target)) setBuscadorAbierto(false);
+    };
+    document.addEventListener('pointerdown', fuera, true);
+    return () => document.removeEventListener('pointerdown', fuera, true);
+  }, [buscadorAbierto]);
   const [activeTool, setActiveTool] = useStateCanvas(null);
   const [contextMenu, setContextMenu] = useStateCanvas(null);
   const [docOpen, setDocOpen] = useStateCanvas(null); // { id, colId? }
@@ -4952,9 +4976,18 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
       if (!dragging && Math.hypot(dx, dy) > 5) dragging = true;
       if (dragging) setToolGhost({ x: ev.clientX, y: ev.clientY, tool: toolId });
     };
+    // Red de seguridad por si el "soltar" nunca llega (ver más abajo): si se
+    // levanta el dedo y nadie lo ha recogido, se cierra igual. El cerrojo evita
+    // que se cree el nodo dos veces cuando llegan los dos avisos.
+    let terminado = false;
+
     const onUp = (ev) => {
+      if (terminado) return;
+      terminado = true;
       window.removeEventListener('mousemove', onMove);
       window.removeEventListener('mouseup', onUp);
+      window.removeEventListener('touchend', onDedoLevantado);
+      window.removeEventListener('touchcancel', onDedoLevantado);
       setToolGhost(null);
       if (!dragging) {
         // Dibujar no se "coloca": se empieza a dibujar. Pulsar el botón y
@@ -5021,8 +5054,19 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
       }
       setActiveTool(null);
     };
+
+    // El dedo levantado, directo del navegador y sin pasar por la traducción a
+    // ratón. Este aviso llega siempre, exista todavía o no el botón del que
+    // estabas arrastrando.
+    const onDedoLevantado = (ev) => {
+      const t = (ev.changedTouches && ev.changedTouches[0]) || null;
+      onUp({ clientX: t ? t.clientX : startX, clientY: t ? t.clientY : startY });
+    };
+
     window.addEventListener('mousemove', onMove);
     window.addEventListener('mouseup', onUp);
+    window.addEventListener('touchend', onDedoLevantado);
+    window.addEventListener('touchcancel', onDedoLevantado);
   };
 
   // ── Paste interceptor: hidden contentEditable that receives paste events when an image node is selected ──
@@ -5828,9 +5872,22 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
         )}
 
         {/* Mini-search */}
-        <div className="mini-search" onMouseDown={(e)=>e.stopPropagation()}>
-          <span className="material-symbols-rounded" style={{color:'var(--ink-3)', fontSize: 17}}>search</span>
-          <input placeholder={window.TRANSLATIONS[lang].search_canvas} value={search} onChange={(e)=>setSearch(e.target.value)}/>
+        <div
+          className={'mini-search ' + (buscadorAbierto ? 'abierta' : 'plegada')}
+          ref={buscadorRef}
+          onMouseDown={(e)=>e.stopPropagation()}
+        >
+          {/* La lupa es un botón de verdad, no un adorno: en el móvil es lo
+              único que se ve cuando está plegada, y es lo que la abre y la
+              cierra. En el escritorio no pliega nada, así que da igual. */}
+          <button
+            className="mini-search-lupa"
+            onClick={() => { setBuscadorAbierto(v => !v); if (buscadorAbierto) setSearch(''); }}
+            title={window.t('Buscar en este lienzo', 'Search this canvas')}
+          >
+            <span className="material-symbols-rounded" style={{color:'var(--ink-3)', fontSize: 17}}>search</span>
+          </button>
+          <input ref={buscadorInputRef} placeholder={window.TRANSLATIONS[lang].search_canvas} value={search} onChange={(e)=>setSearch(e.target.value)}/>
           {/* Puerta al buscador global. En móvil no hay Ctrl+K, así que este
               botón es el único acceso; en escritorio recuerda el atajo. */}
           <button
