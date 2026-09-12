@@ -6,8 +6,7 @@ node_modules/
 # vieja sin que nadie se entere.
 www/
 
-# Los APK ya compilados: pesan y se rehacen en un minuto.
-dist/
+# El APK sale a App/dist/Oddinote-Android, que ya está ignorado por App/.gitignore.
 
 # La ruta del SDK es de este equipo, no del proyecto.
 android/local.properties

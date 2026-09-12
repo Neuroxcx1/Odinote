@@ -27,7 +27,7 @@ if (!fs.existsSync(adb)) {
 }
 
 const version = require(path.resolve(RAIZ, '..', 'App', 'package.json')).version;
-const apk = path.join(RAIZ, 'dist', 'Oddinote-' + version + '.apk');
+const apk = path.resolve(RAIZ, '..', 'App', 'dist', 'Oddinote-Android', 'Oddinote-' + version + '.apk');
 if (!fs.existsSync(apk)) {
   console.error('No hay APK que instalar en ' + apk);
   process.exit(1);

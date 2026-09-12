@@ -17,7 +17,12 @@ const { spawnSync } = require('child_process');
 
 const RAIZ = path.resolve(__dirname, '..');
 const ANDROID = path.join(RAIZ, 'android');
-const DIST = path.join(RAIZ, 'dist');
+
+// El APK sale a App/dist/Oddinote-Android, al lado de las demás entregas: ahí
+// están ya la instalación de diario, pre-release y release. Tener las cosas que
+// se reparten en un sitio y las de Android en otro es como se acaba subiendo a
+// una publicación el archivo de la semana pasada.
+const DIST = path.resolve(RAIZ, '..', 'App', 'dist', 'Oddinote-Android');
 const HERRAMIENTAS = path.join(process.env.USERPROFILE || 'C:\\Users\\USER', 'android-tools');
 
 function buscaJava() {
@@ -85,6 +90,42 @@ const destino = path.join(DIST, 'Oddinote-' + version + '.apk');
 fs.copyFileSync(origen, destino);
 
 const mb = (fs.statSync(destino).size / 1024 / 1024).toFixed(1);
+
+// Un papelito al lado del APK. Se reescribe en cada compilación para que no
+// pueda quedarse contando una versión que ya no es la que hay en la carpeta, y
+// está aquí porque dentro de tres meses nadie se acuerda de qué hacía falta
+// para instalarlo ni de qué cosas no funcionaban todavía.
+const hoy = new Date().toISOString().slice(0, 10);
+const leeme = [
+  'Oddinote ' + version + ' para Android',
+  'Compilado el ' + hoy + ' — ' + mb + ' MB',
+  '',
+  'CÓMO INSTALARLO',
+  '  Pasa el .apk al teléfono (cable, Drive, WhatsApp… da igual) y ábrelo',
+  '  DESDE EL TELÉFONO. Avisará de que viene de una fuente desconocida: hay',
+  '  que darle permiso una vez. Es lo normal fuera de las tiendas.',
+  '',
+  'QUÉ FUNCIONA SIN INTERNET',
+  '  Todo lo de escribir: los tableros y las notas se guardan en el propio',
+  '  teléfono. La aplicación entera va dentro del archivo, no se baja nada.',
+  '',
+  'QUÉ NO FUNCIONA TODAVÍA',
+  '  Entrar con Google, y por tanto Drive, las salas en vivo y la corona.',
+  '  Google bloquea a propósito su ventana de inicio de sesión dentro de una',
+  '  aplicación como esta; hay que rehacerla abriendo el navegador del',
+  '  teléfono. Tampoco está lo que era de Electron: el corrector, el menú del',
+  '  botón derecho y la captura del lienzo a archivo.',
+  '',
+  'PARA PUBLICARLO',
+  '  Sube este .apk tal cual a una publicación de GitHub. Sin comprimir: un',
+  '  APK ya es un archivo comprimido, y metido en un zip el teléfono no puede',
+  '  instalarlo de una pasada.',
+  '',
+  'Se rehace con: npm run apk   (desde la carpeta Movil)',
+  '',
+].join('\r\n');
+fs.writeFileSync(path.join(DIST, 'LEEME.txt'), leeme, 'utf8');
+
 console.log('');
 console.log('APK listo: ' + destino);
-console.log('Pesa ' + mb + ' MB. Pásalo al teléfono y ábrelo desde el propio móvil.');
+console.log('Pesa ' + mb + ' MB. Al lado queda un LEEME.txt con las instrucciones.');
