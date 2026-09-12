@@ -1,0 +1,17 @@
+# Lo que se genera solo y no tiene por qué viajar en el repositorio.
+node_modules/
+
+# www se arma en cada compilación desde App/ (scripts/preparar-web.js).
+# Guardarlo sería tener dos copias de la aplicación entera y que una se quede
+# vieja sin que nadie se entere.
+www/
+
+# Los APK ya compilados: pesan y se rehacen en un minuto.
+dist/
+
+# La ruta del SDK es de este equipo, no del proyecto.
+android/local.properties
+
+# El logo se copia de App/Icon/Icon.png al generar los iconos (npm run iconos).
+# Guardarlo aqui seria tener el icono dos veces, y que un dia no coincidan.
+assets/

@@ -1,0 +1,23 @@
+{
+  "name": "oddinote-movil",
+  "version": "1.0.0",
+  "description": "Oddinote para Android: envoltorio de Capacitor sobre la misma aplicacion de App/",
+  "scripts": {
+    "web": "node scripts/preparar-web.js",
+    "apk": "node scripts/preparar-web.js && cap copy android && node scripts/compilar-apk.js",
+    "movil": "node scripts/preparar-web.js && cap copy android && node scripts/compilar-apk.js && node scripts/instalar-en-movil.js",
+    "iconos": "node -e \"require('fs').mkdirSync('assets',{recursive:true});require('fs').copyFileSync('../App/Icon/Icon.png','assets/logo.png')\" && capacitor-assets generate --android"
+  },
+  "author": "Neuroxcx",
+  "license": "Apache-2.0",
+  "type": "commonjs",
+  "dependencies": {
+    "@capacitor/android": "^8.5.2",
+    "@capacitor/cli": "^8.5.2",
+    "@capacitor/core": "^8.5.2"
+  },
+  "devDependencies": {
+    "@capacitor/assets": "^3.0.5"
+  },
+  "private": true
+}

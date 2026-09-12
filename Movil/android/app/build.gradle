@@ -1,0 +1,68 @@
+apply plugin: 'com.android.application'
+
+// La versión NO se escribe aquí: se lee de App/package.json, que es donde vive
+// la de verdad. Tenerla apuntada dos veces ya costó una campana de "hay versión
+// nueva" que no había forma de apagar, y en Android sale más caro todavía: si
+// el número interno (versionCode) no sube, el teléfono se niega a instalar la
+// nueva encima de la vieja y no dice por qué.
+//
+// De "1.0.8.1" salen los dos: el nombre que se lee tal cual, y el número
+// interno como 1·1000000 + 0·10000 + 8·100 + 1. Así siempre crece al subir
+// cualquiera de las cuatro cifras, y quedan huecos de sobra entre versiones.
+def paqueteApp = new groovy.json.JsonSlurper().parse(file("../../../App/package.json"))
+def versionApp = paqueteApp.version
+def cifras = (versionApp.tokenize('.') + ['0', '0', '0', '0']).take(4)*.toInteger()
+def codigoVersion = cifras[0] * 1000000 + cifras[1] * 10000 + cifras[2] * 100 + cifras[3]
+
+android {
+    namespace = "io.github.neuroxcx1.oddinote"
+    compileSdk = rootProject.ext.compileSdkVersion
+    defaultConfig {
+        applicationId "io.github.neuroxcx1.oddinote"
+        minSdkVersion rootProject.ext.minSdkVersion
+        targetSdkVersion rootProject.ext.targetSdkVersion
+        versionCode codigoVersion
+        versionName versionApp
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        aaptOptions {
+             // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
+             // Default: https://android.googlesource.com/platform/frameworks/base/+/282e181b58cf72b6ca770dc7ca5f91f135444502/tools/aapt/AaptAssets.cpp#61
+            ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
+        }
+    }
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+        }
+    }
+}
+
+repositories {
+    flatDir{
+        dirs '../capacitor-cordova-android-plugins/src/main/libs', 'libs'
+    }
+}
+
+dependencies {
+    implementation fileTree(include: ['*.jar'], dir: 'libs')
+    implementation "androidx.appcompat:appcompat:$androidxAppCompatVersion"
+    implementation "androidx.coordinatorlayout:coordinatorlayout:$androidxCoordinatorLayoutVersion"
+    implementation "androidx.core:core-splashscreen:$coreSplashScreenVersion"
+    implementation project(':capacitor-android')
+    testImplementation "junit:junit:$junitVersion"
+    androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
+    androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"
+    implementation project(':capacitor-cordova-android-plugins')
+}
+
+apply from: 'capacitor.build.gradle'
+
+try {
+    def servicesJSON = file('google-services.json')
+    if (servicesJSON.text) {
+        apply plugin: 'com.google.gms.google-services'
+    }
+} catch(Exception e) {
+    logger.info("google-services.json not found, google-services plugin not applied. Push Notifications won't work")
+}
