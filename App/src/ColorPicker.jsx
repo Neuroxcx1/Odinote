@@ -305,68 +305,147 @@ window.SelectorColor = function SelectorColor({
     </button>
   );
 
-  // La rueda de dentro. Elegir un tono no cambia nada todavía: solo cambia la
-  // fila de abajo. El color se aplica al tocar una claridad, igual que con la
-  // rueda del sistema — se ve al momento y Aceptar es quien lo da por bueno.
-  const ruedaDeDentro = () => (!conDedo || !ruedaAbierta ? null : (
-    <div
-      className="selector-color-rueda"
-      style={{ display: 'flex', flexDirection: 'column', gap: '7px', paddingTop: '2px' }}
+  // Elegir un tono no cambia el color todavía: solo cambia la fila de abajo. El
+  // color se aplica al tocar una claridad —se ve al momento, como con la rueda
+  // del sistema— y Aceptar es quien lo da por bueno.
+
+  // ── La hoja de colores, abajo y a todo lo ancho ──
+  //
+  // Primero la puse dentro del propio panel, y en el de un nodo se veía bien.
+  // Pero el panel de una LÍNEA mide ochenta y pico píxeles: ahí no caben ni dos
+  // tonos seguidos, así que salía una columna de veinticinco bolas más alta que
+  // la pantalla, se desbordaba el panel y ya no había manera ni de cerrarlo.
+  //
+  // Ensancharla dentro de ese panel no se puede. Así que no vive dentro: se
+  // dibuja aparte, pegada abajo y ocupando el ancho de la pantalla, que es donde
+  // los dedos llegan bien y donde caben seis o siete tonos por fila. Va por un
+  // portal al body a propósito: dentro del panel, cualquier antepasado con una
+  // transformación la habría vuelto a encerrar.
+  //
+  // Y se cierra de tres maneras —Aceptar, la X, o tocando fuera—, porque el
+  // fallo que más molestó no fue verla mal: fue no poder quitarla.
+  const enRejillaAncha = {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fill, minmax(38px, 1fr))',
+    gap: '8px',
+  };
+
+  const cierraHoja = (aceptando) => {
+    setRuedaAbierta(false);
+    if (aceptando) {
+      if (eligiendo) elige(eligiendo.actual || valor);
+      return;
+    }
+    // Sin aceptar se deshace, igual que el botón Deshacer de arriba: quien
+    // cierra sin más no quiere quedarse con lo que estaba probando.
+    if (eligiendo) {
+      const previo = eligiendo.previo;
+      setEligiendo(null);
+      devuelveSeleccion();
+      onCambio(previo);
+    }
+  };
+
+  const casillaHoja = (hex, alto) => (
+    <button
+      key={hex}
+      type="button"
+      style={{
+        height: alto + 'px', borderRadius: '9px', padding: 0, cursor: 'pointer',
+        background: hex,
+        border: norm(hex) === actual ? '3px solid var(--wine)' : '1.5px solid var(--line-soft)',
+      }}
       onMouseDown={sinRobarFoco}
-    >
-      <div className="selector-color-rueda-tonos" style={{ ...enFila, gap: '5px' }}>
-        {TONOS_DEDO.map(h => (
-          <button
-            key={h}
-            type="button"
-            style={{
-              width: '22px', height: '22px', borderRadius: '50%', padding: 0, cursor: 'pointer',
-              background: hslAHex(h, 85, 52),
-              border: h === tonoElegido ? '2.5px solid var(--wine)' : '1.5px solid var(--line-soft)',
-            }}
-            onMouseDown={sinRobarFoco}
-            onClick={() => setTonoElegido(h)}
-            aria-label={window.t('Tono ', 'Hue ') + h}
-          />
-        ))}
-      </div>
-      <div className="selector-color-rueda-claridades" style={{ ...enFila, gap: '5px' }}>
-        {CLARIDADES_DEDO.map(({ s, l }) => {
-          const hex = hslAHex(tonoElegido, s, l);
-          return (
+      onClick={() => { enCurso(hex); devuelveSeleccion(); onCambio(hex); }}
+      aria-label={hex}
+    />
+  );
+
+  const ruedaDeDentro = () => {
+    if (!conDedo || !ruedaAbierta) return null;
+    if (!window.ReactDOM || !window.ReactDOM.createPortal) return null;
+    return window.ReactDOM.createPortal(
+      <div
+        className="odi-hoja-color-fondo"
+        style={{ position: 'fixed', inset: 0, zIndex: 900, background: 'rgba(20,18,26,0.42)' }}
+        onMouseDown={(e) => { if (e.target === e.currentTarget) { sinRobarFoco(e); cierraHoja(false); } }}
+      >
+        <div
+          className="odi-hoja-color"
+          style={{
+            position: 'absolute', left: 0, right: 0, bottom: 0,
+            background: 'var(--paper, #FAF9F5)',
+            borderTop: '1.5px solid var(--line)',
+            borderRadius: '16px 16px 0 0',
+            padding: ' 14px 14px calc(14px + env(safe-area-inset-bottom)) 14px',
+            display: 'flex', flexDirection: 'column', gap: '10px',
+            boxShadow: '0 -8px 30px rgba(0,0,0,0.18)',
+          }}
+          onMouseDown={(e) => e.stopPropagation()}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
+            <span style={{ fontSize: '12.5px', fontWeight: 700, color: 'var(--ink, #1A1A1A)' }}>
+              {window.t('Más colores', 'More colours')}
+            </span>
             <button
-              key={s + '-' + l}
               type="button"
               style={{
-                width: (tam + 4) + 'px', height: (tam + 4) + 'px', borderRadius: '7px',
-                padding: 0, cursor: 'pointer', background: hex,
-                border: norm(hex) === actual ? '2.5px solid var(--wine)' : '1.5px solid var(--line-soft)',
+                width: '34px', height: '34px', borderRadius: '9px', padding: 0, lineHeight: 1,
+                border: '1.5px solid var(--line-soft)', background: 'transparent',
+                color: 'var(--ink-3, #595459)', fontSize: '18px', cursor: 'pointer',
               }}
               onMouseDown={sinRobarFoco}
-              onClick={() => { enCurso(hex); devuelveSeleccion(); onCambio(hex); }}
-              aria-label={hex}
-            />
-          );
-        })}
-      </div>
-      <div className="selector-color-rueda-grises" style={{ ...enFila, gap: '5px' }}>
-        {GRISES_DEDO.map(hex => (
+              onClick={() => cierraHoja(false)}
+              title={window.t('Cerrar', 'Close')}
+              aria-label={window.t('Cerrar', 'Close')}
+            >
+              ×
+            </button>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '46vh', overflowY: 'auto', overscrollBehavior: 'contain' }}>
+            <div className="selector-color-rueda-tonos" style={enRejillaAncha}>
+              {TONOS_DEDO.map(h => (
+                <button
+                  key={h}
+                  type="button"
+                  style={{
+                    height: '34px', borderRadius: '50%', padding: 0, cursor: 'pointer',
+                    background: hslAHex(h, 85, 52),
+                    border: h === tonoElegido ? '3px solid var(--wine)' : '1.5px solid var(--line-soft)',
+                  }}
+                  onMouseDown={sinRobarFoco}
+                  onClick={() => setTonoElegido(h)}
+                  aria-label={window.t('Tono ', 'Hue ') + h}
+                />
+              ))}
+            </div>
+            <div className="selector-color-rueda-claridades" style={enRejillaAncha}>
+              {CLARIDADES_DEDO.map(({ s, l }) => casillaHoja(hslAHex(tonoElegido, s, l), 38))}
+            </div>
+            <div className="selector-color-rueda-grises" style={enRejillaAncha}>
+              {GRISES_DEDO.map(hex => casillaHoja(hex, 34))}
+            </div>
+          </div>
+
           <button
-            key={hex}
             type="button"
             style={{
-              width: (tam + 4) + 'px', height: (tam + 4) + 'px', borderRadius: '7px',
-              padding: 0, cursor: 'pointer', background: hex,
-              border: norm(hex) === actual ? '2.5px solid var(--wine)' : '1.5px solid var(--line-soft)',
+              padding: '12px', borderRadius: '10px', border: 'none',
+              background: acento || 'var(--olive, #6A8546)', color: acentoTexto || '#FFF',
+              fontWeight: 700, fontSize: '13.5px', cursor: 'pointer',
             }}
             onMouseDown={sinRobarFoco}
-            onClick={() => { enCurso(hex); devuelveSeleccion(); onCambio(hex); }}
-            aria-label={hex}
-          />
-        ))}
-      </div>
-    </div>
-  ));
+            onClick={() => cierraHoja(true)}
+          >
+            {window.t('Aceptar', 'Accept')}
+          </button>
+        </div>
+      </div>,
+      document.body
+    );
+  };
+
 
   // Aceptar y Deshacer. Van ARRIBA del todo y no al final: la ventana del
   // sistema se abre junto al arcoíris, que está abajo, así que este botón se
