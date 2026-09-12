@@ -1370,7 +1370,20 @@ body[data-patrocinador="1"] .board-preview-item {
    CANVAS surface
    ============================================ */
 .canvas-wrap {
-  flex: 1; position: relative; overflow: hidden;
+  flex: 1; position: relative;
+  /* clip, no hidden. Con overflow:hidden el contenedor SIGUE siendo
+     desplazable por dentro: el navegador lo desplaza por su cuenta cuando algo
+     de dentro recibe el foco, para traerlo a la vista, y no lo devuelve. Como
+     todo lo colocado dentro se mueve con el, la barra de busqueda y la paleta
+     se salian de la pantalla por la izquierda mientras el rail (fixed) se
+     quedaba en su sitio. Habia una red de seguridad que lo devolvia a cero,
+     pero el navegador volvia a desplazarlo y ganaba el.
+     Con clip el contenedor deja de ser desplazable y no hay pelea. Medido en un
+     telefono: con hidden, scrollLeft=200 se quedaba y la barra iba a x=-192;
+     con clip, scrollLeft se queda en 0 y la barra en x=8.
+     El hidden de delante es para los WebView viejos que no entienden clip. */
+  overflow: hidden;
+  overflow: clip;
   background-color: var(--bg);
   /* Tiny triangle grid (distinct from Milanote's dot grid) */
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='22' height='22'%3E%3Cpath d='M11 9.5L12.6 12.3H9.4Z' fill='%231A1A1A' fill-opacity='0.13'/%3E%3C/svg%3E");

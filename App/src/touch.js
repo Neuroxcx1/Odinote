@@ -88,11 +88,41 @@
   // estas banderas, y el doble aviso —al momento y medio segundo después— es
   // porque el teléfono tarda un poco en dar las medidas definitivas: preguntar
   // solo al instante devuelve las de antes.
+  // ── El lienzo no puede desplazarse por dentro. Nunca. ──
+  //
+  // `.canvas-wrap` lleva `overflow: hidden`, y eso hace creer que no se puede
+  // desplazar. No es verdad: el navegador lo desplaza POR SU CUENTA cuando algo
+  // de dentro recibe el foco, para "traerlo a la vista". Y no lo devuelve jamás.
+  //
+  // Como todo lo que va colocado dentro se mueve con él, la barra de búsqueda y
+  // la paleta de colores se salían de la pantalla por la izquierda, mientras el
+  // raíl de nodos —que va fixed— se quedaba tan tranquilo en su sitio. Eso es lo
+  // que se veía como "la interfaz descolocada", y explica que se arreglara sola
+  // al tocar la pantalla: cualquier cosa que devolviera el foco la recolocaba.
+  //
+  // Medido en el teléfono con la aplicación abierta: scrollLeft = 137px y la
+  // barra de búsqueda en x = -129. Poniéndolo a cero, vuelve a x = 8.
+  //
+  // El lienzo ya se mueve con lo suyo (una transformación), así que aquí un
+  // desplazamiento del navegador no es nunca legítimo: se deshace y punto.
+  // De raíz esto lo arregla `overflow: clip` en la hoja de estilos, que impide
+  // que el contenedor se pueda desplazar siquiera. Aquí solo queda el remate
+  // para los WebView viejos que no entienden `clip`, y para el caso de volver a
+  // la aplicación con el lienzo ya torcido de antes.
+  const enderezaLienzo = () => {
+    document.querySelectorAll('.canvas-wrap').forEach((t) => {
+      if (t.scrollLeft) t.scrollLeft = 0;
+      if (t.scrollTop) t.scrollTop = 0;
+    });
+  };
+
   const alVolver = () => {
     applyEnvFlags();
+    enderezaLienzo();
     try { window.dispatchEvent(new Event('resize')); } catch (e) {}
     setTimeout(() => {
       applyEnvFlags();
+      enderezaLienzo();
       try { window.dispatchEvent(new Event('resize')); } catch (e) {}
     }, 450);
   };
