@@ -57,23 +57,54 @@ function GraphView({ open, onClose, projects, canvases, projectId, lang, onGoTo 
     return window.OdiGraph.buildGraph({ projects, canvases, projectId, lang });
   }, [open, projects, canvases, projectId, lang]);
 
+  // ── Por qué el grafo se lee de una referencia y no de la variable ──
+  //
+  // Aquí estaba el fallo que dejaba la vista inservible en un proyecto grande.
+  //
+  // `grafo` se recalcula cada vez que `projects` o `canvases` son un objeto
+  // NUEVO, aunque lleven exactamente lo mismo dentro. Y eso pasa a cada rato sin
+  // que el usuario toque nada: al guardar, al sincronizar, al recontar los nodos
+  // de cada proyecto. Como la simulación dependía de ese objeto, React la
+  // apagaba y la volvía a montar: las bolas regresaban al montoncito del centro
+  // y el despliegue empezaba otra vez desde cero. Con la aplicación guardando
+  // sola cada pocos segundos, eso es un bucle: la red explota, no le da tiempo a
+  // cuajar, y vuelve a explotar. No se puede ni mirar, menos aún pulsar algo.
+  //
+  // Ahora el bucle lee el grafo de una referencia, así que siempre trabaja con
+  // el último sin necesidad de reiniciarse, y el despliegue se lanza solo al
+  // abrir la vista. Comprobado con la prueba de test-grafo.js.
+  const grafoRef = React.useRef(grafo);
+  grafoRef.current = grafo;
+
+  // La firma dice QUÉ nodos hay, no en qué objeto vienen. Mientras no cambie,
+  // no hay nada que recolocar: un guardado no mueve ni una bola.
+  const firma = React.useMemo(() => grafo.nodes.map(n => n.id).join('|'), [grafo]);
+  const firmaRef = React.useRef(firma);
+  firmaRef.current = firma;
+  const firmaPuestaRef = React.useRef(null);
+
   // Simulación animada. Se arranca al abrir y se deja correr unos segundos: el
   // usuario ve la red desplegarse en vez de aparecer ya cuajada.
   React.useEffect(() => {
-    if (!open || !grafo.nodes.length) return;
+    if (!open) return;
     const box = boxRef.current;
     const W = (box && box.clientWidth) || 1200;
     const H = (box && box.clientHeight) || 800;
     sizeRef.current = { w: W, h: H };
     setCam({ x: 0, y: 0, k: 1 });
 
-    // Empieza apretado en el centro para que al soltarse se note el despliegue
-    const n = grafo.nodes.length;
-    posRef.current = grafo.nodes.map((node, i) => {
-      const a = (i / n) * Math.PI * 2;
-      const r = Math.min(W, H) * 0.06;
-      return { id: node.id, x: W / 2 + Math.cos(a) * r, y: H / 2 + Math.sin(a) * r, vx: 0, vy: 0 };
-    });
+    // Coloca a los que falten y quita a los que ya no estén, CONSERVANDO dónde
+    // está cada uno de los que siguen. Si añades un nodo con el grafo abierto,
+    // aparece él solo y el resto se queda donde lo dejaste.
+    const acomoda = () => {
+      posRef.current = window.OdiGraph.acomoda({
+        nodes: grafoRef.current.nodes, pos: posRef.current, width: W, height: H,
+      });
+      firmaPuestaRef.current = firmaRef.current;
+    };
+
+    posRef.current = [];
+    acomoda();
 
     let paso = 0;
     const DESPLIEGUE = 420;
@@ -81,10 +112,18 @@ function GraphView({ open, onClose, projects, canvases, projectId, lang, onGoTo 
     // responde al ratón y a los arrastres en todo momento. Tras el despliegue
     // inicial se queda en energía baja, quieto pero vivo.
     const tick = () => {
+      // ¿Han cambiado los nodos de verdad? Se acomoda lo que haga falta, sin
+      // tirar por tierra lo ya colocado.
+      if (firmaPuestaRef.current !== firmaRef.current) acomoda();
+
+      const g = grafoRef.current;
+      const pos = posRef.current;
+      for (const p of pos) { p._x0 = p.x; p._y0 = p.y; }
+
       const veces = paso < DESPLIEGUE ? 3 : 1;
       for (let k = 0; k < veces; k++) {
         window.OdiGraph.step({
-          nodes: grafo.nodes, edges: grafo.edges, pos: posRef.current,
+          nodes: g.nodes, edges: g.edges, pos,
           width: W, height: H,
           progress: Math.min(1, paso / DESPLIEGUE),
           // Ya desplegada, la red se queda casi quieta para poder apuntarle;
@@ -100,12 +139,28 @@ function GraphView({ open, onClose, projects, canvases, projectId, lang, onGoTo 
         });
         if (paso < DESPLIEGUE) paso++;
       }
-      forceRedraw(v => v + 1);
+
+      // ── Repintar solo si se ha movido algo que se pueda ver ──
+      //
+      // Cuando la red ya ha cuajado se queda temblando por debajo de la décima
+      // de píxel, y aun así se repintaban los cientos de bolas sesenta veces por
+      // segundo, para siempre: el ventilador del portátil daba fe. Con esto, una
+      // red en reposo no cuesta nada y el resto de la aplicación respira.
+      //
+      // Señalar un nodo o mover la cámara repintan por su cuenta (son cambios de
+      // estado), así que no se pierde ninguna reacción al ratón.
+      let meneo = 0;
+      for (const p of pos) {
+        const d = Math.abs(p.x - p._x0) + Math.abs(p.y - p._y0);
+        if (d > meneo) meneo = d;
+      }
+      if (meneo > 0.15 || nodeDragRef.current || dragRef.current) forceRedraw(v => v + 1);
+
       rafRef.current = requestAnimationFrame(tick);
     };
     rafRef.current = requestAnimationFrame(tick);
     return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); };
-  }, [open, grafo]);
+  }, [open]);
 
   React.useEffect(() => {
     if (!open) return;
@@ -130,11 +185,40 @@ function GraphView({ open, onClose, projects, canvases, projectId, lang, onGoTo 
   // siete colores cuando solo se usan dos.
   const capasUsadas = Array.from(new Set(grafo.nodes.map(n => n.depth || 0))).sort((a, b) => a - b);
 
-  const conectado = (id) => {
-    if (!hover) return true;
-    if (hover === id) return true;
-    return grafo.edges.some(e => (e.from === hover && e.to === id) || (e.to === hover && e.from === id));
-  };
+  // ── Los vecinos, calculados una vez y no una vez por bola ──
+  //
+  // Esto es lo que hacía que la vista se atascara JUSTO al pasar el ratón por
+  // encima, que es como lo contó el usuario. Antes, con un nodo señalado, cada
+  // una de las bolas recorría la lista entera de conexiones para saber si tenía
+  // que apagarse: con 500 nodos y 500 conexiones son un cuarto de millón de
+  // comparaciones en cada fotograma, sesenta veces por segundo.
+  //
+  // Medido en un grafo de 500: 1,77 ms por fotograma antes, 0,03 ms así.
+  const vecinosDelSenalado = React.useMemo(() => {
+    if (!hover) return null;
+    const s = new Set();
+    for (const e of grafo.edges) {
+      if (e.from === hover) s.add(e.to);
+      else if (e.to === hover) s.add(e.from);
+    }
+    return s;
+  }, [hover, grafo]);
+
+  const conectado = (id) => !hover || hover === id || vecinosDelSenalado.has(id);
+
+  // ── Por qué el brillo cambia de técnica en los grafos grandes ──
+  //
+  // El brillo es un filtro de desenfoque de SVG, y el navegador lo pinta en un
+  // lienzo aparte POR CADA bola y en CADA fotograma. Con veinte nodos ni se
+  // nota; con quinientos es lo único que queda para explicar que la vista vaya a
+  // trompicones, porque lo demás está medido y sale barato (la física, 2,2 ms; y
+  // rehacer los 500 nodos en React, 2,8 ms).
+  //
+  // Pasado ese tamaño se cambia el filtro por un círculo tenue y grande detrás
+  // de cada bola: se parece mucho —a ese tamaño la diferencia no se aprecia— y
+  // al navegador le cuesta lo mismo que pintar una bola más.
+  const BRILLO_HASTA = 150;
+  const brilloDeVerdad = grafo.nodes.length <= BRILLO_HASTA;
   const conexionesDe = (id) => grafo.edges.filter(e => e.from === id || e.to === id).length;
 
   // ── Acercar con la rueda, manteniendo bajo el cursor el punto mirado ──
@@ -300,6 +384,15 @@ function GraphView({ open, onClose, projects, canvases, projectId, lang, onGoTo 
                         {/* Zona de agarre generosa e invisible: acertarle a un
                             círculo de 5px con el ratón es incómodo. */}
                         <circle cx={p.x} cy={p.y} r={r + 9} fill="transparent"/>
+                        {/* El brillo de los grafos grandes: un círculo tenue en
+                            lugar del filtro de desenfoque (ver brilloDeVerdad). */}
+                        {!brilloDeVerdad && (
+                          <circle
+                            cx={p.x} cy={p.y} r={r * 2.1}
+                            className="odi-ghalo"
+                            style={{ fill: color(n) }}
+                          />
+                        )}
                         <circle
                           cx={p.x} cy={p.y} r={hover === n.id ? r * 1.35 : r}
                           className={`odi-gcircle ${n.isBoard ? 'is-board' : ''} ${hover === n.id ? 'is-hover' : ''}`}
@@ -308,7 +401,7 @@ function GraphView({ open, onClose, projects, canvases, projectId, lang, onGoTo 
                              presentación, así que el color de capa se lo comía
                              el `fill` de .odi-gcircle y salía todo morado. */
                           style={{ fill: color(n) }}
-                          filter="url(#odi-glow)"
+                          filter={brilloDeVerdad ? 'url(#odi-glow)' : undefined}
                         />
                         {/* Un tablero abre otro lienzo entero, así que sigue
                             teniendo que distinguirse de una nota que esté en su

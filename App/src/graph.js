@@ -323,7 +323,30 @@
     return pos;
   }
 
-  const OdiGraph = { buildGraph, layout, step };
+  // ── Colocar los nodos conservando dónde estaba cada uno ──
+  //
+  // Vive aquí, fuera de la vista, porque es la pieza que arregla el fallo del
+  // grafo que se reiniciaba solo: mientras los nodos sean los mismos, sus
+  // posiciones NO se tocan, aunque la aplicación haya entregado un objeto de
+  // datos nuevo por haber guardado o sincronizado. Y si de verdad aparece un
+  // nodo nuevo, nace apretado en el centro sin mover a los demás de su sitio.
+  //
+  // Fuera de React a propósito: así se puede comprobar con Node, que es como se
+  // pilló el fallo.
+  function acomoda({ nodes, pos, width, height }) {
+    const W = width || 1200, H = height || 800;
+    const viejos = new Map((pos || []).map(p => [p.id, p]));
+    const n = Math.max(1, (nodes || []).length);
+    return (nodes || []).map((nodo, i) => {
+      const ya = viejos.get(nodo.id);
+      if (ya) return ya;
+      const a = (i / n) * Math.PI * 2;
+      const r = Math.min(W, H) * 0.06;
+      return { id: nodo.id, x: W / 2 + Math.cos(a) * r, y: H / 2 + Math.sin(a) * r, vx: 0, vy: 0 };
+    });
+  }
+
+  const OdiGraph = { buildGraph, layout, step, acomoda };
   if (typeof window !== 'undefined') window.OdiGraph = OdiGraph;
   if (typeof module !== 'undefined' && module.exports) module.exports = OdiGraph;
 })();

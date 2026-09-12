@@ -261,5 +261,51 @@ for (let i = 0; i < 60; i++) G.step({ nodes: g.nodes, edges: g.edges, pos: pos7,
 const deriva = pos7.reduce((s, p, i) => s + Math.hypot(p.x - reposoAntes[i].x, p.y - reposoAntes[i].y), 0) / pos7.length;
 check('en reposo la red se queda quieta', deriva < 5, `${deriva.toFixed(2)}px/s de media`);
 
+
+// ══ Que la vista no se reinicie sola ══
+//
+// El fallo, contado por quien lo sufrió: en un proyecto de 500 nodos la red
+// volvía a explotar cada pocos segundos y no dejaba ni mirar. La causa no estaba
+// en la física sino en que la vista se reiniciaba entera cada vez que la
+// aplicación le entregaba un objeto de datos NUEVO con el mismo contenido
+// dentro — cosa que pasa sola al guardar, al sincronizar o al recontar nodos.
+//
+// Estas comprobaciones cubren las dos mitades del arreglo: que los mismos datos
+// se reconozcan como los mismos, y que acomodar no mueva a quien ya estaba.
+
+const copiaProfunda = (x) => JSON.parse(JSON.stringify(x));
+const gA = G.buildGraph({ projects, canvases, projectId: 'p1', lang: 'es' });
+const gB = G.buildGraph({ projects: copiaProfunda(projects), canvases: copiaProfunda(canvases), projectId: 'p1', lang: 'es' });
+const firmaDe = (g) => g.nodes.map(n => n.id).join('|');
+check('otro objeto con el mismo contenido da los mismos nodos, y en el mismo orden',
+  firmaDe(gA) === firmaDe(gB), firmaDe(gA).slice(0, 44) + '…');
+
+const colocados = G.acomoda({ nodes: gA.nodes, pos: [], width: 1200, height: 800 });
+colocados.forEach((p, i) => { p.x = 1000 + i; p.y = 500 + i; });
+
+const mismos = G.acomoda({ nodes: gA.nodes, pos: colocados, width: 1200, height: 800 });
+check('acomodar con los mismos nodos no mueve a nadie de su sitio',
+  mismos.every((p, i) => p.x === 1000 + i && p.y === 500 + i));
+check('y conserva los mismos objetos, no copias (la física sigue con su velocidad)',
+  mismos.every((p, i) => p === colocados[i]));
+
+const conUnoMas = G.acomoda({
+  nodes: gA.nodes.concat([{ id: 'recien-llegado', degree: 1, depth: 1 }]),
+  pos: mismos, width: 1200, height: 800,
+});
+check('al añadir un nodo, los de antes se quedan donde estaban',
+  conUnoMas.length === mismos.length + 1 && conUnoMas[0].x === 1000);
+const nacido = conUnoMas[conUnoMas.length - 1];
+check('y el recién llegado nace en el centro, para que se le vea salir',
+  Math.hypot(nacido.x - 600, nacido.y - 400) < 60,
+  Math.round(Math.hypot(nacido.x - 600, nacido.y - 400)) + 'px del centro');
+
+const sinElPrimero = G.acomoda({ nodes: gA.nodes.slice(1), pos: conUnoMas, width: 1200, height: 800 });
+check('un nodo borrado desaparece de las posiciones',
+  sinElPrimero.length === gA.nodes.length - 1 && !sinElPrimero.some(p => p.id === gA.nodes[0].id));
+
+check('acomodar aguanta que no le den nada', G.acomoda({}).length === 0);
+
 console.log(fallos ? `\n${fallos} FALLOS` : '\nTodo correcto');
+
 process.exit(fallos ? 1 : 0);

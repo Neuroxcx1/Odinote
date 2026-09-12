@@ -5758,6 +5758,11 @@ html[data-mobile="1"] .odi-graph-btn span:not(.material-symbols-rounded) { displ
    dejaría de verse a qué capa pertenece justo cuando lo estás mirando. */
 .odi-gcircle { fill: #8E86B8; transition: r 140ms ease; }
 .odi-gcircle.is-hover { stroke: #FFFFFF; stroke-width: 2; }
+/* El brillo de los grafos grandes. No es un desenfoque: es un circulo
+   grande y tenue detras de cada bola. Un desenfoque de SVG obliga al
+   navegador a pintar cada bola en un lienzo aparte, y con cientos de ellas
+   moviendose eso es lo que hacia que la vista fuera a trompicones. */
+.odi-ghalo { opacity: 0.18; pointer-events: none; }
 .odi-gring { fill: none; stroke: rgba(255,255,255,0.55); stroke-width: 1.4; pointer-events: none; }
 .odi-glabel { font-weight: 700; fill: rgba(237,234,246,0.92); font-family: var(--font-display); pointer-events: none; paint-order: stroke; stroke: #14121F; stroke-width: 3px; }
 
