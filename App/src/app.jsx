@@ -47,7 +47,7 @@ try {
 
 // Marcador de build: si la consola no muestra esta versión, el navegador está
 // sirviendo JS cacheado (subir ?v= en index.html invalida la caché)
-window.ODINOTE_BUILD = '1.0.8.1-179';
+window.ODINOTE_BUILD = '1.0.8.1-180';
 console.log('[ODINOTE] Código cargado: ' + window.ODINOTE_BUILD);
 
 // Global shortcuts configuration
@@ -257,6 +257,31 @@ function migrateTemplates(state) {
     state.templatesVersion = currentVersion;
   }
   return state;
+}
+
+// ── Cuál de las publicaciones de GitHub le toca al escritorio ──
+//
+// Antes se cogía la primera de la lista y punto. Eso valía mientras todas las
+// publicaciones fueran del programa de Windows; desde que hay una versión para
+// Android, en esa misma lista salen publicaciones que no son para este
+// programa, y coger la primera rompe las dos direcciones:
+//
+//   · si la del móvil es la más reciente y su etiqueta no se lee como un número
+//     mayor, el escritorio dice "estás al día" y TAPA una versión de Windows
+//     que sí era nueva;
+//   · y si se leyera como mayor, le ofrecería a alguien de Windows descargar un
+//     archivo que su ordenador no puede instalar.
+//
+// Así que una publicación cuenta para el escritorio si trae algún archivo que
+// no sea un APK. Se mira lo que lleva dentro y no cómo se llama la etiqueta,
+// porque los nombres de las etiquetas los pone una persona a mano y acabarán
+// siendo de diez formas distintas.
+function eligePublicacionDeEscritorio(publicaciones) {
+  if (!Array.isArray(publicaciones)) return null;
+  const paraEscritorio = (r) =>
+    Array.isArray(r && r.assets) && r.assets.some(a => a && !/\.apk$/i.test(a.name || ''));
+  const estables = publicaciones.filter(r => r && !r.draft && !r.prerelease);
+  return estables.find(paraEscritorio) || publicaciones.find(paraEscritorio) || null;
 }
 
 function App() {
@@ -1128,7 +1153,7 @@ function App() {
         return;
       }
       const data = await res.json();
-      const latestRelease = Array.isArray(data) ? data.find(r => !r.draft && !r.prerelease) || data[0] : null;
+      const latestRelease = eligePublicacionDeEscritorio(data);
       const latestVersion = latestRelease && latestRelease.tag_name;
       if (!latestVersion) {
         if (manual) setUpdateModal({ state: 'uptodate', version: CURRENT_VERSION });
