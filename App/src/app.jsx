@@ -47,7 +47,7 @@ try {
 
 // Marcador de build: si la consola no muestra esta versión, el navegador está
 // sirviendo JS cacheado (subir ?v= en index.html invalida la caché)
-window.ODINOTE_BUILD = '1.0.8.2-185';
+window.ODINOTE_BUILD = '1.0.8.2-186';
 console.log('[ODINOTE] Código cargado: ' + window.ODINOTE_BUILD);
 
 // Global shortcuts configuration
@@ -589,6 +589,26 @@ function App() {
             'Could not start Google flow. Please make sure you are in the desktop application.'
           ));
         });
+    } else if (window.ODINOTE_PLATFORM === 'android') {
+      // ── Entrar con Google desde el APK: todavía no ──
+      //
+      // Google BLOQUEA a propósito su ventana de inicio de sesión dentro de una
+      // aplicación que lleva un navegador incrustado, que es lo que es un APK
+      // como este. No es un fallo de Oddinote ni hay forma de sortearlo desde
+      // aquí: comprobado en el teléfono, Firebase contesta auth/internal-error
+      // en cuanto se intenta.
+      //
+      // Arreglarlo de verdad es otro trabajo: abrir la sesión en el navegador
+      // del propio teléfono y que vuelva a la aplicación, lo que necesita unas
+      // credenciales de Android nuevas —las crea el mantenedor en su cuenta de
+      // Google Cloud— y un plugin para recoger la vuelta.
+      //
+      // Mientras tanto, decirlo claro. Lo que NO se puede hacer es lo de antes:
+      // pulsar, esperar y que no ocurra nada.
+      setLoginError(window.t(
+        'Entrar con Google todavía no funciona en la aplicación del móvil: Google no permite su ventana de inicio de sesión dentro de una app. Todo lo demás sí va, y tus notas se guardan en el teléfono. Para la nube y las salas, usa Oddinote en el ordenador o ábrela en el navegador del móvil.',
+        'Signing in with Google does not work yet in the phone app: Google does not allow its sign-in window inside an app. Everything else works, and your notes are saved on the phone. For the cloud and live sessions, use Oddinote on a computer or open it in the phone browser.'
+      ));
     } else {
       const provider = new firebase.auth.GoogleAuthProvider();
       if (!isRenewal) provider.setCustomParameters({ prompt: 'select_account' });

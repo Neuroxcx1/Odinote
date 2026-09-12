@@ -83,6 +83,37 @@ function apuntaReciente(color) {
   return lista;
 }
 
+// ── La rueda de dentro, para el dedo ──
+//
+// En el teléfono el arcoíris abría el selector de color de ANDROID, y ahí se
+// perdía todo: elegías un color, pulsabas "Establecer" y no pasaba nada. Ese
+// diálogo es una ventana del sistema, fuera de la página, y lo que devuelve no
+// siempre llega a una aplicación metida en un APK. Comprobado desde el propio
+// teléfono: aplicando el color a mano sí se pinta y sí se guarda, así que lo
+// que fallaba era el diálogo, no la aplicación.
+//
+// Aquí no se abre nada de fuera: trece tonos arriba, seis claridades de ese
+// tono abajo, y una fila de grises —que de un tono no sale un gris por mucho
+// que se le quite color, y el blanco y el negro son de los más usados.
+//
+// En el escritorio se queda el selector del sistema: allí funciona, es el que
+// la gente conoce y trae cuentagotas.
+const TONOS_DEDO = [0, 18, 36, 52, 90, 130, 165, 190, 210, 235, 262, 290, 325];
+const CLARIDADES_DEDO = [
+  { s: 72, l: 88 }, { s: 76, l: 76 }, { s: 78, l: 64 },
+  { s: 80, l: 52 }, { s: 70, l: 40 }, { s: 58, l: 28 },
+];
+const GRISES_DEDO = ['#FFFFFF', '#D4D2D6', '#9E9BA1', '#6B686E', '#3A383C', '#1A1A1A'];
+
+function hslAHex(h, s, l) {
+  s /= 100; l /= 100;
+  const k = (n) => (n + h / 30) % 12;
+  const a = s * Math.min(l, 1 - l);
+  const f = (n) => l - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1)));
+  const dos = (x) => Math.round(x * 255).toString(16).padStart(2, '0');
+  return '#' + dos(f(0)) + dos(f(8)) + dos(f(4));
+}
+
 window.SelectorColor = function SelectorColor({
   valor,
   onCambio,
@@ -100,6 +131,12 @@ window.SelectorColor = function SelectorColor({
   const { useRef, useState } = React;
   const entrada = useRef(null);
   const paleta = colores || window.COLORES_ODINOTE;
+
+  // Si esto se maneja con el dedo, el arcoíris abre la rueda de aquí dentro en
+  // vez del diálogo del sistema (ver arriba).
+  const conDedo = typeof window !== 'undefined' && !!(window.odiIsMobile && window.odiIsMobile());
+  const [ruedaAbierta, setRuedaAbierta] = useState(false);
+  const [tonoElegido, setTonoElegido] = useState(210);
 
   const [recientes, setRecientes] = useState(leeRecientes);
 
@@ -235,29 +272,101 @@ window.SelectorColor = function SelectorColor({
         background: 'conic-gradient(#E6544F, #DDAF2C, #90B968, #3CA59E, #3D5A80, #955BA5, #E6544F)',
       }}
       onMouseDown={sinRobarFoco}
-      onClick={() => entrada.current && entrada.current.click()}
+      onClick={() => {
+        if (conDedo) { setRuedaAbierta(v => !v); return; }
+        if (entrada.current) entrada.current.click();
+      }}
       title={etiquetaLibre || window.t('Elegir otro color', 'Pick another colour')}
       aria-label={etiquetaLibre || window.t('Elegir otro color', 'Pick another colour')}
     >
       {/* Se escuchan los dos avisos que da el navegador. Cuál de ellos llega,
           y cuántas veces, cambia de un navegador a otro; lo único seguro es
           que con los dos no se pierde ningún movimiento de la rueda. Ninguno
-          da el color por bueno: de eso se encarga Aceptar. */}
-      <input
-        ref={entrada}
-        type="color"
-        value={/^#[0-9a-f]{6}$/i.test(valor || '') ? valor : '#1A1A1A'}
-        onInput={(e) => { enCurso(e.target.value); devuelveSeleccion(); onCambio(e.target.value); }}
-        onChange={(e) => { enCurso(e.target.value); devuelveSeleccion(); onCambio(e.target.value); }}
-        style={{
-          position: 'absolute', inset: 0, width: '100%', height: '100%',
-          opacity: 0, border: 'none', padding: 0, cursor: 'pointer',
-        }}
-        tabIndex={-1}
-        aria-hidden="true"
-      />
+          da el color por bueno: de eso se encarga Aceptar.
+
+          Con el dedo este campo NO se pinta: cubre el botón entero, así que el
+          toque caería sobre él y abriría igualmente el diálogo del sistema —
+          justo el que no funciona. */}
+      {!conDedo && (
+        <input
+          ref={entrada}
+          type="color"
+          value={/^#[0-9a-f]{6}$/i.test(valor || '') ? valor : '#1A1A1A'}
+          onInput={(e) => { enCurso(e.target.value); devuelveSeleccion(); onCambio(e.target.value); }}
+          onChange={(e) => { enCurso(e.target.value); devuelveSeleccion(); onCambio(e.target.value); }}
+          style={{
+            position: 'absolute', inset: 0, width: '100%', height: '100%',
+            opacity: 0, border: 'none', padding: 0, cursor: 'pointer',
+          }}
+          tabIndex={-1}
+          aria-hidden="true"
+        />
+      )}
     </button>
   );
+
+  // La rueda de dentro. Elegir un tono no cambia nada todavía: solo cambia la
+  // fila de abajo. El color se aplica al tocar una claridad, igual que con la
+  // rueda del sistema — se ve al momento y Aceptar es quien lo da por bueno.
+  const ruedaDeDentro = () => (!conDedo || !ruedaAbierta ? null : (
+    <div
+      className="selector-color-rueda"
+      style={{ display: 'flex', flexDirection: 'column', gap: '7px', paddingTop: '2px' }}
+      onMouseDown={sinRobarFoco}
+    >
+      <div className="selector-color-rueda-tonos" style={{ ...enFila, gap: '5px' }}>
+        {TONOS_DEDO.map(h => (
+          <button
+            key={h}
+            type="button"
+            style={{
+              width: '22px', height: '22px', borderRadius: '50%', padding: 0, cursor: 'pointer',
+              background: hslAHex(h, 85, 52),
+              border: h === tonoElegido ? '2.5px solid var(--wine)' : '1.5px solid var(--line-soft)',
+            }}
+            onMouseDown={sinRobarFoco}
+            onClick={() => setTonoElegido(h)}
+            aria-label={window.t('Tono ', 'Hue ') + h}
+          />
+        ))}
+      </div>
+      <div className="selector-color-rueda-claridades" style={{ ...enFila, gap: '5px' }}>
+        {CLARIDADES_DEDO.map(({ s, l }) => {
+          const hex = hslAHex(tonoElegido, s, l);
+          return (
+            <button
+              key={s + '-' + l}
+              type="button"
+              style={{
+                width: (tam + 4) + 'px', height: (tam + 4) + 'px', borderRadius: '7px',
+                padding: 0, cursor: 'pointer', background: hex,
+                border: norm(hex) === actual ? '2.5px solid var(--wine)' : '1.5px solid var(--line-soft)',
+              }}
+              onMouseDown={sinRobarFoco}
+              onClick={() => { enCurso(hex); devuelveSeleccion(); onCambio(hex); }}
+              aria-label={hex}
+            />
+          );
+        })}
+      </div>
+      <div className="selector-color-rueda-grises" style={{ ...enFila, gap: '5px' }}>
+        {GRISES_DEDO.map(hex => (
+          <button
+            key={hex}
+            type="button"
+            style={{
+              width: (tam + 4) + 'px', height: (tam + 4) + 'px', borderRadius: '7px',
+              padding: 0, cursor: 'pointer', background: hex,
+              border: norm(hex) === actual ? '2.5px solid var(--wine)' : '1.5px solid var(--line-soft)',
+            }}
+            onMouseDown={sinRobarFoco}
+            onClick={() => { enCurso(hex); devuelveSeleccion(); onCambio(hex); }}
+            aria-label={hex}
+          />
+        ))}
+      </div>
+    </div>
+  ));
 
   // Aceptar y Deshacer. Van ARRIBA del todo y no al final: la ventana del
   // sistema se abre junto al arcoíris, que está abajo, así que este botón se
@@ -364,6 +473,7 @@ window.SelectorColor = function SelectorColor({
           )}
           {recientes.map(casillaReciente)}
         </div>
+        {ruedaDeDentro()}
       </div>
     );
   }
@@ -396,6 +506,7 @@ window.SelectorColor = function SelectorColor({
       <div style={enFila}>
         {casillaLibre()}
       </div>
+      {ruedaDeDentro()}
     </div>
   );
 };

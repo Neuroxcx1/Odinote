@@ -81,7 +81,8 @@ el lienzo con el dedo, el teclado tapando los nodos y el botón de "atrás".
 
 **Lo que se sabe que NO va a funcionar, y hay que rehacer:**
 
-- **Entrar con Google.** La aplicación usa una ventana emergente
+- **Entrar con Google.** Comprobado en el teléfono: Firebase contesta
+  `auth/internal-error` en cuanto se intenta. La aplicación usa una ventana emergente
   (`signInWithPopup`), y Google **bloquea a propósito** el inicio de sesión
   dentro de un WebView. Sin eso no hay Drive, ni salas en vivo, ni corona. La
   solución es abrir la sesión en el navegador del teléfono (Custom Tabs) y

@@ -1,5 +1,5 @@
 // =====================================================
-// Odinote — empaqueta dist/Odinote-win32-x64 en un .zip listo para repartir.
+// Oddinote — empaqueta dist/Oddinote-win32-x64 en un .zip listo para repartir.
 //
 // Se ejecuta solo, después de electron-packager, como parte de
 // `npm run build:exe`. El zip sale en dist/release/, nunca dentro de la
@@ -19,9 +19,9 @@ const archiver = require('archiver');
 const APP_DIR = path.join(__dirname, '..');
 const pkg = require(path.join(APP_DIR, 'package.json'));
 
-const SRC_DIR = path.join(APP_DIR, 'dist', 'Odinote-win32-x64');
+const SRC_DIR = path.join(APP_DIR, 'dist', 'Oddinote-win32-x64');
 const RELEASE_DIR = path.join(APP_DIR, 'dist', 'release');
-const ZIP_NAME = `Odinote-${pkg.version}-win32-x64.zip`;
+const ZIP_NAME = `Oddinote-${pkg.version}-win32-x64.zip`;
 const ZIP_PATH = path.join(RELEASE_DIR, ZIP_NAME);
 
 if (!fs.existsSync(SRC_DIR)) {
@@ -48,5 +48,5 @@ archive.pipe(output);
 // La carpeta raíz dentro del zip se llama "Odinote", no "Odinote-win32-x64":
 // al extraerlo, el atajo/acceso directo que la gente cree queda con un
 // nombre limpio.
-archive.directory(SRC_DIR, 'Odinote');
+archive.directory(SRC_DIR, 'Oddinote');
 archive.finalize();
