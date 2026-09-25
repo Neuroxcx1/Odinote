@@ -82,9 +82,11 @@ function resolveStickyColor(key) {
 // no se sabía nunca en qué número se estaba.
 //
 // Ahora es un número a la vista y una lista para elegir, como en cualquier
-// procesador de textos. Es un <select> de verdad por debajo: en el teléfono abre
-// la rueda del sistema, que es lo más cómodo para el dedo, y en el escritorio la
-// lista de siempre.
+// procesador de textos: un botón con el número, y al tocarlo un panel AL LADO de
+// la barra, como el del color. Al principio era un <select> del sistema, pero su
+// lista se abría hacia abajo tapando los botones de debajo, no se parecía en nada
+// al resto de la aplicación y no dejaba pasar de 72. Ahora el panel trae un campo
+// donde cabe cualquier tamaño y enseña cada tamaño en el nodo al pasar el ratón.
 //
 // Cada nodo sigue guardando su tamaño como lo guardaba (píxeles o
 // multiplicador); esto solo traduce. Así los tableros que ya existen se ven
@@ -94,40 +96,152 @@ const TAMANOS_LETRA = [8, 9, 10, 11, 12, 14, 16, 18, 20, 24, 28, 32, 36, 48, 60,
 // Un tamaño con decimales se enseña con uno solo (13,5), y uno entero, entero.
 const numeroTamano = (px) => (Math.abs(px - Math.round(px)) < 0.05 ? String(Math.round(px)) : px.toFixed(1));
 
-function SelectorTamano({ valor, onCambio, etiqueta, titulo }) {
-  const actual = Math.round(valor * 10) / 10;
-  // Si el tamaño que tiene no está en la lista (el 13,5 de una nota nueva, o uno
-  // que venía de los antiguos multiplicadores), se añade: el desplegable tiene
-  // que enseñar el número de verdad, no el más parecido.
-  const opciones = TAMANOS_LETRA.some(t => Math.abs(t - actual) < 0.05)
-    ? TAMANOS_LETRA
-    : [...TAMANOS_LETRA, actual].sort((a, b) => a - b);
+// Lo que se escriba en el campo, dentro de lo razonable: por debajo de 1 no se
+// lee nada, y por encima de 400 una sola letra ya no cabe en ningún nodo.
+const TAMANO_MIN = 1;
+const TAMANO_MAX = 400;
+const leeTamano = (t) => {
+  const px = parseFloat(String(t).replace(',', '.'));
+  if (!isFinite(px) || px < TAMANO_MIN || px > TAMANO_MAX) return null;
+  return Math.round(px * 10) / 10;
+};
+
+// ── La vista previa al pasar el ratón ──
+// Enseñar un tamaño NO puede pasar por onUpdate: cada paso quedaría en el
+// historial de deshacer (que junta lo que pasa en 450 ms) y se mandaría a
+// guardar y a la nube. Así que se pinta directamente en el nodo, con una
+// variable CSS que solo existe mientras dura la vista previa: cada nodo lee su
+// tamaño como var(--vista-…, lo guardado), y al quitarla vuelve solo a lo suyo.
+// El atributo es para las leyendas, cuyo tamaño normal no está en el nodo sino
+// en la hoja de estilos (y cambia de un tipo de nodo a otro).
+function nodoEnPantalla(itemId) {
+  return document.querySelector(`[data-item-id="${String(itemId).replace(/"/g, '\\"')}"]`);
+}
+function ponVistaTamano(itemId, spec, px) {
+  const el = nodoEnPantalla(itemId);
+  if (!el) return;
+  el.style.setProperty(spec.variable, spec.aVista(px));
+  el.setAttribute('data' + spec.variable.slice(1), '');
+}
+function quitaVistaTamano(itemId, spec) {
+  const el = nodoEnPantalla(itemId);
+  if (!el) return;
+  el.style.removeProperty(spec.variable);
+  el.removeAttribute('data' + spec.variable.slice(1));
+}
+
+function SelectorTamano({ clave, spec, pane, setPane }) {
+  if (!spec) return null;
+  const abierto = pane === 'tamano:' + clave;
   return (
-    <label className="ctx-btn ctx-tamano" title={titulo}>
-      {/* La lista de verdad, invisible y encima de todo el botón: se toque
-          donde se toque, se abre. Va la PRIMERA porque la barra pone la letra
-          pequeña a su último hijo, y ese tiene que seguir siendo la etiqueta. */}
-      <select
-        className="ctx-tamano-lista"
-        value={String(actual)}
-        onChange={(e) => {
-          const px = parseFloat(e.target.value);
-          if (!isFinite(px)) return;
-          onCambio(px);
-          window.playAudioTone && window.playAudioTone('click');
-        }}
-        aria-label={titulo}
-      >
-        {opciones.map(t => (
-          <option key={t} value={String(t)}>{numeroTamano(t)}</option>
-        ))}
-      </select>
+    <button
+      className={`ctx-btn ctx-tamano ${abierto ? 'active' : ''}`}
+      onClick={() => setPane(abierto ? null : 'tamano:' + clave)}
+      title={spec.titulo}
+    >
       <span className="ctx-tamano-num" aria-hidden="true">
-        {numeroTamano(actual)}
+        {numeroTamano(Math.round(spec.valor * 10) / 10)}
         <span className="material-symbols-rounded">expand_more</span>
       </span>
-      <span>{etiqueta}</span>
-    </label>
+      <span>{spec.etiqueta}</span>
+    </button>
+  );
+}
+
+function PanelTamano({ spec, itemId, onCerrar }) {
+  const actual = Math.round(spec.valor * 10) / 10;
+  const [texto, setTexto] = React.useState(numeroTamano(actual));
+  // Lo escrito en el campo y todavía no guardado. Se guarda con Enter, al salir
+  // del campo o al cerrarse el panel por lo que sea (cambiar de nodo, ponerse a
+  // escribir): un panel que se desmonta no avisa con ningún blur, y lo escrito
+  // se perdería sin más.
+  const pendiente = React.useRef(null);
+  const specRef = React.useRef(spec);
+  specRef.current = spec;
+  React.useEffect(() => {
+    setTexto(numeroTamano(Math.round(spec.valor * 10) / 10));
+  }, [spec.valor]);
+  React.useEffect(() => () => {
+    quitaVistaTamano(itemId, specRef.current);
+    if (pendiente.current != null) specRef.current.guarda(pendiente.current);
+  }, []);
+
+  const guarda = (px) => {
+    pendiente.current = null;
+    quitaVistaTamano(itemId, spec);
+    if (Math.abs(px - spec.valor) > 0.01) spec.guarda(px);
+    setTexto(numeroTamano(px));
+    window.playAudioTone && window.playAudioTone('click');
+  };
+  const paso = (d) => {
+    const base = leeTamano(texto) || actual;
+    const px = Math.min(TAMANO_MAX, Math.max(TAMANO_MIN, Math.round(base) + d));
+    guarda(px);
+  };
+
+  return (
+    <div className="ctx-popout ctx-tamano-panel" onMouseDown={(e) => e.stopPropagation()}>
+      <div className="ctx-pop-section">
+        <div className="ctx-pop-title">{spec.titulo}</div>
+        <div className="ctx-tamano-fila">
+          <button className="ctx-tamano-paso" onClick={() => paso(-1)} title={window.t('Un punto menos', 'One point smaller')}>
+            <span className="material-symbols-rounded">remove</span>
+          </button>
+          <input
+            className="ctx-tamano-campo"
+            inputMode="decimal"
+            value={texto}
+            aria-label={spec.titulo}
+            onFocus={(e) => e.target.select()}
+            onChange={(e) => {
+              setTexto(e.target.value);
+              const px = leeTamano(e.target.value);
+              pendiente.current = px;
+              if (px != null) ponVistaTamano(itemId, spec, px);
+              else quitaVistaTamano(itemId, spec);
+            }}
+            onKeyDown={(e) => {
+              // Que no llegue al lienzo: Supr o Retroceso aquí borran una
+              // cifra, no el nodo.
+              e.stopPropagation();
+              if (e.key === 'Enter') {
+                const px = leeTamano(texto);
+                if (px != null) guarda(px);
+                onCerrar();
+              } else if (e.key === 'Escape') {
+                pendiente.current = null;
+                quitaVistaTamano(itemId, spec);
+                onCerrar();
+              }
+            }}
+            onBlur={() => {
+              const px = pendiente.current;
+              if (px != null) guarda(px);
+              else setTexto(numeroTamano(Math.round(specRef.current.valor * 10) / 10));
+            }}
+          />
+          <button className="ctx-tamano-paso" onClick={() => paso(1)} title={window.t('Un punto más', 'One point bigger')}>
+            <span className="material-symbols-rounded">add</span>
+          </button>
+        </div>
+        <div className="ctx-tamano-rejilla" onMouseLeave={() => quitaVistaTamano(itemId, spec)}>
+          {TAMANOS_LETRA.map(t => (
+            <button
+              key={t}
+              className={`ctx-tamano-op ${Math.abs(t - actual) < 0.05 ? 'active' : ''}`}
+              onMouseEnter={() => ponVistaTamano(itemId, spec, t)}
+              onClick={() => { guarda(t); onCerrar(); }}
+            >
+              {numeroTamano(t)}
+            </button>
+          ))}
+        </div>
+        <div className="ctx-tamano-pie">
+          {window.t(`Pasa el ratón por un tamaño para verlo en el nodo. En el campo cabe cualquiera, de ${TAMANO_MIN} a ${TAMANO_MAX}.`,
+            `Hover a size to preview it on the node. The box takes any size from ${TAMANO_MIN} to ${TAMANO_MAX}.`)}
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -158,6 +272,61 @@ function ContextSidebar({
   }, [modo]);
 
   if (!item || window._calendarDayMenuOpen) return null;
+
+  // Cada tamaño que se puede tocar en este nodo: qué número enseñar, cómo
+  // guardarlo en el campo de siempre (píxeles o multiplicador) y con qué
+  // variable se previsualiza. El botón y el panel leen los dos de aquí.
+  const tamanos = {};
+  if (item.type === 'frame') {
+    tamanos.marco = {
+      valor: item.titleSize || 14,
+      guarda: (px) => onUpdate({ titleSize: px }),
+      variable: '--vista-titulo', aVista: (px) => px + 'px',
+      etiqueta: window.t('Título', 'Title'), titulo: window.t('Tamaño del título', 'Title size'),
+    };
+  }
+  if (item.showCaption === true) {
+    // Sin tamaño propio, la leyenda mide lo que diga la hoja de estilos para
+    // ese tipo de nodo (11 en una imagen, 15 en una nota…): se enseña el que
+    // se ve de verdad, no un número inventado.
+    let visto = item.captionSize;
+    if (!visto) {
+      const el = nodoEnPantalla(item.id);
+      const cap = el && el.querySelector('.node-caption');
+      visto = cap ? Math.round(parseFloat(getComputedStyle(cap).fontSize) * 10) / 10 : 11;
+    }
+    tamanos.leyenda = {
+      valor: visto || 11,
+      guarda: (px) => onUpdate({ captionSize: px }),
+      variable: '--vista-leyenda', aVista: (px) => px + 'px',
+      etiqueta: window.t('Leyenda', 'Caption'), titulo: window.t('Tamaño de la leyenda', 'Caption size'),
+    };
+  }
+  // Por dentro sigue siendo un multiplicador de la letra base de cada nodo (13,5
+  // en notas, comentarios, tareas y calendario; 15 en la figura), que es lo que
+  // ya tienen guardado los tableros. Aquí se enseña en píxeles.
+  const baseTexto = item.type === 'shape' ? 15 : item.type === 'separator' ? 18
+    : ['note', 'comment', 'todo', 'calendar'].includes(item.type) ? 13.5 : null;
+  if (baseTexto) {
+    tamanos.texto = {
+      valor: baseTexto * (item.textScale || 1),
+      guarda: (px) => onUpdate({ textScale: px / baseTexto }),
+      variable: '--vista-escala', aVista: (px) => String(px / baseTexto),
+      etiqueta: window.t('Tamaño', 'Size'), titulo: window.t('Tamaño del texto', 'Text size'),
+    };
+  }
+  if (item.type === 'calendar') {
+    // El mes y el año crecen con el texto de los días (si no, al subir el
+    // tamaño la cabecera se quedaba enana encima de unos números enormes), y
+    // este segundo tamaño los ajusta por encima de eso.
+    const ts = item.textScale || 1;
+    tamanos.mes = {
+      valor: 14 * ts * (item.headScale || 1),
+      guarda: (px) => onUpdate({ headScale: px / (14 * ts) }),
+      variable: '--vista-mes', aVista: (px) => String(px / (14 * ts)),
+      etiqueta: window.t('Mes', 'Month'), titulo: window.t('Tamaño del mes y el año', 'Month and year size'),
+    };
+  }
 
   const isText = ['note','comment','doc'].includes(item.type);
   const isColumn = item.type === 'column';
@@ -801,34 +970,6 @@ function ContextSidebar({
         {isCalendar && (
           <>
             <button
-              className="ctx-btn"
-              onClick={() => {
-                const pasos = [0.8, 0.9, 1, 1.15, 1.35, 1.6, 1.9, 2.3, 2.8];
-                const cur = item.headScale || 1;
-                const idx = pasos.findIndex(s => Math.abs(s - cur) < 0.001);
-                onUpdate({ headScale: idx === -1 ? 1.15 : pasos[Math.min(pasos.length - 1, idx + 1)] });
-                window.playAudioTone && window.playAudioTone('click');
-              }}
-              title={window.t('Mes y año más grandes', 'Bigger month and year')}
-            >
-              <span className="material-symbols-rounded">calendar_month</span>
-              <span>{window.t('Mes +', 'Month +')}</span>
-            </button>
-            <button
-              className="ctx-btn"
-              onClick={() => {
-                const pasos = [0.8, 0.9, 1, 1.15, 1.35, 1.6, 1.9, 2.3, 2.8];
-                const cur = item.headScale || 1;
-                const idx = pasos.findIndex(s => Math.abs(s - cur) < 0.001);
-                onUpdate({ headScale: idx === -1 ? 0.9 : pasos[Math.max(0, idx - 1)] });
-                window.playAudioTone && window.playAudioTone('click');
-              }}
-              title={window.t('Mes y año más pequeños', 'Smaller month and year')}
-            >
-              <span className="material-symbols-rounded">calendar_view_month</span>
-              <span>{window.t('Mes −', 'Month −')}</span>
-            </button>
-            <button
               className={`ctx-btn ${pane === 'calNumeros' ? 'active' : ''}`}
               onClick={()=>setPane(pane === 'calNumeros' ? null : 'calNumeros')}
               title={window.t('Color de los números de los días', 'Day numbers colour')}
@@ -1197,12 +1338,7 @@ function ContextSidebar({
           <>
             {/* (El botón "Editar" universal ya entra a editar el título del marco,
                 así que aquí solo queda el tamaño del título.) */}
-            <SelectorTamano
-              valor={item.titleSize || 14}
-              onCambio={(px) => onUpdate({ titleSize: px })}
-              etiqueta={window.t('Título', 'Title')}
-              titulo={window.t('Tamaño del título', 'Title size')}
-            />
+            <SelectorTamano clave="marco" spec={tamanos.marco} pane={pane} setPane={setPane}/>
           </>
         )}
 
@@ -1283,28 +1419,12 @@ function ContextSidebar({
         )}
 
         {/* Tamaño de letra de la leyenda, en cualquier nodo que la tenga puesta. */}
-        {item.showCaption === true && (
-          <SelectorTamano
-            valor={item.captionSize || 11}
-            onCambio={(px) => onUpdate({ captionSize: px })}
-            etiqueta={window.t('Leyenda', 'Caption')}
-            titulo={window.t('Tamaño de la leyenda', 'Caption size')}
-          />
-        )}
+        <SelectorTamano clave="leyenda" spec={tamanos.leyenda} pane={pane} setPane={setPane}/>
 
-        {/* Tamaño del texto del nodo. Por dentro sigue siendo un multiplicador de
-            la letra base (13,5 px), que es lo que ya tienen guardado los
-            tableros, y por eso multiplica todo el texto y convive con los
-            títulos, las negritas y demás formato. Aquí solo se enseña en
-            píxeles, que es lo que se entiende. */}
-        {['note','comment','todo','calendar'].includes(item.type) && (
-          <SelectorTamano
-            valor={13.5 * (item.textScale || 1)}
-            onCambio={(px) => onUpdate({ textScale: px / 13.5 })}
-            etiqueta={window.t('Tamaño', 'Size')}
-            titulo={window.t('Tamaño del texto', 'Text size')}
-          />
-        )}
+        {/* Tamaño del texto del nodo: multiplica todo el texto y convive con
+            los títulos, las negritas y demás formato. En la figura también. */}
+        <SelectorTamano clave="texto" spec={tamanos.texto} pane={pane} setPane={setPane}/>
+        <SelectorTamano clave="mes" spec={tamanos.mes} pane={pane} setPane={setPane}/>
 
         {/* Estirar: ajustar altura al contenido (útil en comentarios/notas largos) */}
         {['note','comment','todo','link'].includes(item.type) && (
@@ -1370,6 +1490,14 @@ function ContextSidebar({
             </button>
           ))}
         </div>
+      )}
+      {pane && pane.startsWith('tamano:') && tamanos[pane.slice(7)] && (
+        <PanelTamano
+          key={item.id + pane}
+          spec={tamanos[pane.slice(7)]}
+          itemId={item.id}
+          onCerrar={() => setPane(null)}
+        />
       )}
       {pane === 'color' && (
         <div className="ctx-popout">

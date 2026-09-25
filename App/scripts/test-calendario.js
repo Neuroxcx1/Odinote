@@ -21,8 +21,12 @@ const css = fs.readFileSync(ruta('src', 'styles.css'), 'utf-8');
 const ctx = fs.readFileSync(ruta('src', 'ContextSidebar.jsx'), 'utf-8');
 
 // ── El nodo pone las variables ──
-check('el nodo pasa el tamaño del texto', /'--cal-texto': item\.textScale \|\| 1/.test(items));
-check('y el del mes y el año, que va aparte', /'--cal-cabecera': item\.headScale \|\| 1/.test(items));
+// Con la vista previa del tamaño por delante: mientras el ratón está encima de
+// un tamaño del panel, manda la variable de la vista previa.
+check('el nodo pasa el tamaño del texto', /'--cal-texto': `var\(--vista-escala, \$\{item\.textScale \|\| 1\}\)`/.test(items));
+// El mes y el año crecen con el texto, y su tamaño propio va por encima.
+check('y el del mes y el año, por encima del del texto',
+  /'--cal-cabecera': `calc\(var\(--vista-mes, \$\{item\.headScale \|\| 1\}\) \* var\(--cal-texto, 1\)\)`/.test(items));
 check('el color de los números solo se pone si lo han elegido',
   /\.\.\.\(item\.numberColor \? \{ '--cal-numero': item\.numberColor \} : null\)/.test(items));
 
@@ -74,10 +78,12 @@ check('la casilla crece con la letra',
   /min-height: calc\(36px \* var\(--cal-texto, 1\)\)/.test(css));
 
 // ── Los botones del menú del nodo ──
-check('el calendario usa el mismo botón de tamaño de texto que las notas',
-  /\['note','comment','todo','calendar'\]\.includes\(item\.type\)/.test(ctx));
-check('hay botón para agrandar el mes y el año', /Mes y año más grandes/.test(ctx));
-check('y para empequeñecerlo', /Mes y año más pequeños/.test(ctx));
+check('el calendario usa el mismo tamaño de texto que las notas',
+  /\['note', 'comment', 'todo', 'calendar'\]\.includes\(item\.type\) \? 13\.5/.test(ctx));
+check('y tiene su propio tamaño para el mes y el año', /tamanos\.mes = \{/.test(ctx) && /Tamaño del mes y el año/.test(ctx));
+check('que guarda en el mismo campo de siempre', /onUpdate\(\{ headScale: px \/ \(14 \* ts\) \}\)/.test(ctx));
+check('el aviso de abajo no crece con el texto',
+  /\.cal-mb-hint \{[^}]*font-size: calc\(10\.5px \* var\(--node-scale, 1\)\);/.test(css));
 check('hay panel de color de los números del calendario', /pane === 'calNumeros'/.test(ctx));
 check('y un interruptor para el verde de hoy',
   /hoyMarcado: item\.hoyMarcado === false/.test(ctx));

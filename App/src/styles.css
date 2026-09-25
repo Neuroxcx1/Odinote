@@ -1599,9 +1599,9 @@ body.dragging-task .item-card { pointer-events: auto !important; }
 .connect-handle:hover .material-symbols-rounded { color: #fff; }
 
 /* Note */
-.note { padding: 0; font-size: calc(13.5px * var(--node-scale, 1) * var(--text-scale, 1)); line-height: 1.45; }
+.note { padding: 0; font-size: calc(13.5px * var(--node-scale, 1) * var(--vista-escala, var(--text-scale, 1))); line-height: 1.45; }
 .note-inner { width: 100%; height: 100%; padding: calc(10px * var(--node-scale, 1)) calc(12px * var(--node-scale, 1)); font-family: var(--font-body); color: var(--ink); overflow: hidden; white-space: pre-wrap; word-break: break-word; }
-.note-edit { width: 100%; height: 100%; padding: calc(10px * var(--node-scale, 1)) calc(12px * var(--node-scale, 1)); font-size: calc(13.5px * var(--node-scale, 1) * var(--text-scale, 1)); line-height: 1.45; background: transparent; overflow-wrap: break-word; word-break: break-word; }
+.note-edit { width: 100%; height: 100%; padding: calc(10px * var(--node-scale, 1)) calc(12px * var(--node-scale, 1)); font-size: calc(13.5px * var(--node-scale, 1) * var(--vista-escala, var(--text-scale, 1))); line-height: 1.45; background: transparent; overflow-wrap: break-word; word-break: break-word; }
 .note.c-white .item-card  { background: var(--c-white); }
 .note.c-cream .item-card  { background: var(--c-cream); }
 .note.c-sage  .item-card  { background: var(--c-sage); }
@@ -1804,7 +1804,7 @@ body.odi-busy iframe { pointer-events: none !important; }
 .todo-list::-webkit-scrollbar-thumb:hover {
   background: var(--olive);
 }
-.todo-row { display: flex; align-items: flex-start; gap: 7px; font-size: calc(13px * var(--node-scale, 1) * var(--text-scale, 1)); padding: 4px 6px; border-radius: 4px; transition: background 150ms ease, box-shadow 150ms ease; margin: 0 -6px; max-width: 100%; box-sizing: border-box; flex-shrink: 0; }
+.todo-row { display: flex; align-items: flex-start; gap: 7px; font-size: calc(13px * var(--node-scale, 1) * var(--vista-escala, var(--text-scale, 1))); padding: 4px 6px; border-radius: 4px; transition: background 150ms ease, box-shadow 150ms ease; margin: 0 -6px; max-width: 100%; box-sizing: border-box; flex-shrink: 0; }
 .todo-row.indent-1 { padding-left: 22px; margin-left: 0; }
 .todo-row.indent-2 { padding-left: 44px; margin-left: 0; }
 .todo-row.focused { background: var(--focused-row-bg, rgba(144, 185, 104, 0.08)); box-shadow: inset 3px 0 0 var(--olive); }
@@ -2161,7 +2161,9 @@ body.odi-busy iframe { pointer-events: none !important; }
   background: var(--bg-main, var(--bg));
   border: 1px solid var(--line-soft);
   border-radius: 999px;
-  font-size: calc(10.5px * var(--node-scale, 1) * var(--cal-texto, 1));
+  /* Sin --cal-texto: es un aviso, no contenido. Con el texto grande crecía
+     hasta ocupar dos líneas enormes debajo de los días. */
+  font-size: calc(10.5px * var(--node-scale, 1));
   font-weight: 600;
   color: var(--text-soft, #595459);
   letter-spacing: -0.01em;
@@ -2241,7 +2243,7 @@ body.odi-busy iframe { pointer-events: none !important; }
   font-family: var(--font-display);
   /* Multiplica por --text-scale para que los botones A+/A− funcionen también
      sobre el texto con formato de Título/Subtítulo */
-  font-size: calc(22px * var(--text-scale, 1));
+  font-size: calc(22px * var(--vista-escala, var(--text-scale, 1)));
   font-weight: 800;
   line-height: 1.1;
   margin: 4px 0 6px;
@@ -2249,7 +2251,7 @@ body.odi-busy iframe { pointer-events: none !important; }
 }
 .note-inner.rich h2, .note-edit.rich h2 {
   font-family: var(--font-display);
-  font-size: calc(17px * var(--text-scale, 1));
+  font-size: calc(17px * var(--vista-escala, var(--text-scale, 1)));
   font-weight: 700;
   line-height: 1.2;
   margin: 4px 0 4px;
@@ -2626,10 +2628,9 @@ html[data-mobile="1"] .connector-hit { stroke-width: 40; }
 .ctx-btn.danger:hover { background: color-mix(in srgb, var(--wine) 14%, transparent); color: var(--wine); }
 
 /* ── El tamaño de letra, como en Word ──
-   Un número a la vista con su flecha, y una lista de verdad por debajo. La
-   lista es un <select> transparente que cubre el botón entero: así se abre la
-   del sistema, que en el teléfono es la rueda cómoda para el dedo. El número va
-   en letra de ancho fijo para que no baile al pasar de 9 a 12. */
+   Un número a la vista con su flecha; al tocarlo se abre su panel al lado de la
+   barra, como el del color. El número va en letra de ancho fijo para que no
+   baile al pasar de 9 a 12. */
 .ctx-tamano { cursor: pointer; }
 .ctx-tamano-num {
   display: inline-flex; align-items: center; justify-content: center; gap: 1px;
@@ -2641,13 +2642,56 @@ html[data-mobile="1"] .connector-hit { stroke-width: 40; }
 }
 .ctx-btn .ctx-tamano-num .material-symbols-rounded { font-size: 16px; color: var(--ink-3); }
 .ctx-tamano:hover .ctx-tamano-num { border-color: var(--line); }
-.ctx-tamano-lista {
-  position: absolute; inset: 0; width: 100%; height: 100%;
-  opacity: 0; margin: 0; border: 0; padding: 0;
-  cursor: pointer;
-  /* 16 px para que el navegador del móvil no amplíe la página al tocarla. */
-  font-size: 16px;
+.ctx-tamano.active .ctx-tamano-num { border-color: var(--olive); }
+
+/* El panel: el campo con − y + a los lados, y los tamaños de siempre en una
+   rejilla de cuatro, que cabe entera sin desplazarse. */
+.ctx-tamano-fila { display: flex; align-items: center; gap: 6px; margin-bottom: 10px; }
+.ctx-tamano-campo {
+  flex: 1; min-width: 0; height: 34px;
+  text-align: center;
+  border: 1.5px solid var(--line); border-radius: 2px;
+  background: var(--paper-2); color: var(--ink);
+  font-family: var(--font-mono); font-size: 15px; font-weight: 700;
+  font-variant-numeric: tabular-nums;
 }
+.ctx-tamano-campo:focus { border-color: var(--olive); }
+.ctx-tamano-paso {
+  width: 34px; height: 34px; flex-shrink: 0;
+  display: grid; place-items: center;
+  border: 1.5px solid var(--line); border-radius: 2px;
+  background: var(--paper); color: var(--ink-2);
+  box-shadow: 1px 1px 0 var(--line);
+  cursor: pointer;
+  transition: background 100ms, color 100ms;
+}
+.ctx-tamano-paso:hover { background: var(--bg-2); color: var(--ink); }
+.ctx-tamano-paso .material-symbols-rounded { font-size: 18px; }
+.ctx-tamano-rejilla { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 5px; }
+.ctx-tamano-op {
+  height: 32px;
+  border: 1.5px solid var(--line-soft); border-radius: 2px;
+  background: var(--paper); color: var(--ink-2);
+  font-family: var(--font-mono); font-size: 12.5px; font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition: background 100ms, border-color 100ms, color 100ms;
+}
+.ctx-tamano-op:hover { background: var(--bg-2); border-color: var(--line); color: var(--ink); }
+/* El elegido, con la pareja de colores de la lista de lenguajes y por lo mismo:
+   --olive-l no cambia en oscuro y --ink sí, y el número salía blanco sobre verde
+   claro. Visto probando en modo oscuro. */
+.ctx-tamano-op.active { background: #E8F0DA; border-color: var(--olive); color: #23331A; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .ctx-tamano-op.active { background: #324329; color: #DCEEC6; }
+}
+:root[data-theme="dark"] .ctx-tamano-op.active { background: #324329; color: #DCEEC6; }
+.ctx-tamano-pie { margin-top: 10px; font-size: 11px; line-height: 1.35; color: var(--ink-3); }
+
+/* La vista previa de la leyenda: su tamaño normal lo pone la hoja de estilos
+   según el tipo de nodo, así que para enseñar otro hay que ganarle aquí. Solo
+   mientras el ratón está encima de un tamaño del panel. */
+[data-vista-leyenda] .node-caption { font-size: var(--vista-leyenda) !important; }
 .ctx-btn .material-symbols-rounded { font-size: 20px; }
 .ctx-btn span:last-child {
   font-size: 9.5px;

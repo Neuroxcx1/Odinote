@@ -383,7 +383,7 @@ function NoteItem({ item, lang, editing, onUpdate }) {
           <div
             ref={ref}
             className="note-edit rich"
-            style={{ fontSize: `calc(13.5px * var(--node-scale, 1) * ${item.textScale || 1})` }}
+            style={{ fontSize: `calc(13.5px * var(--node-scale, 1) * var(--vista-escala, ${item.textScale || 1}))` }}
             contentEditable
             suppressContentEditableWarning
             spellCheck={true}
@@ -615,7 +615,7 @@ function NoteItem({ item, lang, editing, onUpdate }) {
         <div
           ref={ref}
           className="note-inner rich"
-          style={{ color: textColor, fontSize: `calc(13.5px * var(--node-scale, 1) * ${item.textScale || 1})` }}
+          style={{ color: textColor, fontSize: `calc(13.5px * var(--node-scale, 1) * var(--vista-escala, ${item.textScale || 1}))` }}
         />
       </div>
     </div>
@@ -1628,7 +1628,7 @@ function TodoItem({ item, lang, onUpdate, editing, callbacks }) {
                       // heredada no llegaba hasta aquí). Lo demás son las
                       // propiedades antiguas por fila, que siguen valiendo como
                       // estilo de base de la tarea.
-                      fontSize: `calc(13px * var(--node-scale, 1) * ${item.textScale || 1})`,
+                      fontSize: `calc(13px * var(--node-scale, 1) * var(--vista-escala, ${item.textScale || 1}))`,
                       fontWeight: ti.bold ? 700 : undefined,
                       fontStyle: ti.italic ? 'italic' : undefined,
                       textDecoration: [ti.underline && 'underline', ti.strike && 'line-through'].filter(Boolean).join(' ') || undefined,
@@ -2296,10 +2296,12 @@ function CalendarItem({ item, lang, onUpdate, editing }) {
       style={{
         width:'100%', height:'100%',
         // Multiplican al --node-scale que ya tiene el nodo: uno para lo que se
-        // lee dentro de los días y otro para la cabecera del mes y el año,
-        // que se piden por separado porque se leen a distancias distintas.
-        '--cal-texto': item.textScale || 1,
-        '--cal-cabecera': item.headScale || 1,
+        // lee dentro de los días y otro para la cabecera del mes y el año.
+        // La cabecera va ADEMÁS por encima del texto: al subir el tamaño, los
+        // días crecían y el mes se quedaba enano arriba (lo vio el usuario), así
+        // que su propio tamaño es un ajuste sobre el del texto, no aparte.
+        '--cal-texto': `var(--vista-escala, ${item.textScale || 1})`,
+        '--cal-cabecera': `calc(var(--vista-mes, ${item.headScale || 1}) * var(--cal-texto, 1))`,
         ...(item.numberColor ? { '--cal-numero': item.numberColor } : null),
       }}
     >
@@ -3306,10 +3308,10 @@ function CommentItem({ item, lang, onUpdate, editing }) {
             onClick={(e)=>e.stopPropagation()}
             onMouseDown={(e)=>e.stopPropagation()}
             onKeyDown={(e)=>{ if (e.key==='Escape') e.target.blur(); }}
-            style={{ color: window.nodeInk(item), fontSize: `calc(13.5px * var(--node-scale, 1) * ${item.textScale || 1})` }}
+            style={{ color: window.nodeInk(item), fontSize: `calc(13.5px * var(--node-scale, 1) * var(--vista-escala, ${item.textScale || 1}))` }}
           />
         ) : (
-          <div ref={ref} className="note-inner rich comment-rich" style={{ color: window.nodeInk(item), fontSize: `calc(13.5px * var(--node-scale, 1) * ${item.textScale || 1})` }}/>
+          <div ref={ref} className="note-inner rich comment-rich" style={{ color: window.nodeInk(item), fontSize: `calc(13.5px * var(--node-scale, 1) * var(--vista-escala, ${item.textScale || 1}))` }}/>
         )}
         {item.showCaption && (
           <div className="node-caption-row">
@@ -5005,7 +5007,7 @@ function FrameItem({ item, lang, editing, onUpdate, callbacks }) {
                 border: 'none', 
                 outline: 'none', 
                 fontWeight: 800,
-                fontSize: `${titleSize}px`,
+                fontSize: `var(--vista-titulo, ${titleSize}px)`,
                 fontFamily: 'var(--font-display)',
                 textAlign: align,
                 color: titleColor === 'inherit' ? 'var(--frame-title-color, var(--ink))' : titleColor
@@ -5032,7 +5034,7 @@ function FrameItem({ item, lang, editing, onUpdate, callbacks }) {
               className="frame-title" 
               style={{ 
                 fontWeight: 800, 
-                fontSize: `${titleSize}px`, 
+                fontSize: `var(--vista-titulo, ${titleSize}px)`, 
                 fontFamily: 'var(--font-display)',
                 color: titleColor === 'inherit' ? 'var(--frame-title-color, var(--ink))' : titleColor,
                 textAlign: align
@@ -5290,20 +5292,6 @@ function ShapeItem({ item, lang, editing, onUpdate }) {
   // eslint-disable-next-line
   }, [texto, editing, item.h, item.w, item.figura, item.textScale, item.manualH, lang]);
 
-  // Entrar a editar es poner el cursor dentro, no solo permitirlo: sin esto se
-  // podía hacer doble clic en la figura, ver la barra de formato aparecer, y
-  // escribir sin que apareciera una sola letra.
-  React.useEffect(() => {
-    if (!editing || !ref.current) return;
-    ref.current.focus();
-    const r = document.createRange();
-    r.selectNodeContents(ref.current);
-    r.collapse(false);
-    const sel = window.getSelection();
-    sel.removeAllRanges();
-    sel.addRange(r);
-  }, [editing]);
-
   const onInput = () => {
     if (!ref.current) return;
     onUpdate({ content: { es: ref.current.innerHTML, en: ref.current.innerHTML } });
@@ -5335,7 +5323,7 @@ function ShapeItem({ item, lang, editing, onUpdate }) {
           fontWeight: item.bold === false ? 500 : 700,
           fontStyle: item.italic ? 'italic' : 'normal',
           textDecoration: decoracion,
-          fontSize: (15 * (item.textScale || 1)) + 'px',
+          fontSize: `calc(15px * var(--vista-escala, ${item.textScale || 1}))`,
           lineHeight: 1.25,
           overflow: 'hidden',
           outline: 'none',
