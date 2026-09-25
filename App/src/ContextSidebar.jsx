@@ -334,6 +334,8 @@ function ContextSidebar({
   const isMap = item.type === 'map';
   const isShape = item.type === 'shape';
   const isSeparator = item.type === 'separator';
+  const isCarpeta = item.type === 'carpeta';
+  const isRuleta = item.type === 'ruleta';
   const isCode = item.type === 'code';
   const isTimer = item.type === 'timer';
   // Mientras se escribe código, la barra se queda en lo justo: volver, y
@@ -614,13 +616,13 @@ function ContextSidebar({
                 Y un bloque de código tampoco: su azul oscuro con el degradado
                 es lo que lo hace reconocible de un vistazo. Ahí se cambia el
                 título y su barra, que van en sus propios botones. */}
-            {!tableCell && !isImage && !isDraw && !isCode && (
+            {!tableCell && !isImage && !isDraw && !isCode && !isRuleta && (
               <button
             className={`ctx-btn ${(pane === 'color' || pane === 'colorHex') ? 'active' : ''}`}
             onClick={()=> isColor ? setPane(pane === 'colorHex' ? null : 'colorHex') : setPane(pane === 'color' ? null : 'color')}
             title="Color"
           >
-            <div className="ctx-color-chip" style={{ background: isColor ? (item.hex || '#56B3A7') : isSeparator && !item.color ? 'var(--ink-2)' : resolveStickyColor(item.color || 'white'), border: '1.5px solid var(--line-soft)' }}/>
+            <div className="ctx-color-chip" style={{ background: isColor ? (item.hex || '#56B3A7') : isSeparator && !item.color ? 'var(--ink-2)' : isCarpeta && !item.color ? '#74BDEB' : resolveStickyColor(item.color || 'white'), border: '1.5px solid var(--line-soft)' }}/>
             <span>Color</span>
           </button>
         )}
@@ -653,6 +655,52 @@ function ContextSidebar({
             <span className="material-symbols-rounded">aspect_ratio</span>
             <span>{window.t('Igualar', 'Even out')}</span>
           </button>
+        )}
+
+        {/* La carpeta: cambiarla, abrirla en el Explorador y volver a mirarla. El
+            nodo escucha estos avisos por su id (ver Carpeta.jsx). */}
+        {isCarpeta && window.electronAPI && window.electronAPI.carpetaLeer && (
+          <>
+            <button className="ctx-btn" onClick={() => window.dispatchEvent(new CustomEvent('odi-carpeta-elegir', { detail: item.id }))} title={window.t('Elegir otra carpeta', 'Choose another folder')}>
+              <span className="material-symbols-rounded">folder_open</span>
+              <span>{window.t('Carpeta', 'Folder')}</span>
+            </button>
+            {item.ruta && (
+              <button
+                className="ctx-btn"
+                onClick={async () => {
+                  const r = await window.electronAPI.carpetaAbrir(item.ruta);
+                  if (!r || !r.ok) window.showToast && window.showToast(window.t('Esa carpeta ya no está donde estaba.', 'That folder is no longer where it was.'), 'error');
+                }}
+                title={window.t('Abrirla en el Explorador', 'Open it in Explorer')}
+              >
+                <span className="material-symbols-rounded">open_in_new</span>
+                <span>{window.t('Abrir', 'Open')}</span>
+              </button>
+            )}
+            {item.ruta && (
+              <button className="ctx-btn" onClick={() => window.dispatchEvent(new CustomEvent('odi-carpeta-leer', { detail: item.id }))} title={window.t('Volver a mirar lo que hay dentro', 'Look inside again')}>
+                <span className="material-symbols-rounded">refresh</span>
+                <span>{window.t('Actualizar', 'Refresh')}</span>
+              </button>
+            )}
+          </>
+        )}
+
+        {/* La ruleta: girarla y editar sus elementos. */}
+        {isRuleta && (
+          <>
+            {(item.elementos || []).length >= 2 && (
+              <button className="ctx-btn" onClick={() => window.dispatchEvent(new CustomEvent('odi-ruleta-girar', { detail: item.id }))} title={window.t('Girar la ruleta', 'Spin the wheel')}>
+                <span className="material-symbols-rounded">cached</span>
+                <span>{window.t('Girar', 'Spin')}</span>
+              </button>
+            )}
+            <button className={`ctx-btn ${pane === 'ruletaElementos' ? 'active' : ''}`} onClick={() => setPane(pane === 'ruletaElementos' ? null : 'ruletaElementos')} title={window.t('Los elementos de la ruleta', 'The wheel items')}>
+              <span className="material-symbols-rounded">format_list_bulleted</span>
+              <span>{window.t('Elementos', 'Items')}</span>
+            </button>
+          </>
         )}
 
         {/* El separador: el estilo de la línea y dónde va el título. */}
@@ -1526,6 +1574,57 @@ function ContextSidebar({
           onCerrar={() => setPane(null)}
         />
       )}
+      {pane === 'ruletaElementos' && (() => {
+        const elementos = Array.isArray(item.elementos) ? item.elementos : [];
+        const colores = ['#E6544F', '#F7DA84', '#90B968', '#3D5A80', '#955BA5', '#F2A65A', '#5BB5A2', '#E58FB0'];
+        const cambia = (id, patch) => onUpdate({ elementos: elementos.map(e => e.id === id ? { ...e, ...patch } : e) });
+        return (
+          <div className="ctx-popout ruleta-panel" onMouseDown={(e) => e.stopPropagation()}>
+            <div className="ctx-pop-section">
+              <div className="ctx-pop-title">{window.t('Elementos de la ruleta', 'Wheel items')}</div>
+              <div className="ruleta-lista">
+                {elementos.map(el => (
+                  <div key={el.id} className="ruleta-fila">
+                    {/* Un toque cambia al siguiente color de la lista: elegir entre
+                        ocho es más rápido que abrir un selector por cada porción. */}
+                    <button
+                      className="ruleta-fila-color"
+                      style={{ background: el.color }}
+                      onClick={() => cambia(el.id, { color: colores[(colores.indexOf(el.color) + 1) % colores.length] })}
+                      title={window.t('Cambiar el color', 'Change the colour')}
+                    />
+                    <input
+                      className="ruleta-fila-texto"
+                      value={el.texto}
+                      onChange={(e) => cambia(el.id, { texto: e.target.value })}
+                      onKeyDown={(e) => e.stopPropagation()}
+                    />
+                    <button className="ruleta-fila-quitar" onClick={() => onUpdate({ ultimo: null, elementos: elementos.filter(e => e.id !== el.id) })} title={window.t('Quitar', 'Remove')}>
+                      <span className="material-symbols-rounded">close</span>
+                    </button>
+                  </div>
+                ))}
+              </div>
+              <input
+                className="ruleta-nuevo"
+                placeholder={window.t('Nuevo elemento y Intro', 'New item and Enter')}
+                onKeyDown={(e) => {
+                  e.stopPropagation();
+                  if (e.key !== 'Enter' || !e.target.value.trim()) return;
+                  // Con otros elementos, el elegido de antes ya no dice nada.
+                  onUpdate({ ultimo: null, elementos: [...elementos, {
+                    id: `el-${Date.now()}-${Math.floor(Math.random() * 9999)}`,
+                    texto: e.target.value.trim(),
+                    color: colores[elementos.length % colores.length],
+                  }] });
+                  e.target.value = '';
+                  window.playAudioTone && window.playAudioTone('create');
+                }}
+              />
+            </div>
+          </div>
+        );
+      })()}
       {pane === 'sepLinea' && (
         <div className="ctx-popout">
           <div className="ctx-pop-section">
@@ -1577,7 +1676,7 @@ function ContextSidebar({
       {pane === 'color' && (
         <div className="ctx-popout">
           <div className="ctx-pop-section">
-            <div className="ctx-pop-title">{isColumn ? (window.t('Color de la franja', 'Strip color')) : isSeparator ? window.t('Color de la línea', 'Line colour') : (window.t('Color de fondo', 'Background'))}</div>
+            <div className="ctx-pop-title">{isColumn ? (window.t('Color de la franja', 'Strip color')) : isSeparator ? window.t('Color de la línea', 'Line colour') : isCarpeta ? window.t('Color de la carpeta', 'Folder colour') : (window.t('Color de fondo', 'Background'))}</div>
             {/* Cuatro y el arcoiris, como la barra de herramientas. Antes eran
                 trece cuadrados: una rejilla de trece colores parecidos obliga a
                 comparar, y comparar cuesta mas que elegir. Los cuatro cubren lo

@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog, shell, Menu } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, shell, Menu, nativeImage } = require('electron');
 app.commandLine.appendSwitch('disable-features', 'WinUseBrowserSpellChecker');
 const path = require('path');
 const fs = require('fs');
@@ -725,6 +725,85 @@ ipcMain.handle('mostrar-en-carpeta', async (event, datos) => {
     logToFile(`mostrar-en-carpeta failed: ${err.message}`);
     return { ok: false, motivo: 'error' };
   }
+});
+
+// ── El nodo de carpeta ──
+// Un acceso directo a una carpeta del ordenador que enseña lo que hay dentro:
+// cuántos archivos y carpetas, y las miniaturas de los últimos que se tocaron,
+// que asoman por la carpeta al pasar el ratón. Las miniaturas las hace Windows
+// (las mismas del Explorador), así que salen igual para una foto, un PDF, un
+// vídeo o una carpeta, sin tener que saber abrir cada tipo aquí.
+ipcMain.handle('carpeta-elegir', async (event, desde) => {
+  const r = await dialog.showOpenDialog(BrowserWindow.fromWebContents(event.sender), {
+    properties: ['openDirectory'],
+    defaultPath: typeof desde === 'string' && desde && fs.existsSync(desde) ? desde : undefined,
+  });
+  return r.canceled || !r.filePaths.length ? null : r.filePaths[0];
+});
+
+// Lo que el sistema pone en cada carpeta y nadie considera "sus archivos".
+const OCULTOS_CARPETA = new Set(['desktop.ini', 'thumbs.db', '.ds_store']);
+function tipoDeArchivo(nombre, esCarpeta) {
+  if (esCarpeta) return 'carpeta';
+  const ext = path.extname(nombre).toLowerCase().slice(1);
+  if (['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg', 'heic', 'avif', 'tif', 'tiff'].includes(ext)) return 'imagen';
+  if (ext === 'pdf') return 'pdf';
+  if (['mp4', 'mov', 'mkv', 'webm', 'avi'].includes(ext)) return 'video';
+  if (['mp3', 'wav', 'ogg', 'flac', 'm4a', 'aac'].includes(ext)) return 'audio';
+  if (['doc', 'docx', 'odt', 'rtf', 'txt', 'md'].includes(ext)) return 'texto';
+  if (['xls', 'xlsx', 'ods', 'csv'].includes(ext)) return 'hoja';
+  if (['ppt', 'pptx', 'odp', 'key'].includes(ext)) return 'presentacion';
+  return 'otro';
+}
+async function miniaturaDe(ruta, tipo) {
+  try {
+    const img = await nativeImage.createThumbnailFromPath(ruta, { width: 256, height: 256 });
+    if (img && !img.isEmpty()) return img.toDataURL();
+  } catch (e) { /* sin miniatura del sistema: se intenta abajo */ }
+  if (tipo === 'imagen') {
+    try {
+      const img = nativeImage.createFromPath(ruta);
+      if (!img.isEmpty()) return img.resize({ width: 256 }).toDataURL();
+    } catch (e) {}
+  }
+  return null;
+}
+
+ipcMain.handle('carpeta-leer', async (event, ruta) => {
+  try {
+    if (typeof ruta !== 'string' || !ruta) return { ok: false, motivo: 'sin-ruta' };
+    const st = await fs.promises.stat(ruta).catch(() => null);
+    if (!st || !st.isDirectory()) return { ok: false, motivo: 'no-esta' };
+    const entradas = (await fs.promises.readdir(ruta, { withFileTypes: true }))
+      .filter(e => !e.name.startsWith('.') && !OCULTOS_CARPETA.has(e.name.toLowerCase()));
+    const carpetas = entradas.filter(e => e.isDirectory()).length;
+    const archivos = entradas.length - carpetas;
+    // Las muestras: lo último que se tocó, que es lo que uno reconoce. Se miran
+    // como mucho doscientas entradas: una carpeta de descargas con miles de
+    // archivos no puede dejar el nodo esperando.
+    const conFecha = [];
+    for (const e of entradas.slice(0, 200)) {
+      const s = await fs.promises.stat(path.join(ruta, e.name)).catch(() => null);
+      if (s) conFecha.push({ e, t: s.mtimeMs });
+    }
+    conFecha.sort((a, b) => b.t - a.t);
+    const muestras = [];
+    for (const { e } of conFecha.slice(0, 3)) {
+      const completa = path.join(ruta, e.name);
+      const tipo = tipoDeArchivo(e.name, e.isDirectory());
+      muestras.push({ nombre: e.name, tipo, miniatura: await miniaturaDe(completa, tipo) });
+    }
+    return { ok: true, nombre: path.basename(ruta) || ruta, archivos, carpetas, muestras };
+  } catch (err) {
+    logToFile(`carpeta-leer failed: ${err.message}`);
+    return { ok: false, motivo: 'error' };
+  }
+});
+
+ipcMain.handle('carpeta-abrir', async (event, ruta) => {
+  if (typeof ruta !== 'string' || !ruta || !fs.existsSync(ruta)) return { ok: false, motivo: 'no-esta' };
+  const error = await shell.openPath(ruta);
+  return error ? { ok: false, motivo: error } : { ok: true };
 });
 
 ipcMain.handle('open-user-data-folder', async () => {

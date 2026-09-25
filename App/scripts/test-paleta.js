@@ -51,8 +51,9 @@ const barra = lee('TOOLS');
 const extras = lee('EXTRA_TOOLS');
 
 check('la barra de arriba tiene sus catorce nodos', barra.length === 14, 'hay ' + barra.length);
-// Ocho desde que llegó el separador (1.0.9), con la estructura, en rojo.
-check('y el menú del "+" los ocho que sobran', extras.length === 8, 'hay ' + extras.length);
+// Diez en la 1.0.9: el separador y la ruleta con la estructura, en rojo, y la
+// carpeta con los archivos, en gris.
+check('y el menú del "+" los diez que sobran', extras.length === 10, 'hay ' + extras.length);
 
 const malBarra = enOrden(barra);
 check('la barra va verde → gris → rojo → blanco', malBarra === null, malBarra || undefined);
@@ -63,18 +64,18 @@ check('el menú del "+" va verde → gris → rojo', malExtras === null, malExtr
 check('empieza por lo que se escribe',
   extras[0].bg === VERDE && extras[1].bg === VERDE,
   extras.slice(0, 2).map(x => x.id).join(', '));
-check('sigue con los medios y los archivos',
-  extras[2].bg === GRIS && extras[3].bg === GRIS,
-  extras.slice(2, 4).map(x => x.id).join(', '));
+check('sigue con los medios y los archivos (la carpeta entre ellos)',
+  extras.slice(2, 5).every(x => x.bg === GRIS),
+  extras.slice(2, 5).map(x => x.id).join(', '));
 check('y acaba con la estructura y las herramientas',
-  extras.slice(4).every(x => x.bg === ROJO),
-  extras.slice(4).map(x => x.id).join(', '));
+  extras.slice(5).every(x => x.bg === ROJO),
+  extras.slice(5).map(x => x.id).join(', '));
 
 // Que reordenar no se haya llevado ningún nodo por delante.
 const ids = [...barra, ...extras].map(x => x.id).sort();
-check('están los veintidós nodos, sin repetidos',
-  ids.length === 22 && new Set(ids).size === 22, ids.length + ' ids');
-for (const quien of ['comment', 'code', 'file', 'map', 'shape', 'separator', 'calendar', 'timer']) {
+check('están los veinticuatro nodos, sin repetidos',
+  ids.length === 24 && new Set(ids).size === 24, ids.length + ' ids');
+for (const quien of ['comment', 'code', 'file', 'map', 'carpeta', 'shape', 'separator', 'calendar', 'timer', 'ruleta']) {
   check('sigue estando ' + quien, ids.indexOf(quien) !== -1);
 }
 

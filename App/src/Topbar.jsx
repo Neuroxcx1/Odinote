@@ -48,11 +48,13 @@ const EXTRA_TOOLS = [
   // Medios / archivos → gris
   { id: 'file',     icon: 'draft',         label: 'tool_file',     bg: '#E1DFE3', fg: '#1A1A1A' },
   { id: 'map',      icon: 'map',           label: 'tool_map',      bg: '#E1DFE3', fg: '#1A1A1A' },
+  { id: 'carpeta',  icon: 'folder',        label: 'tool_carpeta',  bg: '#E1DFE3', fg: '#1A1A1A' },
   // Estructura y herramientas → rojo
   { id: 'shape',    icon: 'category',      label: 'tool_shape',    bg: '#E6544F', fg: 'white' },
   { id: 'separator', icon: 'horizontal_rule', label: 'tool_separator', bg: '#E6544F', fg: 'white' },
   { id: 'calendar', icon: 'calendar_month',label: 'tool_calendar', bg: '#E6544F', fg: 'white' },
   { id: 'timer',    icon: 'timer',         label: 'tool_timer',    bg: '#E6544F', fg: 'white' },
+  { id: 'ruleta',   icon: 'pie_chart',     label: 'tool_ruleta',   bg: '#E6544F', fg: 'white' },
 ];
 
 function Topbar({

@@ -24,6 +24,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // { ok, motivo }: 'no-esta' cuando la ruta ya no existe, que es lo normal
   // cuando alguien mueve o borra el original meses después.
   mostrarEnCarpeta: (datos) => ipcRenderer.invoke('mostrar-en-carpeta', datos),
+  // El nodo de carpeta: elegirla, leer lo que tiene (cuántos archivos y las
+  // miniaturas de los últimos) y abrirla en el Explorador.
+  carpetaElegir: (desde) => ipcRenderer.invoke('carpeta-elegir', desde),
+  carpetaLeer: (ruta) => ipcRenderer.invoke('carpeta-leer', ruta),
+  carpetaAbrir: (ruta) => ipcRenderer.invoke('carpeta-abrir', ruta),
   fetchImageBase64: (url) => ipcRenderer.invoke('fetch-image-base64', url),
   downloadMediaToVault: (folderPath, url, fileName) => ipcRenderer.invoke('download-media-to-vault', { folderPath, url, fileName }),
   getCustomDictionaryWords: () => ipcRenderer.invoke('get-custom-dictionary-words'),

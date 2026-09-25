@@ -1699,6 +1699,239 @@ body.odi-busy iframe { pointer-events: none !important; }
 /* ── Captions / "leyendas" (shared rich contentEditable) ──
    Always styled like a heading (H1). Font size is FIXED (not node-scaled) so that
    auto-growing the node height can't feed back into the caption height. */
+/* ── Muelle, al estilo del iPhone ──
+   La curva de las animaciones nuevas: se pasa un poco de largo y vuelve, que es
+   lo que hace que un movimiento parezca físico y no mecánico. Los nodos nuevos
+   la estrenan; la 1.2 la llevará al resto de la aplicación. */
+:root {
+  --muelle: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --muelle-suave: cubic-bezier(0.22, 1.25, 0.36, 1);
+}
+
+/* ── Carpeta ──
+   Dibujada con CSS: la trasera con su pestaña, tres hojas con las miniaturas
+   de lo último de dentro, y la delantera medio transparente y esmerilada, que
+   deja ver borroso lo que hay detrás (la foto más reciente, en grande). Al
+   pasar el ratón las hojas salen en abanico y la delantera se inclina un poco
+   hacia quien mira, como si se abriera. */
+.carpeta {
+  width: 100%; height: 100%;
+  container-type: size;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 6px; padding: 10px 8px 8px;
+  cursor: pointer; user-select: none;
+}
+.carpeta-dibujo {
+  position: relative;
+  /* Lo más grande que quepa, dejando sitio debajo para el nombre y la cuenta. */
+  width: min(88cqw, calc((100cqh - 70px) * 1.28));
+  aspect-ratio: 1.28 / 1;
+  flex: 0 0 auto;
+  font-size: min(4.2cqw, 16px);
+  perspective: 700px;
+}
+.carpeta-trasera {
+  position: absolute; left: 0; right: 0; top: 9%; bottom: 0;
+  border-radius: 9% / 11%;
+  background: color-mix(in srgb, var(--carpeta) 78%, #000);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.12);
+}
+.carpeta-trasera::before {
+  content: ''; position: absolute; left: 0; top: -8%;
+  width: 40%; height: 16%;
+  border-radius: 8px 12px 0 0;
+  background: inherit;
+}
+.carpeta-fondo {
+  position: absolute; left: 14%; right: 14%; top: 32%; bottom: 10%;
+  background-size: cover; background-position: center;
+  border-radius: 8px;
+  transition: transform 520ms var(--muelle);
+}
+.carpeta-hojas { position: absolute; left: 10%; right: 10%; top: 0; bottom: 26%; }
+.carpeta-hoja {
+  position: absolute; top: 4%;
+  width: 38%; aspect-ratio: 3 / 3.6;
+  display: grid; place-items: center; overflow: hidden;
+  border-radius: 9%;
+  background: #F4F4F2;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.18), inset 0 0 0 1px rgba(0,0,0,0.06);
+  transition: transform 520ms var(--muelle);
+}
+.carpeta-hoja img { width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
+.carpeta-hoja .material-symbols-rounded { font-size: 2.2em; color: #6E6A6E; }
+.carpeta-hoja.tipo-carpeta .material-symbols-rounded { color: color-mix(in srgb, var(--carpeta) 80%, #000); }
+.carpeta-hoja.tipo-pdf .material-symbols-rounded { color: #E6544F; }
+.carpeta-hoja.hueca { background: color-mix(in srgb, #F4F4F2 70%, transparent); }
+.carpeta-hoja.h0 { left: 0%;  transform: rotate(-9deg); }
+.carpeta-hoja.h1 { left: 31%; transform: translateY(-5%); z-index: 1; }
+.carpeta-hoja.h2 { left: 62%; transform: rotate(9deg); }
+.carpeta-delantera {
+  position: absolute; left: 0; right: 0; top: 27%; bottom: 0;
+  display: grid; place-items: center;
+  border-radius: 9% / 12%;
+  /* Más transparente en el medio: por ahí asoma lo de dentro. */
+  background:
+    radial-gradient(ellipse 62% 58% at 50% 45%, color-mix(in srgb, var(--carpeta) 36%, transparent), color-mix(in srgb, var(--carpeta) 92%, transparent) 78%);
+  -webkit-backdrop-filter: blur(9px) saturate(1.35);
+  backdrop-filter: blur(9px) saturate(1.35);
+  box-shadow: inset 0 1.5px 0 rgba(255,255,255,0.5), 0 6px 16px rgba(0,0,0,0.16);
+  transform-origin: 50% 100%;
+  transition: transform 520ms var(--muelle);
+  z-index: 2;
+}
+/* Las dos rayas de la parte de abajo, como en la carpeta de la captura. */
+.carpeta-delantera::before, .carpeta-delantera::after {
+  content: ''; position: absolute; left: 12%; right: 12%; height: 2px; border-radius: 2px;
+  background: rgba(255,255,255,0.35);
+}
+.carpeta-delantera::before { bottom: 16%; }
+.carpeta-delantera::after { bottom: 10%; }
+.item:hover .carpeta-hoja.h0 { transform: translate(-16%, -30%) rotate(-15deg); }
+.item:hover .carpeta-hoja.h1 { transform: translateY(-40%); transition-delay: 40ms; }
+.item:hover .carpeta-hoja.h2 { transform: translate(16%, -30%) rotate(15deg); transition-delay: 80ms; }
+.item:hover .carpeta-delantera { transform: rotateX(-16deg) translateY(1.5%); }
+.item:hover .carpeta-fondo { transform: scale(1.08) translateY(-4%); }
+.carpeta-nombre {
+  max-width: 100%;
+  font-family: var(--font-display); font-weight: 700; font-size: 15px;
+  color: var(--ink);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.carpeta-cuenta {
+  padding: 2px 9px; border-radius: 999px;
+  background: color-mix(in srgb, var(--ink) 7%, transparent);
+  color: var(--ink-3); font-size: 11px; font-weight: 600;
+  white-space: nowrap;
+}
+.carpeta.vacia .carpeta-trasera, .carpeta.perdida .carpeta-trasera { opacity: 0.55; }
+.carpeta.vacia .carpeta-hoja.hueca { opacity: 0.5; }
+.carpeta-elegir {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 6px 11px; border-radius: 999px;
+  background: #90B968; color: #1A1A1A;
+  font-size: 12px; font-weight: 700; cursor: pointer;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.18);
+  transition: transform 220ms var(--muelle);
+}
+.carpeta-elegir:hover { transform: scale(1.06); }
+.carpeta-elegir .material-symbols-rounded { font-size: 16px; }
+
+/* ── Ruleta ── */
+.ruleta {
+  width: 100%; height: 100%;
+  display: grid; place-items: center;
+  padding: 8px;
+  user-select: none;
+  container-type: size;
+}
+/* Un cuadrado lo más grande que quepa en el nodo, sea como sea el nodo. */
+.ruleta-rueda-caja {
+  position: relative;
+  width: min(100cqw, 100cqh); height: min(100cqw, 100cqh);
+  container-type: inline-size;
+}
+.ruleta-rueda {
+  width: 100%; height: 100%;
+  display: block;
+  border-radius: 50%;
+  filter: drop-shadow(0 6px 14px rgba(0,0,0,0.22));
+  will-change: transform;
+}
+.ruleta-borde { fill: var(--paper); stroke: var(--line); stroke-width: 2.5; }
+.ruleta-porcion { stroke: rgba(255,255,255,0.75); stroke-width: 0.8; transition: opacity 300ms; }
+.ruleta-porcion.apagada { opacity: 0.42; }
+.ruleta-texto { font-family: var(--font-display); font-weight: 800; font-size: 8.5px; letter-spacing: -0.01em; pointer-events: none; transition: opacity 300ms; }
+.ruleta-luz { fill: #FFF6D8; stroke: rgba(0,0,0,0.12); stroke-width: 0.4; }
+.ruleta.girando .ruleta-luz { animation: ruleta-luces 380ms steps(2, jump-none) infinite; }
+.ruleta.girando .ruleta-luz:nth-child(odd) { animation-delay: 190ms; }
+@keyframes ruleta-luces { from { fill: #FFF6D8; } to { fill: #F7DA84; } }
+/* La flecha de arriba, roja como el resto de lo que señala en la aplicación. */
+.ruleta-flecha {
+  position: absolute; left: 50%; top: -3%; z-index: 3;
+  width: 9%; aspect-ratio: 0.8;
+  transform: translateX(-50%);
+  background: #E6544F;
+  clip-path: polygon(0 0, 100% 0, 50% 100%);
+  filter: drop-shadow(0 2px 2px rgba(0,0,0,0.3));
+}
+.ruleta.girando .ruleta-flecha { animation: ruleta-flecha 110ms ease-in-out infinite alternate; transform-origin: 50% 0; }
+@keyframes ruleta-flecha { from { transform: translateX(-50%) rotate(-7deg); } to { transform: translateX(-50%) rotate(7deg); } }
+.ruleta-centro {
+  position: absolute; left: 50%; top: 50%; z-index: 3;
+  width: 26%; aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: var(--paper); color: var(--ink);
+  border: 2.5px solid var(--line);
+  box-shadow: 0 3px 10px rgba(0,0,0,0.25);
+  font-family: var(--font-display); font-weight: 800; font-size: clamp(11px, 4.2cqw, 18px);
+  cursor: pointer;
+  transition: transform 260ms var(--muelle), background 150ms;
+}
+.ruleta-centro:hover:not(:disabled) { transform: translate(-50%, -50%) scale(1.08); background: #90B968; color: #1A1A1A; }
+.ruleta-centro:active:not(:disabled) { transform: translate(-50%, -50%) scale(0.95); }
+.ruleta-centro:disabled { cursor: default; }
+/* El elegido: salta en medio con rebote y se queda, del color de su porción. */
+.ruleta-premio {
+  position: absolute; left: 50%; bottom: 7%; z-index: 4;
+  max-width: 84%;
+  padding: 0.45em 1em;
+  border-radius: 999px;
+  background: var(--paper); color: var(--ink);
+  border: 2px solid var(--ev, var(--line));
+  box-shadow: 0 6px 18px rgba(0,0,0,0.25);
+  font-family: var(--font-display); font-weight: 800; font-size: clamp(12px, 5.5cqw, 22px);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  transform: translateX(-50%);
+  animation: ruleta-premio 620ms var(--muelle) both;
+}
+@keyframes ruleta-premio {
+  from { opacity: 0; transform: translateX(-50%) translateY(14px) scale(0.6); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+}
+/* Vacía: un círculo en blanco que dice lo que falta, como el de la captura. */
+.ruleta-vacia {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px;
+  padding: 16%;
+  border-radius: 50%;
+  background: var(--paper); color: var(--ink);
+  border: 2px dashed var(--line-soft);
+  box-shadow: 0 8px 22px rgba(0,0,0,0.14);
+  text-align: center;
+}
+.ruleta-vacia-texto { font-family: var(--font-display); font-weight: 700; font-size: clamp(12px, 5cqw, 18px); line-height: 1.25; }
+.ruleta-boton {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 7px 14px; border-radius: 999px;
+  background: #90B968; color: #1A1A1A;
+  font-size: 13px; font-weight: 700; cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.18);
+  transition: transform 220ms var(--muelle);
+}
+.ruleta-boton:hover { transform: scale(1.06); }
+.ruleta-boton .material-symbols-rounded { font-size: 17px; }
+/* El panel de elementos de la barra. */
+.ruleta-lista { display: flex; flex-direction: column; gap: 5px; margin-bottom: 8px; max-height: 50vh; overflow-y: auto; }
+.ruleta-fila { display: flex; align-items: center; gap: 6px; }
+.ruleta-fila-color { width: 20px; height: 20px; flex-shrink: 0; border-radius: 50%; border: 1.5px solid var(--line-soft); cursor: pointer; transition: transform 200ms var(--muelle); }
+.ruleta-fila-color:hover { transform: scale(1.15); }
+.ruleta-fila-texto, .ruleta-nuevo {
+  flex: 1; min-width: 0; width: 100%;
+  padding: 6px 8px; border: 1.5px solid var(--line-soft); border-radius: 2px;
+  background: var(--paper-2); color: var(--ink); font-size: 12.5px; font-weight: 600;
+}
+.ruleta-fila-texto:focus, .ruleta-nuevo:focus { border-color: var(--olive); }
+.ruleta-fila-quitar { width: 26px; height: 26px; flex-shrink: 0; display: grid; place-items: center; border-radius: 2px; color: var(--ink-3); cursor: pointer; }
+.ruleta-fila-quitar:hover { background: color-mix(in srgb, var(--wine) 14%, transparent); color: var(--wine); }
+.ruleta-fila-quitar .material-symbols-rounded { font-size: 16px; }
+.ruleta-campo {
+  width: 88%; padding: 7px 12px; border-radius: 999px;
+  border: 2px solid #90B968; background: var(--paper-2); color: var(--ink);
+  font-size: 13px; font-weight: 600; text-align: center;
+}
+
 /* ── Separador ──
    La línea ocupa lo que deje el título; a la izquierda o a la derecha el título
    se come una de las dos. Sin título queda una sola línea de lado a lado. */

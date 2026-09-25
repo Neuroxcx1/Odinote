@@ -65,6 +65,8 @@ function defaultDims(type) {
     case 'frame':    return { w: 400, h: 400 };
     case 'shape':    return { w: 200, h: 160 };
     case 'separator': return { w: 640, h: 48 };
+    case 'carpeta':  return { w: 230, h: 240 };
+    case 'ruleta':   return { w: 340, h: 340 };
     case 'code':     return { w: 420, h: 260 };
     case 'timer':    return { w: 260, h: 252 };
     case 'bigtitle': return { w: 300, h: 80 };
@@ -198,6 +200,15 @@ function makeNewItem(type, x, y, w, h, lang) {
       return { ...base, type: 'separator', ...defaultSize(640, 48),
         content: { es: 'Nueva sección', en: 'New section' },
         align: 'left', estiloLinea: 'continua', grosor: 2 };
+    case 'carpeta':
+      // Nace con su botón de "Elegir carpeta" y no abriendo la ventana de
+      // Windows por su cuenta: así se ve qué es antes de elegir nada, y la
+      // ventana solo sale cuando alguien la pide.
+      return { ...base, type: 'carpeta', ...defaultSize(230, 240), ruta: '', nombre: '' };
+    case 'ruleta':
+      // Nace vacía: el círculo en blanco explica que hacen falta dos elementos
+      // y trae el botón para añadirlos.
+      return { ...base, type: 'ruleta', ...defaultSize(340, 340), elementos: [], giro: 0 };
     case 'timer':
       // Nace en cuenta atras de cinco minutos, que es para lo que la coge uno
       // sin pensarlo. El pomodoro y el cronometro estan a un clic en su menu.
