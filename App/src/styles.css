@@ -1437,7 +1437,12 @@ body[data-patrocinador="1"] .board-preview-item {
 
 /* Zoom controls */
 /* ── La cámara del lienzo ── */
-.canvas-shot {
+/* Con .icon-btn delante a propósito: las reglas que encogen los botones de
+   arriba en pantallas de menos de 1920 (36-39 px) son de .icon-btn y van más
+   abajo en este archivo, así que le ganaban a esta y la cámara salía más
+   grande que sus vecinos de 32 px en cuanto la ventana no era enorme (lo vio
+   el usuario con la ventana pequeña). */
+.icon-btn.canvas-shot {
   position: absolute;
   bottom: 16px;
   right: 205px;
