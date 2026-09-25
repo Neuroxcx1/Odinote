@@ -29,6 +29,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   carpetaElegir: (desde) => ipcRenderer.invoke('carpeta-elegir', desde),
   carpetaLeer: (ruta) => ipcRenderer.invoke('carpeta-leer', ruta),
   carpetaAbrir: (ruta) => ipcRenderer.invoke('carpeta-abrir', ruta),
+  // Copiar las imágenes de un tablero a la carpeta del proyecto en que se convierte.
+  copiarMedios: (datos) => ipcRenderer.invoke('copiar-medios', datos),
   fetchImageBase64: (url) => ipcRenderer.invoke('fetch-image-base64', url),
   downloadMediaToVault: (folderPath, url, fileName) => ipcRenderer.invoke('download-media-to-vault', { folderPath, url, fileName }),
   getCustomDictionaryWords: () => ipcRenderer.invoke('get-custom-dictionary-words'),

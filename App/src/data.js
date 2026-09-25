@@ -2004,6 +2004,11 @@ window.playAudioTone = function(type) {
     } else if (type === 'snap') {
       // Tiny haptic ticking sound
       tone({ from: 1200, dur: 0.008, gain: 0.008 });
+    } else if (type === 'teletransporte') {
+      // Un tablero que se va a ser proyecto: un barrido que sube, con un brillo
+      // encima, y al llegar suena 'board_open' (ver Canvas.jsx).
+      tone({ wave: 'sine', from: 220, to: 1320, dur: 0.55, gain: 0.03 });
+      tone({ wave: 'triangle', from: 880, to: 2640, at: 0.12, dur: 0.4, gain: 0.012 });
     } else if (type === 'board_open') {
       // Entrar a un tablero: arpegio ascendente suave, al estilo de los canales de Wii
       tone({ wave: 'triangle', from: 523.25, dur: 0.35, gain: 0.030 }); // C5

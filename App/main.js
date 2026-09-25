@@ -800,6 +800,37 @@ ipcMain.handle('carpeta-leer', async (event, ruta) => {
   }
 });
 
+// ── Un tablero que pasa a ser proyecto se lleva sus imágenes ──
+// Cada proyecto guarda sus medios en su carpeta de la bóveda ('media/x.png'
+// relativo a ella). Un tablero que se convierte en proyecto las buscaría en la
+// carpeta NUEVA y no estarían: se copian (no se mueven: algún nodo del
+// proyecto de antes puede usar la misma imagen). Se prueba en cada carpeta de
+// origen que se pase y al final en el montón común de las bóvedas viejas.
+ipcMain.handle('copiar-medios', async (event, { boveda, de, a, archivos }) => {
+  try {
+    const nombreValido = (n) => typeof n === 'string' && n && !/[\\/]|\.\./.test(n);
+    if (!boveda || !nombreValido(a) || !Array.isArray(archivos)) return { ok: false, motivo: 'datos' };
+    const origenes = (Array.isArray(de) ? de : [de]).filter(nombreValido);
+    let copiados = 0, faltan = 0;
+    for (const rel of archivos) {
+      if (typeof rel !== 'string' || !rel.startsWith('media/') || rel.includes('..')) continue;
+      const destino = path.join(boveda, a, rel);
+      if (fs.existsSync(destino)) { copiados++; continue; }
+      const origen = origenes.map(c => path.join(boveda, c, rel)).concat([path.join(boveda, rel)])
+        .find(p => fs.existsSync(p));
+      if (!origen) { faltan++; continue; }
+      await fs.promises.mkdir(path.dirname(destino), { recursive: true });
+      await fs.promises.copyFile(origen, destino);
+      copiados++;
+    }
+    logToFile(`copiar-medios: ${copiados} copiados, ${faltan} sin encontrar -> ${a}`);
+    return { ok: true, copiados, faltan };
+  } catch (err) {
+    logToFile(`copiar-medios failed: ${err.message}`);
+    return { ok: false, motivo: err.message };
+  }
+});
+
 ipcMain.handle('carpeta-abrir', async (event, ruta) => {
   if (typeof ruta !== 'string' || !ruta || !fs.existsSync(ruta)) return { ok: false, motivo: 'no-esta' };
   const error = await shell.openPath(ruta);

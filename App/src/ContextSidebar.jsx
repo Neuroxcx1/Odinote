@@ -1322,6 +1322,19 @@ function ContextSidebar({
             <span>{window.t('Abrir', 'Open')}</span>
           </button>
         )}
+        {/* Sacar el tablero a su propio proyecto (ver convierteEnProyecto en
+            Canvas.jsx). No dentro de una columna: ahí el tablero no es un nodo
+            del lienzo y no tiene de dónde salir volando. */}
+        {isBoard && !isColChild && callbacks && callbacks.convertirEnProyecto && (
+          <button
+            className="ctx-btn"
+            onClick={() => callbacks.convertirEnProyecto(item.id)}
+            title={window.t('Convertir este tablero en un proyecto aparte', 'Turn this board into its own project')}
+          >
+            <span className="material-symbols-rounded">rocket_launch</span>
+            <span>{window.t('Proyecto', 'Project')}</span>
+          </button>
+        )}
 
         {isImage && (
           <>

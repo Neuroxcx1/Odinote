@@ -4805,7 +4805,169 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
 
   const [editingChild, setEditingChildState] = useStateCanvas(null); // {colId, childId} | null
 
+  // ── Un tablero que pasa a ser su propio proyecto ──
+  //
+  // Pedido por el usuario: un botón en el tablero para que ese tablero, con
+  // todo lo que tiene dentro, se convierta en un proyecto aparte, "con una
+  // animación bacana, como una teletransportación, o que se vaya para la
+  // izquierda". Se va volando a la flecha de volver, que es donde viven los
+  // proyectos, así que la animación dice a dónde ha ido.
+  //
+  // Lo que pasa con los datos: el lienzo del tablero pasa a ser el lienzo raíz
+  // del proyecto nuevo (misma información, con la clave del proyecto), y los
+  // tableros que tuviera dentro se van con él solos, porque un proyecto es todo
+  // lo que se alcanza desde su raíz (collectProjectCanvases). Del lienzo de
+  // aquí se quita el nodo y sus flechas. El historial de deshacer se empieza de
+  // nuevo: un Ctrl+Z que devolviera el tablero dejaría el proyecto nuevo sin su
+  // lienzo. Y las imágenes se copian a la carpeta del proyecto nuevo (ver
+  // 'copiar-medios' en main.js), o se romperían todas al abrirlo.
+  const projectsRef = useRefCanvas(projects);
+  projectsRef.current = projects;
+  const reiniciaHistorial = () => {
+    if (historyTimerRef.current) { clearTimeout(historyTimerRef.current); historyTimerRef.current = null; }
+    historyRef.current = [];
+    historyIdxRef.current = -1;
+    lastSnapRef.current = null;
+    setHistory([]);
+    setHistoryIdx(-1);
+  };
+  const animaTeletransporte = (itemId) => new Promise((resolve) => {
+    const el = document.querySelector(`.item[data-item-id="${itemId}"]`);
+    const destino = document.querySelector('.crumb-back');
+    if (!el || !destino || !el.animate) { resolve(); return; }
+    const r = el.getBoundingClientRect();
+    const d = destino.getBoundingClientRect();
+    const ancho = el.offsetWidth || r.width, alto = el.offsetHeight || r.height;
+    const escala = r.width / ancho;
+    // Una copia del nodo, fuera del lienzo, es la que viaja: así no la corta el
+    // borde del lienzo ni la mueve el zoom.
+    const copia = el.cloneNode(true);
+    copia.querySelectorAll('.handle, .anchors, .connect-handle, .crop-handle').forEach(n => n.remove());
+    copia.classList.remove('selected');
+    copia.classList.add('teleporte-copia');
+    Object.assign(copia.style, {
+      position: 'fixed', margin: '0', zIndex: '9999', pointerEvents: 'none',
+      width: ancho + 'px', height: alto + 'px',
+      left: (r.left + r.width / 2 - ancho / 2) + 'px', top: (r.top + r.height / 2 - alto / 2) + 'px',
+      transformOrigin: '50% 50%', transform: `scale(${escala})`,
+    });
+    document.body.appendChild(copia);
+    el.style.visibility = 'hidden';
+    // El anillo del portal, donde estaba el tablero.
+    const anillo = document.createElement('div');
+    anillo.className = 'teleporte-anillo';
+    const lado = Math.max(r.width, r.height) * 1.1;
+    Object.assign(anillo.style, { left: (r.left + r.width / 2) + 'px', top: (r.top + r.height / 2) + 'px', width: lado + 'px', height: lado + 'px' });
+    document.body.appendChild(anillo);
+    window.playAudioTone && window.playAudioTone('teletransporte');
+    const dx = d.left + d.width / 2 - (r.left + r.width / 2);
+    const dy = d.top + d.height / 2 - (r.top + r.height / 2);
+    const vuelo = copia.animate([
+      { transform: `translate(0, 0) scale(${escala})`, opacity: 1, offset: 0 },
+      // Se carga un instante, como quien coge impulso.
+      { transform: `translate(0, 0) scale(${escala * 1.06})`, opacity: 1, offset: 0.16 },
+      // Y sale en arco, hacia arriba y a la izquierda, encogiéndose.
+      { transform: `translate(${dx * 0.42}px, ${dy * 0.3 - 60}px) scale(${escala * 0.42}) rotate(-8deg)`, opacity: 0.95, offset: 0.58 },
+      { transform: `translate(${dx}px, ${dy}px) scale(0.03) rotate(-18deg)`, opacity: 0.15, offset: 1 },
+    ], { duration: 950, easing: 'cubic-bezier(0.55, 0, 0.3, 1)', fill: 'forwards' });
+    const termina = () => {
+      copia.remove();
+      anillo.remove();
+      // La flecha de volver "recibe" el proyecto con un saltito.
+      destino.classList.add('recibe');
+      setTimeout(() => destino.classList.remove('recibe'), 650);
+      window.playAudioTone && window.playAudioTone('board_open');
+      resolve();
+    };
+    vuelo.onfinish = termina;
+    vuelo.oncancel = termina;
+  });
+  const convierteEnProyecto = async (itemId) => {
+    const c = canvases[currentId];
+    const tablero = c && (c.items || []).find(i => i.id === itemId && i.type === 'board');
+    if (!tablero || !tablero.canvasId || !canvases[tablero.canvasId]) return;
+    const texto = (tablero.content && (tablero.content[lang] || tablero.content.es || tablero.content.en)) || '';
+    const nombre = String(texto).replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim() || window.t('Tablero', 'Board');
+    const vale = window.customConfirm
+      ? await window.customConfirm(window.t(
+          `¿Convertir «${nombre}» en un proyecto? Sale de este lienzo con todo lo que tiene dentro y aparece en tu pantalla de inicio.`,
+          `Turn "${nombre}" into a project? It leaves this canvas with everything inside it and shows up on your home screen.`))
+      : true;
+    if (!vale) return;
+    setSelected(null);
+    setSelectedIds([]);
+    setEditing(null);
+    await animaTeletransporte(itemId);
+
+    const nuevoId = `proj-${Date.now()}-${Math.floor(Math.random() * 9999)}`;
+    const hex = tablero.color && window.resolveStickyColor ? window.resolveStickyColor(tablero.color) : null;
+    // La portada sale del color del tablero, para que se reconozca; uno blanco
+    // se queda con la amarilla de siempre.
+    const cover = hex && String(hex).toUpperCase() !== '#FFFFFF' && String(hex).toUpperCase() !== '#FAF9F6'
+      ? `linear-gradient(135deg, ${hex} 0%, color-mix(in srgb, ${hex} 68%, #000) 100%)`
+      : 'linear-gradient(135deg, #F7DA84 0%, #F0C24B 100%)';
+    const actual = (projectsRef.current || []).find(p => p.id === projectId);
+    const proyecto = {
+      id: nuevoId,
+      name: { es: nombre, en: nombre },
+      emoji: tablero.icon && /^[a-z0-9_]+$/.test(tablero.icon) ? tablero.icon : 'dashboard',
+      cover,
+      updated: { es: 'ahora', en: 'just now' },
+      items: 0,
+      // En la misma carpeta de la pantalla de inicio que el proyecto de donde sale.
+      ...(actual && actual.carpeta ? { carpeta: actual.carpeta } : null),
+    };
+
+    // Las imágenes que viajan con él.
+    const movidos = window.OdiDrive ? window.OdiDrive.collectProjectCanvases(canvases, tablero.canvasId) : {};
+    const medios = new Set();
+    const recoge = (it) => {
+      if (!it) return;
+      for (const k of ['src', 'srcLocal']) if (typeof it[k] === 'string' && it[k].startsWith('media/')) medios.add(it[k]);
+      (it.children || []).forEach(recoge);
+    };
+    Object.values(movidos).forEach(cv => (cv.items || []).forEach(recoge));
+
+    setCanvases(prev => {
+      const cc = prev[currentId];
+      if (!cc || !prev[tablero.canvasId]) return prev;
+      const next = { ...prev };
+      next[nuevoId] = { ...prev[tablero.canvasId], title: { es: nombre, en: nombre } };
+      delete next[tablero.canvasId];
+      next[currentId] = {
+        ...cc,
+        items: (cc.items || []).filter(i => i.id !== itemId),
+        connectors: (cc.connectors || []).filter(co => {
+          const de = co.fromEnd?.itemId || co.from;
+          const a = co.toEnd?.itemId || co.to;
+          return de !== itemId && a !== itemId;
+        }),
+      };
+      return next;
+    });
+    const antes = projectsRef.current || [];
+    setProjects(prev => [proyecto, ...(prev || [])]);
+    reiniciaHistorial();
+
+    if (medios.size && vaultPath && window.electronAPI && window.electronAPI.copiarMedios && window.Boveda) {
+      const ahora = window.Boveda.carpetasDeProyectos([proyecto, ...antes]);
+      const previas = window.Boveda.carpetasDeProyectos(antes);
+      window.electronAPI.copiarMedios({
+        boveda: vaultPath,
+        de: [previas[projectId], ahora[projectId]],
+        a: ahora[nuevoId],
+        archivos: [...medios],
+      }).then(r => {
+        if (r && r.faltan) console.warn('[Oddinote] tablero a proyecto: ' + r.faltan + ' imágenes sin encontrar');
+      });
+    }
+    window.showToast && window.showToast(window.t(
+      `«${nombre}» ya es un proyecto: lo tienes en la pantalla de inicio.`,
+      `"${nombre}" is now a project: it's on your home screen.`));
+  };
+
   const callbacks = useMemoCanvas(() => ({
+    convertirEnProyecto: convierteEnProyecto,
     openBoard,
     openDoc: (id, colId) => setDocOpen({ id, colId }),
     openFile: (id) => setFileOpen({ id }),
