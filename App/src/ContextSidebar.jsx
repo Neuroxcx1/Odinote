@@ -73,6 +73,64 @@ function resolveStickyColor(key) {
   return '#FFFFFF';
 }
 
+// ── El tamaño de letra, en un desplegable como el de Word ──
+//
+// Antes eran dos botones, "aumentar" y "disminuir", en tres sitios distintos y
+// con tres listas de pasos distintas: el título de un marco saltaba de 14 a 18,
+// una leyenda de 11 a 13, y el texto de una nota iba por multiplicadores (1,15;
+// 1,35…). Para llegar a un tamaño concreto había que ir pulsando y mirando, y
+// no se sabía nunca en qué número se estaba.
+//
+// Ahora es un número a la vista y una lista para elegir, como en cualquier
+// procesador de textos. Es un <select> de verdad por debajo: en el teléfono abre
+// la rueda del sistema, que es lo más cómodo para el dedo, y en el escritorio la
+// lista de siempre.
+//
+// Cada nodo sigue guardando su tamaño como lo guardaba (píxeles o
+// multiplicador); esto solo traduce. Así los tableros que ya existen se ven
+// exactamente igual que antes.
+const TAMANOS_LETRA = [8, 9, 10, 11, 12, 14, 16, 18, 20, 24, 28, 32, 36, 48, 60, 72];
+
+// Un tamaño con decimales se enseña con uno solo (13,5), y uno entero, entero.
+const numeroTamano = (px) => (Math.abs(px - Math.round(px)) < 0.05 ? String(Math.round(px)) : px.toFixed(1));
+
+function SelectorTamano({ valor, onCambio, etiqueta, titulo }) {
+  const actual = Math.round(valor * 10) / 10;
+  // Si el tamaño que tiene no está en la lista (el 13,5 de una nota nueva, o uno
+  // que venía de los antiguos multiplicadores), se añade: el desplegable tiene
+  // que enseñar el número de verdad, no el más parecido.
+  const opciones = TAMANOS_LETRA.some(t => Math.abs(t - actual) < 0.05)
+    ? TAMANOS_LETRA
+    : [...TAMANOS_LETRA, actual].sort((a, b) => a - b);
+  return (
+    <label className="ctx-btn ctx-tamano" title={titulo}>
+      {/* La lista de verdad, invisible y encima de todo el botón: se toque
+          donde se toque, se abre. Va la PRIMERA porque la barra pone la letra
+          pequeña a su último hijo, y ese tiene que seguir siendo la etiqueta. */}
+      <select
+        className="ctx-tamano-lista"
+        value={String(actual)}
+        onChange={(e) => {
+          const px = parseFloat(e.target.value);
+          if (!isFinite(px)) return;
+          onCambio(px);
+          window.playAudioTone && window.playAudioTone('click');
+        }}
+        aria-label={titulo}
+      >
+        {opciones.map(t => (
+          <option key={t} value={String(t)}>{numeroTamano(t)}</option>
+        ))}
+      </select>
+      <span className="ctx-tamano-num" aria-hidden="true">
+        {numeroTamano(actual)}
+        <span className="material-symbols-rounded">expand_more</span>
+      </span>
+      <span>{etiqueta}</span>
+    </label>
+  );
+}
+
 function ContextSidebar({
   item, lang, onUpdate, onDelete, onDuplicate, onOpen, backlinks, onGoToBacklink,
   onClose, isColChild, onStartEdit, callbacks, editando,
@@ -1098,37 +1156,13 @@ function ContextSidebar({
         {isFrame && (
           <>
             {/* (El botón "Editar" universal ya entra a editar el título del marco,
-                así que aquí solo quedan los controles de tamaño del título.) */}
-            <button
-              className="ctx-btn"
-              onClick={() => {
-                const sizes = [12, 14, 18, 24, 30, 36, 48, 60];
-                const titleSize = item.titleSize || 14;
-                const idx = sizes.indexOf(titleSize);
-                const next = idx < sizes.length - 1 ? sizes[idx + 1] : sizes[sizes.length - 1];
-                onUpdate({ titleSize: next });
-                window.playAudioTone && window.playAudioTone('click');
-              }}
-              title={window.t('Aumentar tamaño del título', 'Increase title size')}
-            >
-              <span className="material-symbols-rounded">text_increase</span>
-              <span>{window.t('Aumentar Título', 'Increase Title')}</span>
-            </button>
-            <button
-              className="ctx-btn"
-              onClick={() => {
-                const sizes = [12, 14, 18, 24, 30, 36, 48, 60];
-                const titleSize = item.titleSize || 14;
-                const idx = sizes.indexOf(titleSize);
-                const next = idx > 0 ? sizes[idx - 1] : sizes[0];
-                onUpdate({ titleSize: next });
-                window.playAudioTone && window.playAudioTone('click');
-              }}
-              title={window.t('Disminuir tamaño del título', 'Decrease title size')}
-            >
-              <span className="material-symbols-rounded">text_decrease</span>
-              <span>{window.t('Disminuir Título', 'Decrease Title')}</span>
-            </button>
+                así que aquí solo queda el tamaño del título.) */}
+            <SelectorTamano
+              valor={item.titleSize || 14}
+              onCambio={(px) => onUpdate({ titleSize: px })}
+              etiqueta={window.t('Título', 'Title')}
+              titulo={window.t('Tamaño del título', 'Title size')}
+            />
           </>
         )}
 
@@ -1208,78 +1242,28 @@ function ContextSidebar({
           </>
         )}
 
-        {/* Tamaño de letra de la leyenda — dos botones (aumentar/disminuir),
-            disponibles en cualquier nodo con leyenda activa */}
+        {/* Tamaño de letra de la leyenda, en cualquier nodo que la tenga puesta. */}
         {item.showCaption === true && (
-          <>
-            <button
-              className="ctx-btn"
-              onClick={() => {
-                const sizes = [11, 13, 15, 18, 22, 28, 34];
-                const cur = item.captionSize || 11;
-                const idx = sizes.indexOf(cur);
-                const next = idx < sizes.length - 1 ? sizes[idx + 1] : sizes[sizes.length - 1];
-                onUpdate({ captionSize: next });
-                window.playAudioTone && window.playAudioTone('click');
-              }}
-              title={window.t('Aumentar tamaño de la leyenda', 'Increase caption size')}
-            >
-              <span className="material-symbols-rounded">text_increase</span>
-              <span>{window.t('Aumentar Leyenda', 'Increase Caption')}</span>
-            </button>
-            <button
-              className="ctx-btn"
-              onClick={() => {
-                const sizes = [11, 13, 15, 18, 22, 28, 34];
-                const cur = item.captionSize || 11;
-                const idx = sizes.indexOf(cur);
-                const next = idx > 0 ? sizes[idx - 1] : sizes[0];
-                onUpdate({ captionSize: next });
-                window.playAudioTone && window.playAudioTone('click');
-              }}
-              title={window.t('Disminuir tamaño de la leyenda', 'Decrease caption size')}
-            >
-              <span className="material-symbols-rounded">text_decrease</span>
-              <span>{window.t('Disminuir Leyenda', 'Decrease Caption')}</span>
-            </button>
-          </>
+          <SelectorTamano
+            valor={item.captionSize || 11}
+            onCambio={(px) => onUpdate({ captionSize: px })}
+            etiqueta={window.t('Leyenda', 'Caption')}
+            titulo={window.t('Tamaño de la leyenda', 'Caption size')}
+          />
         )}
 
-        {/* Tamaño del texto del nodo (A+ / A−). Multiplica todo el texto, así que
-            convive con Título/Subtítulo, negritas y demás formato. */}
+        {/* Tamaño del texto del nodo. Por dentro sigue siendo un multiplicador de
+            la letra base (13,5 px), que es lo que ya tienen guardado los
+            tableros, y por eso multiplica todo el texto y convive con los
+            títulos, las negritas y demás formato. Aquí solo se enseña en
+            píxeles, que es lo que se entiende. */}
         {['note','comment','todo','calendar'].includes(item.type) && (
-          <>
-            <button
-              className="ctx-btn"
-              onClick={() => {
-                const steps = [0.8, 0.9, 1, 1.15, 1.35, 1.6, 1.9, 2.3, 2.8];
-                const cur = item.textScale || 1;
-                const idx = steps.findIndex(s => Math.abs(s - cur) < 0.001);
-                const next = idx === -1 ? 1.15 : steps[Math.min(steps.length - 1, idx + 1)];
-                onUpdate({ textScale: next });
-                window.playAudioTone && window.playAudioTone('click');
-              }}
-              title={window.t('Aumentar tamaño del texto', 'Increase text size')}
-            >
-              <span className="material-symbols-rounded">text_increase</span>
-              <span>{window.t('Aumentar Texto', 'Increase Text')}</span>
-            </button>
-            <button
-              className="ctx-btn"
-              onClick={() => {
-                const steps = [0.8, 0.9, 1, 1.15, 1.35, 1.6, 1.9, 2.3, 2.8];
-                const cur = item.textScale || 1;
-                const idx = steps.findIndex(s => Math.abs(s - cur) < 0.001);
-                const next = idx === -1 ? 0.9 : steps[Math.max(0, idx - 1)];
-                onUpdate({ textScale: next });
-                window.playAudioTone && window.playAudioTone('click');
-              }}
-              title={window.t('Disminuir tamaño del texto', 'Decrease text size')}
-            >
-              <span className="material-symbols-rounded">text_decrease</span>
-              <span>{window.t('Disminuir Texto', 'Decrease Text')}</span>
-            </button>
-          </>
+          <SelectorTamano
+            valor={13.5 * (item.textScale || 1)}
+            onCambio={(px) => onUpdate({ textScale: px / 13.5 })}
+            etiqueta={window.t('Tamaño', 'Size')}
+            titulo={window.t('Tamaño del texto', 'Text size')}
+          />
         )}
 
         {/* Estirar: ajustar altura al contenido (útil en comentarios/notas largos) */}

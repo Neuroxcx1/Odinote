@@ -2611,6 +2611,30 @@ html[data-mobile="1"] .connector-hit { stroke-width: 40; }
 .ctx-btn:hover { background: var(--bg-2); color: var(--ink); }
 .ctx-btn.active { background: var(--olive-l); color: var(--ink); }
 .ctx-btn.danger:hover { background: color-mix(in srgb, var(--wine) 14%, transparent); color: var(--wine); }
+
+/* ── El tamaño de letra, como en Word ──
+   Un número a la vista con su flecha, y una lista de verdad por debajo. La
+   lista es un <select> transparente que cubre el botón entero: así se abre la
+   del sistema, que en el teléfono es la rueda cómoda para el dedo. El número va
+   en letra de ancho fijo para que no baile al pasar de 9 a 12. */
+.ctx-tamano { cursor: pointer; }
+.ctx-tamano-num {
+  display: inline-flex; align-items: center; justify-content: center; gap: 1px;
+  min-width: 42px; height: 26px; padding: 0 2px 0 7px;
+  border: 1.5px solid var(--line-soft); border-radius: 6px;
+  background: var(--paper);
+  font-family: var(--font-mono); font-size: 12.5px; font-weight: 700;
+  font-variant-numeric: tabular-nums; color: var(--ink);
+}
+.ctx-btn .ctx-tamano-num .material-symbols-rounded { font-size: 16px; color: var(--ink-3); }
+.ctx-tamano:hover .ctx-tamano-num { border-color: var(--line); }
+.ctx-tamano-lista {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  opacity: 0; margin: 0; border: 0; padding: 0;
+  cursor: pointer;
+  /* 16 px para que el navegador del móvil no amplíe la página al tocarla. */
+  font-size: 16px;
+}
 .ctx-btn .material-symbols-rounded { font-size: 20px; }
 .ctx-btn span:last-child {
   font-size: 9.5px;
