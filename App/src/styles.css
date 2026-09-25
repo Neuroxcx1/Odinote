@@ -1872,7 +1872,12 @@ body.odi-busy iframe { pointer-events: none !important; }
 .carpeta-elegir:hover { transform: translate(-1px, -1px); box-shadow: var(--pop); }
 .carpeta-elegir .material-symbols-rounded { font-size: 16px; }
 
-/* ── Ruleta ── */
+/* ── Ruleta ──
+   Todo lo que va escrito dentro crece con la rueda, como una imagen: las
+   medidas van en cqw (centésimas del ancho de la rueda) y sin tope. Antes
+   llevaban un máximo de 18-22 px, y en una ruleta grande el "Girar" y los
+   avisos se quedaban diminutos en medio del círculo. Aquí no hay botón de
+   tamaño de letra a propósito: lo pidió así el usuario. */
 .ruleta {
   width: 100%; height: 100%;
   display: grid; place-items: center;
@@ -1896,39 +1901,49 @@ body.odi-busy iframe { pointer-events: none !important; }
 .ruleta-borde { fill: var(--paper); stroke: var(--line); stroke-width: 2.5; }
 .ruleta-porcion { stroke: rgba(255,255,255,0.75); stroke-width: 0.8; transition: opacity 300ms; }
 .ruleta-porcion.apagada { opacity: 0.42; }
+/* La porción que se acaba de añadir entra desde el centro con rebote: es la
+   respuesta a haber escrito algo. El centro de la rueda es el 0 0 del dibujo. */
+.ruleta-porcion.nueva { transform-origin: 0 0; animation: ruleta-porcion-entra 560ms var(--muelle) both; }
+@keyframes ruleta-porcion-entra { from { transform: scale(0.35); opacity: 0.2; } to { transform: scale(1); opacity: 1; } }
+/* El hueco del segundo elemento cuando solo hay uno: sin color, con borde de
+   puntos, y con lo que se va escribiendo dentro según se teclea. */
+.ruleta-porcion.fantasma { fill: var(--paper-2); stroke: var(--ink-3); stroke-width: 0.9; stroke-dasharray: 3 2.4; }
 .ruleta-texto { font-family: var(--font-display); font-weight: 800; font-size: 8.5px; letter-spacing: -0.01em; pointer-events: none; transition: opacity 300ms; }
+.ruleta-texto.fantasma { fill: var(--ink-3); }
 .ruleta-luz { fill: #FFF6D8; stroke: rgba(0,0,0,0.12); stroke-width: 0.4; }
 .ruleta.girando .ruleta-luz { animation: ruleta-luces 380ms steps(2, jump-none) infinite; }
 .ruleta.girando .ruleta-luz:nth-child(odd) { animation-delay: 190ms; }
 @keyframes ruleta-luces { from { fill: #FFF6D8; } to { fill: #F7DA84; } }
-/* La flecha de arriba, roja como el resto de lo que señala en la aplicación. */
+/* La flecha de arriba, roja como el resto de lo que señala en la aplicación.
+   No tiembla sin parar: se mueve cuando la golpea una porción (golpeFlecha en
+   Ruleta.jsx), así que al frenar la rueda los golpes se espacian y la flecha
+   se va quedando quieta, como en una de verdad. */
 .ruleta-flecha {
   position: absolute; left: 50%; top: -3%; z-index: 3;
   width: 9%; aspect-ratio: 0.8;
   transform: translateX(-50%);
+  transform-origin: 50% 0;
   background: #E6544F;
   clip-path: polygon(0 0, 100% 0, 50% 100%);
   filter: drop-shadow(0 2px 2px rgba(0,0,0,0.3));
 }
-/* La flecha ya no tiembla sin parar: se mueve cuando la golpea una porción
-   (ver golpeFlecha en Ruleta.jsx), así que al frenar la rueda los golpes se
-   espacian y la flecha se va quedando quieta, como en una de verdad. */
-.ruleta-flecha { transform-origin: 50% 0; }
 .ruleta-centro {
   position: absolute; left: 50%; top: 50%; z-index: 3;
   width: 26%; aspect-ratio: 1;
   transform: translate(-50%, -50%);
   border-radius: 50%;
   background: var(--paper); color: var(--ink);
-  border: 2.5px solid var(--line);
-  box-shadow: 0 3px 10px rgba(0,0,0,0.25);
-  font-family: var(--font-display); font-weight: 800; font-size: clamp(11px, 4.2cqw, 18px);
+  border: 0.8cqw solid var(--line);
+  box-shadow: 0 1cqw 3cqw rgba(0,0,0,0.25);
+  font-family: var(--font-display); font-weight: 800; font-size: 5.2cqw;
   cursor: pointer;
-  transition: transform 260ms var(--muelle), background 150ms;
+  transition: transform 260ms var(--muelle), background 150ms, opacity 300ms;
 }
 .ruleta-centro:hover:not(:disabled) { transform: translate(-50%, -50%) scale(1.08); background: #90B968; color: #1A1A1A; }
 .ruleta-centro:active:not(:disabled) { transform: translate(-50%, -50%) scale(0.95); }
 .ruleta-centro:disabled { cursor: default; }
+/* Con un solo elemento el botón ya está, pero apagado: dice qué viene después. */
+.ruleta-centro.espera { color: var(--ink-3); }
 /* El elegido: salta en medio con rebote y se queda, del color de su porción. */
 .ruleta-premio {
   position: absolute; left: 50%; bottom: 7%; z-index: 4;
@@ -1936,9 +1951,9 @@ body.odi-busy iframe { pointer-events: none !important; }
   padding: 0.45em 1em;
   border-radius: 999px;
   background: var(--paper); color: var(--ink);
-  border: 2px solid var(--ev, var(--line));
-  box-shadow: 0 6px 18px rgba(0,0,0,0.25);
-  font-family: var(--font-display); font-weight: 800; font-size: clamp(12px, 5.5cqw, 22px);
+  border: 0.6cqw solid var(--ev, var(--line));
+  box-shadow: 0 1.8cqw 5.5cqw rgba(0,0,0,0.25);
+  font-family: var(--font-display); font-weight: 800; font-size: 6cqw;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   transform: translateX(-50%);
   animation: ruleta-premio 620ms var(--muelle) both;
@@ -1947,28 +1962,45 @@ body.odi-busy iframe { pointer-events: none !important; }
   from { opacity: 0; transform: translateX(-50%) translateY(14px) scale(0.6); }
   to   { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
 }
-/* Vacía: un círculo en blanco que dice lo que falta, como el de la captura. */
+/* Vacía: un círculo en blanco que dice lo que falta, como el de la captura.
+   Deja sitio abajo para el botón o el campo, que van sueltos (ver
+   .ruleta-anadir) para no rehacerse al pasar de cero elementos a uno. */
 .ruleta-vacia {
   position: absolute; inset: 0;
-  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px;
-  padding: 16%;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  padding: 16% 16% 30%;
   border-radius: 50%;
   background: var(--paper); color: var(--ink);
-  border: 2px dashed var(--line-soft);
-  box-shadow: 0 8px 22px rgba(0,0,0,0.14);
+  border: max(1.5px, 0.6cqw) dashed var(--line-soft);
+  box-shadow: 0 2.5cqw 7cqw rgba(0,0,0,0.14);
   text-align: center;
 }
-.ruleta-vacia-texto { font-family: var(--font-display); font-weight: 700; font-size: clamp(12px, 5cqw, 18px); line-height: 1.25; }
+.ruleta-vacia-texto { font-family: var(--font-display); font-weight: 700; font-size: 5.6cqw; line-height: 1.25; }
+/* El botón de añadir o el campo de escribir: con la rueda vacía, bajo el
+   texto; con un elemento, abajo, encima de la rueda. */
+.ruleta-anadir {
+  position: absolute; left: 50%; top: 60%; z-index: 4;
+  width: 76%;
+  display: flex; justify-content: center;
+  transform: translateX(-50%);
+}
+.ruleta.uno .ruleta-anadir { top: auto; bottom: 7%; }
 .ruleta-boton {
-  display: inline-flex; align-items: center; gap: 5px;
-  padding: 7px 14px; border-radius: 999px;
+  display: inline-flex; align-items: center; gap: 0.4em;
+  padding: 0.55em 1.1em; border-radius: 999px;
   background: #90B968; color: #1A1A1A;
-  font-size: 13px; font-weight: 700; cursor: pointer;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.18);
+  font-size: 4.4cqw; font-weight: 700; cursor: pointer;
+  box-shadow: 0 0.7cqw 2.5cqw rgba(0,0,0,0.18);
   transition: transform 220ms var(--muelle);
 }
 .ruleta-boton:hover { transform: scale(1.06); }
-.ruleta-boton .material-symbols-rounded { font-size: 17px; }
+.ruleta-boton .material-symbols-rounded { font-size: 1.3em; }
+.ruleta-campo {
+  width: 100%; padding: 0.55em 0.9em; border-radius: 999px;
+  border: max(1.5px, 0.6cqw) solid #90B968; background: var(--paper-2); color: var(--ink);
+  box-shadow: 0 0.7cqw 2.5cqw rgba(0,0,0,0.18);
+  font-size: 4.4cqw; font-weight: 600; text-align: center;
+}
 /* El panel de elementos de la barra. */
 /* Con un poco de margen: la lista se desplaza, y lo que sobresale de ella (el
    aro del color al pasar el ratón) se cortaba por el borde. */
@@ -1986,11 +2018,6 @@ body.odi-busy iframe { pointer-events: none !important; }
 .ruleta-fila-quitar { width: 26px; height: 26px; flex-shrink: 0; display: grid; place-items: center; border-radius: 2px; color: var(--ink-3); cursor: pointer; }
 .ruleta-fila-quitar:hover { background: color-mix(in srgb, var(--wine) 14%, transparent); color: var(--wine); }
 .ruleta-fila-quitar .material-symbols-rounded { font-size: 16px; }
-.ruleta-campo {
-  width: 88%; padding: 7px 12px; border-radius: 999px;
-  border: 2px solid #90B968; background: var(--paper-2); color: var(--ink);
-  font-size: 13px; font-weight: 600; text-align: center;
-}
 
 /* ── Un tablero que se va a ser proyecto ──
    El anillo verde que se abre donde estaba (el portal), el brillo de la copia

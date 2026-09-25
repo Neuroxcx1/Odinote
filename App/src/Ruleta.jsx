@@ -8,8 +8,9 @@
 // por la flecha y, al parar, un sonido corto de premio y el elegido que salta
 // en medio con un rebote.
 //
-// Con menos de dos elementos no hay nada que girar: se enseña un círculo en
-// blanco que lo dice, con el botón para ir añadiéndolos ahí mismo.
+// Sin elementos se enseña un círculo en blanco que lo dice, con el botón para
+// ir añadiéndolos ahí mismo. Con uno ya se dibuja la rueda, con ese y el hueco
+// del segundo, que se va rellenando según se escribe.
 //
 // El giro se guarda en el nodo (item.giro) para que la ruleta siga donde se
 // quedó al volver a abrir el proyecto, y el último elegido (item.ultimo) para
@@ -66,12 +67,17 @@ function ruletaAclara(hex, cuanto) {
 function RuletaItem({ item, lang, onUpdate }) {
   const elementos = Array.isArray(item.elementos) ? item.elementos : [];
   const n = elementos.length;
-  const paso = n ? 360 / n : 360;
   const [giro, setGiro] = React.useState(item.giro || 0);
   const [girando, setGirando] = React.useState(false);
   const [ganador, setGanador] = React.useState(null);
   const [escribiendo, setEscribiendo] = React.useState(false);
   const [texto, setTexto] = React.useState('');
+  // El último elemento añadido desde el propio nodo: su porción entra con un
+  // rebote desde el centro, para que se vea que lo escrito ha llegado.
+  const [recien, setRecien] = React.useState(null);
+  // Lo escrito, también en una ref: al pulsar Intro se vacía AL MOMENTO, y el
+  // "salir del campo" que pueda llegar después no lo añade otra vez.
+  const textoRef = React.useRef('');
   const ruedaRef = React.useRef(null);
   const flechaRef = React.useRef(null);
   // La flecha salta un poco cuando la golpea una porción y vuelve con rebote.
@@ -92,18 +98,30 @@ function RuletaItem({ item, lang, onUpdate }) {
   elementosRef.current = elementos;
   const idBase = 'ruleta-' + String(item.id).replace(/[^a-z0-9_-]/gi, '');
 
+  const escribe = (v) => { textoRef.current = v; setTexto(v); };
   const anade = (t) => {
     const limpio = String(t || '').trim();
     if (!limpio) return;
     const actuales = elementosRef.current;
+    const id = `el-${Date.now()}-${Math.floor(Math.random() * 9999)}`;
     // Con otros elementos, el elegido de antes ya no dice nada: se suelta.
     onUpdate({ ultimo: null, elementos: [...actuales, {
-      id: `el-${Date.now()}-${Math.floor(Math.random() * 9999)}`,
+      id,
       texto: limpio,
       color: RULETA_COLORES[actuales.length % RULETA_COLORES.length],
     }] });
+    setRecien(id);
     window.playAudioTone && window.playAudioTone('create');
   };
+
+  // Mientras solo hay uno, la rueda se dibuja con ese y con el hueco del
+  // segundo. Antes se quedaba el círculo en blanco con un texto que cambiaba,
+  // y escribir el primero parecía no haber servido de nada.
+  const lista = n === 1
+    ? [elementos[0], { id: '__hueco', texto: texto.trim() || '?', hueco: true }]
+    : elementos;
+  const m = lista.length;
+  const paso = m ? 360 / m : 360;
 
   const gira = () => {
     if (n < 2 || girando) return;
@@ -127,9 +145,9 @@ function RuletaItem({ item, lang, onUpdate }) {
       const el = ruedaRef.current;
       if (el) {
         const t = getComputedStyle(el).transform;
-        const m = /matrix\(([^,]+),\s*([^,]+)/.exec(t);
-        if (m) {
-          const ang = Math.atan2(parseFloat(m[2]), parseFloat(m[1])) * 180 / Math.PI;
+        const mm = /matrix\(([^,]+),\s*([^,]+)/.exec(t);
+        if (mm) {
+          const ang = Math.atan2(parseFloat(mm[2]), parseFloat(mm[1])) * 180 / Math.PI;
           const arriba = ((360 - ang) % 360 + 360) % 360;
           const porcion = Math.floor(arriba / paso);
           if (ultima !== null && porcion !== ultima) { ruletaSuena('tic'); golpeFlecha(); }
@@ -156,81 +174,93 @@ function RuletaItem({ item, lang, onUpdate }) {
   React.useEffect(() => () => cancelAnimationFrame(animacion.current), []);
   // Lo mismo con el que acaba de salir, si cambian los elementos.
   React.useEffect(() => { setGanador(null); }, [n]);
+  // Con dos ya se puede girar: el campo de añadir se va solo.
+  React.useEffect(() => { if (n >= 2) { setEscribiendo(false); escribe(''); } }, [n]);
   React.useEffect(() => {
     const pedido = (e) => { if (e.detail === item.id) gira(); };
     window.addEventListener('odi-ruleta-girar', pedido);
     return () => window.removeEventListener('odi-ruleta-girar', pedido);
   });
 
-  const elegidoId = ganador || (!girando ? item.ultimo : null);
+  const elegidoId = n >= 2 ? (ganador || (!girando ? item.ultimo : null)) : null;
   const elegido = elementos.find(e => e.id === elegidoId);
 
-  // ── Sin elementos suficientes ──
-  if (n < 2) {
+  // El botón de añadir o el campo, para cuando faltan elementos. Va suelto y
+  // con su clave para que siga siendo EL MISMO al pasar de cero a uno: si se
+  // rehiciera, se perdería el cursor entre el primero y el segundo.
+  const anadir = n < 2 && (
+    <div className="ruleta-anadir" key="anadir">
+      {escribiendo ? (
+        <input
+          className="ruleta-campo"
+          autoFocus
+          value={texto}
+          placeholder={n === 0
+            ? window.t('Escribe y pulsa Intro', 'Type and press Enter')
+            : window.t('El segundo, y pulsa Intro', 'The second one, then Enter')}
+          onChange={(e) => escribe(e.target.value)}
+          onMouseDown={(e) => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
+          onKeyDown={(e) => {
+            e.stopPropagation();
+            if (e.key === 'Enter') { const t = textoRef.current; escribe(''); anade(t); }
+            if (e.key === 'Escape') { escribe(''); setEscribiendo(false); }
+          }}
+          onBlur={() => { const t = textoRef.current; escribe(''); if (t.trim()) anade(t); setEscribiendo(false); }}
+        />
+      ) : (
+        <button
+          className="ruleta-boton"
+          onMouseDown={(e) => e.stopPropagation()}
+          onClick={(e) => { e.stopPropagation(); setEscribiendo(true); }}
+        >
+          <span className="material-symbols-rounded">add</span>
+          {n === 0 ? window.t('Añadir elemento', 'Add item') : window.t('Añadir otro', 'Add another')}
+        </button>
+      )}
+    </div>
+  );
+
+  // ── Sin ningún elemento ──
+  if (n === 0) {
     return (
-      <div className="ruleta">
+      <div className="ruleta cero">
         <div className="ruleta-rueda-caja">
-          <div className="ruleta-vacia">
+          <div className="ruleta-vacia" key="vacia">
             <div className="ruleta-vacia-texto">
-              {n === 0
-                ? window.t('Añade al menos dos elementos para girar la ruleta.', 'Add at least two items to spin the wheel.')
-                : window.t(`Ya tienes «${elementos[0].texto}». Falta uno más.`, `You have "${elementos[0].texto}". One more to go.`)}
+              {window.t('Añade al menos dos elementos para girar la ruleta.', 'Add at least two items to spin the wheel.')}
             </div>
-            {escribiendo ? (
-              <input
-                className="ruleta-campo"
-                autoFocus
-                value={texto}
-                placeholder={window.t('Escribe y pulsa Intro', 'Type and press Enter')}
-                onChange={(e) => setTexto(e.target.value)}
-                onMouseDown={(e) => e.stopPropagation()}
-                onClick={(e) => e.stopPropagation()}
-                onKeyDown={(e) => {
-                  e.stopPropagation();
-                  if (e.key === 'Enter') { anade(texto); setTexto(''); }
-                  if (e.key === 'Escape') { setEscribiendo(false); setTexto(''); }
-                }}
-                onBlur={() => { if (texto.trim()) anade(texto); setTexto(''); setEscribiendo(false); }}
-              />
-            ) : (
-              <button
-                className="ruleta-boton"
-                onMouseDown={(e) => e.stopPropagation()}
-                onClick={(e) => { e.stopPropagation(); setEscribiendo(true); }}
-              >
-                <span className="material-symbols-rounded">add</span>
-                {window.t('Añadir elemento', 'Add item')}
-              </button>
-            )}
           </div>
+          {anadir}
         </div>
       </div>
     );
   }
 
   // ── La rueda ──
-  const porciones = elementos.map((el, i) => {
+  const porciones = lista.map((el, i) => {
     const a0 = i * paso, a1 = (i + 1) * paso;
     const [x0, y0] = ruletaPunto(a0, 96);
     const [x1, y1] = ruletaPunto(a1, 96);
     const grande = a1 - a0 > 180 ? 1 : 0;
     const medio = (a0 + a1) / 2;
-    const color = el.color || RULETA_COLORES[i % RULETA_COLORES.length];
+    const color = el.hueco ? null : (el.color || RULETA_COLORES[i % RULETA_COLORES.length]);
     // El texto sale del centro hacia fuera; en la mitad izquierda se da la
     // vuelta para no leerse cabeza abajo.
     const giroTexto = medio - 90;
     const volteado = giroTexto > 90 && giroTexto < 270;
-    const tinta = typeof tintaLegible === 'function' ? tintaLegible(color) : '#1A1A1A';
+    const tinta = color && typeof tintaLegible === 'function' ? tintaLegible(color) : '#1A1A1A';
     return { el, i, color, medio, tinta, volteado, giroTexto,
-      d: n === 1 ? '' : `M0 0 L${x0.toFixed(3)} ${y0.toFixed(3)} A96 96 0 ${grande} 1 ${x1.toFixed(3)} ${y1.toFixed(3)} Z` };
+      d: `M0 0 L${x0.toFixed(3)} ${y0.toFixed(3)} A96 96 0 ${grande} 1 ${x1.toFixed(3)} ${y1.toFixed(3)} Z` };
   });
-  const maxLetras = n <= 4 ? 16 : n <= 8 ? 12 : 9;
+  const maxLetras = m <= 4 ? 16 : m <= 8 ? 12 : 9;
 
   return (
-    <div className={`ruleta ${girando ? 'girando' : ''} ${elegido && !girando ? 'con-elegido' : ''}`}>
+    <div className={`ruleta ${n === 1 ? 'uno' : ''} ${girando ? 'girando' : ''} ${elegido && !girando ? 'con-elegido' : ''}`}>
       <div className="ruleta-rueda-caja">
-        <div className="ruleta-flecha" ref={flechaRef}/>
+        <div className="ruleta-flecha" ref={flechaRef} key="flecha"/>
         <svg
+          key="rueda"
           ref={ruedaRef}
           className="ruleta-rueda"
           viewBox="-100 -100 200 200"
@@ -240,7 +270,7 @@ function RuletaItem({ item, lang, onUpdate }) {
           }}
         >
           <defs>
-            {porciones.map(p => (
+            {porciones.filter(p => p.color).map(p => (
               <radialGradient key={p.el.id} id={`${idBase}-${p.i}`} cx="0" cy="0" r="96" gradientUnits="userSpaceOnUse">
                 <stop offset="0%" stopColor={ruletaAclara(p.color, 0.62)}/>
                 <stop offset="100%" stopColor={p.color}/>
@@ -252,17 +282,18 @@ function RuletaItem({ item, lang, onUpdate }) {
             <path
               key={p.el.id}
               d={p.d}
-              fill={`url(#${idBase}-${p.i})`}
-              className={`ruleta-porcion ${elegido && !girando && p.el.id !== elegido.id ? 'apagada' : ''}`}
+              fill={p.color ? `url(#${idBase}-${p.i})` : undefined}
+              className={`ruleta-porcion ${p.el.hueco ? 'fantasma' : ''} ${p.el.id === recien ? 'nueva' : ''} ${elegido && !girando && p.el.id !== elegido.id ? 'apagada' : ''}`}
+              onAnimationEnd={p.el.id === recien ? () => setRecien(null) : undefined}
             />
           ))}
           {porciones.map(p => (
             <text
               key={'t' + p.el.id}
-              className="ruleta-texto"
-              fill={p.tinta}
+              className={`ruleta-texto ${p.el.hueco ? 'fantasma' : ''}`}
+              fill={p.el.hueco ? undefined : p.tinta}
               transform={`rotate(${p.giroTexto}) translate(${p.volteado ? 86 : 30} 0)${p.volteado ? ' rotate(180)' : ''}`}
-              textAnchor={p.volteado ? 'start' : 'start'}
+              textAnchor="start"
               dominantBaseline="central"
               style={{ opacity: elegido && !girando && p.el.id !== elegido.id ? 0.45 : 1 }}
             >
@@ -276,11 +307,12 @@ function RuletaItem({ item, lang, onUpdate }) {
           })}
         </svg>
         <button
-          className="ruleta-centro"
-          disabled={girando}
+          key="centro"
+          className={`ruleta-centro ${n < 2 ? 'espera' : ''}`}
+          disabled={girando || n < 2}
           onMouseDown={(e) => e.stopPropagation()}
           onClick={(e) => { e.stopPropagation(); gira(); }}
-          title={window.t('Girar la ruleta', 'Spin the wheel')}
+          title={n < 2 ? window.t('Falta uno más para poder girar', 'One more to be able to spin') : window.t('Girar la ruleta', 'Spin the wheel')}
         >
           {girando ? '' : window.t('Girar', 'Spin')}
         </button>
@@ -289,6 +321,7 @@ function RuletaItem({ item, lang, onUpdate }) {
             {elegido.texto}
           </div>
         )}
+        {anadir}
       </div>
     </div>
   );
