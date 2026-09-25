@@ -1897,8 +1897,10 @@ body.odi-busy iframe { pointer-events: none !important; }
   clip-path: polygon(0 0, 100% 0, 50% 100%);
   filter: drop-shadow(0 2px 2px rgba(0,0,0,0.3));
 }
-.ruleta.girando .ruleta-flecha { animation: ruleta-flecha 110ms ease-in-out infinite alternate; transform-origin: 50% 0; }
-@keyframes ruleta-flecha { from { transform: translateX(-50%) rotate(-7deg); } to { transform: translateX(-50%) rotate(7deg); } }
+/* La flecha ya no tiembla sin parar: se mueve cuando la golpea una porción
+   (ver golpeFlecha en Ruleta.jsx), así que al frenar la rueda los golpes se
+   espacian y la flecha se va quedando quieta, como en una de verdad. */
+.ruleta-flecha { transform-origin: 50% 0; }
 .ruleta-centro {
   position: absolute; left: 50%; top: 50%; z-index: 3;
   width: 26%; aspect-ratio: 1;
@@ -1955,10 +1957,13 @@ body.odi-busy iframe { pointer-events: none !important; }
 .ruleta-boton:hover { transform: scale(1.06); }
 .ruleta-boton .material-symbols-rounded { font-size: 17px; }
 /* El panel de elementos de la barra. */
-.ruleta-lista { display: flex; flex-direction: column; gap: 5px; margin-bottom: 8px; max-height: 50vh; overflow-y: auto; }
+/* Con un poco de margen: la lista se desplaza, y lo que sobresale de ella (el
+   aro del color al pasar el ratón) se cortaba por el borde. */
+.ruleta-lista { display: flex; flex-direction: column; gap: 5px; margin-bottom: 8px; max-height: 50vh; overflow-y: auto; padding: 4px; margin-left: -4px; margin-right: -4px; }
 .ruleta-fila { display: flex; align-items: center; gap: 6px; }
-.ruleta-fila-color { width: 20px; height: 20px; flex-shrink: 0; border-radius: 50%; border: 1.5px solid var(--line-soft); cursor: pointer; transition: transform 200ms var(--muelle); }
-.ruleta-fila-color:hover { transform: scale(1.15); }
+.ruleta-fila-color { width: 22px; height: 22px; flex-shrink: 0; border-radius: 50%; border: 1.5px solid var(--line); cursor: pointer; transition: box-shadow 150ms; }
+.ruleta-fila-color:hover, .ruleta-fila-color.abierto { box-shadow: 0 0 0 2px var(--paper), 0 0 0 3.5px var(--line); }
+.ruleta-fila-selector { padding: 6px 0 8px 30px; }
 .ruleta-fila-texto, .ruleta-nuevo {
   flex: 1; min-width: 0; width: 100%;
   padding: 6px 8px; border: 1.5px solid var(--line-soft); border-radius: 2px;

@@ -250,6 +250,8 @@ function ContextSidebar({
   onClose, isColChild, onStartEdit, callbacks, editando,
 }) {
   const [pane, setPane] = React.useState(null); // 'color' | 'emoji' | 'comments' | 'rename' | null
+  // En la ruleta, el elemento cuyo selector de color está abierto.
+  const [colorRuleta, setColorRuleta] = React.useState(null);
   const [focusedRowVersion, setFocusedRowVersion] = React.useState(0);
   const [iconQuery, setIconQuery] = React.useState('');
 
@@ -1584,13 +1586,16 @@ function ContextSidebar({
               <div className="ctx-pop-title">{window.t('Elementos de la ruleta', 'Wheel items')}</div>
               <div className="ruleta-lista">
                 {elementos.map(el => (
-                  <div key={el.id} className="ruleta-fila">
-                    {/* Un toque cambia al siguiente color de la lista: elegir entre
-                        ocho es más rápido que abrir un selector por cada porción. */}
+                  <React.Fragment key={el.id}>
+                  <div className="ruleta-fila">
+                    {/* El color abre el selector de toda la aplicación: cualquier
+                        color, con el historial. Antes un toque pasaba al
+                        siguiente de una lista fija y no se podía elegir uno a
+                        gusto (lo pidió el usuario). */}
                     <button
-                      className="ruleta-fila-color"
+                      className={`ruleta-fila-color ${colorRuleta === el.id ? 'abierto' : ''}`}
                       style={{ background: el.color }}
-                      onClick={() => cambia(el.id, { color: colores[(colores.indexOf(el.color) + 1) % colores.length] })}
+                      onClick={() => setColorRuleta(colorRuleta === el.id ? null : el.id)}
                       title={window.t('Cambiar el color', 'Change the colour')}
                     />
                     <input
@@ -1603,6 +1608,17 @@ function ContextSidebar({
                       <span className="material-symbols-rounded">close</span>
                     </button>
                   </div>
+                  {colorRuleta === el.id && window.SelectorColor && (
+                    <div className="ruleta-fila-selector">
+                      <window.SelectorColor
+                        valor={el.color}
+                        onCambio={(c) => cambia(el.id, { color: c })}
+                        colores={['#E6544F', '#F7DA84', '#90B968', '#3D5A80']}
+                        tam={22}
+                      />
+                    </div>
+                  )}
+                  </React.Fragment>
                 ))}
               </div>
               <input

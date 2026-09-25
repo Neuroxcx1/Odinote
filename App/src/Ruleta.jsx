@@ -73,6 +73,20 @@ function RuletaItem({ item, lang, onUpdate }) {
   const [escribiendo, setEscribiendo] = React.useState(false);
   const [texto, setTexto] = React.useState('');
   const ruedaRef = React.useRef(null);
+  const flechaRef = React.useRef(null);
+  // La flecha salta un poco cuando la golpea una porción y vuelve con rebote.
+  // Antes temblaba sin parar mientras la rueda giraba, también a punto de
+  // frenar (lo vio el usuario). Así, al frenar, los golpes se espacian y la
+  // flecha se queda quieta sola. Hacia la derecha porque la rueda gira como el
+  // reloj: arriba, las porciones pasan de izquierda a derecha.
+  const golpeFlecha = () => {
+    const f = flechaRef.current;
+    if (!f || !f.animate) return;
+    f.animate([
+      { transform: 'translateX(-50%) rotate(-24deg)' },
+      { transform: 'translateX(-50%) rotate(0deg)' },
+    ], { duration: 260, easing: 'cubic-bezier(0.34, 1.56, 0.64, 1)' });
+  };
   const animacion = React.useRef(null);
   const elementosRef = React.useRef(elementos);
   elementosRef.current = elementos;
@@ -118,7 +132,7 @@ function RuletaItem({ item, lang, onUpdate }) {
           const ang = Math.atan2(parseFloat(m[2]), parseFloat(m[1])) * 180 / Math.PI;
           const arriba = ((360 - ang) % 360 + 360) % 360;
           const porcion = Math.floor(arriba / paso);
-          if (ultima !== null && porcion !== ultima) ruletaSuena('tic');
+          if (ultima !== null && porcion !== ultima) { ruletaSuena('tic'); golpeFlecha(); }
           ultima = porcion;
         }
       }
@@ -215,7 +229,7 @@ function RuletaItem({ item, lang, onUpdate }) {
   return (
     <div className={`ruleta ${girando ? 'girando' : ''} ${elegido && !girando ? 'con-elegido' : ''}`}>
       <div className="ruleta-rueda-caja">
-        <div className="ruleta-flecha"/>
+        <div className="ruleta-flecha" ref={flechaRef}/>
         <svg
           ref={ruedaRef}
           className="ruleta-rueda"
