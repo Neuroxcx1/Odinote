@@ -200,9 +200,12 @@ function TextFormatSidebar({ item, lang, onUpdate, onClose, variant }) {
           fontSize: 14,
           color: usaTextColor ? (item.textColor || '#1A1A1A') : ((isFrame || isMap || isCode || isTimer) ? (item.titleColor || '#1A1A1A') : '#E6544F'),
           background: isCustomPropType && (usaTextColor ? item.textColor : item.titleColor) && (usaTextColor ? item.textColor : item.titleColor) !== 'inherit' ? 'none' : 'linear-gradient(90deg, #1A1A1A, #E6544F, #90B968)',
-          WebkitBackgroundClip: isCustomPropType && (usaTextColor ? item.textColor : item.titleColor) && (usaTextColor ? item.textColor : item.titleColor) !== 'inherit' ? 'none' : 'text',
-          WebkitTextFillColor: isCustomPropType && (usaTextColor ? item.textColor : item.titleColor) && (usaTextColor ? item.textColor : item.titleColor) !== 'inherit' ? 'none' : 'transparent',
-          backgroundClip: isCustomPropType && (usaTextColor ? item.textColor : item.titleColor) && (usaTextColor ? item.textColor : item.titleColor) !== 'inherit' ? 'none' : 'text',
+          // 'none' no es un valor que acepten estas tres: el navegador lo ignoraba y
+          // se quedaba el de antes. Con un color elegido después de abrir la barra,
+          // la A seguía transparente y el botón salía vacío.
+          WebkitBackgroundClip: isCustomPropType && (usaTextColor ? item.textColor : item.titleColor) && (usaTextColor ? item.textColor : item.titleColor) !== 'inherit' ? 'border-box' : 'text',
+          WebkitTextFillColor: isCustomPropType && (usaTextColor ? item.textColor : item.titleColor) && (usaTextColor ? item.textColor : item.titleColor) !== 'inherit' ? 'currentcolor' : 'transparent',
+          backgroundClip: isCustomPropType && (usaTextColor ? item.textColor : item.titleColor) && (usaTextColor ? item.textColor : item.titleColor) !== 'inherit' ? 'border-box' : 'text',
         }}>
           {isCustomPropType && (usaTextColor ? item.textColor : item.titleColor) && (usaTextColor ? item.textColor : item.titleColor) !== 'inherit' ? <span style={{color: usaTextColor ? item.textColor : item.titleColor}}>A</span> : 'A'}
         </div>
