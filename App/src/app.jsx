@@ -47,7 +47,7 @@ try {
 
 // Marcador de build: si la consola no muestra esta versión, el navegador está
 // sirviendo JS cacheado (subir ?v= en index.html invalida la caché)
-window.ODINOTE_BUILD = '1.0.9-196';
+window.ODINOTE_BUILD = '1.0.9-200';
 console.log('[ODINOTE] Código cargado: ' + window.ODINOTE_BUILD);
 
 // Global shortcuts configuration
@@ -358,6 +358,50 @@ function App() {
     window.playAudioTone && window.playAudioTone('click');
   };
   window.showToast = showToast;
+
+  // ── Los avisos del calendario ──
+  // Cada medio minuto se mira si algún evento de algún calendario tiene un aviso
+  // que toca, en los lienzos de todos los proyectos (no solo el que está
+  // abierto: un aviso que solo sonara con su calendario a la vista no avisaría
+  // de nada). Suena, sale el aviso de la aplicación y, si el sistema deja, el
+  // del sistema. Lo ya avisado se apunta en este equipo para no repetirlo al
+  // volver a mirar, y se olvida a los tres días. Un aviso que se pasó con la
+  // aplicación cerrada salta al abrirla si fue hace menos de cinco minutos; los
+  // más viejos ya no sirven de nada.
+  const lienzosParaAvisosRef = React.useRef(canvases);
+  lienzosParaAvisosRef.current = canvases;
+  useEffectApp(() => {
+    if (!window.CalLogica) return;
+    const LLAVE = 'odinote.avisos_dados';
+    const mira = () => {
+      let dados = {};
+      try { dados = JSON.parse(localStorage.getItem(LLAVE) || '{}') || {}; } catch (e) {}
+      const ahora = new Date();
+      let cambio = false;
+      for (const a of window.CalLogica.avisosPendientes(lienzosParaAvisosRef.current, ahora, 5 * 60000)) {
+        if (dados[a.id]) continue;
+        dados[a.id] = ahora.getTime();
+        cambio = true;
+        const titulo = a.ev.text || window.t('Evento', 'Event');
+        const cuando = window.CalLogica.esDeDiaEntero(a.ev)
+          ? window.t('Hoy', 'Today')
+          : a.empieza.getHours() + ':' + String(a.empieza.getMinutes()).padStart(2, '0');
+        setToast({ message: '⏰ ' + titulo + ' · ' + cuando + (a.ev.lugar ? ' · ' + a.ev.lugar : ''), type: 'success' });
+        window.playAudioTone && window.playAudioTone('board_open');
+        try {
+          if (window.Notification && Notification.permission === 'granted') {
+            new Notification(titulo, { body: cuando + (a.ev.lugar ? ' · ' + a.ev.lugar : ''), icon: 'Icon/Icon.png' });
+          }
+        } catch (e) {}
+      }
+      const tope = ahora.getTime() - 3 * 86400000;
+      for (const k of Object.keys(dados)) if (dados[k] < tope) { delete dados[k]; cambio = true; }
+      if (cambio) { try { localStorage.setItem(LLAVE, JSON.stringify(dados)); } catch (e) {} }
+    };
+    mira();
+    const t = setInterval(mira, 30000);
+    return () => clearInterval(t);
+  }, []);
 
   // La corona cuelga de la cuenta: sin sesión de Google no hay a quién darle
   // los cosméticos, ni forma de comprobar una donación. Así que sin sesión el

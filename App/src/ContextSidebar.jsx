@@ -315,18 +315,6 @@ function ContextSidebar({
       etiqueta: window.t('Tamaño', 'Size'), titulo: window.t('Tamaño del texto', 'Text size'),
     };
   }
-  if (item.type === 'calendar') {
-    // El mes y el año crecen con el texto de los días (si no, al subir el
-    // tamaño la cabecera se quedaba enana encima de unos números enormes), y
-    // este segundo tamaño los ajusta por encima de eso.
-    const ts = item.textScale || 1;
-    tamanos.mes = {
-      valor: 14 * ts * (item.headScale || 1),
-      guarda: (px) => onUpdate({ headScale: px / (14 * ts) }),
-      variable: '--vista-mes', aVista: (px) => String(px / (14 * ts)),
-      etiqueta: window.t('Mes', 'Month'), titulo: window.t('Tamaño del mes y el año', 'Month and year size'),
-    };
-  }
 
   const isText = ['note','comment','doc'].includes(item.type);
   const isColumn = item.type === 'column';
@@ -1018,6 +1006,16 @@ function ContextSidebar({
               <span className="material-symbols-rounded">today</span>
               <span>{window.t('Hoy', 'Today')}</span>
             </button>
+            {/* Los ajustes de Google que tienen sentido aquí, y el .ics para
+                pasar el calendario a Google, Outlook o Apple, o traerlo. */}
+            <button
+              className={`ctx-btn ${pane === 'calAjustes' ? 'active' : ''}`}
+              onClick={() => setPane(pane === 'calAjustes' ? null : 'calAjustes')}
+              title={window.t('Ajustes del calendario', 'Calendar settings')}
+            >
+              <span className="material-symbols-rounded">settings</span>
+              <span>{window.t('Ajustes', 'Settings')}</span>
+            </button>
           </>
         )}
 
@@ -1454,7 +1452,6 @@ function ContextSidebar({
         {/* Tamaño del texto del nodo: multiplica todo el texto y convive con
             los títulos, las negritas y demás formato. En la figura también. */}
         <SelectorTamano clave="texto" spec={tamanos.texto} pane={pane} setPane={setPane}/>
-        <SelectorTamano clave="mes" spec={tamanos.mes} pane={pane} setPane={setPane}/>
 
         {/* Estirar: ajustar altura al contenido (útil en comentarios/notas largos) */}
         {['note','comment','todo','link'].includes(item.type) && (
@@ -1619,6 +1616,83 @@ function ContextSidebar({
         </div>
       )}
 
+      {pane === 'calAjustes' && (() => {
+        const interruptor = (clave, encendido, texto, valorSiApagado) => (
+          <button
+            className={`ctx-lang-item ${encendido ? 'active' : ''}`}
+            onClick={() => { onUpdate({ [clave]: encendido ? valorSiApagado : !valorSiApagado }); window.playAudioTone && window.playAudioTone('click'); }}
+          >
+            <span>{texto}</span>
+            {encendido && <span className="material-symbols-rounded">check</span>}
+          </button>
+        );
+        const exporta = () => {
+          const texto = window.CalLogica.aICS(item.events || {}, window.t('Calendario de Oddinote', 'Oddinote calendar'));
+          const url = URL.createObjectURL(new Blob([texto], { type: 'text/calendar;charset=utf-8' }));
+          const a = document.createElement('a');
+          a.href = url; a.download = 'calendario.ics';
+          document.body.appendChild(a); a.click(); a.remove();
+          setTimeout(() => URL.revokeObjectURL(url), 2000);
+        };
+        const importa = (e) => {
+          const archivo = e.target.files && e.target.files[0];
+          e.target.value = '';
+          if (!archivo) return;
+          archivo.text().then((texto) => {
+            const nuevos = window.CalLogica.deICS(texto);
+            const n = Object.values(nuevos).reduce((t, l) => t + l.length, 0);
+            if (!n) { window.showToast && window.showToast(window.t('Ese archivo no trae ningún evento.', 'That file has no events.'), 'error'); return; }
+            const juntos = { ...(item.events || {}) };
+            for (const k of Object.keys(nuevos)) juntos[k] = [...(Array.isArray(juntos[k]) ? juntos[k] : []), ...nuevos[k]];
+            onUpdate({ events: juntos });
+            window.showToast && window.showToast(window.t(`${n} eventos importados.`, `${n} events imported.`));
+          });
+        };
+        const primer = item.primerDia == null ? 1 : item.primerDia;
+        return (
+          <div className="ctx-popout">
+            <div className="ctx-pop-section">
+              <div className="ctx-pop-title">{window.t('Ajustes del calendario', 'Calendar settings')}</div>
+              <div className="ctx-pop-sub">{window.t('La semana empieza en', 'Week starts on')}</div>
+              <div className="ctx-lang-list">
+                {[[1, window.t('Lunes', 'Monday')], [0, window.t('Domingo', 'Sunday')], [6, window.t('Sábado', 'Saturday')]].map(([d, nombre]) => (
+                  <button key={d} className={`ctx-lang-item ${primer === d ? 'active' : ''}`} onClick={() => onUpdate({ primerDia: d })}>
+                    <span>{nombre}</span>
+                    {primer === d && <span className="material-symbols-rounded">check</span>}
+                  </button>
+                ))}
+              </div>
+              <div className="ctx-pop-sub">{window.t('Ver', 'Show')}</div>
+              <div className="ctx-lang-list">
+                {interruptor('finesDeSemana', item.finesDeSemana !== false, window.t('Fines de semana', 'Weekends'), true)}
+                {interruptor('numSemana', item.numSemana === true, window.t('Números de semana', 'Week numbers'), false)}
+                {interruptor('formato24', item.formato24 !== false, window.t('Reloj de 24 horas', '24-hour clock'), true)}
+              </div>
+              <div className="ctx-pop-sub">{window.t('Duración de un evento nuevo', 'New event length')}</div>
+              <div className="ctx-lang-list">
+                {[30, 60, 90, 120].map(m => (
+                  <button key={m} className={`ctx-lang-item ${(item.duracion || 60) === m ? 'active' : ''}`} onClick={() => onUpdate({ duracion: m })}>
+                    <span>{m < 60 ? m + ' min' : (m / 60) + ' h'}</span>
+                    {(item.duracion || 60) === m && <span className="material-symbols-rounded">check</span>}
+                  </button>
+                ))}
+              </div>
+              <div className="ctx-pop-sub">{window.t('Pasar a otros calendarios', 'Move to other calendars')}</div>
+              <div className="ctx-lang-list">
+                <button className="ctx-lang-item" onClick={exporta}>
+                  <span>{window.t('Exportar .ics', 'Export .ics')}</span>
+                  <span className="material-symbols-rounded">download</span>
+                </button>
+                <label className="ctx-lang-item">
+                  <span>{window.t('Importar .ics', 'Import .ics')}</span>
+                  <span className="material-symbols-rounded">upload</span>
+                  <input type="file" accept=".ics,text/calendar" style={{ display: 'none' }} onChange={importa}/>
+                </label>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
       {pane === 'calNumeros' && (
         <div className="ctx-popout">
           <div className="ctx-pop-section">
