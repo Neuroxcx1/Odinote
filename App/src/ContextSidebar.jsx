@@ -1540,7 +1540,9 @@ function ContextSidebar({
                   continua: window.t('Continua', 'Solid'),
                   discontinua: window.t('Discontinua', 'Dashed'),
                   punteada: window.t('Punteada', 'Dotted'),
-                  doble: window.t('Doble', 'Double'),
+                  // 'Doble' a secas ya está en el diccionario común como el de las flechas
+                  // de doble sentido, y salía 'Two-way'.
+                  doble: window.t('Doble línea', 'Double line'),
                 }[e];
                 return (
                   <button
