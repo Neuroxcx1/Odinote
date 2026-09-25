@@ -178,6 +178,49 @@ function pickLang(v, lang) {
 window.pickLang = pickLang;
 
 // ──────────────── NOTE ────────────────
+// ── Al entrar a escribir, el cursor dentro ──
+//
+// Encontrado probando la aplicación: se ponía una nota, entraba sola a modo
+// escritura… y lo que se tecleaba no aparecía por ningún lado. Había que
+// pinchar dentro antes de escribir.
+//
+// El motivo: tras CADA cambio de selección, a los 50 ms, el lienzo le da el foco
+// a un campo invisible que existe solo para que Ctrl+V pegue imágenes — salvo
+// que ya haya algo editable con el foco. El nodo nuevo entraba en modo escritura
+// pero nadie le daba el foco, así que el campo invisible se lo quedaba y lo
+// tecleado iba a parar ahí, donde no se ve. Lo mismo al entrar con el botón
+// "Editar", que en el móvil es la única forma de hacerlo.
+//
+// Ahora el propio nodo coge el foco al entrar a escribir, y con eso el campo
+// invisible ya no se lo quita. Si se entró con doble clic sobre una palabra, esa
+// selección se respeta; si no, el cursor va al FINAL. Hay que mirarlo antes de
+// enfocar: al enfocar, Chrome planta el cursor al principio, y la primera
+// versión lo tomaba por un cursor puesto a propósito. Un cursor suelto dentro
+// tampoco cuenta: lo deja el clic con el que se seleccionó el nodo.
+//
+// seleccionarTodo: para cuando lo que hay escrito es solo el texto de ejemplo
+// con el que nace el nodo ("Título Grande"). Ahí lo que se teclea tiene que
+// SUSTITUIRLO, no ponerse detrás: probando, un título nuevo acababa diciendo
+// "Título GrandeMi título".
+function usaCursorAlEditar(ref, editing, seleccionarTodo) {
+  React.useEffect(() => {
+    if (!editing || !ref.current) return;
+    const el = ref.current;
+    if (!el.isContentEditable) return;
+    if (el.contains(document.activeElement)) return;
+    const sel = window.getSelection();
+    const palabra = sel && sel.rangeCount && !sel.isCollapsed && el.contains(sel.anchorNode)
+      ? sel.getRangeAt(0).cloneRange()
+      : null;
+    el.focus();
+    const r = palabra || document.createRange();
+    if (!palabra) { r.selectNodeContents(el); if (!seleccionarTodo) r.collapse(false); }
+    const s2 = window.getSelection();
+    s2.removeAllRanges();
+    s2.addRange(r);
+  }, [editing]);
+}
+
 // Rich text via contentEditable + execCommand (per-selection styling)
 function NoteItem({ item, lang, editing, onUpdate }) {
   const cls = colorClass(item.color || 'white');
@@ -185,6 +228,7 @@ function NoteItem({ item, lang, editing, onUpdate }) {
   const bg = window.nodeBg(item);
   const textColor = window.nodeInk(item);
   const ref = React.useRef(null);
+  usaCursorAlEditar(ref, editing);
 
   // Ensure every <pre> has an editable <p> sibling after it (so user can click below)
   const ensureTrailingParagraph = (root) => {
@@ -3214,6 +3258,7 @@ function TableItem({ item, lang, onUpdate, editing, selected, onSelectItem, onRe
 // user header (avatar + name) on top.
 function CommentItem({ item, lang, onUpdate, editing }) {
   const ref = React.useRef(null);
+  usaCursorAlEditar(ref, editing);
   const html = (item.text && (item.text[lang] || item.text.es || item.text.en)) || '';
   const bg = window.resolveStickyColor ? window.resolveStickyColor(item.color || 'cream') : null;
   const isDarkBg = ['olive','wine','dark','green','red','purple'].includes(item.color);
@@ -5199,6 +5244,7 @@ function ShapeItem({ item, lang, editing, onUpdate }) {
   const relleno = window.resolveStickyColor ? window.resolveStickyColor(item.color || 'white') : '#FFFFFF';
   const texto = pickLang(item.content, lang);
   const ref = React.useRef(null);
+  usaCursorAlEditar(ref, editing);
   const hueco = HUECO_FIGURA[figura] || HUECO_FIGURA.circulo;
 
   // Mismo trato que el título grande: se escribe en innerHTML y no en innerText,
@@ -5315,6 +5361,8 @@ function ShapeItem({ item, lang, editing, onUpdate }) {
 // ancho metería más palabras por línea en vez de agrandar la letra, que es justo
 // lo contrario de lo que se espera de algo que funciona como una imagen.
 const ALTO_LINEA_TITULO = 1.12;
+// El texto con el que nace un título, en los dos idiomas en que lo guarda.
+const TEXTOS_EJEMPLO_TITULO = ['Título Grande', 'Large Title'];
 const LETRA_TITULO_ANTIGUA = 32;
 // Un pelo menos de lo que cabría exactamente: el navegador redondea los anchos
 // y, sin este margen, a veces la última letra rozaba el borde de la caja.
@@ -5359,6 +5407,7 @@ if (typeof document !== 'undefined' && document.fonts && document.fonts.ready) {
 function BigTitleItem({ item, lang, editing, onUpdate }) {
   const text = pickLang(item.content, lang);
   const ref = React.useRef(null);
+  usaCursorAlEditar(ref, editing, TEXTOS_EJEMPLO_TITULO.includes((text || '').trim()));
   const align = item.align || 'center';
   const color = item.textColor || 'inherit';
   // Estilos de nodo completo (B/I/S/U) del título
