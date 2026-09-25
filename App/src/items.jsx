@@ -756,26 +756,24 @@ function ImageItem({ item, lang, onUpdate, callbacks }) {
     window.addEventListener('mouseup', onUp);
   };
   
-  let frameW = '100%';
-  let frameH = '100%';
-  let frameLeft = '0px';
-  let frameTop = '0px';
-
-  if (!isCropping && naturalRatio && item.w && item.h) {
-    const cropAspect = naturalRatio * (crop.w / crop.h);
-    const cardAspect = item.w / item.h;
-    if (cropAspect > cardAspect) {
-      const pct = (cardAspect / cropAspect) * 100;
-      frameW = '100%';
-      frameH = `${pct}%`;
-      frameTop = `${(100 - pct) / 2}%`;
-    } else {
-      const pct = (cropAspect / cardAspect) * 100;
-      frameW = `${pct}%`;
-      frameH = '100%';
-      frameLeft = `${(100 - pct) / 2}%`;
-    }
-  }
+  // ── La imagen llena su caja, aunque eso la deforme ──
+  //
+  // Antes, si la caja no tenía la proporción de la imagen, la imagen se quedaba
+  // con la suya, centrada, y dejaba bandas vacías: estirabas una foto cuadrada
+  // hasta hacerla alargada y lo único que crecía era el hueco alrededor. No
+  // había forma de deformarla aposta.
+  //
+  // Ahora la imagen ocupa la caja entera: estirarla la estira. Para devolverle
+  // su proporción está el botón "Ajustar" de la barra lateral, que ciñe la caja
+  // a la forma real de la imagen (recortada, si lo está).
+  //
+  // Las imágenes que se ponen desde la aplicación nacen ya con la caja a su
+  // proporción, así que a casi ninguna de las que ya existen les cambia nada:
+  // solo a las que alguien había estirado, que son justo las que tenían hueco.
+  const frameW = '100%';
+  const frameH = '100%';
+  const frameLeft = '0px';
+  const frameTop = '0px';
 
   return (
     <div className={`image-card${hasImage ? '' : ' empty'}`} style={{width:'100%', height:'100%'}}>

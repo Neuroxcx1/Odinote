@@ -1114,11 +1114,11 @@ function ContextSidebar({
               <span className="material-symbols-rounded">crop</span>
               <span>{window.t('Recortar', 'Crop')}</span>
             </button>
-            {/* ── Ajustar: la caja se ciñe a la imagen ──
-                Una imagen no se deforma al estirar su caja: se queda con su
-                proporción, centrada, y deja bandas vacías alrededor. Esto quita
-                esas bandas. La imagen NO cambia de tamaño ni de sitio en la
-                pantalla y el recorte se respeta: solo desaparece el hueco.
+            {/* ── Ajustar: la imagen recupera su proporción ──
+                Estirar la caja de una imagen la estira (a propósito: se pidió
+                poder deformarlas). Esto la devuelve a su forma real: el lado que
+                sobra se recorta hasta la proporción de la imagen —tal como esté
+                recortada— y la caja conserva su centro, así que no salta de sitio.
 
                 Antes este botón se llamaba "Restaurar" y además borraba el
                 recorte, así que para arreglar la proporción había que perder
