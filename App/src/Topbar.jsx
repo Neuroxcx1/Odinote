@@ -16,7 +16,9 @@ const TOOLS = [
   // Estructura → rojo
   { id: 'board',    icon: 'dashboard',     label: 'tool_board',    bg: '#E6544F', fg: 'white' },
   { id: 'column',   icon: 'view_column',   label: 'tool_column',   bg: '#E6544F', fg: 'white' },
-  { id: 'table',    icon: 'table_chart',   label: 'tool_table',    bg: '#E6544F', fg: 'white' },
+  // La figura en el sitio de la tabla, que se usa poco (dicho por el usuario):
+  // la tabla sigue en el menú de More.
+  { id: 'shape',    icon: 'category',      label: 'tool_shape',    bg: '#E6544F', fg: 'white' },
   { id: 'frame',    icon: 'crop_free',     label: 'tool_frame',    bg: '#E6544F', fg: 'white' },
   // Conector y dibujo a mano → blanco
   { id: 'line',     icon: 'arrow_outward', label: 'tool_line',     bg: '#FFFFFF', fg: '#1A1A1A' },
@@ -50,7 +52,7 @@ const EXTRA_TOOLS = [
   { id: 'map',      icon: 'map',           label: 'tool_map',      bg: '#E1DFE3', fg: '#1A1A1A' },
   { id: 'carpeta',  icon: 'folder',        label: 'tool_carpeta',  bg: '#E1DFE3', fg: '#1A1A1A' },
   // Estructura y herramientas → rojo
-  { id: 'shape',    icon: 'category',      label: 'tool_shape',    bg: '#E6544F', fg: 'white' },
+  { id: 'table',    icon: 'table_chart',   label: 'tool_table',    bg: '#E6544F', fg: 'white' },
   { id: 'separator', icon: 'horizontal_rule', label: 'tool_separator', bg: '#E6544F', fg: 'white' },
   { id: 'calendar', icon: 'calendar_month',label: 'tool_calendar', bg: '#E6544F', fg: 'white' },
   { id: 'timer',    icon: 'timer',         label: 'tool_timer',    bg: '#E6544F', fg: 'white' },
