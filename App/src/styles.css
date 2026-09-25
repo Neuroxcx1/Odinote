@@ -2931,10 +2931,32 @@ html[data-mobile="1"] .connector-hit { stroke-width: 40; }
 .handle.br { bottom: 0; right: 0; cursor: nwse-resize; }
 /* Girar: va por fuera de la caja y por debajo a la izquierda, donde no pisa
    ninguna esquina de redimensionado. Es redondo a propósito, para que no se
-   confunda con los cuadraditos que cambian el tamaño. */
+   confunda con los cuadraditos que cambian el tamaño.
+
+   ── Por qué su sitio se calcula con el zoom ──
+   Los tiradores crecen al alejarse (--handle-scale) para seguir siendo
+   agarrables, pero la DISTANCIA entre este y la esquina estaba escrita en
+   píxeles del lienzo, y esa encoge con el zoom. Al alejarse, el tirador crecía
+   y el hueco menguaba: se montaba encima del cuadradito de la esquina, y al
+   intentar girar se agarraba el de cambiar el tamaño. A lo lejos no había
+   manera de girar nada.
+
+   Ahora tanto su tamaño como su separación se multiplican por --handle-libre
+   (1 / zoom, sin tope), así que en la PANTALLA miden siempre lo mismo: 22 px de
+   bola a 44 px por debajo de la esquina, estés al 20 % o al 250 %. Las
+   zonas de agarre de los dos no llegan a tocarse a ningún zoom: las dos son
+   cuadradas, así que lo que cuenta es la separación en UN eje, y en vertical hay
+   44 px frente a los 34 que suman sus medios anchos (13 del cuadradito y 21 de
+   la bola). La primera versión la ponía a 30 px y medida se rozaban por una
+   esquina al 50 % y al 30 %. */
 .handle.rot {
   width: 22px; height: 22px;
-  left: -14px; bottom: -30px;
+  /* El centro de la bola a 26 px a la izquierda y 44 px por debajo de la
+     esquina, en píxeles de pantalla; los 11 px son su medio ancho, porque
+     left y bottom colocan el borde y no el centro. */
+  left: calc(-26px * var(--handle-libre, 1) - 11px);
+  bottom: calc(-44px * var(--handle-libre, 1) - 11px);
+  transform: scale(var(--handle-libre, 1));
   border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
   cursor: grab;
@@ -2943,6 +2965,21 @@ html[data-mobile="1"] .connector-hit { stroke-width: 40; }
 .handle.rot:active { cursor: grabbing; }
 .handle.rot .material-symbols-rounded { font-size: 15px; color: var(--olive); }
 .handle.rot::before { top: -10px; left: -10px; right: -10px; bottom: -10px; }
+
+/* ── Los tiradores del recorte, del mismo tamaño a cualquier distancia ──
+   Miden 12 px del lienzo, así que al 30 % de zoom se quedaban en 3,6 px de
+   pantalla: un punto que hay que acertar con el ratón. Crecen con el zoom igual
+   que el de girar, y además llevan una zona de agarre invisible alrededor,
+   porque un tirador de recorte se busca a ojo y no con precisión. */
+.crop-handle {
+  transform: scale(var(--handle-libre, 1));
+  transform-origin: center;
+}
+.crop-handle::before {
+  content: '';
+  position: absolute;
+  top: -9px; left: -9px; right: -9px; bottom: -9px;
+}
 
 /* ============================================
    Subtle enter animation (only the incoming page)

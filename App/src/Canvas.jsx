@@ -5517,7 +5517,13 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
             transformOrigin: '0 0', 
             width: bounds.w, 
             height: bounds.h,
-            '--handle-scale': Math.min(3, 1 / scale)
+            '--handle-scale': Math.min(3, 1 / scale),
+            // La misma cuenta SIN tope, para lo que tiene que medir siempre lo
+            // mismo en la pantalla por lejos que estés: el tirador de girar y
+            // los del recorte. Con el tope de 3, por debajo del 33 % de zoom
+            // encogían hasta hacerse imposibles de agarrar. El zoom no baja del
+            // 20 %, así que esto nunca pasa de 5.
+            '--handle-libre': 1 / scale,
           }}
         >
           <div className="canvas-content" style={{width: bounds.w, height: bounds.h}}>
