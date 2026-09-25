@@ -5303,6 +5303,61 @@ function ShapeItem({ item, lang, editing, onUpdate }) {
   );
 }
 
+// ── El título se ajusta a su caja, como una imagen ──
+//
+// Antes la letra del título estaba clavada a 32 px, y los dos botones de tamaño
+// que había no la tocaban. Hacer un título grande era imposible: se agrandaba la
+// caja y la letra se quedaba igual, perdida en medio.
+//
+// Ahora es al revés: la caja manda. Se estira la esquina y la letra crece hasta
+// llenarla, igual que una imagen. La cuenta es sencilla: se mide el texto una
+// vez a 100 px y se escala por lo que quepa, en ancho y en alto, quedándose con
+// el que antes se acabe. Los saltos de línea que escribas se respetan, pero el
+// título NO parte las líneas por su cuenta: si lo hiciera, estirar la caja a lo
+// ancho metería más palabras por línea en vez de agrandar la letra, que es justo
+// lo contrario de lo que se espera de algo que funciona como una imagen.
+const ALTO_LINEA_TITULO = 1.12;
+const LETRA_TITULO_ANTIGUA = 32;
+// Un pelo menos de lo que cabría exactamente: el navegador redondea los anchos
+// y, sin este margen, a veces la última letra rozaba el borde de la caja.
+const HOLGURA_TITULO = 0.97;
+
+const medidasTitulo = new Map();
+let medidorTitulo = null;
+
+function mideTitulo(html, peso, cursiva) {
+  const clave = peso + '|' + (cursiva ? 1 : 0) + '|' + html;
+  const guardada = medidasTitulo.get(clave);
+  if (guardada) return guardada;
+  if (!medidorTitulo) {
+    medidorTitulo = document.createElement('div');
+    medidorTitulo.setAttribute('aria-hidden', 'true');
+    medidorTitulo.style.cssText = [
+      'position:absolute', 'left:-99999px', 'top:0', 'visibility:hidden', 'pointer-events:none',
+      'display:inline-block', 'white-space:pre', 'font-size:100px', 'padding:0', 'margin:0',
+      'font-family:var(--font-display)', 'line-height:' + ALTO_LINEA_TITULO,
+    ].join(';');
+    document.body.appendChild(medidorTitulo);
+  }
+  medidorTitulo.style.fontWeight = String(peso);
+  medidorTitulo.style.fontStyle = cursiva ? 'italic' : 'normal';
+  medidorTitulo.innerHTML = html;
+  const medida = {
+    w: Math.max(1, medidorTitulo.offsetWidth),
+    h: Math.max(1, medidorTitulo.offsetHeight),
+  };
+  // Tope por si alguien escribe sin parar: con esto no crece para siempre.
+  if (medidasTitulo.size > 300) medidasTitulo.clear();
+  medidasTitulo.set(clave, medida);
+  return medida;
+}
+
+// Las medidas tomadas antes de que llegue la tipografía del título salen con la
+// de repuesto, que es más estrecha: se tiran en cuanto la de verdad está lista.
+if (typeof document !== 'undefined' && document.fonts && document.fonts.ready) {
+  document.fonts.ready.then(() => medidasTitulo.clear());
+}
+
 function BigTitleItem({ item, lang, editing, onUpdate }) {
   const text = pickLang(item.content, lang);
   const ref = React.useRef(null);
@@ -5339,6 +5394,44 @@ function BigTitleItem({ item, lang, editing, onUpdate }) {
   const hasColor = item.color && item.color !== 'transparent';
   const bg = hasColor && window.resolveStickyColor ? window.resolveStickyColor(item.color) : 'transparent';
 
+  // Lo que la caja deja para el texto: el relleno de la tarjeta (solo si tiene
+  // color) más los 4 px del propio texto, por cada lado.
+  const rellenoX = (hasColor ? 12 * 2 : 0) + 4 * 2;
+  const rellenoY = (hasColor ? 8 * 2 : 0) + 4 * 2;
+  const tieneCaja = typeof item.w === 'number' && typeof item.h === 'number';
+  const anchoLibre = Math.max(10, (tieneCaja ? item.w : 300) - rellenoX);
+  const altoLibre = Math.max(10, (tieneCaja ? item.h : 80) - rellenoY);
+
+  // Lo que se mide es el texto de verdad; si está vacío, el aviso que se ve en
+  // su lugar ("Escribe un título…"), para que un título recién puesto no salga
+  // con una letra gigantesca por no tener nada que medir.
+  const [, setFuentesListas] = React.useState(0);
+  React.useEffect(() => {
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => setFuentesListas(v => v + 1));
+  }, []);
+  const htmlParaMedir = (text && text.replace(/<br\s*\/?>/gi, '').trim())
+    ? text
+    : window.t('Escribe un título…', 'Write a title…');
+  const medida = mideTitulo(htmlParaMedir, weight, !!item.italic);
+  const letra = Math.max(6, 100 * HOLGURA_TITULO * Math.min(anchoLibre / medida.w, altoLibre / medida.h));
+
+  // ── Los títulos que ya existían no cambian de aspecto ──
+  //
+  // Hasta ahora todos se pintaban a 32 px, con la caja que tuvieran alrededor
+  // (normalmente más grande que el texto). Si se ajustaran sin más a esa caja,
+  // al estrenar esta versión cambiarían de tamaño todos los títulos de todos los
+  // tableros. Así que la primera vez que se pinta uno viejo, su caja se ciñe a
+  // lo que ocupaba su texto a 32 px: la cuenta de arriba da entonces 32 px y se
+  // ve exactamente igual que antes. La marca evita repetirlo.
+  React.useEffect(() => {
+    if (item.ajustaCaja || editing || !tieneCaja) return;
+    const real = mideTitulo(htmlParaMedir, weight, !!item.italic);
+    const factor = LETRA_TITULO_ANTIGUA / (100 * HOLGURA_TITULO);
+    const w = Math.max(item.w, Math.ceil(real.w * factor + rellenoX));
+    const h = Math.ceil(real.h * factor + rellenoY);
+    onUpdate({ w, h, ajustaCaja: true });
+  }, [item.id, item.ajustaCaja]);
+
   return (
     <div 
       className={`bigtitle-card ${hasColor ? 'has-bg' : ''}`}
@@ -5366,7 +5459,10 @@ function BigTitleItem({ item, lang, editing, onUpdate }) {
         onMouseDown={(e)=>editing && e.stopPropagation()}
         style={{
           fontFamily: 'var(--font-display)',
-          fontSize: '32px',
+          fontSize: letra + 'px',
+          lineHeight: ALTO_LINEA_TITULO,
+          // Sin partir líneas: las pone quien escribe, no el ancho de la caja.
+          whiteSpace: 'pre',
           fontWeight: weight,
           fontStyle: fontStyle,
           textDecoration: textDecoration,

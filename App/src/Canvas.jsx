@@ -209,9 +209,13 @@ function makeNewItem(type, x, y, w, h, lang) {
       return { ...base, type: 'code', ...defaultSize(420, 260),
         code: '', codeLang: 'auto', codeTitle: '' };
     case 'bigtitle':
+      // ajustaCaja: nace ya en el sistema nuevo, donde la letra la decide la
+      // caja. Sin la marca, al abrir el proyecto otro día lo tomaría por un
+      // título antiguo y le ceñiría la caja a los 32 px de antes.
       return { ...base, type: 'bigtitle', ...defaultSize(300, 80),
         color: 'transparent',
         align: 'center',
+        ajustaCaja: true,
         content: { es: 'Título Grande', en: 'Large Title' } };
     case 'draw': {
       const size = defaultSize(420, 300);
