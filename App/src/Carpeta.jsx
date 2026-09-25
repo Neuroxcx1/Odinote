@@ -82,7 +82,13 @@ function CarpetaItem({ item, lang, onUpdate }) {
     : CARPETA_COLOR;
   const muestras = info && info.ok ? info.muestras || [] : [];
   const perdida = info && !info.ok && info.motivo === 'no-esta';
-  const nombre = (info && info.ok && info.nombre) || item.nombre || window.t('Carpeta', 'Folder');
+  // El nombre que se ve: el que le haya puesto el usuario, y si no, el de la
+  // carpeta de verdad. Ponerle otro no toca el disco: es solo cómo se llama
+  // aquí en el lienzo.
+  const nombreReal = (info && info.ok && info.nombre) || item.nombre || window.t('Carpeta', 'Folder');
+  const nombre = item.titulo && item.titulo.trim() ? item.titulo : nombreReal;
+  const editandoNombre = !!item._editandoNombre;
+  const dejaDeEditar = () => onUpdate({ _editandoNombre: undefined, titulo: item.titulo && item.titulo.trim() ? item.titulo : undefined });
   const fondo = muestras.find(m => m.miniatura);
 
   let pie = null;
@@ -99,7 +105,7 @@ function CarpetaItem({ item, lang, onUpdate }) {
   return (
     <div
       className={`carpeta ${!item.ruta ? 'vacia' : ''} ${perdida ? 'perdida' : ''} ${muestras.length ? 'con-muestras' : ''}`}
-      style={{ '--carpeta': color }}
+      style={{ '--carpeta': color, ...(item.textColor ? { '--carpeta-tinta': item.textColor } : null) }}
       onMouseEnter={() => lee(false)}
       onDoubleClick={(e) => { e.stopPropagation(); if (item.ruta) abre(); else elige(); }}
       title={item.ruta || ''}
@@ -125,8 +131,6 @@ function CarpetaItem({ item, lang, onUpdate }) {
           ))}
         </div>
         <div className="carpeta-delantera">
-          <div className="carpeta-cara"/>
-          <div className="carpeta-ventana"/>
           {!item.ruta && api && (
             <button
               className="carpeta-elegir"
@@ -149,7 +153,32 @@ function CarpetaItem({ item, lang, onUpdate }) {
           )}
         </div>
       </div>
-      <div className="carpeta-nombre">{nombre}</div>
+      {editandoNombre ? (
+        // Se guarda según se escribe: un campo que solo guarda al salir pierde
+        // lo escrito si se desmonta por otro lado (la trampa de los títulos).
+        <input
+          className="carpeta-nombre-campo"
+          autoFocus
+          value={item.titulo != null ? item.titulo : nombreReal}
+          onFocus={(e) => e.target.select()}
+          onChange={(e) => onUpdate({ titulo: e.target.value })}
+          onKeyDown={(e) => {
+            e.stopPropagation();
+            if (e.key === 'Enter' || e.key === 'Escape') { e.preventDefault(); dejaDeEditar(); }
+          }}
+          onBlur={dejaDeEditar}
+          onMouseDown={(e) => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
+          onDoubleClick={(e) => e.stopPropagation()}
+        />
+      ) : (
+        <div
+          className="carpeta-nombre"
+          // Doble clic en el NOMBRE lo edita; en el dibujo, abre la carpeta.
+          onDoubleClick={(e) => { e.stopPropagation(); onUpdate({ _editandoNombre: true }); }}
+          title={window.t('Doble clic para cambiar el nombre', 'Double-click to rename')}
+        >{nombre}</div>
+      )}
       {pie && <div className="carpeta-cuenta">{pie}</div>}
     </div>
   );

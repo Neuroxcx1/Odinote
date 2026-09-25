@@ -1789,39 +1789,20 @@ body.odi-busy iframe { pointer-events: none !important; }
   position: absolute; left: 0; right: 0; top: 30%; bottom: 0;
   display: grid; place-items: center;
   border: 1.5px solid var(--line); border-radius: 4px;
-  /* Sin fondo propio: el color lo pone .carpeta-cara, que lleva el hueco de la
-     ventana. Con el fondo aquí, la ventana tapaba lo de dentro en vez de
-     dejarlo ver (se vio en la primera prueba). */
-  background: transparent;
+  /* Medio transparente y más en el medio, como la primera versión, que era lo
+     que le gustaba al usuario: por ahí asoma borroso lo de dentro (la foto más
+     reciente, en .carpeta-fondo). Con el borde y la sombra dura de siempre, eso
+     sí, para que siga pareciendo de Oddinote. El rectángulo con borde que hubo
+     en medio (una "ventana") se quitó: no le gustó. */
+  background: radial-gradient(ellipse 62% 58% at 50% 45%,
+    color-mix(in srgb, var(--carpeta) 45%, transparent),
+    color-mix(in srgb, var(--carpeta) 90%, transparent) 78%);
+  -webkit-backdrop-filter: blur(8px) saturate(1.25);
+  backdrop-filter: blur(8px) saturate(1.25);
   box-shadow: var(--pop);
   transform-origin: 50% 100%;
   transition: transform 520ms var(--muelle), box-shadow 200ms;
   z-index: 2;
-}
-/* La cara de la carpeta, con un hueco donde va la ventana: una máscara con dos
-   capas que se restan (todo, menos el rectángulo de la ventana). Los números
-   son los de .carpeta-ventana: 72 % de ancho a 14 % del borde, y 58 % de alto
-   empezando a 16 % de arriba (38 % en la escala de posición de las máscaras). */
-.carpeta-cara {
-  position: absolute; inset: 0; z-index: -1;
-  border-radius: 2.5px;
-  background: var(--carpeta);
-  -webkit-mask: linear-gradient(#000 0 0), linear-gradient(#000 0 0);
-  -webkit-mask-size: 100% 100%, 72% 58%;
-  -webkit-mask-position: 0 0, 50% 38%;
-  -webkit-mask-repeat: no-repeat;
-  -webkit-mask-composite: xor;
-  mask: linear-gradient(#000 0 0) 0 0 / 100% 100% no-repeat, linear-gradient(#000 0 0) 50% 38% / 72% 58% no-repeat;
-  mask-composite: exclude;
-}
-/* La ventana del medio, medio transparente: por ahí se ve lo de dentro. Plana
-   y con su trazo, como una etiqueta recortada en la carpeta. */
-.carpeta-ventana {
-  position: absolute; left: 14%; right: 14%; top: 16%; bottom: 26%;
-  border: 1.5px solid var(--line); border-radius: 2px;
-  background: color-mix(in srgb, var(--carpeta) 42%, transparent);
-  -webkit-backdrop-filter: blur(2px);
-  backdrop-filter: blur(2px);
 }
 /* Las dos rayas de abajo, como las de una carpeta de cartón. */
 .carpeta-delantera::before, .carpeta-delantera::after {
@@ -1838,8 +1819,19 @@ body.odi-busy iframe { pointer-events: none !important; }
 .carpeta-nombre {
   max-width: 100%;
   font-family: var(--font-display); font-weight: 800; font-size: 15px; letter-spacing: -0.01em;
-  color: var(--ink);
+  color: var(--carpeta-tinta, var(--ink));
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  cursor: text;
+}
+/* Escribiendo el nombre: el mismo tamaño y la misma letra, en su campo. */
+.carpeta-nombre-campo {
+  width: 100%; max-width: 100%;
+  padding: 1px 6px;
+  border: 1.5px solid var(--olive); border-radius: 2px;
+  background: var(--paper);
+  font-family: var(--font-display); font-weight: 800; font-size: 15px; letter-spacing: -0.01em;
+  color: var(--carpeta-tinta, var(--ink));
+  text-align: center;
 }
 /* La cuenta, con la letra de los datos de la aplicación (la de ancho fijo). */
 .carpeta-cuenta {

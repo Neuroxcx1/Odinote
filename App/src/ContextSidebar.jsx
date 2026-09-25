@@ -667,6 +667,18 @@ function ContextSidebar({
               <span className="material-symbols-rounded">folder_open</span>
               <span>{window.t('Carpeta', 'Folder')}</span>
             </button>
+            <button className="ctx-btn" onClick={() => onUpdate({ _editandoNombre: true })} title={window.t('Cambiar el nombre que se ve en el lienzo', 'Change the name shown on the canvas')}>
+              <span className="material-symbols-rounded">edit</span>
+              <span>{window.t('Nombre', 'Name')}</span>
+            </button>
+            <button
+              className={`ctx-btn ${pane === 'carpetaTexto' ? 'active' : ''}`}
+              onClick={() => setPane(pane === 'carpetaTexto' ? null : 'carpetaTexto')}
+              title={window.t('Color del nombre', 'Name colour')}
+            >
+              <div className="ctx-letter" style={{ color: item.textColor || 'var(--ink)' }}>A</div>
+              <span>{window.t('Texto', 'Text')}</span>
+            </button>
             {item.ruta && (
               <button
                 className="ctx-btn"
@@ -1575,6 +1587,24 @@ function ContextSidebar({
           itemId={item.id}
           onCerrar={() => setPane(null)}
         />
+      )}
+      {pane === 'carpetaTexto' && (
+        <div className="ctx-popout">
+          <div className="ctx-pop-section">
+            <div className="ctx-pop-title">{window.t('Color del nombre', 'Name colour')}</div>
+            <window.SelectorColor
+              valor={item.textColor || null}
+              onCambio={(c) => onUpdate({ textColor: c })}
+              tam={26}
+            />
+            {item.textColor && (
+              <button className="ctx-lang-item" style={{ marginTop: 10 }} onClick={() => onUpdate({ textColor: null })}>
+                <span>{window.t('El de siempre', 'Default')}</span>
+                <span className="material-symbols-rounded">format_color_reset</span>
+              </button>
+            )}
+          </div>
+        </div>
       )}
       {pane === 'ruletaElementos' && (() => {
         const elementos = Array.isArray(item.elementos) ? item.elementos : [];
