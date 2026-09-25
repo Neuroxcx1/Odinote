@@ -16,6 +16,9 @@ function TextFormatSidebar({ item, lang, onUpdate, onClose, variant }) {
   // El reloj lleva su título en la barra de arriba, igual que el bloque de
   // código: en item.timerTitle, con el formato como propiedades del nodo.
   const isTimer = item.type === 'timer';
+  // El nombre de la carpeta: texto plano en su propio campo, con el formato
+  // como propiedades del nodo y el color en item.textColor.
+  const isCarpeta = item.type === 'carpeta';
   const isTodo = item.type === 'todo';
   const isBoard = item.type === 'board';
   // Estos tipos guardan el formato como propiedades del nodo en vez de HTML, así
@@ -29,10 +32,10 @@ function TextFormatSidebar({ item, lang, onUpdate, onClose, variant }) {
   // propiedades del NODO entero, no de la selección —un pie de tablero con
   // dos tamaños de letra en dos palabras se vería mal—, pero sin alineación,
   // que ahí no significa nada (es una barra icono+texto+contador, no un bloque).
-  const isCustomPropType = isBigTitle || isFrame || isMap || isBoard || isCode || isTimer;
+  const isCustomPropType = isBigTitle || isFrame || isMap || isBoard || isCode || isTimer || isCarpeta;
   // Ambos guardan el color en el mismo campo (item.textColor); frame y map
   // usan uno propio (item.titleColor) porque su titulo vive aparte del cuerpo.
-  const usaTextColor = isBigTitle || isBoard;
+  const usaTextColor = isBigTitle || isBoard || isCarpeta;
 
   // ── To-do: el formato se aplica a la TAREA enfocada; si no hay ninguna
   // enfocada, se aplica a todas las tareas del nodo. ──
@@ -84,7 +87,7 @@ function TextFormatSidebar({ item, lang, onUpdate, onClose, variant }) {
     // El tablero también guarda su formato como propiedades: su título es un
     // campo de texto plano, no HTML editable, así que B/I/S/U valen para el
     // título entero. Se lee igual que el del Título grande.
-    if (item.type === 'board') {
+    if (item.type === 'board' || item.type === 'carpeta') {
       return {
         bold: item.bold !== false,
         italic: !!item.italic,
@@ -227,26 +230,26 @@ function TextFormatSidebar({ item, lang, onUpdate, onClose, variant }) {
         </>
       )}
 
-      {(!isCustomPropType || isBigTitle || isBoard || isCode || isTimer) && (
+      {(!isCustomPropType || isBigTitle || isBoard || isCode || isTimer || isCarpeta) && (
         <>
           {/* En el título y en las tareas, B/I/S/U son toggles de propiedad
               (texto plano); en las notas usan execCommand por selección. */}
-          <button className={`ctx-btn ${shown.bold ? 'active' : ''}`} onClick={()=> (isBigTitle || isBoard || isCode || isTimer) ? onUpdate({ bold: item.bold === false }) : exec('bold')}>
+          <button className={`ctx-btn ${shown.bold ? 'active' : ''}`} onClick={()=> (isBigTitle || isBoard || isCode || isTimer || isCarpeta) ? onUpdate({ bold: item.bold === false }) : exec('bold')}>
             <div className="ctx-letter" style={{fontWeight: 800}}>B</div>
             <span>{lang==='es'?'Negrita':'Bold'}</span>
           </button>
 
-          <button className={`ctx-btn ${shown.italic ? 'active' : ''}`} onClick={()=> (isBigTitle || isBoard || isCode || isTimer) ? onUpdate({ italic: !item.italic }) : exec('italic')}>
+          <button className={`ctx-btn ${shown.italic ? 'active' : ''}`} onClick={()=> (isBigTitle || isBoard || isCode || isTimer || isCarpeta) ? onUpdate({ italic: !item.italic }) : exec('italic')}>
             <div className="ctx-letter" style={{fontStyle: 'italic', fontWeight: 700}}>I</div>
             <span>{lang==='es'?'Cursiva':'Italic'}</span>
           </button>
 
-          <button className={`ctx-btn ${shown.strike ? 'active' : ''}`} onClick={()=> (isBigTitle || isBoard || isCode || isTimer) ? onUpdate({ strike: !item.strike }) : exec('strikeThrough')}>
+          <button className={`ctx-btn ${shown.strike ? 'active' : ''}`} onClick={()=> (isBigTitle || isBoard || isCode || isTimer || isCarpeta) ? onUpdate({ strike: !item.strike }) : exec('strikeThrough')}>
             <div className="ctx-letter" style={{textDecoration: 'line-through', fontWeight: 700}}>S</div>
             <span>{lang==='es'?'Tachado':'Strike'}</span>
           </button>
 
-          <button className={`ctx-btn ${shown.underline ? 'active' : ''}`} onClick={()=> (isBigTitle || isBoard || isCode || isTimer) ? onUpdate({ underline: !item.underline }) : exec('underline')}>
+          <button className={`ctx-btn ${shown.underline ? 'active' : ''}`} onClick={()=> (isBigTitle || isBoard || isCode || isTimer || isCarpeta) ? onUpdate({ underline: !item.underline }) : exec('underline')}>
             <div className="ctx-letter" style={{textDecoration: 'underline', fontWeight: 700}}>U</div>
             <span>{lang==='es'?'Subrayado':'Underline'}</span>
           </button>
@@ -254,7 +257,7 @@ function TextFormatSidebar({ item, lang, onUpdate, onClose, variant }) {
       )}
 
       {/* Alineación: no aplica a las tareas (y evitaría caer en execCommand) */}
-      {!isTodo && !isBoard && (isCustomPropType || !isCaption) && (
+      {!isTodo && !isBoard && !isCarpeta && (isCustomPropType || !isCaption) && (
         <>
           <div className="ctx-sep-h"/>
 
@@ -356,8 +359,10 @@ function TextFormatSidebar({ item, lang, onUpdate, onClose, variant }) {
           está cerrado para títulos y leyendas porque usan execCommand, que en
           esos tipos formatearía otro nodo. Enlazar no usa execCommand —solo
           envuelve la selección—, así que puede estar en todos los textos. */}
-      <div className="ctx-sep-h"/>
-      <button
+      {/* El nombre de la carpeta es un campo de texto plano: enlazar un trozo
+          no significa nada ahí. */}
+      {!isCarpeta && <div className="ctx-sep-h"/>}
+      {!isCarpeta && <button
         className="ctx-btn"
         onClick={()=>{
           const sel = window.getSelection();
@@ -373,7 +378,7 @@ function TextFormatSidebar({ item, lang, onUpdate, onClose, variant }) {
       >
         <span className="material-symbols-rounded">add_link</span>
         <span>{lang==='es'?'Enlazar':'Link'}</span>
-      </button>
+      </button>}
     </div>
 
     {colorOpen && (

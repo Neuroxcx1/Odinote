@@ -5601,7 +5601,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
 
       {/* Text format sidebar (when editing a text-based item) */}
       {((editing && editing === selected)
-        || (selectedItem && (selectedItem.type === 'map' || selectedItem.type === 'code' || selectedItem.type === 'timer') && selectedItem._editingTitle)
+        || (selectedItem && (selectedItem.type === 'map' || selectedItem.type === 'code' || selectedItem.type === 'carpeta' || selectedItem.type === 'timer') && selectedItem._editingTitle)
        ) && !captionFocusId && (() => {
         const it = selectedItem;
         if (!it) return null;
@@ -5613,19 +5613,21 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
         // Y el del reloj igual: es un título como el del bloque de código,
         // guardado en su propio campo y no dentro del texto del nodo.
         const isEditingTimerTitle = it.type === 'timer' && it._editingTitle;
+        // Y el nombre de la carpeta: su campo de texto propio, con su color.
+        const isEditingCarpetaTitle = it.type === 'carpeta' && it._editingTitle;
         // 'board' entró aquí porque, al empezar a escribir su título, el menú
         // contextual normal se ocultaba (se oculta siempre que editing===selected)
         // y esta barra de texto tampoco lo cubría: el panel de la izquierda
         // desaparecía entero mientras se cambiaba el nombre del tablero.
         const isEditingTextNode = editing && editing === selected && ['note','comment','bigtitle','frame','todo','board','shape','separator'].includes(it.type);
-        if (!isEditingTextNode && !isEditingMapTitle && !isEditingCodeTitle && !isEditingTimerTitle) return null;
+        if (!isEditingTextNode && !isEditingMapTitle && !isEditingCodeTitle && !isEditingTimerTitle && !isEditingCarpetaTitle) return null;
         return (
           <window.TextFormatSidebar
             item={it}
             lang={lang}
             onUpdate={(patch)=>updateItem(it.id, patch)}
             onClose={()=>{
-              if (isEditingMapTitle || isEditingCodeTitle || isEditingTimerTitle) {
+              if (isEditingMapTitle || isEditingCodeTitle || isEditingTimerTitle || isEditingCarpetaTitle) {
                 updateItem(it.id, { _editingTitle: false });
               } else {
                 setEditing(null);

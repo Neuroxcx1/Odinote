@@ -307,7 +307,7 @@ function ContextSidebar({
   // Por dentro sigue siendo un multiplicador de la letra base de cada nodo (13,5
   // en notas, comentarios, tareas y calendario; 15 en la figura), que es lo que
   // ya tienen guardado los tableros. Aquí se enseña en píxeles.
-  const baseTexto = item.type === 'shape' ? 15 : item.type === 'separator' ? 18
+  const baseTexto = item.type === 'shape' || item.type === 'carpeta' ? 15 : item.type === 'separator' ? 18
     : ['note', 'comment', 'todo', 'calendar'].includes(item.type) ? 13.5 : null;
   if (baseTexto) {
     tamanos.texto = {
@@ -667,17 +667,16 @@ function ContextSidebar({
               <span className="material-symbols-rounded">folder_open</span>
               <span>{window.t('Carpeta', 'Folder')}</span>
             </button>
-            <button className="ctx-btn" onClick={() => onUpdate({ _editandoNombre: true })} title={window.t('Cambiar el nombre que se ve en el lienzo', 'Change the name shown on the canvas')}>
+            {/* El nombre tiene MENÚ PROPIO, como el título del reloj: se pulsa
+                aquí, se pasa a escribirlo y a la izquierda sale la barra de
+                texto, con su color y su negrita. */}
+            <button
+              className="ctx-btn"
+              onClick={() => { setPane(null); onUpdate({ _editingTitle: true }); }}
+              title={window.t('Cambiar el nombre que se ve en el lienzo', 'Change the name shown on the canvas')}
+            >
               <span className="material-symbols-rounded">edit</span>
               <span>{window.t('Nombre', 'Name')}</span>
-            </button>
-            <button
-              className={`ctx-btn ${pane === 'carpetaTexto' ? 'active' : ''}`}
-              onClick={() => setPane(pane === 'carpetaTexto' ? null : 'carpetaTexto')}
-              title={window.t('Color del nombre', 'Name colour')}
-            >
-              <div className="ctx-letter" style={{ color: item.textColor || 'var(--ink)' }}>A</div>
-              <span>{window.t('Texto', 'Text')}</span>
             </button>
             {item.ruta && (
               <button
@@ -693,7 +692,22 @@ function ContextSidebar({
               </button>
             )}
             {item.ruta && (
-              <button className="ctx-btn" onClick={() => window.dispatchEvent(new CustomEvent('odi-carpeta-leer', { detail: item.id }))} title={window.t('Volver a mirar lo que hay dentro', 'Look inside again')}>
+              <button
+                className="ctx-btn"
+                onClick={(e) => {
+                  // La flecha da una vuelta entera con rebote: sin eso, leer
+                  // una carpeta que no ha cambiado no se notaba y parecía que
+                  // el botón no hacía nada.
+                  const flecha = e.currentTarget.querySelector('.material-symbols-rounded');
+                  if (flecha && flecha.animate) {
+                    flecha.animate([{ transform: 'rotate(0deg)' }, { transform: 'rotate(360deg)' }],
+                      { duration: 700, easing: 'cubic-bezier(0.34, 1.56, 0.64, 1)' });
+                  }
+                  window.playAudioTone && window.playAudioTone('click');
+                  window.dispatchEvent(new CustomEvent('odi-carpeta-leer', { detail: item.id }));
+                }}
+                title={window.t('Volver a mirar lo que hay dentro', 'Look inside again')}
+              >
                 <span className="material-symbols-rounded">refresh</span>
                 <span>{window.t('Actualizar', 'Refresh')}</span>
               </button>
@@ -1600,24 +1614,6 @@ function ContextSidebar({
           itemId={item.id}
           onCerrar={() => setPane(null)}
         />
-      )}
-      {pane === 'carpetaTexto' && (
-        <div className="ctx-popout">
-          <div className="ctx-pop-section">
-            <div className="ctx-pop-title">{window.t('Color del nombre', 'Name colour')}</div>
-            <window.SelectorColor
-              valor={item.textColor || null}
-              onCambio={(c) => onUpdate({ textColor: c })}
-              tam={26}
-            />
-            {item.textColor && (
-              <button className="ctx-lang-item" style={{ marginTop: 10 }} onClick={() => onUpdate({ textColor: null })}>
-                <span>{window.t('El de siempre', 'Default')}</span>
-                <span className="material-symbols-rounded">format_color_reset</span>
-              </button>
-            )}
-          </div>
-        </div>
       )}
       {pane === 'ruletaElementos' && (() => {
         const elementos = Array.isArray(item.elementos) ? item.elementos : [];

@@ -2,11 +2,12 @@
 // Oddinote — el nodo de carpeta
 //
 // Pedido por el usuario en vez del "hito", que no se entendía: un acceso
-// directo a una carpeta del ordenador. Enseña cómo se llama, cuántos archivos
-// y carpetas tiene y, al pasar el ratón, las miniaturas de lo último que se
-// tocó dentro asoman por arriba —fotos, PDFs, otras carpetas—, con la parte de
-// delante medio transparente para que se vea lo que hay detrás. Doble clic la
-// abre en el Explorador.
+// directo a una carpeta del ordenador. Enseña cómo se llama y cuántos archivos
+// y carpetas tiene. En reposo está cerrada; al pasar el ratón la parte de
+// delante se vuelve medio transparente y salen por arriba las miniaturas de lo
+// último que se tocó dentro —fotos, PDFs, otras carpetas—. Doble clic la abre
+// en el Explorador; doble clic en el NOMBRE lo cambia, con la barra de texto
+// de los demás nodos (color, negrita…) y el tamaño en la barra del nodo.
 //
 // Leer el disco solo se puede desde la aplicación de escritorio (ver
 // 'carpeta-leer' en main.js, que pide las miniaturas a Windows). En la web y
@@ -87,9 +88,18 @@ function CarpetaItem({ item, lang, onUpdate }) {
   // aquí en el lienzo.
   const nombreReal = (info && info.ok && info.nombre) || item.nombre || window.t('Carpeta', 'Folder');
   const nombre = item.titulo && item.titulo.trim() ? item.titulo : nombreReal;
-  const editandoNombre = !!item._editandoNombre;
-  const dejaDeEditar = () => onUpdate({ _editandoNombre: undefined, titulo: item.titulo && item.titulo.trim() ? item.titulo : undefined });
-  const fondo = muestras.find(m => m.miniatura);
+  // Se edita con el mismo aviso que el título del reloj o del bloque de
+  // código (_editingTitle): con él, el lienzo cambia la barra del nodo por la
+  // barra de texto, que es donde vive el color del nombre.
+  const editandoNombre = item._editingTitle === true;
+  const dejaDeEditar = () => onUpdate({ _editingTitle: false, titulo: item.titulo && item.titulo.trim() ? item.titulo : undefined });
+  const tinta = item.textColor && item.textColor !== 'inherit' ? item.textColor : null;
+  // Los mismos campos que escribe la barra de texto en el reloj y en el código.
+  const estiloNombre = {
+    fontWeight: item.bold === false ? 500 : 800,
+    fontStyle: item.italic ? 'italic' : 'normal',
+    textDecoration: [item.underline ? 'underline' : '', item.strike ? 'line-through' : ''].filter(Boolean).join(' ') || 'none',
+  };
 
   let pie = null;
   if (!api) pie = window.t('Solo en la aplicación de escritorio', 'Desktop app only');
@@ -105,14 +115,13 @@ function CarpetaItem({ item, lang, onUpdate }) {
   return (
     <div
       className={`carpeta ${!item.ruta ? 'vacia' : ''} ${perdida ? 'perdida' : ''} ${muestras.length ? 'con-muestras' : ''}`}
-      style={{ '--carpeta': color, ...(item.textColor ? { '--carpeta-tinta': item.textColor } : null) }}
+      style={{ '--carpeta': color, ...(tinta ? { '--carpeta-tinta': tinta } : null) }}
       onMouseEnter={() => lee(false)}
       onDoubleClick={(e) => { e.stopPropagation(); if (item.ruta) abre(); else elige(); }}
       title={item.ruta || ''}
     >
       <div className="carpeta-dibujo">
         <div className="carpeta-trasera"/>
-        {fondo && <div className="carpeta-fondo" style={{ backgroundImage: `url("${fondo.miniatura}")` }}/>}
         <div className="carpeta-hojas">
           {(muestras.length ? muestras : [null, null, null]).slice(0, 3).map((m, i) => (
             <div key={i} className={`carpeta-hoja h${i} ${m ? 'tipo-' + m.tipo : 'hueca'}`}>
@@ -158,6 +167,7 @@ function CarpetaItem({ item, lang, onUpdate }) {
         // lo escrito si se desmonta por otro lado (la trampa de los títulos).
         <input
           className="carpeta-nombre-campo"
+          style={estiloNombre}
           autoFocus
           value={item.titulo != null ? item.titulo : nombreReal}
           onFocus={(e) => e.target.select()}
@@ -166,7 +176,14 @@ function CarpetaItem({ item, lang, onUpdate }) {
             e.stopPropagation();
             if (e.key === 'Enter' || e.key === 'Escape') { e.preventDefault(); dejaDeEditar(); }
           }}
-          onBlur={dejaDeEditar}
+          // Salir del campo lo termina, salvo si se va a la barra de texto o a
+          // su color (el campo del código del color, por ejemplo): eso es
+          // seguir editando el nombre.
+          onBlur={(e) => {
+            const a = e.relatedTarget;
+            if (a && a.closest && a.closest('.text-format, .ctx-popout')) return;
+            dejaDeEditar();
+          }}
           onMouseDown={(e) => e.stopPropagation()}
           onClick={(e) => e.stopPropagation()}
           onDoubleClick={(e) => e.stopPropagation()}
@@ -174,8 +191,9 @@ function CarpetaItem({ item, lang, onUpdate }) {
       ) : (
         <div
           className="carpeta-nombre"
+          style={estiloNombre}
           // Doble clic en el NOMBRE lo edita; en el dibujo, abre la carpeta.
-          onDoubleClick={(e) => { e.stopPropagation(); onUpdate({ _editandoNombre: true }); }}
+          onDoubleClick={(e) => { e.stopPropagation(); onUpdate({ _editingTitle: true }); }}
           title={window.t('Doble clic para cambiar el nombre', 'Double-click to rename')}
         >{nombre}</div>
       )}
