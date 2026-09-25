@@ -2472,6 +2472,19 @@ body.odi-busy iframe { pointer-events: none !important; }
 }
 
 /* Comment */
+/* El comentario es una tarjeta crema, clara en los dos temas (--c-cream no
+   cambia en oscuro). Su texto no puede seguir al tema: un comentario nuevo nace
+   sin color propio —las notas nacen blancas—, así que su tinta era la del tema,
+   casi blanca en modo oscuro, y lo escrito desaparecía sobre el crema.
+   Encontrado probando la aplicación en oscuro. El mismo arreglo que ya tiene la
+   tarjeta de archivo: dentro de la tarjeta se clavan los valores del tema claro.
+   Si alguien le pone un color oscuro, su texto sigue saliendo en blanco, porque
+   ese se pone directamente en el propio nodo. */
+.comment-card {
+  --ink:   #1A1A1A;
+  --ink-2: #595459;
+  --ink-3: #8E8A8E;
+}
 .comment-card .item-card { background: var(--c-cream); padding: 9px 11px; display: flex; flex-direction: column; gap: 6px; }
 .comment-head { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
 .comment-avatar { width: 24px; height: 24px; border-radius: 50%; border: 1.5px solid var(--line); flex-shrink: 0; display: grid; place-items: center; font-weight: 700; font-size: 10px; }
