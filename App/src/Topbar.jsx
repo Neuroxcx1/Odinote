@@ -60,6 +60,47 @@ const EXTRA_TOOLS = [
   { id: 'ruleta',   icon: 'pie_chart',     label: 'tool_ruleta',   bg: '#E6544F', fg: 'white' },
 ];
 
+// ── La concha del botón de More ──
+// Pedida por el usuario: un caracol. Una espiral dentro de un círculo, con el
+// trazo de la tinta de siempre. Se calcula una vez: una espiral de Arquímedes
+// de dos vueltas y media, del centro hacia fuera.
+const CONCHA_ESPIRAL = (() => {
+  let d = '';
+  const pasos = 64, vueltas = 2.5;
+  for (let i = 0; i <= pasos; i++) {
+    const f = i / pasos;
+    const ang = f * vueltas * 2 * Math.PI - Math.PI / 2;
+    const r = 0.8 + f * 7.6;
+    d += (i ? ' L' : 'M') + (12 + r * Math.cos(ang)).toFixed(2) + ' ' + (12 + r * Math.sin(ang)).toFixed(2);
+  }
+  return d;
+})();
+function ConchaMas() {
+  return (
+    <svg className="mas-concha" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
+      <circle cx="12" cy="12" r="9.6" fill="none" stroke="currentColor" strokeWidth="1.7"/>
+      <path d={CONCHA_ESPIRAL} fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  );
+}
+
+// Los nodos de More en sus tres grupos, por el color que ya tienen: lo que se
+// escribe, los medios y archivos, y la estructura.
+function gruposDeMas() {
+  const nombre = {
+    '#90B968': window.t('Escribir', 'Write'),
+    '#E1DFE3': window.t('Medios', 'Media'),
+    '#E6544F': window.t('Estructura', 'Structure'),
+  };
+  const grupos = [];
+  EXTRA_TOOLS.forEach(tool => {
+    const ultimo = grupos[grupos.length - 1];
+    if (ultimo && ultimo.bg === tool.bg) ultimo.tools.push(tool);
+    else grupos.push({ bg: tool.bg, nombre: nombre[tool.bg] || '', tools: [tool] });
+  });
+  return grupos;
+}
+
 function Topbar({
   lang, setLang,
   theme, setTheme,
@@ -79,6 +120,21 @@ function Topbar({
 }) {
   const t = window.TRANSLATIONS[lang];
   const [extraOpen, setExtraOpen] = React.useState(false);
+  // Cerrando: la tira se recoge hacia la concha antes de desaparecer.
+  const [extraCerrando, setExtraCerrando] = React.useState(false);
+  const cierraExtras = () => {
+    if (!extraOpen || extraCerrando) return;
+    if (esMovil()) { setExtraOpen(false); return; }
+    setExtraCerrando(true);
+    setTimeout(() => { setExtraOpen(false); setExtraCerrando(false); }, 260);
+  };
+  // Esc la recoge, como cualquier menú.
+  React.useEffect(() => {
+    if (!extraOpen) return;
+    const tecla = (e) => { if (e.key === 'Escape') cierraExtras(); };
+    window.addEventListener('keydown', tecla);
+    return () => window.removeEventListener('keydown', tecla);
+  });
   // Donde se dibuja el panel de extras. Va en coordenadas de pantalla porque
   // el panel se pinta fuera de la barra (que recorta), no dentro de ella.
   const [extraPos, setExtraPos] = React.useState({ left: 0, top: 0 });
@@ -98,6 +154,11 @@ function Topbar({
       setExtraPos({
         left: Math.max(8, Math.min(r.left, window.innerWidth - ANCHO - 8)),
         top: r.bottom + 8,
+        // La tira del caracol se ancla por la DERECHA, bajo la concha, y
+        // crece hacia la izquierda. Si no cabe entera, se parte en dos filas.
+        right: Math.max(8, window.innerWidth - r.right),
+        anchoMax: Math.max(220, r.right - 8),
+        pico: r.width / 2,
       });
     };
     coloca();
@@ -279,18 +340,19 @@ function Topbar({
           </React.Fragment>
         ))}
 
-        {/* Botón de tres puntos para herramientas extras */}
+        {/* More: una concha de caracol. Al pulsarla da una vuelta y de ella sale
+            la tira con el resto de nodos (ver el portal de más abajo). */}
         <button
           ref={extraBtnRef}
-          className={`tool press ${extraOpen ? 'active' : ''}`}
+          className={`tool press mas-boton ${extraOpen && !extraCerrando ? 'active abierto' : ''}`}
           title={window.t('Más herramientas', 'More tools')}
           onClick={() => {
-            setExtraOpen(o => !o);
+            if (extraOpen) cierraExtras(); else setExtraOpen(true);
             window.playAudioTone && window.playAudioTone('click');
           }}
         >
           <div className="tool-icon" style={{ background: '#E1DFE3', color: '#1A1A1A' }}>
-            <span className="material-symbols-rounded">more_horiz</span>
+            <ConchaMas/>
           </div>
           <div className="tool-label">{window.t('Más', 'More')}</div>
         </button>
@@ -324,7 +386,79 @@ function Topbar({
           este panel cuelga por debajo: dentro quedaba cortado y no se veía
           nada al pulsar "Más". Al estar fuera, se coloca en coordenadas fijas
           calculadas desde el botón. */}
-      {extraOpen && ReactDOM.createPortal(
+      {extraOpen && !esMovil() && ReactDOM.createPortal(
+        <>
+          {/* Mientras se recoge ya no tapa nada: el clic que llega en ese cuarto
+              de segundo es para el lienzo (colocar el nodo elegido, por ejemplo). */}
+          {!extraCerrando && (
+            <div
+              style={{ position: 'fixed', inset: 0, zIndex: 400 }}
+              onClick={cierraExtras}
+            />
+          )}
+          {/* La tira del caracol. Sale de debajo de la concha y se estira hacia
+              la izquierda; los nodos van de izquierda a derecha, agrupados por
+              su color, y entran uno detrás de otro desde la concha con un
+              pequeño vaivén, como el cuerpo de una serpiente al estirarse. */}
+          <div
+            className={`mas-serpiente ${extraCerrando ? 'cierra' : ''}`}
+            style={{ position: 'fixed', right: extraPos.right, top: extraPos.top, maxWidth: extraPos.anchoMax, '--pico': (extraPos.pico || 20) + 'px' }}
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            {(() => {
+              const grupos = gruposDeMas();
+              const total = EXTRA_TOOLS.length;
+              let k = 0;
+              return grupos.map(g => (
+                <div className="mas-grupo" key={g.bg}>
+                  <div className="mas-grupo-nombre">{g.nombre}</div>
+                  <div className="mas-grupo-nodos">
+                    {g.tools.map(tool => {
+                      const j = k++;
+                      // Los de la derecha salen antes: la tira nace en la concha.
+                      const retraso = 60 + (total - 1 - j) * 32;
+                      const ola = Math.sin(j * 1.1) * 12;
+                      return (
+                        <button
+                          key={tool.id}
+                          className={`tool press mas-nodo ${activeTool === tool.id ? 'active' : ''}`}
+                          style={{ '--retraso': retraso + 'ms', '--ola': ola.toFixed(1) + 'px' }}
+                          title={`${t[tool.label] || tool.id} · ${window.t('Arrastra al canvas o clic', 'Drag to canvas or click')}`}
+                          onMouseDown={(e) => {
+                            cierraExtras();
+                            startToolDrag(e, tool.id);
+                          }}
+                          onClick={() => {
+                            window.playAudioTone && window.playAudioTone('click');
+                            setActiveTool(tool.id);
+                          }}
+                        >
+                          <div
+                            className="tool-icon"
+                            style={{
+                              background: activeTool === tool.id ? 'var(--olive)' : tool.bg,
+                              color: activeTool === tool.id ? 'white' : (tool.fg || 'var(--ink)'),
+                            }}
+                          >
+                            <span className="material-symbols-rounded">{tool.icon}</span>
+                          </div>
+                          <div className="tool-label">{t[tool.label] || tool.id}</div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ));
+            })()}
+          </div>
+        </>,
+        document.body
+      )}
+
+      {/* En el teléfono se queda la lista de siempre, pegada al raíl de
+          herramientas: una tira de once nodos no cabe de lado en una pantalla
+          de móvil. */}
+      {extraOpen && esMovil() && ReactDOM.createPortal(
         <>
           <div
             style={{ position: 'fixed', inset: 0, zIndex: 400 }}
