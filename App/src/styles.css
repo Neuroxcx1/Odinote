@@ -2953,9 +2953,14 @@ html[data-mobile="1"] .connector-hit { stroke-width: 40; }
 .handle.tr { top: 0; right: 0; cursor: nesw-resize; }
 .handle.bl { bottom: 0; left: 0; cursor: nesw-resize; }
 .handle.br { bottom: 0; right: 0; cursor: nwse-resize; }
-/* Girar: va por fuera de la caja y por debajo a la izquierda, donde no pisa
+/* Girar: va por fuera de la caja y por debajo a la DERECHA, donde no pisa
    ninguna esquina de redimensionado. Es redondo a propósito, para que no se
    confunda con los cuadraditos que cambian el tamaño.
+
+   A la derecha y no a la izquierda porque la barra de acciones del nodo
+   seleccionado sale siempre por la izquierda: probando la aplicación con un
+   título pegado al borde izquierdo, la bola quedaba DEBAJO de esa barra y no
+   había forma de alcanzarla. Por la derecha no la tapa nada.
 
    ── Por qué su sitio se calcula con el zoom ──
    Los tiradores crecen al alejarse (--handle-scale) para seguir siendo
@@ -2975,10 +2980,10 @@ html[data-mobile="1"] .connector-hit { stroke-width: 40; }
    esquina al 50 % y al 30 %. */
 .handle.rot {
   width: 22px; height: 22px;
-  /* El centro de la bola a 26 px a la izquierda y 44 px por debajo de la
+  /* El centro de la bola a 26 px a la derecha y 44 px por debajo de la
      esquina, en píxeles de pantalla; los 11 px son su medio ancho, porque
-     left y bottom colocan el borde y no el centro. */
-  left: calc(-26px * var(--handle-libre, 1) - 11px);
+     right y bottom colocan el borde y no el centro. */
+  right: calc(-26px * var(--handle-libre, 1) - 11px);
   bottom: calc(-44px * var(--handle-libre, 1) - 11px);
   transform: scale(var(--handle-libre, 1));
   border-radius: 50%;
