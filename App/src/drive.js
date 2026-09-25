@@ -152,7 +152,8 @@
   }
 
   // Escanea TODAS las páginas del proyecto (raíz + boards anidados + hijos de
-  // columnas), sube cada medio local a Drive y devuelve el mapa de reemplazos.
+  // columnas + fotos de las galerías), sube cada medio local a Drive y
+  // devuelve el mapa de reemplazos.
   // Devuelve { replaced: {canvasId: {clave: url}}, attempted, uploaded, authError }
   async function syncProjectMedia({ canvases, projectId, folderId, accessToken, resolveSrc, fetchFn, log }) {
     const f = fetchFn || fetch.bind(typeof window !== 'undefined' ? window : globalThis);
@@ -210,6 +211,12 @@
         if (authError) return { replaced, attempted, uploaded, authError };
         for (const child of (item.children || [])) {
           await processOne(cid, `${item.id}::${child.id}`, child);
+          if (authError) return { replaced, attempted, uploaded, authError };
+        }
+        // Las fotos de una galería: cada una con su id, con la misma clave
+        // que los hijos de una columna.
+        for (const foto of (Array.isArray(item.fotos) ? item.fotos : [])) {
+          await processOne(cid, `${item.id}::${foto.id}`, foto);
           if (authError) return { replaced, attempted, uploaded, authError };
         }
       }

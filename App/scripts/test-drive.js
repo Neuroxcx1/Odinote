@@ -210,6 +210,30 @@ const nuevoEstado = () => ({
       `${archivos.size} archivo (solo la carpeta media)`);
   }
 
+  // ── 7. Las fotos de una galería suben una a una, y una vez ──
+  {
+    const { fetchFalso, llamadas } = crearDriveFalso();
+    const canvases = {
+      proj1: { title: 'Raíz', items: [
+        { id: 'g1', type: 'galeria', fotos: [
+          { id: 'f1', src: imagen, fileType: 'png' },
+          { id: 'f2', src: 'media/galeria_f2.webp', fileType: 'webp' },
+          { id: 'f3', src: 'https://lh3.googleusercontent.com/d/ya-subida' },
+        ] },
+      ] },
+    };
+    const leeLocal = async (url) => ({ ok: true, arrayBuffer: async () => new Uint8Array([1, 2, 3]).buffer, headers: { get: () => 'image/webp' } });
+    const fetchConBoveda = (url, opts) => String(url).startsWith('/vault-media/') ? leeLocal(url) : fetchFalso(url, opts);
+    const res = await OdiDrive.syncProjectMedia({
+      canvases, projectId: 'proj1', folderId: 'carpetaProyecto', accessToken: 'tok',
+      fetchFn: fetchConBoveda, resolveSrc: (s) => '/vault-media/Proyecto/' + s,
+    });
+    const r = res.replaced.proj1 || {};
+    check('las fotos de una galería se suben, cada una con su clave',
+      res.uploaded === 2 && !!r['g1::f1'] && !!r['g1::f2'], `subidas ${res.uploaded}, claves ${Object.keys(r).join(', ')}`);
+    check('la que ya está en la nube no se vuelve a subir', !r['g1::f3'] && llamadas.creados === 2, `${llamadas.creados} archivos`);
+  }
+
   console.log(fallos ? `\n${fallos} FALLOS` : '\nTodo correcto');
   process.exit(fallos ? 1 : 0);
 })();

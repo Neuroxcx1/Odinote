@@ -51,9 +51,9 @@ const barra = lee('TOOLS');
 const extras = lee('EXTRA_TOOLS');
 
 check('la barra de arriba tiene sus catorce nodos', barra.length === 14, 'hay ' + barra.length);
-// Diez en la 1.0.9: el separador y la ruleta con la estructura, en rojo, y la
-// carpeta con los archivos, en gris.
-check('y el menú del "+" los diez que sobran', extras.length === 10, 'hay ' + extras.length);
+// Once en la 1.0.9: el separador y la ruleta con la estructura, en rojo, y la
+// carpeta y la galería con los archivos, en gris.
+check('y el menú del "+" los once que sobran', extras.length === 11, 'hay ' + extras.length);
 
 const malBarra = enOrden(barra);
 check('la barra va verde → gris → rojo → blanco', malBarra === null, malBarra || undefined);
@@ -64,18 +64,18 @@ check('el menú del "+" va verde → gris → rojo', malExtras === null, malExtr
 check('empieza por lo que se escribe',
   extras[0].bg === VERDE && extras[1].bg === VERDE,
   extras.slice(0, 2).map(x => x.id).join(', '));
-check('sigue con los medios y los archivos (la carpeta entre ellos)',
-  extras.slice(2, 5).every(x => x.bg === GRIS),
-  extras.slice(2, 5).map(x => x.id).join(', '));
+check('sigue con los medios y los archivos (la carpeta y la galería entre ellos)',
+  extras.slice(2, 6).every(x => x.bg === GRIS),
+  extras.slice(2, 6).map(x => x.id).join(', '));
 check('y acaba con la estructura y las herramientas',
-  extras.slice(5).every(x => x.bg === ROJO),
-  extras.slice(5).map(x => x.id).join(', '));
+  extras.slice(6).every(x => x.bg === ROJO),
+  extras.slice(6).map(x => x.id).join(', '));
 
 // Que reordenar no se haya llevado ningún nodo por delante.
 const ids = [...barra, ...extras].map(x => x.id).sort();
-check('están los veinticuatro nodos, sin repetidos',
-  ids.length === 24 && new Set(ids).size === 24, ids.length + ' ids');
-for (const quien of ['comment', 'code', 'file', 'map', 'carpeta', 'shape', 'separator', 'calendar', 'timer', 'ruleta']) {
+check('están los veinticinco nodos, sin repetidos',
+  ids.length === 25 && new Set(ids).size === 25, ids.length + ' ids');
+for (const quien of ['comment', 'code', 'file', 'map', 'carpeta', 'galeria', 'shape', 'separator', 'calendar', 'timer', 'ruleta']) {
   check('sigue estando ' + quien, ids.indexOf(quien) !== -1);
 }
 

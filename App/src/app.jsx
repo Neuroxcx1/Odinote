@@ -1580,6 +1580,42 @@ function App() {
             }
           })());
         }
+        // Las fotos de una galería van dentro del nodo, cada una con su id: se
+        // guardan una a una igual que la de un nodo de imagen, para que el
+        // proyecto no lleve megas de fotos metidos en su json.
+        (Array.isArray(item.fotos) ? item.fotos : []).forEach(foto => {
+          if (!foto || typeof foto.src !== 'string' || !foto.src.startsWith('data:')) return;
+          const clave = `${item.id}::${foto.id}`;
+          if (savingMediaRef.current.has(clave)) return;
+          savingMediaRef.current.add(clave);
+          changed = true;
+          const tipo = foto.fileType || (foto.src.match(/^data:image\/([a-z0-9+.-]+)/i) || [])[1] || 'png';
+          const ext = String(tipo).toLowerCase().replace('jpeg', 'jpg').replace(/[^a-z0-9]/g, '') || 'png';
+          saves.push((async () => {
+            try {
+              const carpeta = carpetaPorCanvas[cid] || null;
+              const ruta = String(await window.electronAPI.saveMedia(activeVaultPath, `galeria_${foto.id}.${ext}`, foto.src, carpeta)).replace(/\\/g, '/');
+              foto.src = ruta;
+              setCanvases(prev => {
+                const c = prev[cid];
+                if (!c || !c.items) return prev;
+                return {
+                  ...prev,
+                  [cid]: {
+                    ...c,
+                    items: c.items.map(it => it.id === item.id && Array.isArray(it.fotos)
+                      ? { ...it, fotos: it.fotos.map(f => f.id === foto.id ? { ...f, src: ruta } : f) }
+                      : it)
+                  }
+                };
+              });
+            } catch (err) {
+              console.error('No se pudo guardar una foto de la galería en la bóveda:', err);
+            } finally {
+              savingMediaRef.current.delete(clave);
+            }
+          })());
+        });
       });
     }
 
@@ -1791,6 +1827,20 @@ function App() {
               updated = {
                 ...updated,
                 children: updated.children.map(ch => replaced[cid][`${it.id}::${ch.id}`] ? { ...ch, src: replaced[cid][`${it.id}::${ch.id}`] } : ch)
+              };
+            }
+            // Las fotos de una galería. La copia de la bóveda se queda como
+            // srcLocal: en este equipo siguen cargando sin internet. En otro,
+            // esa ruta no existe y la galería prueba la de la nube.
+            if (Array.isArray(updated.fotos) && updated.fotos.some(f => replaced[cid][`${it.id}::${f.id}`])) {
+              updated = {
+                ...updated,
+                fotos: updated.fotos.map(f => {
+                  const url = replaced[cid][`${it.id}::${f.id}`];
+                  if (!url) return f;
+                  const local = typeof f.src === 'string' && f.src.startsWith('media/') ? f.src : f.srcLocal;
+                  return local ? { ...f, src: url, srcLocal: local } : { ...f, src: url };
+                })
               };
             }
             return updated;
@@ -2598,6 +2648,7 @@ function App() {
           for (const item of (pages[cid].items || [])) {
             const jobs = [[item.id, item]];
             (item.children || []).forEach(ch => jobs.push([`${item.id}::${ch.id}`, ch]));
+            (Array.isArray(item.fotos) ? item.fotos : []).forEach(f => jobs.push([`${item.id}::${f.id}`, f]));
             for (const [key, node] of jobs) {
               if (!node.src || !/^https?:\/\//.test(node.src)) continue;
               // Con copia local ya no hay nada que traer… salvo que esa copia
@@ -2642,6 +2693,12 @@ function App() {
                     updated = {
                       ...updated,
                       children: updated.children.map(ch => cached[cid][`${it.id}::${ch.id}`] ? { ...ch, srcLocal: cached[cid][`${it.id}::${ch.id}`] } : ch)
+                    };
+                  }
+                  if (Array.isArray(updated.fotos) && updated.fotos.some(f => cached[cid][`${it.id}::${f.id}`])) {
+                    updated = {
+                      ...updated,
+                      fotos: updated.fotos.map(f => cached[cid][`${it.id}::${f.id}`] ? { ...f, srcLocal: cached[cid][`${it.id}::${f.id}`] } : f)
                     };
                   }
                   return updated;

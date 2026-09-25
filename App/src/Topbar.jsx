@@ -51,6 +51,7 @@ const EXTRA_TOOLS = [
   { id: 'file',     icon: 'draft',         label: 'tool_file',     bg: '#E1DFE3', fg: '#1A1A1A' },
   { id: 'map',      icon: 'map',           label: 'tool_map',      bg: '#E1DFE3', fg: '#1A1A1A' },
   { id: 'carpeta',  icon: 'folder',        label: 'tool_carpeta',  bg: '#E1DFE3', fg: '#1A1A1A' },
+  { id: 'galeria',  icon: 'photo_library', label: 'tool_galeria',  bg: '#E1DFE3', fg: '#1A1A1A' },
   // Estructura y herramientas → rojo
   { id: 'table',    icon: 'table_chart',   label: 'tool_table',    bg: '#E6544F', fg: 'white' },
   { id: 'separator', icon: 'horizontal_rule', label: 'tool_separator', bg: '#E6544F', fg: 'white' },

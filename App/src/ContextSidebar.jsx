@@ -338,6 +338,7 @@ function ContextSidebar({
   const isSeparator = item.type === 'separator';
   const isCarpeta = item.type === 'carpeta';
   const isRuleta = item.type === 'ruleta';
+  const isGaleria = item.type === 'galeria';
   const isCode = item.type === 'code';
   const isTimer = item.type === 'timer';
   // Mientras se escribe código, la barra se queda en lo justo: volver, y
@@ -714,6 +715,42 @@ function ContextSidebar({
             )}
           </>
         )}
+
+        {/* La galería: añadir fotos, verlas en grande, cambiar entre rejilla y
+            pila, y ordenarlas. El nodo escucha los avisos por su id (ver
+            Galeria.jsx). */}
+        {isGaleria && (() => {
+          const nFotos = (item.fotos || []).length;
+          const pila = item.vista === 'pila';
+          return (
+            <>
+              <button className="ctx-btn" onClick={() => window.dispatchEvent(new CustomEvent('odi-galeria-anadir', { detail: item.id }))} title={window.t('Añadir fotos', 'Add photos')}>
+                <span className="material-symbols-rounded">add_photo_alternate</span>
+                <span>{window.t('Añadir', 'Add')}</span>
+              </button>
+              {nFotos > 0 && (
+                <button className="ctx-btn" onClick={() => window.dispatchEvent(new CustomEvent('odi-galeria-ver', { detail: item.id }))} title={window.t('Verlas en grande', 'View them full screen')}>
+                  <span className="material-symbols-rounded">slideshow</span>
+                  <span>{window.t('Ver', 'View')}</span>
+                </button>
+              )}
+              <button
+                className="ctx-btn"
+                onClick={() => { onUpdate({ vista: pila ? 'rejilla' : 'pila' }); window.playAudioTone && window.playAudioTone('click'); }}
+                title={pila ? window.t('Ponerlas en rejilla', 'Show them as a grid') : window.t('Apilarlas como fotos de papel', 'Stack them like paper photos')}
+              >
+                <span className="material-symbols-rounded">{pila ? 'filter_none' : 'grid_view'}</span>
+                <span>{pila ? window.t('Pila', 'Stack') : window.t('Rejilla', 'Grid')}</span>
+              </button>
+              {nFotos > 1 && (
+                <button className={`ctx-btn ${pane === 'galeriaFotos' ? 'active' : ''}`} onClick={() => setPane(pane === 'galeriaFotos' ? null : 'galeriaFotos')} title={window.t('Ordenar o quitar fotos', 'Reorder or remove photos')}>
+                  <span className="material-symbols-rounded">photo_library</span>
+                  <span>{window.t('Fotos', 'Photos')}</span>
+                </button>
+              )}
+            </>
+          );
+        })()}
 
         {/* La ruleta: girarla y editar sus elementos. */}
         {isRuleta && (
@@ -1676,6 +1713,47 @@ function ContextSidebar({
                   window.playAudioTone && window.playAudioTone('create');
                 }}
               />
+            </div>
+          </div>
+        );
+      })()}
+      {pane === 'galeriaFotos' && (() => {
+        const fotos = Array.isArray(item.fotos) ? item.fotos : [];
+        const mueve = (k, d) => {
+          const j = k + d;
+          if (j < 0 || j >= fotos.length) return;
+          const c = fotos.slice();
+          const t = c[k]; c[k] = c[j]; c[j] = t;
+          onUpdate({ fotos: c });
+          window.playAudioTone && window.playAudioTone('click');
+        };
+        return (
+          <div className="ctx-popout galeria-panel" onMouseDown={(e) => e.stopPropagation()}>
+            <div className="ctx-pop-section">
+              <div className="ctx-pop-title">{window.t('Fotos de la galería', 'Gallery photos')} · {fotos.length}</div>
+              <div className="galeria-lista">
+                {fotos.map((f, k) => (
+                  <div className="galeria-fila" key={f.id}>
+                    <img className="galeria-fila-mini" src={window.displayMediaSrc ? window.displayMediaSrc(f) : f.src} alt="" draggable={false}/>
+                    <span className="galeria-fila-nombre">
+                      {k === 0 ? window.t('Portada', 'Cover') : window.t(`Foto ${k + 1}`, `Photo ${k + 1}`)}
+                    </span>
+                    <button className="galeria-fila-boton" disabled={k === 0} onClick={() => mueve(k, -1)} title={window.t('Antes', 'Earlier')}>
+                      <span className="material-symbols-rounded">arrow_upward</span>
+                    </button>
+                    <button className="galeria-fila-boton" disabled={k === fotos.length - 1} onClick={() => mueve(k, 1)} title={window.t('Después', 'Later')}>
+                      <span className="material-symbols-rounded">arrow_downward</span>
+                    </button>
+                    <button
+                      className="galeria-fila-boton quitar"
+                      onClick={() => window.dispatchEvent(new CustomEvent('odi-galeria-quitar', { detail: { id: item.id, foto: f.id } }))}
+                      title={window.t('Quitar', 'Remove')}
+                    >
+                      <span className="material-symbols-rounded">close</span>
+                    </button>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         );

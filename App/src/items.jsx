@@ -5504,6 +5504,7 @@ function ItemRenderer({ item, lang, editing, callbacks }) {
     case 'separator': return <SeparatorItem item={item} lang={lang} editing={editing} onUpdate={onUpdate}/>;
     case 'carpeta':  return window.CarpetaItem ? <window.CarpetaItem item={item} lang={lang} onUpdate={onUpdate}/> : null;
     case 'ruleta':   return window.RuletaItem ? <window.RuletaItem item={item} lang={lang} onUpdate={onUpdate}/> : null;
+    case 'galeria':  return window.GaleriaItem ? <window.GaleriaItem item={item} lang={lang} onUpdate={onUpdate}/> : null;
     case 'bigtitle': return <BigTitleItem item={item} lang={lang} editing={editing} onUpdate={onUpdate}/>;
     case 'map':      return <MapItem item={item} lang={lang} editing={editing} onUpdate={onUpdate} onEndEdit={cb.endEdit} callbacks={cb}/>;
     case 'draw':     return <DrawItem item={item}/>;

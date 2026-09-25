@@ -67,6 +67,7 @@ function defaultDims(type) {
     case 'separator': return { w: 640, h: 48 };
     case 'carpeta':  return { w: 230, h: 240 };
     case 'ruleta':   return { w: 340, h: 340 };
+    case 'galeria':  return { w: 420, h: 320 };
     case 'code':     return { w: 420, h: 260 };
     case 'timer':    return { w: 260, h: 252 };
     case 'bigtitle': return { w: 300, h: 80 };
@@ -209,6 +210,10 @@ function makeNewItem(type, x, y, w, h, lang) {
       // Nace vacía: el círculo en blanco explica que hacen falta dos elementos
       // y trae el botón para añadirlos.
       return { ...base, type: 'ruleta', ...defaultSize(340, 340), elementos: [], giro: 0 };
+    case 'galeria':
+      // Nace vacía y en rejilla: el hueco explica que se sueltan fotos encima
+      // y trae el botón para elegirlas.
+      return { ...base, type: 'galeria', ...defaultSize(420, 320), fotos: [], vista: 'rejilla' };
     case 'timer':
       // Nace en cuenta atras de cinco minutos, que es para lo que la coge uno
       // sin pensarlo. El pomodoro y el cronometro estan a un clic en su menu.
@@ -4925,6 +4930,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
       if (!it) return;
       for (const k of ['src', 'srcLocal']) if (typeof it[k] === 'string' && it[k].startsWith('media/')) medios.add(it[k]);
       (it.children || []).forEach(recoge);
+      (it.fotos || []).forEach(recoge);
     };
     Object.values(movidos).forEach(cv => (cv.items || []).forEach(recoge));
 
