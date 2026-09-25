@@ -1114,20 +1114,60 @@ function ContextSidebar({
               <span className="material-symbols-rounded">crop</span>
               <span>{window.t('Recortar', 'Crop')}</span>
             </button>
+            {/* ── Ajustar: la caja se ciñe a la imagen ──
+                Una imagen no se deforma al estirar su caja: se queda con su
+                proporción, centrada, y deja bandas vacías alrededor. Esto quita
+                esas bandas. La imagen NO cambia de tamaño ni de sitio en la
+                pantalla y el recorte se respeta: solo desaparece el hueco.
+
+                Antes este botón se llamaba "Restaurar" y además borraba el
+                recorte, así que para arreglar la proporción había que perder
+                el recorte. Eso ahora es un botón aparte, justo aquí debajo. */}
             <button
               className="ctx-btn"
               onClick={() => {
-                const ratio = item.naturalRatio || 1;
+                const ratio = item.naturalRatio;
+                if (!ratio || !item.w || !item.h) return;
+                const c = item.crop || { x: 0, y: 0, w: 100, h: 100 };
+                const aspecto = ratio * (c.w / c.h);
+                let w = item.w, h = item.h;
+                // El lado que sobra es el que se recorta; el otro no se toca.
+                if (aspecto > item.w / item.h) h = Math.max(20, Math.round(item.w / aspecto));
+                else w = Math.max(20, Math.round(item.h * aspecto));
+                if (w === item.w && h === item.h) return;
+                // Centrada: la imagen estaba en medio de su caja, así que la
+                // caja nueva se queda con el mismo centro y la imagen no se mueve.
                 onUpdate({
-                  crop: { x: 0, y: 0, w: 100, h: 100 },
-                  h: Math.max(60, Math.round(item.w / ratio))
+                  w, h,
+                  x: Math.round((item.x || 0) + (item.w - w) / 2),
+                  y: Math.round((item.y || 0) + (item.h - h) / 2),
                 });
+                window.playAudioTone && window.playAudioTone('click');
               }}
-              title={window.t('Aspecto original', 'Original aspect')}
+              title={window.t('Ajustar la caja a la imagen, sin huecos', 'Fit the box to the image, no gaps')}
             >
               <span className="material-symbols-rounded">aspect_ratio</span>
-              <span>{window.t('Restaurar', 'Restore')}</span>
+              <span>{window.t('Ajustar', 'Fit')}</span>
             </button>
+            {/* Quitar el recorte: lo que hacía el antiguo "Restaurar". Solo sale
+                si la imagen está recortada, que es cuando tiene sentido. */}
+            {item.crop && (item.crop.x !== 0 || item.crop.y !== 0 || item.crop.w !== 100 || item.crop.h !== 100) && (
+              <button
+                className="ctx-btn"
+                onClick={() => {
+                  const ratio = item.naturalRatio || (item.w && item.h ? item.w / item.h : 1);
+                  onUpdate({
+                    crop: { x: 0, y: 0, w: 100, h: 100 },
+                    h: Math.max(60, Math.round(item.w / ratio))
+                  });
+                  window.playAudioTone && window.playAudioTone('click');
+                }}
+                title={window.t('Quitar el recorte y volver a la imagen entera', 'Remove the crop and go back to the whole image')}
+              >
+                <span className="material-symbols-rounded">crop_free</span>
+                <span>{window.t('Sin recorte', 'Uncrop')}</span>
+              </button>
+            )}
             <button
               className={`ctx-btn ${item.flipH ? 'active' : ''}`}
               onClick={() => {
