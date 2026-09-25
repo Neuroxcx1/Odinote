@@ -2407,6 +2407,16 @@ body.odi-busy iframe { pointer-events: none !important; }
   overflow: hidden;
 }
 .cover-pick:hover { transform: translateY(-2px) scale(1.04); }
+/* El de subir una imagen: hueco con borde de trazos, que se lee como "pon
+   aquí algo tuyo" y no como un color más de la lista. */
+.cover-pick.cover-subir {
+  display: grid; place-items: center;
+  background: var(--paper-2);
+  border-style: dashed;
+  color: var(--ink-2);
+}
+.cover-pick.cover-subir .material-symbols-rounded { font-size: 20px; }
+.cover-pick.cover-subir:hover { color: var(--ink); background: var(--paper); }
 .cover-pick.active {
   outline: 3px solid var(--olive);
   outline-offset: 2px;
@@ -3125,6 +3135,8 @@ html[data-mobile="1"] .connector-hit { stroke-width: 40; }
 .field input { padding: 9px 12px; border: 1.5px solid var(--line); border-radius: 2px; font-size: 14px; background: var(--paper-2); }
 .field input:focus { outline: 2px solid var(--olive); outline-offset: 1px; }
 .emoji-row { display: flex; gap: 5px; flex-wrap: wrap; }
+.emoji-pick.sin-icono { color: var(--ink-3); }
+.emoji-pick.sin-icono .material-symbols-rounded { font-size: 18px; }
 .emoji-pick { width: 34px; height: 34px; border-radius: 2px; border: 1.5px solid var(--line); display: grid; place-items: center; font-size: 18px; background: var(--paper); cursor: pointer; transition: transform 120ms var(--e-out); }
 .emoji-pick:hover { transform: translateY(-1px); }
 .emoji-pick.active { background: var(--olive); border-color: var(--olive); }

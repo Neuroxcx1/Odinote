@@ -132,6 +132,43 @@ function tonoDePortada(cover) {
   return m ? Number(m[1]) : null;
 }
 
+// ── Una foto tuya de portada ──
+//
+// Lo pidió alguien en GitHub: además de los degradados, poder subir una imagen.
+// La portada sigue siendo una cadena de CSS (un fondo con la imagen dentro), así
+// que viaja como hasta ahora —en la lista de proyectos, en su json de la bóveda
+// y en Drive— sin campos nuevos ni archivos aparte que perder por el camino.
+//
+// Por eso se encoge antes de guardarla: una foto del móvil de 4 MB pesaría en
+// todas esas partes a la vez, y la tarjeta donde se ve no pasa de 300 px de
+// ancho. A 720x480 como mucho, en WebP (guarda la transparencia de un PNG y
+// ocupa poco); si el navegador no sabe hacer WebP, en JPEG.
+const PORTADA_ANCHO_MAX = 720;
+const PORTADA_ALTO_MAX = 480;
+function portadaDeImagen(file) {
+  return new Promise((resolve, reject) => {
+    if (!file || !/^image\//.test(file.type || '')) { reject(new Error('no es una imagen')); return; }
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      try {
+        const k = Math.min(1, PORTADA_ANCHO_MAX / img.naturalWidth, PORTADA_ALTO_MAX / img.naturalHeight);
+        const w = Math.max(1, Math.round(img.naturalWidth * k));
+        const h = Math.max(1, Math.round(img.naturalHeight * k));
+        const lienzo = document.createElement('canvas');
+        lienzo.width = w; lienzo.height = h;
+        lienzo.getContext('2d').drawImage(img, 0, 0, w, h);
+        let datos = lienzo.toDataURL('image/webp', 0.82);
+        if (!/^data:image\/webp/.test(datos)) datos = lienzo.toDataURL('image/jpeg', 0.84);
+        resolve('center / cover no-repeat url("' + datos + '")');
+      } catch (e) { reject(e); }
+      finally { URL.revokeObjectURL(url); }
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('no se pudo leer la imagen')); };
+    img.src = url;
+  });
+}
+
 // Una portada es "tuya" cuando no es ninguna de las doce. Da igual cómo se
 // hiciera: las hay de cuando se elegía un color suelto, y esas también.
 function esPortadaPropia(cover) {
@@ -178,10 +215,30 @@ function BarraDegradado({ tono, onCambio }) {
 // dos copias del mismo formulario acaban siempre con una arreglada y la otra no.
 function CampoPortada({ cover, onCambio }) {
   const propia = esPortadaPropia(cover);
+  const archivo = useRefHome(null);
+  const eligeImagen = (e) => {
+    const f = e.target.files && e.target.files[0];
+    e.target.value = '';
+    if (!f) return;
+    portadaDeImagen(f).then(onCambio).catch(() => {
+      window.customAlert && window.customAlert(window.t(
+        'Esa imagen no se ha podido abrir. Prueba con un PNG, JPG o WebP.',
+        'That image could not be opened. Try a PNG, JPG or WebP.'));
+    });
+  };
   return (
     <div className="field">
       <label>{window.t('Portada', 'Cover')}</label>
       <div className="cover-row">
+        {/* La primera, para que se vea: subir una foto propia. */}
+        <button
+          className="cover-pick cover-subir"
+          onClick={() => archivo.current && archivo.current.click()}
+          title={window.t('Usar una imagen tuya', 'Use your own image')}
+        >
+          <span className="material-symbols-rounded">add_photo_alternate</span>
+        </button>
+        <input ref={archivo} type="file" accept="image/*" style={{ display: 'none' }} onChange={eligeImagen}/>
         {COVER_PRESETS.map(c => (
           <button
             key={c}
@@ -216,6 +273,11 @@ function CampoPortada({ cover, onCambio }) {
   );
 }
 
+// Un proyecto sin icono, para quien quiere la portada limpia. Es una palabra y
+// no un campo vacío a propósito: al traer un proyecto de Drive, un icono vacío
+// se rellena con el de por defecto, y el "sin icono" se perdería por el camino.
+const SIN_ICONO = 'none';
+
 const EMOJI_PRESETS = [
   'icon:video_game', 'icon:crossed_swords', 'icon:rocket', 'icon:artist_palette',
   'icon:paintbrush', 'icon:puzzle_piece', 'icon:game_die', 'icon:world_map',
@@ -226,6 +288,7 @@ const EMOJI_PRESETS = [
 // Renderiza el icono del proyecto según su formato:
 //  'icon:nombre' → PNG de Fluent Emoji · snake_case → Material Symbol · otro → emoji de texto
 function renderProjectIcon(icon) {
+  if (!icon || icon === SIN_ICONO) return null;
   if (icon && icon.startsWith('icon:')) {
     return <img className="project-icon-img" src={`lib/project-icons/${icon.slice(5)}_3d.png`} alt="" draggable={false}/>;
   }
@@ -235,6 +298,27 @@ function renderProjectIcon(icon) {
   return icon;
 }
 window.renderProjectIcon = renderProjectIcon;
+
+// El mismo campo en las dos ventanas, como el de la portada.
+function CampoIcono({ emoji, onCambio }) {
+  return (
+    <div className="field">
+      <label>{window.t('Ícono', 'Icon')}</label>
+      <div className="emoji-row">
+        {EMOJI_PRESETS.map(e => (
+          <button key={e} className={`emoji-pick ${emoji === e ? 'active' : ''}`} onClick={() => onCambio(e)}>{renderProjectIcon(e)}</button>
+        ))}
+        <button
+          className={`emoji-pick sin-icono ${emoji === SIN_ICONO ? 'active' : ''}`}
+          onClick={() => onCambio(SIN_ICONO)}
+          title={window.t('Sin icono', 'No icon')}
+        >
+          <span className="material-symbols-rounded">block</span>
+        </button>
+      </div>
+    </div>
+  );
+}
 
 function Home({ lang, setLang, theme, setTheme, onOpenProject, projects, onCreate, onDelete, onRename, onRestore, onPurge, onToggleStar, onExport, onImport, vaultPath, onOpenVault, onCloseVault, updateAvailable, onUpdateClick, onSettingsClick, userProfile, esPatrocinador, onAbrirCorona, onUserClick, onJoinProjectClick, onTogglePublic, onManualSync, isSyncingDrive, needsDriveAuth, onSetFolder, onSetFolderMany, onRenameFolder, onDeleteFolder }) {
   const t = window.TRANSLATIONS[lang];
@@ -1401,14 +1485,7 @@ function NewProjectModal({ lang, onClose, onCreate }) {
           />
         </div>
 
-        <div className="field">
-          <label>{window.t('Ícono', 'Icon')}</label>
-          <div className="emoji-row">
-            {EMOJI_PRESETS.map(e => (
-              <button key={e} className={`emoji-pick ${emoji===e?'active':''}`} onClick={()=>setEmoji(e)}>{renderProjectIcon(e)}</button>
-            ))}
-          </div>
-        </div>
+        <CampoIcono emoji={emoji} onCambio={setEmoji} />
 
         <CampoPortada cover={cover} onCambio={setCover} />
 
@@ -1460,14 +1537,7 @@ function RenameProjectModal({ project, lang, onClose, onSave, onTogglePublic, us
           />
         </div>
 
-        <div className="field">
-          <label>{window.t('Ícono', 'Icon')}</label>
-          <div className="emoji-row">
-            {EMOJI_PRESETS.map(e => (
-              <button key={e} className={`emoji-pick ${emoji===e?'active':''}`} onClick={()=>setEmoji(e)}>{renderProjectIcon(e)}</button>
-            ))}
-          </div>
-        </div>
+        <CampoIcono emoji={emoji} onCambio={setEmoji} />
 
         <CampoPortada cover={cover} onCambio={setCover} />
 
