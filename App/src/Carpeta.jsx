@@ -17,7 +17,8 @@
 // ventana y al pasar el ratón (como mucho cada quince segundos).
 // =====================================================
 
-const CARPETA_COLOR = '#74BDEB';
+// Amarilla, el amarillo de la paleta de la aplicación: una carpeta de cartón.
+const CARPETA_COLOR = '#F7DA84';
 const CARPETA_ICONOS = {
   carpeta: 'folder', imagen: 'image', pdf: 'picture_as_pdf', video: 'movie', audio: 'music_note',
   texto: 'description', hoja: 'table_chart', presentacion: 'slideshow', otro: 'draft',
@@ -111,11 +112,21 @@ function CarpetaItem({ item, lang, onUpdate }) {
             <div key={i} className={`carpeta-hoja h${i} ${m ? 'tipo-' + m.tipo : 'hueca'}`}>
               {m && m.miniatura
                 ? <img src={m.miniatura} alt="" draggable={false}/>
-                : <span className="material-symbols-rounded">{m ? CARPETA_ICONOS[m.tipo] || 'draft' : ''}</span>}
+                : m && (
+                  <>
+                    <span className="material-symbols-rounded">{CARPETA_ICONOS[m.tipo] || 'draft'}</span>
+                    {/* La extensión en pequeño, como la etiqueta de un archivo. */}
+                    {m.tipo !== 'carpeta' && /\.[a-z0-9]{1,5}$/i.test(m.nombre) && (
+                      <span className="carpeta-hoja-ext">{m.nombre.split('.').pop().toUpperCase()}</span>
+                    )}
+                  </>
+                )}
             </div>
           ))}
         </div>
         <div className="carpeta-delantera">
+          <div className="carpeta-cara"/>
+          <div className="carpeta-ventana"/>
           {!item.ruta && api && (
             <button
               className="carpeta-elegir"

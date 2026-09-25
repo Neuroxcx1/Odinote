@@ -622,7 +622,7 @@ function ContextSidebar({
             onClick={()=> isColor ? setPane(pane === 'colorHex' ? null : 'colorHex') : setPane(pane === 'color' ? null : 'color')}
             title="Color"
           >
-            <div className="ctx-color-chip" style={{ background: isColor ? (item.hex || '#56B3A7') : isSeparator && !item.color ? 'var(--ink-2)' : isCarpeta && !item.color ? '#74BDEB' : resolveStickyColor(item.color || 'white'), border: '1.5px solid var(--line-soft)' }}/>
+            <div className="ctx-color-chip" style={{ background: isColor ? (item.hex || '#56B3A7') : isSeparator && !item.color ? 'var(--ink-2)' : isCarpeta && !item.color ? '#F7DA84' : resolveStickyColor(item.color || 'white'), border: '1.5px solid var(--line-soft)' }}/>
             <span>Color</span>
           </button>
         )}

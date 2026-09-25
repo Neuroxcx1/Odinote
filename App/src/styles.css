@@ -1709,112 +1709,154 @@ body.odi-busy iframe { pointer-events: none !important; }
 }
 
 /* ── Carpeta ──
-   Dibujada con CSS: la trasera con su pestaña, tres hojas con las miniaturas
-   de lo último de dentro, y la delantera medio transparente y esmerilada, que
-   deja ver borroso lo que hay detrás (la foto más reciente, en grande). Al
-   pasar el ratón las hojas salen en abanico y la delantera se inclina un poco
-   hacia quien mira, como si se abriera. */
+   Dibujada con las reglas del resto de la aplicación, no con las de otro
+   sistema: colores planos, el borde de 1,5 px en el color de las líneas, la
+   sombra dura desplazada (sin difuminar) y esquinas casi rectas. La primera
+   versión llevaba degradados, sombras suaves y cristal esmerilado, y el
+   usuario vio enseguida que parecía "algo aparte" (lo era: era la estética de
+   macOS). Se queda la idea: por la ventana del medio se ve lo de dentro, las
+   hojas asoman por arriba, y al pasar el ratón salen en abanico con rebote. */
 .carpeta {
   width: 100%; height: 100%;
   container-type: size;
   display: flex; flex-direction: column; align-items: center; justify-content: center;
-  gap: 6px; padding: 10px 8px 8px;
+  gap: 7px; padding: 12px 8px 8px;
   cursor: pointer; user-select: none;
 }
 .carpeta-dibujo {
   position: relative;
   /* Lo más grande que quepa, dejando sitio debajo para el nombre y la cuenta. */
-  width: min(88cqw, calc((100cqh - 70px) * 1.28));
-  aspect-ratio: 1.28 / 1;
+  width: min(86cqw, calc((100cqh - 74px) * 1.3));
+  aspect-ratio: 1.3 / 1;
   flex: 0 0 auto;
   font-size: min(4.2cqw, 16px);
   perspective: 700px;
 }
 .carpeta-trasera {
-  position: absolute; left: 0; right: 0; top: 9%; bottom: 0;
-  border-radius: 9% / 11%;
-  background: color-mix(in srgb, var(--carpeta) 78%, #000);
-  box-shadow: 0 2px 6px rgba(0,0,0,0.12);
+  position: absolute; left: 0; right: 0; top: 10%; bottom: 0;
+  border: 1.5px solid var(--line); border-radius: 4px;
+  background: color-mix(in srgb, var(--carpeta) 78%, var(--line));
+  box-shadow: var(--pop);
 }
+/* La pestaña, del mismo trazo. */
 .carpeta-trasera::before {
-  content: ''; position: absolute; left: 0; top: -8%;
-  width: 40%; height: 16%;
-  border-radius: 8px 12px 0 0;
+  content: ''; position: absolute; left: -1.5px; top: -12%;
+  width: 38%; height: 13%;
+  border: 1.5px solid var(--line); border-bottom: 0;
+  border-radius: 4px 4px 0 0;
   background: inherit;
 }
 .carpeta-fondo {
-  position: absolute; left: 14%; right: 14%; top: 32%; bottom: 10%;
+  position: absolute; left: 16%; right: 16%; top: 36%; bottom: 14%;
   background-size: cover; background-position: center;
-  border-radius: 8px;
+  border-radius: 2px;
   transition: transform 520ms var(--muelle);
 }
-.carpeta-hojas { position: absolute; left: 10%; right: 10%; top: 0; bottom: 26%; }
+.carpeta-hojas { position: absolute; left: 9%; right: 9%; top: 0; bottom: 28%; }
+/* Cada hoja, una tarjetita como las del lienzo: papel, borde y sombra dura. */
 .carpeta-hoja {
-  position: absolute; top: 4%;
-  width: 38%; aspect-ratio: 3 / 3.6;
-  display: grid; place-items: center; overflow: hidden;
-  border-radius: 9%;
-  background: #F4F4F2;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.18), inset 0 0 0 1px rgba(0,0,0,0.06);
+  position: absolute; top: 5%;
+  width: 36%; aspect-ratio: 3 / 3.7;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  overflow: hidden;
+  padding: 5%;
+  border: 1.5px solid var(--line); border-radius: 2px;
+  background: var(--paper);
+  box-shadow: var(--pop-sm);
   transition: transform 520ms var(--muelle);
 }
-.carpeta-hoja img { width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
-.carpeta-hoja .material-symbols-rounded { font-size: 2.2em; color: #6E6A6E; }
-.carpeta-hoja.tipo-carpeta .material-symbols-rounded { color: color-mix(in srgb, var(--carpeta) 80%, #000); }
-.carpeta-hoja.tipo-pdf .material-symbols-rounded { color: #E6544F; }
-.carpeta-hoja.hueca { background: color-mix(in srgb, #F4F4F2 70%, transparent); }
-.carpeta-hoja.h0 { left: 0%;  transform: rotate(-9deg); }
-.carpeta-hoja.h1 { left: 31%; transform: translateY(-5%); z-index: 1; }
-.carpeta-hoja.h2 { left: 62%; transform: rotate(9deg); }
+.carpeta-hoja img {
+  width: 100%; height: 100%; object-fit: cover; pointer-events: none;
+  border-radius: 1px;
+}
+.carpeta-hoja .material-symbols-rounded { font-size: 2em; color: var(--ink-2); }
+.carpeta-hoja-ext {
+  font-family: var(--font-mono); font-size: 0.62em; font-weight: 700;
+  letter-spacing: 0.04em; color: var(--ink-3);
+}
+.carpeta-hoja.tipo-carpeta .material-symbols-rounded { color: color-mix(in srgb, var(--carpeta) 70%, var(--line)); }
+.carpeta-hoja.tipo-pdf .material-symbols-rounded { color: var(--wine); }
+.carpeta-hoja.hueca { background: var(--paper-2); box-shadow: none; }
+.carpeta-hoja.h0 { left: 0%;  transform: rotate(-8deg); }
+.carpeta-hoja.h1 { left: 32%; transform: translateY(-6%); z-index: 1; }
+.carpeta-hoja.h2 { left: 64%; transform: rotate(8deg); }
 .carpeta-delantera {
-  position: absolute; left: 0; right: 0; top: 27%; bottom: 0;
+  position: absolute; left: 0; right: 0; top: 30%; bottom: 0;
   display: grid; place-items: center;
-  border-radius: 9% / 12%;
-  /* Más transparente en el medio: por ahí asoma lo de dentro. */
-  background:
-    radial-gradient(ellipse 62% 58% at 50% 45%, color-mix(in srgb, var(--carpeta) 36%, transparent), color-mix(in srgb, var(--carpeta) 92%, transparent) 78%);
-  -webkit-backdrop-filter: blur(9px) saturate(1.35);
-  backdrop-filter: blur(9px) saturate(1.35);
-  box-shadow: inset 0 1.5px 0 rgba(255,255,255,0.5), 0 6px 16px rgba(0,0,0,0.16);
+  border: 1.5px solid var(--line); border-radius: 4px;
+  /* Sin fondo propio: el color lo pone .carpeta-cara, que lleva el hueco de la
+     ventana. Con el fondo aquí, la ventana tapaba lo de dentro en vez de
+     dejarlo ver (se vio en la primera prueba). */
+  background: transparent;
+  box-shadow: var(--pop);
   transform-origin: 50% 100%;
-  transition: transform 520ms var(--muelle);
+  transition: transform 520ms var(--muelle), box-shadow 200ms;
   z-index: 2;
 }
-/* Las dos rayas de la parte de abajo, como en la carpeta de la captura. */
-.carpeta-delantera::before, .carpeta-delantera::after {
-  content: ''; position: absolute; left: 12%; right: 12%; height: 2px; border-radius: 2px;
-  background: rgba(255,255,255,0.35);
+/* La cara de la carpeta, con un hueco donde va la ventana: una máscara con dos
+   capas que se restan (todo, menos el rectángulo de la ventana). Los números
+   son los de .carpeta-ventana: 72 % de ancho a 14 % del borde, y 58 % de alto
+   empezando a 16 % de arriba (38 % en la escala de posición de las máscaras). */
+.carpeta-cara {
+  position: absolute; inset: 0; z-index: -1;
+  border-radius: 2.5px;
+  background: var(--carpeta);
+  -webkit-mask: linear-gradient(#000 0 0), linear-gradient(#000 0 0);
+  -webkit-mask-size: 100% 100%, 72% 58%;
+  -webkit-mask-position: 0 0, 50% 38%;
+  -webkit-mask-repeat: no-repeat;
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) 0 0 / 100% 100% no-repeat, linear-gradient(#000 0 0) 50% 38% / 72% 58% no-repeat;
+  mask-composite: exclude;
 }
-.carpeta-delantera::before { bottom: 16%; }
-.carpeta-delantera::after { bottom: 10%; }
-.item:hover .carpeta-hoja.h0 { transform: translate(-16%, -30%) rotate(-15deg); }
-.item:hover .carpeta-hoja.h1 { transform: translateY(-40%); transition-delay: 40ms; }
-.item:hover .carpeta-hoja.h2 { transform: translate(16%, -30%) rotate(15deg); transition-delay: 80ms; }
-.item:hover .carpeta-delantera { transform: rotateX(-16deg) translateY(1.5%); }
-.item:hover .carpeta-fondo { transform: scale(1.08) translateY(-4%); }
+/* La ventana del medio, medio transparente: por ahí se ve lo de dentro. Plana
+   y con su trazo, como una etiqueta recortada en la carpeta. */
+.carpeta-ventana {
+  position: absolute; left: 14%; right: 14%; top: 16%; bottom: 26%;
+  border: 1.5px solid var(--line); border-radius: 2px;
+  background: color-mix(in srgb, var(--carpeta) 42%, transparent);
+  -webkit-backdrop-filter: blur(2px);
+  backdrop-filter: blur(2px);
+}
+/* Las dos rayas de abajo, como las de una carpeta de cartón. */
+.carpeta-delantera::before, .carpeta-delantera::after {
+  content: ''; position: absolute; left: 14%; right: 14%; height: 1.5px;
+  background: var(--line); opacity: 0.35;
+}
+.carpeta-delantera::before { bottom: 15%; }
+.carpeta-delantera::after { bottom: 9%; }
+.item:hover .carpeta-hoja.h0 { transform: translate(-14%, -30%) rotate(-14deg); }
+.item:hover .carpeta-hoja.h1 { transform: translateY(-42%); transition-delay: 40ms; }
+.item:hover .carpeta-hoja.h2 { transform: translate(14%, -30%) rotate(14deg); transition-delay: 80ms; }
+.item:hover .carpeta-delantera { transform: rotateX(-14deg) translateY(1.5%); box-shadow: var(--pop-hover); }
+.item:hover .carpeta-fondo { transform: scale(1.06) translateY(-4%); }
 .carpeta-nombre {
   max-width: 100%;
-  font-family: var(--font-display); font-weight: 700; font-size: 15px;
+  font-family: var(--font-display); font-weight: 800; font-size: 15px; letter-spacing: -0.01em;
   color: var(--ink);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
+/* La cuenta, con la letra de los datos de la aplicación (la de ancho fijo). */
 .carpeta-cuenta {
-  padding: 2px 9px; border-radius: 999px;
-  background: color-mix(in srgb, var(--ink) 7%, transparent);
-  color: var(--ink-3); font-size: 11px; font-weight: 600;
+  padding: 2px 8px;
+  border: 1.5px solid var(--line-soft); border-radius: 2px;
+  color: var(--ink-3);
+  font-family: var(--font-mono); font-size: 10px; font-weight: 700;
+  letter-spacing: 0.03em; text-transform: uppercase;
   white-space: nowrap;
 }
-.carpeta.vacia .carpeta-trasera, .carpeta.perdida .carpeta-trasera { opacity: 0.55; }
-.carpeta.vacia .carpeta-hoja.hueca { opacity: 0.5; }
+.carpeta.vacia .carpeta-trasera, .carpeta.perdida .carpeta-trasera { opacity: 0.6; }
 .carpeta-elegir {
+  position: relative; z-index: 1;
   display: inline-flex; align-items: center; gap: 5px;
-  padding: 6px 11px; border-radius: 999px;
-  background: #90B968; color: #1A1A1A;
+  padding: 6px 11px;
+  border: 1.5px solid var(--line); border-radius: 2px;
+  background: var(--olive); color: #1A1A1A;
+  box-shadow: var(--pop-sm);
   font-size: 12px; font-weight: 700; cursor: pointer;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.18);
-  transition: transform 220ms var(--muelle);
+  transition: transform 220ms var(--muelle), box-shadow 150ms;
 }
-.carpeta-elegir:hover { transform: scale(1.06); }
+.carpeta-elegir:hover { transform: translate(-1px, -1px); box-shadow: var(--pop); }
 .carpeta-elegir .material-symbols-rounded { font-size: 16px; }
 
 /* ── Ruleta ── */
