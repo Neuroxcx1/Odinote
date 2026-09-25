@@ -1958,6 +1958,12 @@ body.odi-busy iframe { pointer-events: none !important; }
   transform: translateX(-50%);
   animation: ruleta-premio 620ms var(--muelle) both;
 }
+/* El confeti del final (ruletaConfeti en Ruleta.jsx): el doble de la rueda
+   y centrado en ella, para que los triángulos puedan salir fuera. */
+.ruleta-confeti {
+  position: absolute; left: -50%; top: -50%; width: 200%; height: 200%;
+  z-index: 5; pointer-events: none; overflow: visible;
+}
 @keyframes ruleta-premio {
   from { opacity: 0; transform: translateX(-50%) translateY(14px) scale(0.6); }
   to   { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }

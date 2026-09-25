@@ -51,6 +51,77 @@ function ruletaSuena(tipo) {
   } catch (e) {}
 }
 
+// ── El confeti del final ──
+// Pedido por el usuario: al parar, una explosión de confeti con los colores de
+// la aplicación —verde, rojo y blanco— y solo de triangulitos, que son su
+// otra seña. Cada uno lleva el borde de tinta de todo lo demás, que además
+// hace que los blancos se vean sobre el lienzo claro.
+//
+// Va en un SVG encima de la rueda y en sus mismas unidades (la rueda mide 200),
+// así que crece con ella y se mueve con el lienzo. Se anima a mano, fotograma
+// a fotograma: salen del botón del centro hacia todos lados, caen con un poco
+// de gravedad y aire, dan vueltas y se aplastan como papel al voltearse, y se
+// apagan solos. Luego el SVG se quita.
+const RULETA_CONFETI = ['#90B968', '#E6544F', '#FFFFFF'];
+function ruletaConfeti(caja) {
+  if (!caja) return;
+  if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const NS = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(NS, 'svg');
+  svg.setAttribute('class', 'ruleta-confeti');
+  svg.setAttribute('viewBox', '-200 -200 400 400');
+  const piezas = [];
+  for (let i = 0; i < 96; i++) {
+    const lado = 2.4 + Math.random() * 3.2;
+    const p = document.createElementNS(NS, 'polygon');
+    p.setAttribute('points', `0,${(-lado).toFixed(2)} ${(lado * 0.9).toFixed(2)},${(lado * 0.6).toFixed(2)} ${(-lado * 0.9).toFixed(2)},${(lado * 0.6).toFixed(2)}`);
+    p.setAttribute('fill', RULETA_CONFETI[i % RULETA_CONFETI.length]);
+    p.setAttribute('stroke', '#1A1A1A');
+    p.setAttribute('stroke-width', '0.55');
+    p.setAttribute('stroke-linejoin', 'round');
+    svg.appendChild(p);
+    const ang = Math.random() * Math.PI * 2;
+    const vel = 120 + Math.random() * 190;
+    const r0 = Math.random() * 12;
+    piezas.push({
+      el: p,
+      x: Math.cos(ang) * r0, y: Math.sin(ang) * r0,
+      vx: Math.cos(ang) * vel, vy: Math.sin(ang) * vel - 70,
+      giro: Math.random() * 360, vg: (Math.random() - 0.5) * 820,
+      volteo: 5 + Math.random() * 9,
+      vida: 1.3 + Math.random() * 0.9,
+    });
+  }
+  caja.appendChild(svg);
+  // El tiempo del confeti es el que se ha dibujado, no el del reloj: en un
+  // equipo lento o con la ventana atascada, los triángulos se apagaban por
+  // edad antes de haber llegado a volar.
+  let antes = performance.now();
+  let t = 0;
+  const paso = (ahora) => {
+    const dt = Math.min(0.05, (ahora - antes) / 1000);
+    antes = ahora;
+    t += dt;
+    let vivas = 0;
+    for (const p of piezas) {
+      if (t >= p.vida) { if (p.el.parentNode) p.el.remove(); continue; }
+      vivas++;
+      p.vx *= 1 - 1.5 * dt;
+      p.vy = p.vy * (1 - 1.1 * dt) + 240 * dt;
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+      p.giro += p.vg * dt;
+      const aplastado = Math.cos(t * p.volteo);
+      const luz = Math.min(1, (p.vida - t) / 0.4);
+      p.el.setAttribute('transform', `translate(${p.x.toFixed(1)} ${p.y.toFixed(1)}) rotate(${p.giro.toFixed(0)}) scale(1 ${aplastado.toFixed(2)})`);
+      p.el.setAttribute('opacity', luz.toFixed(2));
+    }
+    if (vivas) requestAnimationFrame(paso);
+    else svg.remove();
+  };
+  requestAnimationFrame(paso);
+}
+
 // Un punto de la circunferencia, con 0 grados ARRIBA y girando como el reloj.
 function ruletaPunto(grados, radio) {
   const r = (grados - 90) * Math.PI / 180;
@@ -165,6 +236,7 @@ function RuletaItem({ item, lang, onUpdate }) {
       const gano = elementosRef.current[elegido];
       setGanador(gano ? gano.id : null);
       ruletaSuena('premio');
+      ruletaConfeti(ruedaRef.current && ruedaRef.current.parentElement);
       onUpdate({ giro: ((final % 360) + 360) % 360, ultimo: gano ? gano.id : null });
       // El giro se deja en lo que se guarda: así la siguiente vuelta sale del
       // mismo sitio y no desenrolla las cinco vueltas de antes hacia atrás.
