@@ -5335,6 +5335,78 @@ function ShapeItem({ item, lang, editing, onUpdate }) {
   );
 }
 
+// ──────────────── SEPARADOR ────────────────
+// Una línea con título para partir un lienzo grande en zonas. Hasta ahora la
+// única forma de separar dos partes de un tablero era dejar hueco entre ellas y
+// esperar que se entendiera.
+//
+// La línea ocupa lo que sobre del ancho, así que el separador se estira como
+// cualquier nodo; y para ponerlo en vertical está el giro de siempre, que ya
+// gira también el título. Sin título queda la línea sola, de lado a lado.
+const ESTILOS_SEPARADOR = ['continua', 'discontinua', 'punteada', 'doble'];
+const TEXTOS_EJEMPLO_SEPARADOR = ['Nueva sección', 'New section'];
+
+// El borde de la línea, en un solo sitio: lo usan el nodo y las muestras de su
+// menú, y así el menú enseña exactamente lo que se va a pintar.
+function bordeSeparador(estilo, grosor, color) {
+  const g = Math.max(1, grosor || 2);
+  if (estilo === 'doble') return Math.max(3, g * 2 + 1) + 'px double ' + color;
+  const tipo = estilo === 'discontinua' ? 'dashed' : estilo === 'punteada' ? 'dotted' : 'solid';
+  return g + 'px ' + tipo + ' ' + color;
+}
+window.bordeSeparador = bordeSeparador;
+window.ESTILOS_SEPARADOR = ESTILOS_SEPARADOR;
+
+function SeparatorItem({ item, lang, editing, onUpdate }) {
+  const texto = pickLang(item.content, lang) || '';
+  const ref = React.useRef(null);
+  // Uno recién puesto dice "Nueva sección": lo que se teclea lo sustituye.
+  usaCursorAlEditar(ref, editing, TEXTOS_EJEMPLO_SEPARADOR.includes(texto.trim()));
+
+  React.useEffect(() => {
+    if (!ref.current) return;
+    const sano = window.repairEscapedMarkup ? window.repairEscapedMarkup(texto) : texto;
+    if (ref.current.innerHTML !== sano) ref.current.innerHTML = sano;
+  }, [item.id, texto]);
+
+  const onInput = () => {
+    if (!ref.current) return;
+    onUpdate({ content: { es: ref.current.innerHTML, en: ref.current.innerHTML } });
+  };
+
+  const align = ['left', 'center', 'right'].includes(item.align) ? item.align : 'left';
+  const estilo = ESTILOS_SEPARADOR.includes(item.estiloLinea) ? item.estiloLinea : 'continua';
+  // Sin color elegido, la tinta secundaria del tema: se ve en claro y en oscuro.
+  const color = item.color ? (window.resolveStickyColor ? window.resolveStickyColor(item.color) : item.color) : 'var(--ink-2)';
+  const sinTitulo = !editing && !texto.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim();
+  const linea = { borderTop: bordeSeparador(estilo, item.grosor, color) };
+
+  return (
+    <div className={`separador sep-${align} ${sinTitulo ? 'sin-titulo' : ''}`}>
+      <span className="sep-linea sep-antes" style={linea}/>
+      <div
+        ref={ref}
+        className="sep-titulo"
+        contentEditable={editing}
+        suppressContentEditableWarning
+        onInput={onInput}
+        onMouseDown={(e) => editing && e.stopPropagation()}
+        onClick={(e) => editing && e.stopPropagation()}
+        // Es una línea de título: Intro no parte en dos, que el separador no
+        // tiene alto para una segunda línea.
+        onKeyDown={(e) => { if (e.key === 'Enter') e.preventDefault(); }}
+        data-placeholder={window.t('Título de la sección', 'Section title')}
+        style={{
+          color: item.color ? color : 'var(--ink)',
+          fontSize: `calc(18px * var(--vista-escala, ${item.textScale || 1}))`,
+          cursor: editing ? 'text' : 'move',
+        }}
+      />
+      <span className="sep-linea sep-despues" style={linea}/>
+    </div>
+  );
+}
+
 // ── El título se ajusta a su caja, como una imagen ──
 //
 // Antes la letra del título estaba clavada a 32 px, y los dos botones de tamaño
@@ -5843,6 +5915,7 @@ function ItemRenderer({ item, lang, editing, callbacks }) {
     case 'swatch':   return <SwatchItem item={item} lang={lang}/>;
     case 'frame':    return <FrameItem item={item} lang={lang} editing={editing} onUpdate={onUpdate} callbacks={cb}/>;
     case 'shape':    return <ShapeItem item={item} lang={lang} editing={editing} onUpdate={onUpdate}/>;
+    case 'separator': return <SeparatorItem item={item} lang={lang} editing={editing} onUpdate={onUpdate}/>;
     case 'bigtitle': return <BigTitleItem item={item} lang={lang} editing={editing} onUpdate={onUpdate}/>;
     case 'map':      return <MapItem item={item} lang={lang} editing={editing} onUpdate={onUpdate} onEndEdit={cb.endEdit} callbacks={cb}/>;
     case 'draw':     return <DrawItem item={item}/>;

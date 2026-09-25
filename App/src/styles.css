@@ -1699,6 +1699,28 @@ body.odi-busy iframe { pointer-events: none !important; }
 /* ── Captions / "leyendas" (shared rich contentEditable) ──
    Always styled like a heading (H1). Font size is FIXED (not node-scaled) so that
    auto-growing the node height can't feed back into the caption height. */
+/* ── Separador ──
+   La línea ocupa lo que deje el título; a la izquierda o a la derecha el título
+   se come una de las dos. Sin título queda una sola línea de lado a lado. */
+.separador {
+  width: 100%; height: 100%;
+  display: flex; align-items: center; gap: 0.7em;
+  font-size: calc(18px * var(--vista-escala, var(--text-scale, 1)));
+}
+.sep-linea { flex: 1 1 0; min-width: 16px; height: 0; }
+.sep-left .sep-antes, .sep-right .sep-despues { display: none; }
+.separador.sin-titulo .sep-antes { display: block; }
+.separador.sin-titulo .sep-titulo, .separador.sin-titulo .sep-despues { display: none; }
+.sep-titulo {
+  flex: 0 1 auto; min-width: 1ch; max-width: 80%;
+  font-family: var(--font-display); font-weight: 800;
+  letter-spacing: -0.01em; line-height: 1.2;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  outline: none;
+}
+.sep-titulo:empty::before { content: attr(data-placeholder); color: var(--ink-3); font-weight: 600; }
+.sep-muestra { width: 34px; height: 0; flex-shrink: 0; color: var(--ink-2); }
+
 .node-caption { width: 100%; outline: none; font-family: var(--font-display); font-weight: 800; font-size: 15px; line-height: 1.25; letter-spacing: -0.01em; color: var(--ink); min-height: 1.2em; word-break: break-word; cursor: text; }
 .node-caption:empty::before { content: attr(data-placeholder); color: var(--ink-3); font-weight: 600; pointer-events: none; }
 .node-caption a { color: var(--wine); text-decoration: underline; }

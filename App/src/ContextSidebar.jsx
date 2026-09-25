@@ -345,6 +345,7 @@ function ContextSidebar({
   const isBigTitle = item.type === 'bigtitle';
   const isMap = item.type === 'map';
   const isShape = item.type === 'shape';
+  const isSeparator = item.type === 'separator';
   const isCode = item.type === 'code';
   const isTimer = item.type === 'timer';
   // Mientras se escribe código, la barra se queda en lo justo: volver, y
@@ -610,7 +611,7 @@ function ContextSidebar({
                 notas, títulos, comentarios, etc. muestra las opciones de texto).
                 Se omite en imagen (se edita con doble clic / recorte) y en nodos
                 sin edición de contenido (color, audio, archivo). */}
-            {!tableCell && onStartEdit && ['note','comment','bigtitle','todo','link','board','column','frame','shape'].includes(item.type) && (
+            {!tableCell && onStartEdit && ['note','comment','bigtitle','todo','link','board','column','frame','shape','separator'].includes(item.type) && (
               <button
                 className="ctx-btn"
                 onClick={()=>{ onStartEdit(); window.playAudioTone && window.playAudioTone('click'); }}
@@ -631,7 +632,7 @@ function ContextSidebar({
             onClick={()=> isColor ? setPane(pane === 'colorHex' ? null : 'colorHex') : setPane(pane === 'color' ? null : 'color')}
             title="Color"
           >
-            <div className="ctx-color-chip" style={{ background: isColor ? (item.hex || '#56B3A7') : resolveStickyColor(item.color || 'white'), border: '1.5px solid var(--line-soft)' }}/>
+            <div className="ctx-color-chip" style={{ background: isColor ? (item.hex || '#56B3A7') : isSeparator && !item.color ? 'var(--ink-2)' : resolveStickyColor(item.color || 'white'), border: '1.5px solid var(--line-soft)' }}/>
             <span>Color</span>
           </button>
         )}
@@ -664,6 +665,35 @@ function ContextSidebar({
             <span className="material-symbols-rounded">aspect_ratio</span>
             <span>{window.t('Igualar', 'Even out')}</span>
           </button>
+        )}
+
+        {/* El separador: el estilo de la línea y dónde va el título. */}
+        {isSeparator && (
+          <>
+            <button
+              className={`ctx-btn ${pane === 'sepLinea' ? 'active' : ''}`}
+              onClick={() => setPane(pane === 'sepLinea' ? null : 'sepLinea')}
+              title={window.t('Estilo y grosor de la línea', 'Line style and thickness')}
+            >
+              <span className="material-symbols-rounded">line_style</span>
+              <span>{window.t('Línea', 'Line')}</span>
+            </button>
+            <button
+              className="ctx-btn"
+              onClick={() => {
+                const orden = ['left', 'center', 'right'];
+                const i = orden.indexOf(item.align || 'left');
+                onUpdate({ align: orden[(i + 1) % 3] });
+                window.playAudioTone && window.playAudioTone('click');
+              }}
+              title={window.t('Título a la izquierda, en medio o a la derecha', 'Title left, centre or right')}
+            >
+              <span className="material-symbols-rounded">
+                {item.align === 'center' ? 'format_align_center' : item.align === 'right' ? 'format_align_right' : 'format_align_left'}
+              </span>
+              <span>{window.t('Alinear', 'Align')}</span>
+            </button>
+          </>
         )}
 
         {isShape && (
@@ -1499,10 +1529,56 @@ function ContextSidebar({
           onCerrar={() => setPane(null)}
         />
       )}
+      {pane === 'sepLinea' && (
+        <div className="ctx-popout">
+          <div className="ctx-pop-section">
+            <div className="ctx-pop-title">{window.t('Estilo de la línea', 'Line style')}</div>
+            <div className="ctx-lang-list">
+              {(window.ESTILOS_SEPARADOR || []).map(e => {
+                const activo = (item.estiloLinea || 'continua') === e;
+                const nombre = {
+                  continua: window.t('Continua', 'Solid'),
+                  discontinua: window.t('Discontinua', 'Dashed'),
+                  punteada: window.t('Punteada', 'Dotted'),
+                  doble: window.t('Doble', 'Double'),
+                }[e];
+                return (
+                  <button
+                    key={e}
+                    className={`ctx-lang-item ${activo ? 'active' : ''}`}
+                    onClick={() => { onUpdate({ estiloLinea: e }); window.playAudioTone && window.playAudioTone('click'); }}
+                  >
+                    <span className="sep-muestra" style={{ borderTop: window.bordeSeparador(e, item.grosor, 'currentColor') }}/>
+                    <span>{nombre}</span>
+                    {activo && <span className="material-symbols-rounded">check</span>}
+                  </button>
+                );
+              })}
+            </div>
+            <div className="ctx-pop-sub">{window.t('Grosor', 'Thickness')}</div>
+            <div className="ctx-lang-list">
+              {[[1, window.t('Fina', 'Thin')], [2, window.t('Media', 'Medium')], [4, window.t('Gruesa', 'Thick')], [8, window.t('Muy gruesa', 'Very thick')]].map(([g, nombre]) => {
+                const activo = (item.grosor || 2) === g;
+                return (
+                  <button
+                    key={g}
+                    className={`ctx-lang-item ${activo ? 'active' : ''}`}
+                    onClick={() => { onUpdate({ grosor: g }); window.playAudioTone && window.playAudioTone('click'); }}
+                  >
+                    <span className="sep-muestra" style={{ borderTop: window.bordeSeparador(item.estiloLinea || 'continua', g, 'currentColor') }}/>
+                    <span>{nombre}</span>
+                    {activo && <span className="material-symbols-rounded">check</span>}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
       {pane === 'color' && (
         <div className="ctx-popout">
           <div className="ctx-pop-section">
-            <div className="ctx-pop-title">{isColumn ? (window.t('Color de la franja', 'Strip color')) : (window.t('Color de fondo', 'Background'))}</div>
+            <div className="ctx-pop-title">{isColumn ? (window.t('Color de la franja', 'Strip color')) : isSeparator ? window.t('Color de la línea', 'Line colour') : (window.t('Color de fondo', 'Background'))}</div>
             {/* Cuatro y el arcoiris, como la barra de herramientas. Antes eran
                 trece cuadrados: una rejilla de trece colores parecidos obliga a
                 comparar, y comparar cuesta mas que elegir. Los cuatro cubren lo

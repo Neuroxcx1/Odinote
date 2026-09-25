@@ -244,6 +244,7 @@ function localDefaultDims(type) {
     case 'column':   return { w: 320, h: 380 };
     case 'comment':  return { w: 280, h: 150 };
     case 'calendar': return { w: 520, h: 420 };
+    case 'separator': return { w: 640, h: 48 };
     case 'table':    return { w: 380, h: 220 };
     case 'audio':    return { w: 320, h: 140 };
     case 'color':    return { w: 220, h: 240 };

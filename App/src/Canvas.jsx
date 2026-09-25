@@ -64,6 +64,7 @@ function defaultDims(type) {
     case 'file':     return { w: 230, h: 150 };
     case 'frame':    return { w: 400, h: 400 };
     case 'shape':    return { w: 200, h: 160 };
+    case 'separator': return { w: 640, h: 48 };
     case 'code':     return { w: 420, h: 260 };
     case 'timer':    return { w: 260, h: 252 };
     case 'bigtitle': return { w: 300, h: 80 };
@@ -190,6 +191,13 @@ function makeNewItem(type, x, y, w, h, lang) {
         // recién puesta no se parecía a nada de lo que ya había en el lienzo.
         color: 'white',
         content: { es: '', en: '' } };
+    case 'separator':
+      // Nace ancho y bajo, que es lo que es una línea, con el título a la
+      // izquierda como el de una sección, y entra a escribir: el título es lo
+      // primero que se quiere poner.
+      return { ...base, type: 'separator', ...defaultSize(640, 48),
+        content: { es: 'Nueva sección', en: 'New section' },
+        align: 'left', estiloLinea: 'continua', grosor: 2 };
     case 'timer':
       // Nace en cuenta atras de cinco minutos, que es para lo que la coge uno
       // sin pensarlo. El pomodoro y el cronometro estan a un clic en su menu.
@@ -2880,7 +2888,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
           });
           setSelected(item.id);
           // auto-enter edit mode for text types
-          if (['note','comment','bigtitle','shape'].includes(item.type) && !skipAutoEdit()) {
+          if (['note','comment','bigtitle','shape','separator'].includes(item.type) && !skipAutoEdit()) {
             setTimeout(() => setEditing(item.id), 40);
           }
           if (item.type === 'doc') {
@@ -3014,7 +3022,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
     setSelected(item.id);
     setSelectedIds([]);
     if (item.type === 'doc') setTimeout(() => setDocOpen({ id: item.id }), 40);
-    else if (['note','comment','link','todo','board','column','shape'].includes(item.type)) setTimeout(() => setEditing(item.id), 40);
+    else if (['note','comment','link','todo','board','column','shape','separator'].includes(item.type)) setTimeout(() => setEditing(item.id), 40);
   };
 
   const selectAllItems = () => {
@@ -5052,7 +5060,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
         });
         setSelected(item.id);
         window.playAudioTone && window.playAudioTone('drop');
-        if (['note','comment','bigtitle','shape'].includes(item.type) && !skipAutoEdit()) setTimeout(() => setEditing(item.id), 40);
+        if (['note','comment','bigtitle','shape','separator'].includes(item.type) && !skipAutoEdit()) setTimeout(() => setEditing(item.id), 40);
         if (item.type === 'doc') setTimeout(() => setDocOpen({ id: item.id }), 40);
         if (['link','todo','board','column','map','frame'].includes(item.type)) setTimeout(() => setEditing(item.id), 40);
       }
@@ -5436,7 +5444,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
         // contextual normal se ocultaba (se oculta siempre que editing===selected)
         // y esta barra de texto tampoco lo cubría: el panel de la izquierda
         // desaparecía entero mientras se cambiaba el nombre del tablero.
-        const isEditingTextNode = editing && editing === selected && ['note','comment','bigtitle','frame','todo','board','shape'].includes(it.type);
+        const isEditingTextNode = editing && editing === selected && ['note','comment','bigtitle','frame','todo','board','shape','separator'].includes(it.type);
         if (!isEditingTextNode && !isEditingMapTitle && !isEditingCodeTitle && !isEditingTimerTitle) return null;
         return (
           <window.TextFormatSidebar
@@ -5613,7 +5621,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
                     if (item.type === 'doc') { e.stopPropagation(); setDocOpen({ id: item.id }); return; }
                     if (item.type === 'draw') { e.stopPropagation(); enterDrawMode(item.id); return; }
                     if (item.type === 'board') return;
-                    if (['note','comment','todo','column','link','board','bigtitle','frame','shape','code'].includes(item.type)) {
+                    if (['note','comment','todo','column','link','board','bigtitle','frame','shape','code','separator'].includes(item.type)) {
                       e.stopPropagation();
                       // Los dos modos del bloque de código son excluyentes: al
                       // entrar a escribir código se cierra el del título. Si no,
