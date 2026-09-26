@@ -250,16 +250,15 @@ function createWindow() {
       const relativePart = decodedPath.replace('/vault-media/', ''); // p. ej. Diana/media/foto.png
       let filePath = path.join(activeVaultPath, relativePart);
 
-      // Si ahí no está, se prueba en el montón de siempre. Una bóveda con
-      // historia tiene las dos cosas: lo de este mes dentro del proyecto y lo
-      // de hace meses en el 'media' común, y ninguna imagen debe romperse por
-      // haber cambiado de sitio la casa.
+      // Si ahí no está, se prueba en el montón de siempre (una bóveda con
+      // historia tiene lo de este mes dentro del proyecto y lo de hace meses en
+      // el 'media' común) y, si tampoco, en la carpeta de otro proyecto: la de
+      // un tablero recién convertido en proyecto todavía no tiene sus imágenes
+      // (se le copian al guardar). Ninguna imagen debe romperse por haber
+      // cambiado de sitio la casa. Ver Boveda.buscaMedio.
       if (!fs.existsSync(filePath)) {
-        const cola = relativePart.match(/media\/[^/]+$/i);
-        if (cola) {
-          const alternativa = path.join(activeVaultPath, cola[0]);
-          if (fs.existsSync(alternativa)) filePath = alternativa;
-        }
+        const encontrada = Boveda.buscaMedio({ fs, path }, activeVaultPath, relativePart);
+        if (encontrada) filePath = encontrada;
       }
       const ext = path.extname(filePath).toLowerCase();
 
@@ -474,7 +473,8 @@ ipcMain.handle('write-vault', async (event, { folderPath, data, carpetas }) => {
     try {
       const hecho = Boveda.escribeCarpetas(IO, folderPath, data, carpetas);
       logToFile(`write-vault: ${hecho.escritos.length} carpetas escritas, ` +
-        `${hecho.renombrados.length} renombradas, ${hecho.retirados.length} retiradas`);
+        `${hecho.renombrados.length} renombradas, ${hecho.retirados.length} retiradas` +
+        (hecho.traidos ? `, ${hecho.traidos} archivos traídos de otra carpeta` : ''));
     } catch (splitErr) {
       // El reparto es una mejora, no un requisito: si falla, odinote.json ya
       // está escrito y la app sigue funcionando exactamente como antes.
@@ -797,37 +797,6 @@ ipcMain.handle('carpeta-leer', async (event, ruta) => {
   } catch (err) {
     logToFile(`carpeta-leer failed: ${err.message}`);
     return { ok: false, motivo: 'error' };
-  }
-});
-
-// ── Un tablero que pasa a ser proyecto se lleva sus imágenes ──
-// Cada proyecto guarda sus medios en su carpeta de la bóveda ('media/x.png'
-// relativo a ella). Un tablero que se convierte en proyecto las buscaría en la
-// carpeta NUEVA y no estarían: se copian (no se mueven: algún nodo del
-// proyecto de antes puede usar la misma imagen). Se prueba en cada carpeta de
-// origen que se pase y al final en el montón común de las bóvedas viejas.
-ipcMain.handle('copiar-medios', async (event, { boveda, de, a, archivos }) => {
-  try {
-    const nombreValido = (n) => typeof n === 'string' && n && !/[\\/]|\.\./.test(n);
-    if (!boveda || !nombreValido(a) || !Array.isArray(archivos)) return { ok: false, motivo: 'datos' };
-    const origenes = (Array.isArray(de) ? de : [de]).filter(nombreValido);
-    let copiados = 0, faltan = 0;
-    for (const rel of archivos) {
-      if (typeof rel !== 'string' || !rel.startsWith('media/') || rel.includes('..')) continue;
-      const destino = path.join(boveda, a, rel);
-      if (fs.existsSync(destino)) { copiados++; continue; }
-      const origen = origenes.map(c => path.join(boveda, c, rel)).concat([path.join(boveda, rel)])
-        .find(p => fs.existsSync(p));
-      if (!origen) { faltan++; continue; }
-      await fs.promises.mkdir(path.dirname(destino), { recursive: true });
-      await fs.promises.copyFile(origen, destino);
-      copiados++;
-    }
-    logToFile(`copiar-medios: ${copiados} copiados, ${faltan} sin encontrar -> ${a}`);
-    return { ok: true, copiados, faltan };
-  } catch (err) {
-    logToFile(`copiar-medios failed: ${err.message}`);
-    return { ok: false, motivo: err.message };
   }
 });
 

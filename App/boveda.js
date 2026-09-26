@@ -240,6 +240,83 @@
     return Object.assign({}, meta, { projects: proyectos, canvases: canvases });
   }
 
+  // ── Los archivos de medios que usa un proyecto ──
+  // Los nombres (sin el 'media/' de delante) de todo lo que sus nodos guardan
+  // relativo a su carpeta: imágenes, archivos, hijos de columna y fotos de
+  // galería.
+  function mediosDeLienzos(canvases) {
+    var fuera = {};
+    var mira = function (n) {
+      if (!n || typeof n !== 'object') return;
+      ['src', 'srcLocal'].forEach(function (k) {
+        var s = n[k];
+        if (typeof s !== 'string' || s.indexOf('media/') !== 0) return;
+        var nombre = s.slice('media/'.length);
+        // Solo un nombre de archivo, nada de subir de carpeta.
+        if (!nombre || /[\\/]|\.\./.test(nombre)) return;
+        fuera[nombre] = true;
+      });
+      (Array.isArray(n.children) ? n.children : []).forEach(mira);
+      (Array.isArray(n.fotos) ? n.fotos : []).forEach(mira);
+    };
+    Object.keys(canvases || {}).forEach(function (cid) {
+      var c = canvases[cid];
+      (c && Array.isArray(c.items) ? c.items : []).forEach(mira);
+    });
+    return Object.keys(fuera);
+  }
+
+  // ── Dónde está de verdad un archivo de medios ──
+  // Primero donde dice (la carpeta de su proyecto), luego en el montón de
+  // siempre ('media' en la raíz) y, si no, en la carpeta de cualquier otro
+  // proyecto. Lo último es lo que hace que no se rompa una imagen que acabó en
+  // otra carpeta: la de un tablero convertido en proyecto (su carpeta nueva
+  // aún no tenía nada), o una copiada de un proyecto a otro. Los nombres llevan
+  // una huella del contenido, así que dos archivos distintos no se llaman igual.
+  // relativo: 'Diana/media/foto.png' o 'media/foto.png'. Devuelve la ruta o null.
+  function buscaMedio(io, folderPath, relativo) {
+    if (!relativo || /\.\./.test(relativo)) return null;
+    var directa = io.path.join(folderPath, relativo);
+    if (io.fs.existsSync(directa)) return directa;
+    var cola = String(relativo).match(/media\/([^/]+)$/i);
+    if (!cola) return null;
+    var monton = io.path.join(folderPath, 'media', cola[1]);
+    if (io.fs.existsSync(monton)) return monton;
+    var entradas;
+    try { entradas = io.fs.readdirSync(folderPath, { withFileTypes: true }); } catch (err) { return null; }
+    for (var i = 0; i < entradas.length; i++) {
+      if (!entradas[i].isDirectory() || entradas[i].name === 'media') continue;
+      var otra = io.path.join(folderPath, entradas[i].name, 'media', cola[1]);
+      if (io.fs.existsSync(otra)) return otra;
+    }
+    return null;
+  }
+
+  // Trae a la carpeta de un proyecto los archivos que usa y no tiene, desde la
+  // carpeta de otro proyecto. Del montón de siempre no se copia: de ahí el
+  // servidor ya los sirve, y copiar la historia entera de golpe llenaría el
+  // disco a quien actualice. Devuelve cuántos trajo.
+  function reparaMedios(io, folderPath, carpeta, canvases) {
+    var dir = io.path.join(folderPath, carpeta, 'media');
+    var traidos = 0;
+    mediosDeLienzos(canvases).forEach(function (nombre) {
+      var destino = io.path.join(dir, nombre);
+      if (io.fs.existsSync(destino)) return;
+      if (io.fs.existsSync(io.path.join(folderPath, 'media', nombre))) return;
+      var origen = buscaMedio(io, folderPath, carpeta + '/media/' + nombre);
+      if (!origen) return;
+      try {
+        io.fs.mkdirSync(dir, { recursive: true });
+        io.fs.copyFileSync(origen, destino);
+        traidos++;
+        io.log && io.log('write-vault: "' + carpeta + '" trae ' + nombre + ' de otra carpeta');
+      } catch (err) {
+        io.log && io.log('write-vault: no se pudo traer ' + nombre + ' a "' + carpeta + '" (' + err.message + ')');
+      }
+    });
+    return traidos;
+  }
+
   // Escribe una carpeta por proyecto: renombra las que cambiaron de nombre,
   // guarda cada json, y retira las de los proyectos borrados.
   function escribeCarpetas(io, folderPath, data, mapa) {
@@ -251,7 +328,7 @@
       if (k !== 'projects' && k !== 'canvases') meta[k] = datos[k];
     });
     var carpetas = mapa || carpetasDeProyectos(proyectos);
-    var hecho = { escritos: [], renombrados: [], retirados: [] };
+    var hecho = { escritos: [], renombrados: [], retirados: [], traidos: 0 };
 
     // 1. Un proyecto renombrado no empieza una carpeta nueva: se le MUEVE la
     // suya, con su json y sus imágenes dentro. Se reconoce por el identificador
@@ -280,7 +357,8 @@
       vivas[carpeta] = true;
       var dir = io.path.join(folderPath, carpeta);
       io.fs.mkdirSync(dir, { recursive: true });
-      var carga = { meta: meta, project: proyecto, canvases: canvasesDeProyecto(canvases, proyecto.id) };
+      var suyos = canvasesDeProyecto(canvases, proyecto.id);
+      var carga = { meta: meta, project: proyecto, canvases: suyos };
       // Escritura atómica: a un temporal y luego renombrar. Si se corta la
       // corriente a media escritura, el project.json anterior sigue entero en
       // vez de quedarse truncado.
@@ -288,6 +366,15 @@
       io.fs.writeFileSync(tmp, JSON.stringify(carga, null, 2), 'utf-8');
       io.fs.renameSync(tmp, io.path.join(dir, 'project.json'));
       hecho.escritos.push(carpeta);
+    });
+
+    // 2b. Que cada proyecto tenga en su carpeta los archivos que usa. Se hace
+    // después de escribirlos todos y de los renombres: un proyecto nuevo que
+    // se queda con el nombre de otro (el que va primero en la lista gana el
+    // nombre limpio) estrena carpeta vacía, y sus imágenes siguen en la otra.
+    proyectos.forEach(function (proyecto) {
+      if (!proyecto || !proyecto.id || !carpetas[proyecto.id]) return;
+      hecho.traidos += reparaMedios(io, folderPath, carpetas[proyecto.id], canvasesDeProyecto(canvases, proyecto.id));
     });
 
     // 3. Las carpetas de proyectos que ya no existen. Se retiran SOLO si llevan
@@ -315,6 +402,9 @@
     leeCarpetas: leeCarpetas,
     leeRepartoAnterior: leeRepartoAnterior,
     escribeCarpetas: escribeCarpetas,
+    mediosDeLienzos: mediosDeLienzos,
+    buscaMedio: buscaMedio,
+    reparaMedios: reparaMedios,
   };
 
   if (typeof module !== 'undefined' && module.exports) module.exports = Boveda;

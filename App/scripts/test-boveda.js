@@ -187,6 +187,48 @@ const check = (nombre, ok, extra) => {
   fs.rmSync(raiz, { recursive: true, force: true });
 }
 
+// ── Un tablero que pasa a ser proyecto con el nombre de otro ──
+//
+// El caso del usuario: "New board" ya existía, el tablero convertido también se
+// llamaba así y, al ir primero en la lista, se quedó el nombre limpio. La
+// carpeta del otro se renombró al guardar y el proyecto nuevo estrenó una
+// vacía: su imagen salía en blanco. Ahora, al escribir, cada proyecto se trae
+// de otra carpeta los archivos que usa y no tiene.
+{
+  const io = { fs, path, log: () => {} };
+  const os = require('os');
+  const raiz = fs.mkdtempSync(path.join(os.tmpdir(), 'boveda-choque-'));
+  const viejo = { id: 'pv', name: { es: 'New board' } };
+  const origen = { id: 'po', name: { es: 'Origen' } };
+  B.escribeCarpetas(io, raiz, { projects: [viejo, origen], canvases: {
+    pv: { items: [] },
+    po: { items: [{ id: 't', type: 'board', canvasId: 'b1' }] },
+    b1: { items: [{ id: 'i1', type: 'image', src: 'media/foto_abc123.png' }] },
+  } });
+  fs.mkdirSync(path.join(raiz, 'Origen', 'media'), { recursive: true });
+  fs.writeFileSync(path.join(raiz, 'Origen', 'media', 'foto_abc123.png'), 'png');
+  // El tablero pasa a ser proyecto: sale el primero y se llama como el viejo.
+  const nuevo = { id: 'pn', name: { es: 'New board' } };
+  const canvases2 = { pv: { items: [] }, po: { items: [] }, pn: { items: [{ id: 'i1', type: 'image', src: 'media/foto_abc123.png' }] } };
+  const hecho = B.escribeCarpetas(io, raiz, { projects: [nuevo, viejo, origen], canvases: canvases2 });
+  check('el proyecto nuevo se queda el nombre limpio', B.carpetasDeProyectos([nuevo, viejo, origen]).pn === 'New board');
+  check('y su imagen está en SU carpeta', fs.existsSync(path.join(raiz, 'New board', 'media', 'foto_abc123.png')), JSON.stringify(hecho));
+  check('se trajo una', hecho.traidos === 1, String(hecho.traidos));
+  check('la del proyecto de origen sigue en su sitio', fs.existsSync(path.join(raiz, 'Origen', 'media', 'foto_abc123.png')));
+  check('buscaMedio la encuentra en la carpeta de otro proyecto', B.buscaMedio(io, raiz, 'Nadie/media/foto_abc123.png') !== null);
+  check('buscaMedio no se sale de la bóveda', B.buscaMedio(io, raiz, '../fuera/media/x.png') === null);
+  check('una segunda escritura no copia nada más',
+    B.escribeCarpetas(io, raiz, { projects: [nuevo, viejo, origen], canvases: canvases2 }).traidos === 0);
+  const med = B.mediosDeLienzos({ c: { items: [
+    { id: 'g', type: 'galeria', fotos: [{ id: 'f', src: 'media/galeria_f.webp' }] },
+    { id: 'col', type: 'column', children: [{ id: 'h', src: 'media/hijo.png' }] },
+    { id: 'x', src: 'media/../../malo.png' },
+  ] } });
+  check('cuenta las fotos de galería y los hijos de columna, y no lo que sube de carpeta',
+    med.sort().join(',') === 'galeria_f.webp,hijo.png', med.join(','));
+  fs.rmSync(raiz, { recursive: true, force: true });
+}
+
 console.log('');
 console.log(fallos === 0 ? 'Todo en orden.' : fallos + ' fallo(s).');
 process.exit(fallos === 0 ? 0 : 1);

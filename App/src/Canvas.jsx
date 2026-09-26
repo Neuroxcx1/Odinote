@@ -4688,8 +4688,9 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
   // lo que se alcanza desde su raíz (collectProjectCanvases). Del lienzo de
   // aquí se quita el nodo y sus flechas. El historial de deshacer se empieza de
   // nuevo: un Ctrl+Z que devolviera el tablero dejaría el proyecto nuevo sin su
-  // lienzo. Y las imágenes se copian a la carpeta del proyecto nuevo (ver
-  // 'copiar-medios' en main.js), o se romperían todas al abrirlo.
+  // lienzo. Las imágenes siguen en la carpeta del proyecto de antes hasta que,
+  // al guardar la bóveda, se copian a la del nuevo (Boveda.reparaMedios); entre
+  // tanto el servidor las encuentra allí (Boveda.buscaMedio).
   const projectsRef = useRefCanvas(projects);
   projectsRef.current = projects;
   const reiniciaHistorial = () => {
@@ -4787,17 +4788,12 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
       ...(actual && actual.carpeta ? { carpeta: actual.carpeta } : null),
     };
 
-    // Las imágenes que viajan con él.
-    const movidos = window.OdiDrive ? window.OdiDrive.collectProjectCanvases(canvases, tablero.canvasId) : {};
-    const medios = new Set();
-    const recoge = (it) => {
-      if (!it) return;
-      for (const k of ['src', 'srcLocal']) if (typeof it[k] === 'string' && it[k].startsWith('media/')) medios.add(it[k]);
-      (it.children || []).forEach(recoge);
-      (it.fotos || []).forEach(recoge);
-    };
-    Object.values(movidos).forEach(cv => (cv.items || []).forEach(recoge));
-
+    // Las imágenes viajan solas: el lienzo se lleva sus rutas ('media/…') y el
+    // servidor las busca también en la carpeta de otro proyecto hasta que, al
+    // guardar la bóveda, se copian a la del nuevo (Boveda.reparaMedios). Aquí
+    // antes se copiaban en el acto a la carpeta que tendría el proyecto, pero
+    // si otro proyecto ya se llamaba igual, esa carpeta era la del otro:
+    // se renombraba al guardar y se llevaba las imágenes consigo.
     setCanvases(prev => {
       const cc = prev[currentId];
       if (!cc || !prev[tablero.canvasId]) return prev;
@@ -4815,22 +4811,8 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
       };
       return next;
     });
-    const antes = projectsRef.current || [];
     setProjects(prev => [proyecto, ...(prev || [])]);
     reiniciaHistorial();
-
-    if (medios.size && vaultPath && window.electronAPI && window.electronAPI.copiarMedios && window.Boveda) {
-      const ahora = window.Boveda.carpetasDeProyectos([proyecto, ...antes]);
-      const previas = window.Boveda.carpetasDeProyectos(antes);
-      window.electronAPI.copiarMedios({
-        boveda: vaultPath,
-        de: [previas[projectId], ahora[projectId]],
-        a: ahora[nuevoId],
-        archivos: [...medios],
-      }).then(r => {
-        if (r && r.faltan) console.warn('[Oddinote] tablero a proyecto: ' + r.faltan + ' imágenes sin encontrar');
-      });
-    }
     window.showToast && window.showToast(window.t(
       `«${nombre}» ya es un proyecto: lo tienes en la pantalla de inicio.`,
       `"${nombre}" is now a project: it's on your home screen.`));
