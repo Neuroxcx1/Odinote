@@ -24,16 +24,74 @@
 // la carpeta del proyecto (ver saveBase64MediaLocally en app.jsx), y con Drive
 // se suben por el mismo camino que las demás (syncProjectMedia en drive.js).
 // Cada una lleva su propio id para eso.
+//
+// Lo que se PINTA no es la foto guardada sino una miniatura del tamaño que
+// ocupa en la pantalla (galeria-miniaturas.js): con 111 fotos enteras el
+// lienzo iba a tirones. Y en la pila solo se pintan las de arriba: las demás
+// quedan debajo y no se ven.
 // =====================================================
 
 const GALERIA_LADO = 1600;   // lado largo máximo al guardar una foto
 const GALERIA_HUECO = 6;     // separación entre fotos, en píxeles del lienzo
 const GALERIA_BORDE = 8;     // margen del nodo alrededor de las fotos
 const GALERIA_ABANICO = 7;   // cuántas se abren en el abanico de la pila
+const GALERIA_EN_PILA = 12;  // cuántas se pintan en la pila (el resto no asoma)
 
 // Encoge una foto antes de guardarla. Un GIF se deja tal cual, que encogerlo
 // en un lienzo lo dejaría quieto; y si algo falla al encoger, también.
+//
+// De cuatro en cuatro y descodificando fuera del hilo de la página: soltar
+// quinientas fotos de golpe las abría todas a la vez (gigas de memoria) y las
+// encogía una detrás de otra con la ventana congelada.
+const galeriaEncogiendo = { activos: 0, cola: [] };
 function galeriaEncoge(file) {
+  return new Promise((resolve) => {
+    galeriaEncogiendo.cola.push(() => galeriaEncogeYa(file).then(resolve, () => resolve(null)));
+    galeriaSigueEncogiendo();
+  });
+}
+function galeriaSigueEncogiendo() {
+  const g = galeriaEncogiendo;
+  while (g.activos < 4 && g.cola.length) {
+    const tarea = g.cola.shift();
+    g.activos++;
+    tarea().finally(() => { g.activos--; galeriaSigueEncogiendo(); });
+  }
+}
+const galeriaComoDataURL = (blob) => new Promise((resolve, reject) => {
+  const r = new FileReader();
+  r.onload = () => resolve(r.result);
+  r.onerror = () => reject(r.error);
+  r.readAsDataURL(blob);
+});
+async function galeriaEncogeYa(file) {
+  if (/gif|svg/.test(file.type || '') || typeof createImageBitmap !== 'function' || typeof OffscreenCanvas === 'undefined') {
+    return galeriaEncogeEnLaPagina(file);
+  }
+  let entera;
+  try { entera = await createImageBitmap(file); } catch (e) { return galeriaEncogeEnLaPagina(file); }
+  let bmp = entera;
+  try {
+    const escala = Math.min(1, GALERIA_LADO / Math.max(entera.width, entera.height));
+    const w = Math.max(1, Math.round(entera.width * escala));
+    const h = Math.max(1, Math.round(entera.height * escala));
+    if (escala < 1) bmp = await createImageBitmap(entera, { resizeWidth: w, resizeHeight: h, resizeQuality: 'high' });
+    const lienzo = new OffscreenCanvas(w, h);
+    lienzo.getContext('2d').drawImage(bmp, 0, 0);
+    let blob = await lienzo.convertToBlob({ type: 'image/webp', quality: 0.86 });
+    let fileType = 'webp';
+    if (!/webp/.test(blob.type)) { blob = await lienzo.convertToBlob({ type: 'image/jpeg', quality: 0.86 }); fileType = 'jpg'; }
+    return { src: await galeriaComoDataURL(blob), w, h, fileType };
+  } catch (e) {
+    return galeriaEncogeEnLaPagina(file);
+  } finally {
+    if (bmp !== entera) bmp.close();
+    entera.close();
+  }
+}
+// La manera de antes, para lo que no pasa por la de arriba (un GIF, o un
+// navegador sin createImageBitmap).
+function galeriaEncogeEnLaPagina(file) {
   return new Promise((resolve) => {
     const tal = () => {
       const r = new FileReader();
@@ -157,6 +215,89 @@ function galeriaSiFalla(e, foto) {
   }
   window.driveImageFallback && window.driveImageFallback(e);
 }
+// Las fotos aparecen con un fundido al llegar su miniatura, en vez de
+// pintarse a trozos.
+const galeriaYaCargo = (e) => e.currentTarget.classList.add('lista');
+
+// Qué pintar de una foto para un lado: su miniatura si ya está (o una mayor),
+// y si no, la pide. '' mientras no hay nada; la foto de siempre si no hay
+// miniatura que valga. "activa" dice si está cerca de verse: las que están
+// lejos no piden nada.
+function useGaleriaMini(foto, lado, activa) {
+  const M = window.GaleriaMinis;
+  const ahora = () => (M && M.hecha ? M.hecha(foto, lado) : { url: null, basta: true });
+  const [url, setUrl] = React.useState(() => ahora().url);
+  React.useEffect(() => {
+    const h = ahora();
+    setUrl(h.url);
+    if (h.basta || !activa || !M) return;
+    let vivo = true;
+    M.pide(foto, lado).then(u => { if (vivo) setUrl(u); });
+    return () => { vivo = false; };
+  }, [foto.src, foto.srcLocal, lado, activa]);
+  if (url === null) return galeriaSrc(foto);
+  return url || '';
+}
+
+// Una miniatura suelta, para las listas largas (la tira del visor y el panel
+// de ordenar): solo se pide cuando se acerca a la vista.
+function GaleriaMiniImg({ foto, caja, className }) {
+  const M = window.GaleriaMinis;
+  const ref = React.useRef(null);
+  const [ve, setVe] = React.useState(false);
+  React.useEffect(() => {
+    if (!M || !M.observa) { setVe(true); return; }
+    return M.observa(ref.current, (si) => { if (si) setVe(true); });
+  }, []);
+  const lado = M ? M.ladoPara(foto, caja, caja, M.escalaRedonda(window.devicePixelRatio || 1)) : 0;
+  const src = useGaleriaMini(foto, lado, ve);
+  return (
+    <span ref={ref} className={`galeria-mini-caja ${className || ''}`}>
+      {src && <img src={src} alt="" draggable={false} onLoad={galeriaYaCargo} onError={(e) => galeriaSiFalla(e, foto)}/>}
+    </span>
+  );
+}
+
+// Cada foto por separado y memorizada: el lienzo vuelve a pintar todos sus
+// nodos a cada paso al moverlo o hacer zoom, y así la galería no rehace sus
+// cien fotos cada vez, solo las que cambian.
+const GaleriaFoto = React.memo(function GaleriaFoto({ f, c, i, vista, orden, sale, lado, activa, acciones }) {
+  const src = useGaleriaMini(f, lado, activa);
+  const estilo = {
+    left: c.x + '%', top: c.y + '%', width: c.w + '%', height: c.h + '%',
+    zIndex: vista === 'pila' ? c.z : undefined,
+    animationDelay: orden != null ? (orden * 70) + 'ms' : undefined,
+  };
+  if (vista === 'pila') {
+    estilo['--pila-x'] = c.reposo.dx + 'px';
+    estilo['--pila-y'] = c.reposo.dy + 'px';
+    estilo['--pila-giro'] = c.reposo.giro + 'deg';
+    estilo['--abanico-x'] = c.abanico.dx + 'px';
+    estilo['--abanico-y'] = c.abanico.dy + 'px';
+    estilo['--abanico-giro'] = c.abanico.giro + 'deg';
+    estilo.transitionDelay = (Math.min(i, GALERIA_ABANICO) * 25) + 'ms';
+  }
+  return (
+    <div
+      data-foto={f.id}
+      className={`galeria-foto ${orden != null ? 'entra' : ''} ${sale ? 'sale' : ''}`}
+      style={estilo}
+      onAnimationEnd={orden != null ? () => acciones.current.entro(f.id) : undefined}
+      onDoubleClick={(e) => { e.stopPropagation(); acciones.current.abre(f.id, e.currentTarget); }}
+    >
+      {src && <img src={src} alt="" draggable={false} onLoad={galeriaYaCargo} onError={(e) => galeriaSiFalla(e, f)}/>}
+      <button
+        className="galeria-quitar"
+        title={window.t('Quitar esta foto', 'Remove this photo')}
+        onMouseDown={(e) => e.stopPropagation()}
+        onClick={(e) => { e.stopPropagation(); acciones.current.quita(f.id); }}
+        onDoubleClick={(e) => e.stopPropagation()}
+      >
+        <span className="material-symbols-rounded">close</span>
+      </button>
+    </div>
+  );
+});
 
 // Las fotos que trae un arrastre: archivos de imagen, o la dirección de una
 // imagen arrastrada desde el navegador.
@@ -189,7 +330,30 @@ function GaleriaItem({ item, lang, onUpdate }) {
   onUpdateRef.current = onUpdate;
   const campoRef = React.useRef(null);
   const cajaRef = React.useRef(null);
+  const raizRef = React.useRef(null);
   const profundidad = React.useRef(0);
+  const M = window.GaleriaMinis;
+  // Si está cerca de verse (entonces pide sus miniaturas; una galería en la
+  // otra punta del lienzo no hace trabajar a nadie). Una vez vista se queda.
+  const [activa, setActiva] = React.useState(false);
+  // El zoom del lienzo por los píxeles de la pantalla, en escalones: decide
+  // de qué tamaño se pide cada miniatura.
+  const [escala, setEscala] = React.useState(() => (M ? M.escalaRedonda(window.devicePixelRatio || 1) : 1));
+
+  React.useEffect(() => {
+    if (!M || !M.observa) { setActiva(true); return; }
+    return M.observa(raizRef.current, (si) => { if (si) setActiva(true); });
+  }, []);
+  // El lienzo pinta de nuevo todos los nodos a cada paso del zoom, así que
+  // basta con mirarlo después de cada vez: el zoom está en --handle-libre
+  // (1/zoom) de la superficie.
+  React.useEffect(() => {
+    if (!M) return;
+    const sup = raizRef.current && raizRef.current.closest('.canvas-surface');
+    const libre = sup ? parseFloat(sup.style.getPropertyValue('--handle-libre')) : 0;
+    const e = M.escalaRedonda((libre > 0 ? 1 / libre : 1) * (window.devicePixelRatio || 1));
+    if (e !== escala) setEscala(e);
+  });
 
   const W = Math.max(40, (item.w || 420) - GALERIA_BORDE * 2);
   const H = Math.max(40, (item.h || 320) - GALERIA_BORDE * 2);
@@ -273,10 +437,26 @@ function GaleriaItem({ item, lang, onUpdate }) {
     anade(lo);
   };
 
-  const cajas = vista === 'pila' ? galeriaPila(fotos, W, H) : galeriaRejilla(fotos.length, W, H, GALERIA_HUECO);
+  // En la pila solo las de arriba: con cien fotos, las otras noventa quedan
+  // debajo sin asomar y solo costaban.
+  const vistas = vista === 'pila' ? fotos.slice(0, GALERIA_EN_PILA) : fotos;
+  const cajas = React.useMemo(
+    () => (vista === 'pila' ? galeriaPila(vistas, W, H) : galeriaRejilla(fotos.length, W, H, GALERIA_HUECO)),
+    [vista, fotos, W, H]
+  );
+  // Lo que hacen las fotos, siempre el mismo objeto para no deshacer la
+  // memoria de GaleriaFoto; dentro, lo de este momento.
+  const acciones = React.useRef({});
+  acciones.current.abre = (id, el) => {
+    const i = fotosRef.current.findIndex(x => x.id === id);
+    if (i >= 0) abreVisor(i, el);
+  };
+  acciones.current.quita = quita;
+  acciones.current.entro = (id) => setRecientes(r => { const s = { ...r }; delete s[id]; return s; });
 
   return (
     <div
+      ref={raizRef}
       className={`galeria ${vista} ${fotos.length ? '' : 'vacia'} ${soltando ? 'soltando' : ''}`}
       style={{ background: window.nodeBg ? window.nodeBg(item) : 'var(--paper)', '--galeria-borde': GALERIA_BORDE + 'px' }}
       onDragEnter={alEntrar}
@@ -318,43 +498,22 @@ function GaleriaItem({ item, lang, onUpdate }) {
         </div>
       ) : (
         <div className="galeria-fotos" ref={cajaRef}>
-          {fotos.map((f, i) => {
+          {vistas.map((f, i) => {
             const c = cajas[i];
             if (!c) return null;
-            const orden = recientes[f.id];
-            const estilo = {
-              left: c.x + '%', top: c.y + '%', width: c.w + '%', height: c.h + '%',
-              zIndex: vista === 'pila' ? c.z : undefined,
-              animationDelay: orden != null ? (orden * 70) + 'ms' : undefined,
-            };
-            if (vista === 'pila') {
-              estilo['--pila-x'] = c.reposo.dx + 'px';
-              estilo['--pila-y'] = c.reposo.dy + 'px';
-              estilo['--pila-giro'] = c.reposo.giro + 'deg';
-              estilo['--abanico-x'] = c.abanico.dx + 'px';
-              estilo['--abanico-y'] = c.abanico.dy + 'px';
-              estilo['--abanico-giro'] = c.abanico.giro + 'deg';
-              estilo.transitionDelay = (Math.min(i, GALERIA_ABANICO) * 25) + 'ms';
-            }
             return (
-              <div
+              <GaleriaFoto
                 key={f.id}
-                className={`galeria-foto ${orden != null ? 'entra' : ''} ${saliendo[f.id] ? 'sale' : ''}`}
-                style={estilo}
-                onAnimationEnd={orden != null ? () => setRecientes(r => { const s = { ...r }; delete s[f.id]; return s; }) : undefined}
-                onDoubleClick={(e) => { e.stopPropagation(); abreVisor(i, e.currentTarget); }}
-              >
-                <img src={galeriaSrc(f)} alt="" draggable={false} onError={(e) => galeriaSiFalla(e, f)}/>
-                <button
-                  className="galeria-quitar"
-                  title={window.t('Quitar esta foto', 'Remove this photo')}
-                  onMouseDown={(e) => e.stopPropagation()}
-                  onClick={(e) => { e.stopPropagation(); quita(f.id); }}
-                  onDoubleClick={(e) => e.stopPropagation()}
-                >
-                  <span className="material-symbols-rounded">close</span>
-                </button>
-              </div>
+                f={f}
+                c={c}
+                i={i}
+                vista={vista}
+                orden={recientes[f.id]}
+                sale={!!saliendo[f.id]}
+                lado={M ? M.ladoPara(f, c.w * W / 100, c.h * H / 100, escala) : 0}
+                activa={activa}
+                acciones={acciones}
+              />
             );
           })}
           {vista === 'pila' && fotos.length > 1 && (
@@ -377,7 +536,9 @@ function GaleriaItem({ item, lang, onUpdate }) {
           inicio={visor.i}
           desde={visor.desde}
           rectDe={(i) => {
-            const el = cajaRef.current && cajaRef.current.querySelectorAll('.galeria-foto')[i];
+            // Por su id y no por su puesto: en la pila no están pintadas todas.
+            const f = fotosRef.current[i];
+            const el = f && cajaRef.current && [...cajaRef.current.querySelectorAll('.galeria-foto')].find(x => x.dataset.foto === f.id);
             if (!el) return null;
             const r = el.getBoundingClientRect();
             return { left: r.left, top: r.top, width: r.width, height: r.height };
@@ -550,7 +711,7 @@ function GaleriaVisor({ fotos, inicio, desde, rectDe, onCerrar }) {
                 className={`galeria-visor-mini ${k === i ? 'actual' : ''}`}
                 onClick={() => ve(k)}
               >
-                <img src={galeriaSrc(f)} alt="" draggable={false} onError={(e) => galeriaSiFalla(e, f)}/>
+                <GaleriaMiniImg foto={f} caja={50}/>
               </button>
             ))}
           </div>
@@ -562,4 +723,5 @@ function GaleriaVisor({ fotos, inicio, desde, rectDe, onCerrar }) {
 }
 
 window.GaleriaItem = GaleriaItem;
+window.GaleriaMiniImg = GaleriaMiniImg;
 window.galeriaRejilla = galeriaRejilla;

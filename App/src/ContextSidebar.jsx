@@ -1734,7 +1734,11 @@ function ContextSidebar({
               <div className="galeria-lista">
                 {fotos.map((f, k) => (
                   <div className="galeria-fila" key={f.id}>
-                    <img className="galeria-fila-mini" src={window.displayMediaSrc ? window.displayMediaSrc(f) : f.src} alt="" draggable={false}/>
+                    {/* Con miniatura: con cien fotos, pintar las enteras aquí
+                        volvía lento el panel. */}
+                    {window.GaleriaMiniImg
+                      ? <window.GaleriaMiniImg foto={f} caja={40} className="galeria-fila-mini"/>
+                      : <img className="galeria-fila-mini" src={window.displayMediaSrc ? window.displayMediaSrc(f) : f.src} alt="" draggable={false}/>}
                     <span className="galeria-fila-nombre">
                       {k === 0 ? window.t('Portada', 'Cover') : window.t(`Foto ${k + 1}`, `Photo ${k + 1}`)}
                     </span>
