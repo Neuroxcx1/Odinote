@@ -167,6 +167,24 @@ body[data-theme="dark"] { background: #2A282A; }
 
 * { box-sizing: border-box; }
 html, body, #root { height: 100%; margin: 0; }
+
+/* ── Las barras de desplazamiento de toda la aplicación ──
+   Finas, redondeadas, sin flechas y del color de la tinta con transparencia,
+   así que valen igual en claro y en oscuro. Hasta ahora solo las tenían
+   algunos sitios (el calendario, las tareas, la barra del nodo) y todo lo
+   demás salía con la barra gris de Windows, con sus flechas: el panel de
+   fotos de la galería, la pantalla de inicio, los paneles de al lado... (lo
+   vio el usuario: "no es el de la app"). Las que ya tenían la suya la
+   conservan: sus reglas son más concretas que estas. */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track, ::-webkit-scrollbar-corner { background: transparent; }
+::-webkit-scrollbar-button { display: none; width: 0; height: 0; }
+::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--ink) 24%, transparent);
+  border-radius: 4px;
+  border: 2px solid transparent; background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover { background-color: color-mix(in srgb, var(--ink) 40%, transparent); }
 body {
   font-family: var(--font-body);
   color: var(--ink);
