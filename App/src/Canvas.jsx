@@ -296,126 +296,6 @@ function closestAnchor(item, x, y) {
   return opts[0].a;
 }
 
-function cleanupOrtho(ortho) {
-  console.log('[DEBUG-ORTHO-CANVAS] Entrada cleanupOrtho:', JSON.stringify(ortho));
-  if (!ortho || ortho.length <= 1) return ortho;
-
-  let currentPts = ortho.map(p => ({ x: p.x, y: p.y }));
-  let changed = true;
-  let iterations = 0;
-  const THRESHOLD = 10;
-
-  while (changed && iterations < 5) {
-    changed = false;
-    iterations++;
-
-    // 1. Alinear puntos casi alineados en el mismo eje
-    for (let i = 0; i < currentPts.length - 1; i++) {
-      const p1 = currentPts[i];
-      const p2 = currentPts[i + 1];
-      if (Math.abs(p1.x - p2.x) > 0 && Math.abs(p1.x - p2.x) < THRESHOLD) {
-        p2.x = p1.x;
-        changed = true;
-      }
-      if (Math.abs(p1.y - p2.y) > 0 && Math.abs(p1.y - p2.y) < THRESHOLD) {
-        p2.y = p1.y;
-        changed = true;
-      }
-    }
-
-    // 2. Fusionar puntos coincidentes o muy cercanos (eliminar stubs)
-    let merged = [currentPts[0]];
-    for (let i = 1; i < currentPts.length; i++) {
-      const prev = merged[merged.length - 1];
-      const cur = currentPts[i];
-      const dist = Math.hypot(cur.x - prev.x, cur.y - prev.y);
-      if (dist < THRESHOLD) {
-        changed = true;
-      } else {
-        merged.push(cur);
-      }
-    }
-    currentPts = merged;
-
-    if (currentPts.length <= 2) break;
-
-    // 3. Eliminar puntos colineales
-    let nonCollinear = [currentPts[0]];
-    for (let i = 1; i < currentPts.length - 1; i++) {
-      const prev = nonCollinear[nonCollinear.length - 1];
-      const cur = currentPts[i];
-      const next = currentPts[i + 1];
-
-      const isCollinearX = Math.abs(prev.x - cur.x) < THRESHOLD && Math.abs(cur.x - next.x) < THRESHOLD;
-      const isCollinearY = Math.abs(prev.y - cur.y) < THRESHOLD && Math.abs(cur.y - next.y) < THRESHOLD;
-
-      if (isCollinearX) {
-        cur.x = prev.x;
-        next.x = prev.x;
-        changed = true;
-      } else if (isCollinearY) {
-        cur.y = prev.y;
-        next.y = prev.y;
-        changed = true;
-      } else {
-        nonCollinear.push(cur);
-      }
-    }
-    nonCollinear.push(currentPts[currentPts.length - 1]);
-    currentPts = nonCollinear;
-
-    if (currentPts.length <= 2) break;
-
-    // 4. Eliminar zigzags/bucles en "U" redundantes (backtracking)
-    let cleanLoops = [currentPts[0]];
-    for (let i = 1; i < currentPts.length; i++) {
-      const last = cleanLoops[cleanLoops.length - 1];
-      const cur = currentPts[i];
-      if (i < currentPts.length - 1) {
-        const next = currentPts[i + 1];
-        if (Math.abs(last.x - next.x) < THRESHOLD && Math.abs(last.y - cur.y) < THRESHOLD) {
-          cleanLoops.pop();
-          cleanLoops.push({ x: last.x, y: next.y });
-          i++;
-          changed = true;
-          continue;
-        }
-      }
-      cleanLoops.push(cur);
-    }
-    currentPts = cleanLoops;
-
-    if (currentPts.length <= 2) break;
-
-    // 5. Eliminar picos estrechos (zigzags de ida y vuelta muy pegados)
-    let cleanPikes = [currentPts[0]];
-    const PIKE_THRESHOLD = 15;
-    for (let i = 1; i < currentPts.length - 1; i++) {
-      const prev = cleanPikes[cleanPikes.length - 1];
-      const cur = currentPts[i];
-      const next = currentPts[i + 1];
-
-      const isVerticalPike = Math.abs(prev.x - next.x) < PIKE_THRESHOLD;
-      const isHorizontalPike = Math.abs(prev.y - next.y) < PIKE_THRESHOLD;
-
-      if (isVerticalPike) {
-        next.x = prev.x;
-        changed = true;
-      } else if (isHorizontalPike) {
-        next.y = prev.y;
-        changed = true;
-      } else {
-        cleanPikes.push(cur);
-      }
-    }
-    cleanPikes.push(currentPts[currentPts.length - 1]);
-    currentPts = cleanPikes;
-  }
-
-  console.log('[DEBUG-ORTHO-CANVAS] Salida cleanupOrtho:', JSON.stringify(currentPts));
-  if (currentPts.length === 0) return ortho;
-  return currentPts;
-}
 
 function duplicateCanvasState(state, origId, newId) {
   if (!state[origId]) return;
@@ -2542,16 +2422,9 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
       const c = prev[currentId];
       return { ...prev, [currentId]: {
         ...c,
+        // Los codos de las flechas rectas ya se movieron con los nodos; al
+        // soltar no se "limpian": eso los recolocaba solos.
         items: c.items.map(it => ids.includes(it.id) ? { ...it, _dragging: false } : it),
-        connectors: (c.connectors || []).map(co => {
-          if (co.shape === 'orthogonal' && co.fromEnd && ids.includes(co.fromEnd.itemId) && co.toEnd && ids.includes(co.toEnd.itemId)) {
-            return {
-              ...co,
-              ortho: cleanupOrtho(co.ortho || [])
-            };
-          }
-          return co;
-        })
       }};
     });
   };
@@ -3598,15 +3471,6 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
           return { ...prev, [currentId]: {
             ...c,
             items: c.items.map(it => selectedIds.includes(it.id) ? { ...it, _dragging: false } : it),
-            connectors: (c.connectors || []).map(co => {
-              if (co.shape === 'orthogonal' && co.fromEnd && selectedIds.includes(co.fromEnd.itemId) && co.toEnd && selectedIds.includes(co.toEnd.itemId)) {
-                return {
-                  ...co,
-                  ortho: cleanupOrtho(co.ortho || [])
-                };
-              }
-              return co;
-            })
           }};
         });
         return;
@@ -5529,10 +5393,22 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
               <span className="material-symbols-rounded">show_chart</span>
               <span>{window.t('Curva', 'Curve')}</span>
             </button>
-            <button className={`ctx-btn ${shape==='orthogonal' ? 'active' : ''}`} onClick={()=>updateConnector(conn.id, { shape: 'orthogonal', bend: { x: 0, y: 0 }, ortho: undefined })}>
+            <button className={`ctx-btn ${shape==='orthogonal' ? 'active' : ''}`} onClick={()=>updateConnector(conn.id, { ...(window.FlechaRecta ? window.FlechaRecta.patchAutomatica(conn) : { ortho: undefined, orthoManual: undefined }), shape: 'orthogonal', bend: { x: 0, y: 0 } })}>
               <span className="material-symbols-rounded">stairs</span>
               <span>{window.t('Recta', 'Right-angle')}</span>
             </button>
+            {/* Con el recorrido hecho a mano, volver al automático: el que se
+                rehace solo al mover los nodos. */}
+            {shape === 'orthogonal' && window.FlechaRecta && window.FlechaRecta.esAMano(conn) && (
+              <button
+                className="ctx-btn"
+                onClick={()=>{ updateConnector(conn.id, window.FlechaRecta.patchAutomatica(conn)); window.playAudioTone && window.playAudioTone('click'); }}
+                title={window.t('Volver al recorrido automático, el que se recoloca solo al mover los nodos', 'Back to the automatic route, which rearranges itself when nodes move')}
+              >
+                <span className="material-symbols-rounded">auto_fix_high</span>
+                <span>{window.t('Automática', 'Automatic')}</span>
+              </button>
+            )}
 
             <div className="ctx-sep-h"/>
 

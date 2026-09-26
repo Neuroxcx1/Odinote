@@ -1,5 +1,6 @@
 // =====================================================
 // Odinote — Connector v3
+// (Las flechas rectas: ver flecha-recta.js y la explicación de allí.)
 // • Endpoints always anchor to the CENTER of a node.
 // • The arrow keeps a small GAP from the node (never touches it).
 // • The section that runs inside the node (center → edge) is drawn dotted
@@ -7,167 +8,53 @@
 // • Supports bidirectional arrows and a text label.
 // =====================================================
 
-function cleanupOrtho(ortho) {
-  console.log('[DEBUG-ORTHO-CONNECTOR] Entrada cleanupOrtho:', JSON.stringify(ortho));
-  if (!ortho || ortho.length <= 1) return ortho;
+// ───── Flecha recta ─────
+// El recorrido lo calcula flecha-recta.js (window.FlechaRecta): el automático
+// se rehace en cada pintada y el hecho a mano se respeta tal cual. Aquí van
+// las ayudas para pasar de lo que guarda la flecha a lo que usa ese módulo.
 
-  let currentPts = ortho.map(p => ({ x: p.x, y: p.y }));
-  let changed = true;
-  let iterations = 0;
-  const THRESHOLD = 10;
-
-  while (changed && iterations < 5) {
-    changed = false;
-    iterations++;
-
-    // 1. Alinear puntos que están casi alineados en el mismo eje (eliminar pequeñas desviaciones de arrastre)
-    for (let i = 0; i < currentPts.length - 1; i++) {
-      const p1 = currentPts[i];
-      const p2 = currentPts[i + 1];
-      if (Math.abs(p1.x - p2.x) > 0 && Math.abs(p1.x - p2.x) < THRESHOLD) {
-        p2.x = p1.x;
-        changed = true;
-      }
-      if (Math.abs(p1.y - p2.y) > 0 && Math.abs(p1.y - p2.y) < THRESHOLD) {
-        p2.y = p1.y;
-        changed = true;
-      }
-    }
-
-    // 2. Fusionar puntos coincidentes o extremadamente cercanos (eliminar tramos vacíos/stubs)
-    let merged = [currentPts[0]];
-    for (let i = 1; i < currentPts.length; i++) {
-      const prev = merged[merged.length - 1];
-      const cur = currentPts[i];
-      const dist = Math.hypot(cur.x - prev.x, cur.y - prev.y);
-      if (dist < THRESHOLD) {
-        changed = true;
-      } else {
-        merged.push(cur);
-      }
-    }
-    currentPts = merged;
-
-    if (currentPts.length <= 2) break;
-
-    // 3. Eliminar puntos colineales
-    let nonCollinear = [currentPts[0]];
-    for (let i = 1; i < currentPts.length - 1; i++) {
-      const prev = nonCollinear[nonCollinear.length - 1];
-      const cur = currentPts[i];
-      const next = currentPts[i + 1];
-
-      const isCollinearX = Math.abs(prev.x - cur.x) < THRESHOLD && Math.abs(cur.x - next.x) < THRESHOLD;
-      const isCollinearY = Math.abs(prev.y - cur.y) < THRESHOLD && Math.abs(cur.y - next.y) < THRESHOLD;
-
-      if (isCollinearX) {
-        cur.x = prev.x;
-        next.x = prev.x;
-        changed = true;
-      } else if (isCollinearY) {
-        cur.y = prev.y;
-        next.y = prev.y;
-        changed = true;
-      } else {
-        nonCollinear.push(cur);
-      }
-    }
-    nonCollinear.push(currentPts[currentPts.length - 1]);
-    currentPts = nonCollinear;
-
-    if (currentPts.length <= 2) break;
-
-    // 4. Eliminar zigzags/bucles en "U" redundantes (backtracking)
-    let cleanLoops = [currentPts[0]];
-    for (let i = 1; i < currentPts.length; i++) {
-      const last = cleanLoops[cleanLoops.length - 1];
-      const cur = currentPts[i];
-      if (i < currentPts.length - 1) {
-        const next = currentPts[i + 1];
-        if (Math.abs(last.x - next.x) < THRESHOLD && Math.abs(last.y - cur.y) < THRESHOLD) {
-          cleanLoops.pop();
-          cleanLoops.push({ x: last.x, y: next.y });
-          i++;
-          changed = true;
-          continue;
-        }
-      }
-      cleanLoops.push(cur);
-    }
-    currentPts = cleanLoops;
-
-    if (currentPts.length <= 2) break;
-
-    // 5. Eliminar picos estrechos (zigzags de ida y vuelta muy pegados)
-    let cleanPikes = [currentPts[0]];
-    const PIKE_THRESHOLD = 15;
-    for (let i = 1; i < currentPts.length - 1; i++) {
-      const prev = cleanPikes[cleanPikes.length - 1];
-      const cur = currentPts[i];
-      const next = currentPts[i + 1];
-
-      const isVerticalPike = Math.abs(prev.x - next.x) < PIKE_THRESHOLD;
-      const isHorizontalPike = Math.abs(prev.y - next.y) < PIKE_THRESHOLD;
-
-      if (isVerticalPike) {
-        next.x = prev.x;
-        changed = true;
-      } else if (isHorizontalPike) {
-        next.y = prev.y;
-        changed = true;
-      } else {
-        cleanPikes.push(cur);
-      }
-    }
-    cleanPikes.push(currentPts[currentPts.length - 1]);
-    currentPts = cleanPikes;
+// Por dónde sale un extremo de una flecha recta hecha a mano: por su enganche
+// si lo tiene; si no (flechas de antes), por el lado que mira a su primer
+// codo, como se hacía entonces.
+function salidaRecta(end, hacia) {
+  const FR = window.FlechaRecta;
+  if (end.item && end.frac) {
+    const { p: e, dir, sgn } = puntoDeFrac(end.item, end.frac);
+    const lado = dir === 'h' ? (sgn < 0 ? 'izq' : 'der') : (sgn < 0 ? 'arr' : 'aba');
+    const p = dir === 'h' ? { x: e.x + sgn * FR.GAP, y: e.y } : { x: e.x, y: e.y + sgn * FR.GAP };
+    return { e, p, dir, sgn, lado };
   }
-
-  console.log('[DEBUG-ORTHO-CONNECTOR] Salida cleanupOrtho:', JSON.stringify(currentPts));
-  if (currentPts.length === 0) return ortho;
-  return currentPts;
+  const c = end.center;
+  const hw = end.item ? end.item.w / 2 : 0, hh = end.item ? end.item.h / 2 : 0;
+  const dx = hacia.x - c.x, dy = hacia.y - c.y;
+  const nx = hw > 0 ? Math.abs(dx) / hw : Math.abs(dx);
+  const ny = hh > 0 ? Math.abs(dy) / hh : Math.abs(dy);
+  const lado = nx >= ny ? (dx >= 0 ? 'der' : 'izq') : (dy >= 0 ? 'aba' : 'arr');
+  return end.item ? FR.salida(end.item, lado, 0.5) : FR.salidaLibre(c, lado);
 }
 
-function cleanOrthoWithEndpoints(ortho, p1, p2, exA_dir, exB_dir) {
-  if (!ortho || ortho.length === 0) return ortho;
-  if (!p1 || !p2) return cleanupOrtho(ortho);
+// El enganche (frac) que corresponde a una salida: para fijar los extremos
+// en cuanto alguien toca el recorrido, y que la flecha no cambie de lado sola.
+function fracDeSalida(rect, s) {
+  const r3 = (n) => +Math.min(1, Math.max(0, n)).toFixed(3);
+  if (s.lado === 'izq') return { x: 0, y: r3((s.e.y - rect.y) / rect.h) };
+  if (s.lado === 'der') return { x: 1, y: r3((s.e.y - rect.y) / rect.h) };
+  if (s.lado === 'arr') return { x: r3((s.e.x - rect.x) / rect.w), y: 0 };
+  return { x: r3((s.e.x - rect.x) / rect.w), y: 1 };
+}
 
-  const dA = exA_dir || 'h';
-  const dB = exB_dir || 'h';
-
-  // 1. Build full list of vertices
-  const verts = [{ x: p1.x, y: p1.y }];
-  let prev = p1, dir = dA;
-  for (let k = 0; k < ortho.length; k++) {
-    const wp = ortho[k];
-    if (dir === 'h') {
-      verts.push({ x: wp.x, y: prev.y });
-      verts.push({ x: wp.x, y: wp.y });
-      prev = { x: wp.x, y: wp.y };
-    } else {
-      verts.push({ x: prev.x, y: wp.y });
-      verts.push({ x: wp.x, y: wp.y });
-      prev = { x: wp.x, y: wp.y };
-    }
-    dir = (dir === 'h' ? 'v' : 'h');
+// El punto que queda a mitad del recorrido: ahí va la etiqueta.
+function puntoEnMedio(verts) {
+  let total = 0;
+  for (let i = 0; i < verts.length - 1; i++) total += Math.hypot(verts[i + 1].x - verts[i].x, verts[i + 1].y - verts[i].y);
+  let falta = total / 2;
+  for (let i = 0; i < verts.length - 1; i++) {
+    const a = verts[i], b = verts[i + 1];
+    const L = Math.hypot(b.x - a.x, b.y - a.y);
+    if (L >= falta && L > 0) return { x: a.x + (b.x - a.x) * falta / L, y: a.y + (b.y - a.y) * falta / L };
+    falta -= L;
   }
-  if (dB === 'h') {
-    verts.push({ x: prev.x, y: p2.y });
-    verts.push({ x: p2.x, y: p2.y });
-  } else {
-    verts.push({ x: p2.x, y: prev.y });
-    verts.push({ x: p2.x, y: p2.y });
-  }
-
-  // 2. Run cleanup on the full vertices list
-  const cleanV = cleanupOrtho(verts);
-
-  // 3. Extract the intermediate vertices as new waypoints
-  let nextOrtho = cleanV.slice(1, cleanV.length - 1);
-  if (nextOrtho.length === 0) {
-    nextOrtho = [{ x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 }];
-  }
-  return nextOrtho;
+  return verts[0] || { x: 0, y: 0 };
 }
 
 function getCenter(item) { return { x: item.x + item.w / 2, y: item.y + item.h / 2 }; }
@@ -402,150 +289,50 @@ function Connector({ conn, items, selected, selectedIds, onSelect, onUpdate, onD
   const GAP = 16;
 
   let eA, eB, p1, p2, qx, qy, path, hx, hy, angleEnd, angleStart, exADir, exBDir;
-  let orthoWaypoints = null;   // user-draggable interior waypoints (Miro-style)
-  let orthoVerts = null;       // full vertex list of the right-angle polyline (for segment handles)
-  let orthoSegments = null;    // segment midpoints (drag to add a new control point)
+  let rectaSA = null, rectaSB = null;  // por dónde sale y entra la flecha recta
+  let rectaCodos = null;               // sus codos (automáticos o hechos a mano)
+  let rectaVerts = null;               // el recorrido que se ve, ya limpio
+  let rectaTramos = null;              // los tramos que se pueden arrastrar
+  const rectaAMano = shape === 'orthogonal' && window.FlechaRecta.esAMano(conn);
 
   if (shape === 'orthogonal') {
-    // Miro-style right-angle routing through ANY number of draggable waypoints.
-    // Default: a single midpoint (back-compat with conn.bend). The user can drag each
-    // waypoint and add new ones by dragging a segment, while the path stays orthogonal.
-    const hwA = A.item ? A.item.w / 2 : 0, hhA = A.item ? A.item.h / 2 : 0;
-    const hwB = B.item ? B.item.w / 2 : 0, hhB = B.item ? B.item.h / 2 : 0;
-    const orthoGuardado = Array.isArray(conn.ortho) && conn.ortho.length > 0;
-    let ortho = orthoGuardado
-      ? conn.ortho.map(p => ({ x: p.x, y: p.y }))
-      : [{ x: (cA.x + cB.x) / 2 + (bend.x || 0), y: (cA.y + cB.y) / 2 + (bend.y || 0) }];
-
-    // Este ajuste es para el codo que se inventa la propia flecha cuando nadie
-    // la ha tocado: lo pega al medio de los dos nodos. Antes se aplicaba
-    // TAMBIÉN a un codo puesto a mano, así que en cuanto lo movías —o
-    // arrastrabas la flecha para llevarte los nodos— la siguiente pintada lo
-    // devolvía al medio. Eso es lo que se veía como "la flecha se recoloca
-    // sola cada dos por tres".
-    if (ortho.length === 1 && !orthoGuardado) {
-      const ddx = cB.x - cA.x;
-      const ddy = cB.y - cA.y;
-      const avgHw = (hwA + hwB) / 2 || 1;
-      const avgHh = (hhA + hhB) / 2 || 1;
-      if (Math.abs(ddx) / avgHw >= Math.abs(ddy) / avgHh) {
-        ortho[0].y = (cA.y + cB.y) / 2;
-      } else {
-        ortho[0].x = (cA.x + cB.x) / 2;
-      }
-    }
-    orthoWaypoints = ortho;
-
-    // Por dónde sale la flecha de cada nodo. Si el extremo tiene enganche
-    // guardado (`frac`), sale por AHÍ y no se discute; si no, se decide por
-    // geometría como siempre. Esa decisión automática es la que hacía que la
-    // flecha se cambiara de lado sola mientras movías los nodos.
-    const exitFor = (c, hw, hh, hasItem, toward, rect, frac) => {
-      if (rect && frac) {
-        const { p: e, dir, sgn } = puntoDeFrac(rect, frac);
-        return {
-          e, dir,
-          p: hasItem
-            ? (dir === 'h' ? { x: e.x + sgn * GAP, y: e.y } : { x: e.x, y: e.y + sgn * GAP })
-            : { x: e.x, y: e.y },
-        };
-      }
-      const ddx = toward.x - c.x, ddy = toward.y - c.y;
-      const normX = hw > 0 ? Math.abs(ddx) / hw : Math.abs(ddx);
-      const normY = hh > 0 ? Math.abs(ddy) / hh : Math.abs(ddy);
-      if (normX >= normY) {
-        const sgn = ddx >= 0 ? 1 : -1;
-        const e = { x: c.x + sgn * hw, y: c.y };
-        return { e, dir: 'h', p: hasItem ? { x: e.x + sgn * GAP, y: e.y } : { x: e.x, y: e.y } };
-      }
-      const sgn = ddy >= 0 ? 1 : -1;
-      const e = { x: c.x, y: c.y + sgn * hh };
-      return { e, dir: 'v', p: hasItem ? { x: e.x, y: e.y + sgn * GAP } : { x: e.x, y: e.y } };
-    };
-
-    const exA = exitFor(cA, hwA, hhA, !!A.item, ortho[0], A.item, A.frac);
-    const exB = exitFor(cB, hwB, hhB, !!B.item, ortho[ortho.length - 1], B.item, B.frac);
-    eA = exA.e; eB = exB.e;
-    p1 = exA.p; p2 = exB.p;
-    exADir = exA.dir;
-    exBDir = exB.dir;
-
-    if (ortho.length > 1) {
-      const cleaned = cleanOrthoWithEndpoints(ortho, p1, p2, exADir, exBDir);
-      if (JSON.stringify(cleaned) !== JSON.stringify(ortho)) {
-        ortho = cleaned;
-        const newExA = exitFor(cA, hwA, hhA, !!A.item, ortho[0], A.item, A.frac);
-        const newExB = exitFor(cB, hwB, hhB, !!B.item, ortho[ortho.length - 1], B.item, B.frac);
-        eA = newExA.e; eB = newExB.e;
-        p1 = newExA.p; p2 = newExB.p;
-        exADir = newExA.dir;
-        exBDir = newExB.dir;
-      }
-    }
-    orthoWaypoints = ortho;
-
-    // Build a right-angle polyline. Each straight segment records which waypoint
-    // coordinate controls it (so dragging the segment moves the WHOLE segment perpendicular,
-    // no spikes). wpIndex < 0 means the segment is pinned to a node exit → dragging it inserts
-    // a new bend instead of moving an existing point.
-    const verts = [p1];
-    const segs = []; // { from, to, axis:'x'|'y', wpIndex, insertAfter }
-    let prev = p1, dir = exA.dir;
-    const pushSeg = (to, axis, wpIndex, insertAfter) => {
-      segs.push({ from: prev, to, axis, wpIndex, insertAfter });
-      verts.push(to); prev = to;
-    };
-    for (let k = 0; k < ortho.length; k++) {
-      const wp = ortho[k];
-      if (dir === 'h') {
-        // horizontal first: segment y is controlled by the PREVIOUS waypoint (k-1) or exit
-        pushSeg({ x: wp.x, y: prev.y }, 'y', k - 1, k);
-        // then vertical: segment x controlled by THIS waypoint (k)
-        pushSeg({ x: wp.x, y: wp.y }, 'x', k, k + 1);
-      } else {
-        pushSeg({ x: prev.x, y: wp.y }, 'x', k - 1, k);
-        pushSeg({ x: wp.x, y: wp.y }, 'y', k, k + 1);
-      }
-      dir = (dir === 'h' ? 'v' : 'h');
-    }
-    // Final approach into B — must end along B's facing axis (these touch the exit → insert-only)
-    if (exB.dir === 'h') {
-      pushSeg({ x: prev.x, y: p2.y }, 'x', ortho.length - 1, ortho.length); // vertical, x of last wp
-      pushSeg({ x: p2.x, y: p2.y }, 'y', -1, ortho.length);                  // horizontal into B (pinned)
+    const FR = window.FlechaRecta;
+    if (!rectaAMano) {
+      // Sin tocar: se rehace entera cada vez con los nodos donde estén ahora.
+      const ruta = FR.automatica(
+        A.item ? { rect: A.item, frac: A.frac } : { punto: cA },
+        B.item ? { rect: B.item, frac: B.frac } : { punto: cB });
+      rectaSA = ruta.sA; rectaSB = ruta.sB; rectaCodos = ruta.codos;
     } else {
-      pushSeg({ x: p2.x, y: prev.y }, 'y', ortho.length - 1, ortho.length);
-      pushSeg({ x: p2.x, y: p2.y }, 'x', -1, ortho.length);
+      // Hecha a mano: sus codos, tal cual, sin limpiar ni recolocar nada.
+      rectaCodos = conn.ortho.map(p => ({ x: p.x, y: p.y }));
+      rectaSA = salidaRecta(A, rectaCodos.length ? rectaCodos[0] : cB);
+      rectaSB = salidaRecta(B, rectaCodos.length ? rectaCodos[rectaCodos.length - 1] : cA);
     }
-
-    orthoVerts = verts;
-    // Draggable segment handles — skip near-zero-length stubs.
-    orthoSegments = [];
-    for (const s of segs) {
-      const len = Math.hypot(s.to.x - s.from.x, s.to.y - s.from.y);
-      if (len < 10) continue;
-      orthoSegments.push({
-        from: s.from,
-        to: s.to,
-        mid: { x: (s.from.x + s.to.x) / 2, y: (s.from.y + s.to.y) / 2 },
-        axis: s.axis, wpIndex: s.wpIndex, insertAfter: s.insertAfter,
+    eA = rectaSA.e; eB = rectaSB.e;
+    p1 = rectaSA.p; p2 = rectaSB.p;
+    exADir = rectaSA.dir; exBDir = rectaSB.dir;
+    rectaVerts = FR.limpia(FR.construye(p1, exADir, rectaCodos, p2, exBDir).verts);
+    // Esquinas redondeadas (aspecto Miro).
+    path = roundedOrthoPath(rectaVerts, 8);
+    const medio = puntoEnMedio(rectaVerts);
+    hx = medio.x; hy = medio.y;
+    const cn = rectaVerts.length;
+    angleEnd = cn >= 2 ? Math.atan2(rectaVerts[cn - 1].y - rectaVerts[cn - 2].y, rectaVerts[cn - 1].x - rectaVerts[cn - 2].x) : 0;
+    angleStart = cn >= 2 ? Math.atan2(rectaVerts[0].y - rectaVerts[1].y, rectaVerts[0].x - rectaVerts[1].x) : 0;
+    // Cada tramo que se ve, con su tirador. Uno por tramo de verdad (ya
+    // juntados los que siguen la misma recta), no uno por cada trozo interno.
+    rectaTramos = [];
+    for (let i = 0; i < cn - 1; i++) {
+      const a = rectaVerts[i], b = rectaVerts[i + 1];
+      if (Math.abs(b.x - a.x) + Math.abs(b.y - a.y) < 10) continue;
+      rectaTramos.push({
+        i, from: a, to: b,
+        mid: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 },
+        // 'y': tramo horizontal, se mueve arriba y abajo; 'x': vertical.
+        axis: Math.abs(a.y - b.y) < 0.5 ? 'y' : 'x',
       });
     }
-    // Collapse coincident/collinear points so the path is clean and the arrowhead has a real direction
-    const cleanV = [verts[0]];
-    for (let i = 1; i < verts.length; i++) {
-      const pv = cleanV[cleanV.length - 1];
-      if (Math.abs(pv.x - verts[i].x) < 0.5 && Math.abs(pv.y - verts[i].y) < 0.5) continue;
-      cleanV.push(verts[i]);
-    }
-    orthoVerts = cleanV;
-    // Esquinas redondeadas (aspecto Miro) — los handles siguen usando los vértices exactos
-    path = roundedOrthoPath(cleanV, 8);
-    const mid = ortho[Math.floor((ortho.length - 1) / 2)];
-    hx = mid.x; hy = mid.y;
-    const cn = cleanV.length;
-    // Robust arrow angles: use the last/first DISTINCT pair of points.
-    angleEnd = cn >= 2 ? Math.atan2(cleanV[cn-1].y - cleanV[cn-2].y, cleanV[cn-1].x - cleanV[cn-2].x) : 0;
-    angleStart = cn >= 2 ? Math.atan2(cleanV[0].y - cleanV[1].y, cleanV[0].x - cleanV[1].x) : 0;
   } else {
     // Punto de control del arco.
     //
@@ -643,34 +430,55 @@ function Connector({ conn, items, selected, selectedIds, onSelect, onUpdate, onD
     window.addEventListener('mouseup', onUp);
   };
 
-  // Drag a segment PERPENDICULAR only (vertical seg → left/right · horizontal seg → up/down).
-  // Moving a segment shifts its controlling waypoint's coordinate, so the whole segment slides
-  // without spikes. If the segment is pinned to a node exit (wpIndex < 0), a new bend is inserted.
-  const handleSegmentDrag = (seg) => (e) => {
+  // Los extremos que salen por donde decidió el recorrido automático quedan
+  // fijados ahí (como enganche) en cuanto alguien toca el recorrido: si no,
+  // al mover un nodo la flecha podía cambiar de lado sola y el recorrido hecho
+  // a mano dejaba de tener sentido.
+  const fijaExtremos = () => {
+    const patch = {};
+    if (A.item && !A.frac && from?.itemId && rectaSA) {
+      Object.assign(patch, { fromEnd: { itemId: from.itemId, frac: fracDeSalida(A.item, rectaSA), fijado: true }, from: undefined, fromAnchor: undefined });
+    }
+    if (B.item && !B.frac && to?.itemId && rectaSB) {
+      Object.assign(patch, { toEnd: { itemId: to.itemId, frac: fracDeSalida(B.item, rectaSB), fijado: true }, to: undefined, toAnchor: undefined });
+    }
+    return patch;
+  };
+
+  // Volver al recorrido automático (doble clic en un tirador de tramo, o el
+  // botón de la barra de la flecha).
+  const vuelveAutomatica = (e) => {
+    if (e) { e.stopPropagation(); e.preventDefault(); }
+    onUpdate(conn.id, window.FlechaRecta.patchAutomatica(conn));
+    window.playAudioTone && window.playAudioTone('click');
+  };
+
+  // ── Arrastrar un tramo ──
+  //
+  // Se mueve en paralelo a sí mismo (uno horizontal, arriba y abajo; uno
+  // vertical, a los lados), con los tramos de al lado estirándose para
+  // seguirle. Se trabaja con los vértices que se ven: se mueven los dos del
+  // tramo y de ahí se sacan los codos. Si el tramo sale de un nodo, ese
+  // extremo no se puede mover, así que junto a la salida aparece un escalón.
+  // Imán a la altura de los otros vértices, para poder dejarlo recto.
+  const handleTramoDrag = (tramo) => (e) => {
     e.stopPropagation(); e.preventDefault();
     onSelect && onSelect(conn.id);
-    const base = (orthoWaypoints || []).map(p => ({ x: p.x, y: p.y }));
+    const FR = window.FlechaRecta;
     const startX = e.clientX, startY = e.clientY;
     const scale = panZoom?.scale || 1;
-    // axis = the coordinate this segment controls ('x' for a vertical segment, 'y' for horizontal)
-    const axis = seg.axis;
+    const axis = tramo.axis;
+    const sA = rectaSA, sB = rectaSB;
+    let arr = rectaVerts.map(p => ({ x: p.x, y: p.y }));
 
     // ── Una línea recta se MUEVE, no se dobla ──
-    //
-    // Si la flecha es un solo tramo recto entre dos nodos y se tira de ella
-    // hacia el lado, lo que uno quiere es correrla, no que aparezca un doblez
-    // y quede en escalera. Se puede hacer porque el enganche se pasea por el
-    // borde: se deslizan los dos extremos a la vez y la línea entera se mueve.
-    // Solo cuando de verdad no hay curva que romper (dos vértices) y los dos
-    // extremos salen por el mismo tipo de borde que el movimiento permite.
-    const rectaEntera = (orthoVerts || []).length <= 2;
-    const salenIgual = axis === 'y' ? (exADir === 'h' && exBDir === 'h')
-                                    : (exADir === 'v' && exBDir === 'v');
-    if (seg.wpIndex < 0 && rectaEntera && salenIgual && A.item && B.item && from?.itemId && to?.itemId) {
+    // Un solo tramo recto entre dos nodos: se deslizan los dos enganches a la
+    // vez por sus bordes y la línea entera se corre, sin escalón.
+    if (arr.length === 2 && A.item && B.item && from?.itemId && to?.itemId) {
       const rectA = A.item, rectB = B.item;
-      const iniA = A.frac ? { ...A.frac } : fracEnElBorde(rectA, eA.x, eA.y);
-      const iniB = B.frac ? { ...B.frac } : fracEnElBorde(rectB, eB.x, eB.y);
-      const largo = axis === 'y' ? 'h' : 'w';   // el lado del nodo por el que se desliza
+      const iniA = A.frac ? { ...A.frac } : fracDeSalida(rectA, sA);
+      const iniB = B.frac ? { ...B.frac } : fracDeSalida(rectB, sB);
+      const largo = axis === 'y' ? 'h' : 'w';
       const eje = axis === 'y' ? 'y' : 'x';
       const onMoveRecta = (ev) => {
         const d = axis === 'y' ? (ev.clientY - startY) / scale : (ev.clientX - startX) / scale;
@@ -678,7 +486,6 @@ function Connector({ conn, items, selected, selectedIds, onSelect, onUpdate, onD
           const t = Math.min(1, Math.max(0, ini[eje] + d / (rect[largo] || 1)));
           const f = { ...ini };
           f[eje] = +t.toFixed(3);
-          // El mismo imán que al soltar un extremo: medio y esquinas.
           const IMAN = 0.06;
           if (Math.abs(f[eje] - 0.5) < IMAN) f[eje] = 0.5;
           else if (f[eje] < IMAN) f[eje] = 0;
@@ -700,138 +507,48 @@ function Connector({ conn, items, selected, selectedIds, onSelect, onUpdate, onD
       return;
     }
 
-    // Stable starting array + index for this drag (insert a fresh bend if pinned to an exit)
-    let startArr, targetIdx;
-    if (seg.wpIndex < 0 || seg.wpIndex >= base.length) {
-      const newWp = { x: seg.mid.x, y: seg.mid.y };
-      startArr = [...base.slice(0, seg.insertAfter), newWp, ...base.slice(seg.insertAfter)];
-      targetIdx = seg.insertAfter;
-    } else {
-      startArr = base;
-      targetIdx = seg.wpIndex;
+    const fijos = fijaExtremos();
+    const ESCALON = 18;
+    const avanza = (a, b, d) => ({ x: a.x + Math.sign(b.x - a.x) * d, y: a.y + Math.sign(b.y - a.y) * d });
+    const largoDe = (a, b) => Math.abs(b.x - a.x) + Math.abs(b.y - a.y);
+    let iA = tramo.i, iB = tramo.i + 1;
+    if (iA === 0) {
+      const s = avanza(arr[0], arr[1], Math.min(ESCALON, largoDe(arr[0], arr[1]) / 3));
+      arr = [arr[0], s, { ...s }, ...arr.slice(1)];
+      iA = 2; iB += 2;
     }
-    const startVal = startArr[targetIdx][axis];
-
-    const onMove = (ev) => {
-      const delta = axis === 'x' ? (ev.clientX - startX) / scale : (ev.clientY - startY) / scale;
-      let newVal = startVal + delta;
-
-      const SNAP_THRESHOLD = 12;
-      let snapTarget = null;
-      let minDiff = SNAP_THRESHOLD;
-
-      startArr.forEach((p) => {
-        if (Math.abs(p[axis] - startVal) >= 5) {
-          const diff = Math.abs(p[axis] - newVal);
-          if (diff < minDiff) {
-            minDiff = diff;
-            snapTarget = p[axis];
-          }
-        }
-      });
-
-      [p1, p2].forEach((pt) => {
-        if (pt) {
-          const diff = Math.abs(pt[axis] - newVal);
-          if (diff < minDiff) {
-            minDiff = diff;
-            snapTarget = pt[axis];
-          }
-        }
-      });
-
-      if (snapTarget !== null) {
-        newVal = snapTarget;
+    if (iB === arr.length - 1) {
+      const u = arr.length - 1;
+      const s = avanza(arr[u], arr[u - 1], Math.min(ESCALON, largoDe(arr[u], arr[u - 1]) / 3));
+      arr = [...arr.slice(0, u), { ...s }, s, arr[u]];
+      iB = u;
+    }
+    const startVal = arr[iA][axis];
+    const imanes = arr.filter((_, k) => k !== iA && k !== iB).map(p => p[axis]);
+    const calcula = (ev) => {
+      const d = axis === 'x' ? (ev.clientX - startX) / scale : (ev.clientY - startY) / scale;
+      let val = startVal + d;
+      let cerca = 8 / scale;
+      for (const c of imanes) {
+        if (Math.abs(c - val) < cerca) { cerca = Math.abs(c - val); val = c; }
       }
-
-      const next = startArr.map((p) => {
-        if (Math.abs(p[axis] - startVal) < 5) {
-          return { ...p, [axis]: newVal };
-        }
-        return p;
-      });
-      onUpdate(conn.id, { ortho: next, bend: undefined });
+      const nuevo = arr.map((p, k) => (k >= iA && k <= iB ? { ...p, [axis]: val } : p));
+      return FR.codosDeVertices(nuevo, sA.dir, sB.dir);
+    };
+    const onMove = (ev) => {
+      const codos = calcula(ev);
+      if (codos) onUpdate(conn.id, { ...fijos, ortho: codos, orthoManual: true, bend: undefined });
     };
     const onUp = (ev) => {
       window.removeEventListener('mousemove', onMove);
       window.removeEventListener('mouseup', onUp);
-      const delta = axis === 'x' ? (ev.clientX - startX) / scale : (ev.clientY - startY) / scale;
-      let newVal = startVal + delta;
-
-      const SNAP_THRESHOLD = 12;
-      let snapTarget = null;
-      let minDiff = SNAP_THRESHOLD;
-
-      startArr.forEach((p) => {
-        if (Math.abs(p[axis] - startVal) >= 5) {
-          const diff = Math.abs(p[axis] - newVal);
-          if (diff < minDiff) {
-            minDiff = diff;
-            snapTarget = p[axis];
-          }
-        }
-      });
-
-      [p1, p2].forEach((pt) => {
-        if (pt) {
-          const diff = Math.abs(pt[axis] - newVal);
-          if (diff < minDiff) {
-            minDiff = diff;
-            snapTarget = pt[axis];
-          }
-        }
-      });
-
-      if (snapTarget !== null) {
-        newVal = snapTarget;
-      }
-
-      const next = startArr.map((p) => {
-        if (Math.abs(p[axis] - startVal) < 5) {
-          return { ...p, [axis]: newVal };
-        }
-        return p;
-      });
-      onUpdate(conn.id, { ortho: cleanOrthoWithEndpoints(next, p1, p2, exADir, exBDir), bend: undefined });
+      const codos = calcula(ev);
+      // Al soltar, y solo entonces, se quitan los tramos que han quedado en
+      // cero y se juntan los que han quedado en la misma recta.
+      if (codos) onUpdate(conn.id, { ...fijos, ortho: FR.limpiaCodos(codos, sA, sB), orthoManual: true, bend: undefined });
     };
     window.addEventListener('mousemove', onMove);
     window.addEventListener('mouseup', onUp);
-  };
-
-  // Drag a waypoint directly to customize the path bends
-  const handleWaypointDrag = (idx) => (e) => {
-    e.stopPropagation(); e.preventDefault();
-    onSelect && onSelect(conn.id);
-    const base = (orthoWaypoints || []).map(p => ({ x: p.x, y: p.y }));
-    const startX = e.clientX, startY = e.clientY;
-    const scale = panZoom?.scale || 1;
-    const startPt = { ...base[idx] };
-
-    const onMove = (ev) => {
-      const dxp = (ev.clientX - startX) / scale;
-      const dyp = (ev.clientY - startY) / scale;
-      const next = base.map((p, i) => i === idx ? { x: Math.round(startPt.x + dxp), y: Math.round(startPt.y + dyp) } : p);
-      onUpdate(conn.id, { ortho: next, bend: undefined });
-    };
-    const onUp = (ev) => {
-      window.removeEventListener('mousemove', onMove);
-      window.removeEventListener('mouseup', onUp);
-      const dxp = (ev.clientX - startX) / scale;
-      const dyp = (ev.clientY - startY) / scale;
-      const next = base.map((p, i) => i === idx ? { x: Math.round(startPt.x + dxp), y: Math.round(startPt.y + dyp) } : p);
-      onUpdate(conn.id, { ortho: cleanOrthoWithEndpoints(next, p1, p2, exADir, exBDir), bend: undefined });
-    };
-    window.addEventListener('mousemove', onMove);
-    window.addEventListener('mouseup', onUp);
-  };
-
-  // Double-click a waypoint to remove it (keeps at least one).
-  const handleWaypointRemove = (idx) => (e) => {
-    e.stopPropagation(); e.preventDefault();
-    const base = (orthoWaypoints || []);
-    if (base.length <= 1) return;
-    const next = base.filter((_, i) => i !== idx).map(p => ({ x: p.x, y: p.y }));
-    onUpdate(conn.id, { ortho: cleanOrthoWithEndpoints(next, p1, p2, exADir, exBDir), bend: undefined });
   };
 
   // Drag the connector line itself: hold + move TRANSLATES the whole connector together
@@ -847,7 +564,8 @@ function Connector({ conn, items, selected, selectedIds, onSelect, onUpdate, onD
     if (B.item) nodeStarts.push({ id: B.item.id, x: B.item.x, y: B.item.y });
     const fromFree = !A.item ? { x: from.x ?? cA.x, y: from.y ?? cA.y } : null;
     const toFree = !B.item ? { x: to.x ?? cB.x, y: to.y ?? cB.y } : null;
-    const orthoStarts = (conn.ortho || []).map(p => ({ x: p.x, y: p.y }));
+    // Solo los codos de una flecha hecha a mano: la automática se rehace sola.
+    const orthoStarts = rectaAMano ? (conn.ortho || []).map(p => ({ x: p.x, y: p.y })) : [];
     let moved = false;
     const onMove = (ev) => {
       const dxp = (ev.clientX - startX) / scale;
@@ -870,9 +588,6 @@ function Connector({ conn, items, selected, selectedIds, onSelect, onUpdate, onD
       if (!moved) { onSelect && onSelect(conn.id); }            // plain click → edit mode
       else {
         if (nodeStarts.length && onDragNodesEnd) onDragNodesEnd(nodeStarts.map(n => n.id)); // commit
-        if (orthoStarts.length) {
-          onUpdate(conn.id, { ortho: cleanOrthoWithEndpoints(conn.ortho || [], p1, p2, exADir, exBDir) });
-        }
       }
     };
     window.addEventListener('mousemove', onMove);
@@ -883,6 +598,8 @@ function Connector({ conn, items, selected, selectedIds, onSelect, onUpdate, onD
   const handleEndpointDrag = (which) => (e) => {
     e.stopPropagation(); e.preventDefault();
     onSelect && onSelect(conn.id);
+    const inicial = (which === 'from' ? from : to)?.itemId;
+    let ultimo = inicial;
     const onMove = (ev) => {
       const p = screenToCanvas(ev.clientX, ev.clientY);
       
@@ -910,8 +627,10 @@ function Connector({ conn, items, selected, selectedIds, onSelect, onUpdate, onD
         const newEnd = rect
           ? { itemId: targetId, frac: fracEnElBorde(rect, p.x, p.y) }
           : { itemId: targetId };
+        ultimo = targetId;
         onUpdate(conn.id, which === 'from' ? { fromEnd: newEnd, from: undefined, fromAnchor: undefined } : { toEnd: newEnd, to: undefined, toAnchor: undefined });
       } else {
+        ultimo = null;
         const newEnd = { x: p.x, y: p.y };
         onUpdate(conn.id, which === 'from' ? { fromEnd: newEnd, from: undefined, fromAnchor: undefined } : { toEnd: newEnd, to: undefined, toAnchor: undefined });
       }
@@ -919,8 +638,13 @@ function Connector({ conn, items, selected, selectedIds, onSelect, onUpdate, onD
     const onUp = () => {
       window.removeEventListener('mousemove', onMove);
       window.removeEventListener('mouseup', onUp);
-      if (shape === 'orthogonal') {
-        onUpdate(conn.id, { ortho: cleanOrthoWithEndpoints(conn.ortho || [], p1, p2, exADir, exBDir) });
+      // Pegada a otro nodo (o soltada), los codos hechos a mano ya no tienen
+      // sentido: la flecha recta vuelve a su recorrido automático.
+      if (shape === 'orthogonal' && rectaAMano && ultimo !== inicial) {
+        const p = window.FlechaRecta.patchAutomatica(conn);
+        // El extremo recién soltado se queda como lo dejó quien lo arrastró.
+        if (which === 'from') delete p.fromEnd; else delete p.toEnd;
+        onUpdate(conn.id, p);
       }
     };
     window.addEventListener('mousemove', onMove);
@@ -938,15 +662,28 @@ function Connector({ conn, items, selected, selectedIds, onSelect, onUpdate, onD
     onSelect && onSelect(conn.id);
     const end = which === 'from' ? from : to;
     if (!end?.itemId) return;
+    // El lado por el que sale ahora. Si el enganche se pasa a otro lado, los
+    // codos hechos a mano dejarían la flecha entrando al revés: se vuelve al
+    // recorrido automático.
+    const ladoInicial = (which === 'from' ? rectaSA : rectaSB)?.lado || null;
     const onMove = (ev) => {
       const rect = getNodeRect(end.itemId, items);
       if (!rect) return;
       const p = screenToCanvas(ev.clientX, ev.clientY);
       const frac = fracEnElBorde(rect, p.x, p.y);
       const nuevo = { itemId: end.itemId, frac };
-      onUpdate(conn.id, which === 'from'
+      const patch = which === 'from'
         ? { fromEnd: nuevo, from: undefined, fromAnchor: undefined }
-        : { toEnd: nuevo, to: undefined, toAnchor: undefined });
+        : { toEnd: nuevo, to: undefined, toAnchor: undefined };
+      if (shape === 'orthogonal' && rectaAMano && ladoInicial && window.FlechaRecta.ladoDeFrac(frac) !== ladoInicial) {
+        const auto = window.FlechaRecta.patchAutomatica(conn);
+        patch.ortho = undefined;
+        patch.orthoManual = undefined;
+        // El otro extremo, si lo fijó la aplicación, se suelta también.
+        if (which === 'from' && auto.toEnd) patch.toEnd = auto.toEnd;
+        if (which === 'to' && auto.fromEnd) patch.fromEnd = auto.fromEnd;
+      }
+      onUpdate(conn.id, patch);
     };
     const onUp = () => {
       window.removeEventListener('mousemove', onMove);
@@ -960,74 +697,75 @@ function Connector({ conn, items, selected, selectedIds, onSelect, onUpdate, onD
   // controls so the center anchors stay grabbable even when they sit inside a node.
   if (layer === 'handles') {
     if (!selected) return null;
+    // Los tiradores miden lo mismo en pantalla al alejar el zoom (hasta el
+    // triple): en coordenadas del lienzo encogían con él y, alejado, no había
+    // forma de agarrar una píldora de cuatro píxeles.
+    const k = Math.min(3, Math.max(1, 1 / (panZoom?.scale || 1)));
     return (
       <g>
         {/* Dotted covered segments — center → node edge, drawn over the node */}
         {dottedA && <path className="connector-covered" d={dottedA} style={{ stroke: sel }}/>}
         {dottedB && <path className="connector-covered" d={dottedB} style={{ stroke: sel }}/>}
         {/* Center anchor handles */}
-        <circle className="connector-handle endpoint" cx={cA.x} cy={cA.y} r={8} onMouseDown={handleEndpointDrag('from')}/>
-        <circle className="connector-handle endpoint" cx={cB.x} cy={cB.y} r={8} onMouseDown={handleEndpointDrag('to')}/>
+        <circle className="connector-handle endpoint" cx={cA.x} cy={cA.y} r={8 * k} onMouseDown={handleEndpointDrag('from')}/>
+        <circle className="connector-handle endpoint" cx={cB.x} cy={cB.y} r={8 * k} onMouseDown={handleEndpointDrag('to')}/>
         {/* Enganche: solo si esa punta está pegada a un nodo. Se pasea por su
             borde y no se despega. Doble clic lo devuelve a automático. */}
         {A.item && (
           <circle
-            className="connector-handle anchor-slide" cx={eA.x} cy={eA.y} r={6}
+            className="connector-handle anchor-slide" cx={eA.x} cy={eA.y} r={6 * k}
             onMouseDown={handleAnchorSlide('from')}
             onDoubleClick={(ev)=>{ ev.stopPropagation(); onUpdate(conn.id, { fromEnd: { itemId: from.itemId } }); }}
           />
         )}
         {B.item && (
           <circle
-            className="connector-handle anchor-slide" cx={eB.x} cy={eB.y} r={6}
+            className="connector-handle anchor-slide" cx={eB.x} cy={eB.y} r={6 * k}
             onMouseDown={handleAnchorSlide('to')}
             onDoubleClick={(ev)=>{ ev.stopPropagation(); onUpdate(conn.id, { toEnd: { itemId: to.itemId } }); }}
           />
         )}
         {shape === 'orthogonal' ? (
           <>
-            {/* Per-segment handles — drag anywhere on the segment or its midpoint circle */}
-            {orthoSegments && orthoSegments.map((s, i) => (
-              <g key={`seg-g-${i}`}>
-                <path
-                  d={`M ${s.from.x} ${s.from.y} L ${s.to.x} ${s.to.y}`}
-                  fill="none"
-                  stroke="transparent"
-                  strokeWidth={14}
-                  style={{ cursor: s.axis === 'x' ? 'ew-resize' : 'ns-resize', pointerEvents: 'stroke' }}
-                  onMouseDown={handleSegmentDrag(s)}
-                />
-                <circle
-                  className="connector-handle seg-move"
-                  cx={s.mid.x} cy={s.mid.y} r={4}
-                  style={{ cursor: s.axis === 'x' ? 'ew-resize' : 'ns-resize', pointerEvents: 'all' }}
-                  onMouseDown={handleSegmentDrag(s)}
-                />
-              </g>
-            ))}
-            {/* Waypoint dots — drag to adjust, double-click to remove a bend */}
-            {orthoWaypoints && orthoWaypoints.map((w, i) => (
-              <circle key={`wp-${i}`} className="connector-handle waypoint" cx={w.x} cy={w.y} r={5}
-                style={{ cursor: 'move' }}
-                onMouseDown={handleWaypointDrag(i)}
-                onDoubleClick={handleWaypointRemove(i)}/>
-            ))}
+            {/* Un tirador por tramo: una píldora en su centro, tumbada a lo
+                largo del tramo, que se arrastra en perpendicular. También se
+                puede coger el tramo por cualquier sitio. Doble clic devuelve
+                la flecha a su recorrido automático. */}
+            {rectaTramos && rectaTramos.map(t => {
+              const tumbada = t.axis === 'y';
+              return (
+                <g key={`tramo-${t.i}`}>
+                  <path
+                    d={`M ${t.from.x} ${t.from.y} L ${t.to.x} ${t.to.y}`}
+                    fill="none"
+                    stroke="transparent"
+                    strokeWidth={14 * k}
+                    style={{ cursor: t.axis === 'x' ? 'ew-resize' : 'ns-resize', pointerEvents: 'stroke' }}
+                    onMouseDown={handleTramoDrag(t)}
+                    onDoubleClick={rectaAMano ? vuelveAutomatica : undefined}
+                  />
+                  {/* La píldora solo en tramos con sitio: en uno corto tapaba la
+                      punta de la flecha y se amontonaba con la de al lado. Esos
+                      se agarran igual por la propia línea. */}
+                  {Math.abs(t.to.x - t.from.x) + Math.abs(t.to.y - t.from.y) >= 36 && <rect
+                    className="connector-handle seg-move"
+                    x={t.mid.x - (tumbada ? 10 : 4) * k} y={t.mid.y - (tumbada ? 4 : 10) * k}
+                    width={(tumbada ? 20 : 8) * k} height={(tumbada ? 8 : 20) * k} rx={4 * k}
+                    style={{ cursor: t.axis === 'x' ? 'ew-resize' : 'ns-resize', pointerEvents: 'all' }}
+                    onMouseDown={handleTramoDrag(t)}
+                    onDoubleClick={rectaAMano ? vuelveAutomatica : undefined}
+                  />}
+                </g>
+              );
+            })}
           </>
         ) : (
           /* Curve bend handle */
-          <circle className="connector-handle curve" cx={hx} cy={hy} r={7} onMouseDown={handleCurveDrag}/>
+          <circle className="connector-handle curve" cx={hx} cy={hy} r={7 * k} onMouseDown={handleCurveDrag}/>
         )}
       </g>
     );
   }
-
-  React.useEffect(() => {
-    if (shape === 'orthogonal' && orthoWaypoints) {
-      if (JSON.stringify(conn.ortho) !== JSON.stringify(orthoWaypoints)) {
-        onUpdate(conn.id, { ortho: orthoWaypoints });
-      }
-    }
-  }, [conn.ortho, orthoWaypoints, shape, conn.id, onUpdate]);
 
   // The lines layer (rendered BELOW nodes) carries the path, arrowheads and label.
   return (
