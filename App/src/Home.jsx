@@ -462,9 +462,12 @@ function Home({ lang, setLang, theme, setTheme, onOpenProject, projects, onCreat
       {sideOpen && <div className="ms-side-scrim" onClick={()=>setSideOpen(false)}/>}
       {/* Sidebar */}
       <aside className="ms-side" onClick={(e)=>{ if (e.target.closest('button, a')) setSideOpen(false); }}>
-        <div className="ms-brand">
+        {/* data-mueve-ventana: con la ventana fijada, arrastrar aquí la mueve. */}
+        <div className="ms-brand" data-mueve-ventana="">
           <div className="brand-mark"><BrandMark/></div>
           <span>Oddinote</span>
+          {/* La chincheta: siempre encima y sin bordes (solo en el escritorio). */}
+          {window.BotonFijar && <window.BotonFijar/>}
         </div>
 
         <button className="ms-new-btn" onClick={()=>setModal(true)}>
@@ -570,7 +573,7 @@ function Home({ lang, setLang, theme, setTheme, onOpenProject, projects, onCreat
           </div>
         )}
 
-        <div className="ms-side-spacer" style={{ flex: 1 }}/>
+        <div className="ms-side-spacer" data-mueve-ventana="" style={{ flex: 1 }}/>
 
         <div className="kofi-sidebar-card" style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: '10px', background: 'var(--bg-card, #FFFFFF)', borderRadius: '12px', border: '1.5px solid var(--line-soft, #E5E1DD)', marginTop: '8px' }}>
           <div className="kofi-card-title" style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--wine, #7B2D26)', fontWeight: '600', fontSize: '14px' }}>
@@ -621,7 +624,7 @@ function Home({ lang, setLang, theme, setTheme, onOpenProject, projects, onCreat
 
       {/* Main */}
       <main className="ms-main">
-        <header className="ms-top">
+        <header className="ms-top" data-mueve-ventana="">
           {/* Abre la barra lateral como cajón. Solo se ve en móvil. */}
           <button
             className="ms-side-toggle"

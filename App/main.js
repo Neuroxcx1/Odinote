@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog, shell, Menu, nativeImage } = require('electron');
+const { app, BrowserWindow, BrowserView, ipcMain, dialog, shell, Menu, nativeImage, screen } = require('electron');
 app.commandLine.appendSwitch('disable-features', 'WinUseBrowserSpellChecker');
 const path = require('path');
 const fs = require('fs');
@@ -9,7 +9,47 @@ const Boveda = require('./boveda.js');
 const http = require('http');
 
 let mainWindow;
+// La aplicación va en una vista propia, debajo de la barra de título que pinta
+// la ventana (barra-titulo.html). Ver createWindow.
+let vistaApp = null;
+// "Siempre encima": sin barra de título ni bordes, como PureRef.
+let ventanaFijada = false;
+const ALTO_BARRA = 32;
 let serverInstance;
+
+// El contenido de la aplicación (no el de la barra de título).
+function appWC() {
+  if (vistaApp && !vistaApp.webContents.isDestroyed()) return vistaApp.webContents;
+  return mainWindow ? mainWindow.webContents : null;
+}
+
+// La vista de la aplicación ocupa todo menos la franja de la barra de título;
+// fijada (o a pantalla completa) lo ocupa todo, y así la ventana queda sin
+// barra ni bordes. La barra es una página aparte, y no una franja dentro de la
+// aplicación, a propósito: la aplicación coloca muchas cosas contando desde el
+// borde de arriba de la ventana, y una franja dentro las habría descuadrado.
+function colocaVistas() {
+  if (!mainWindow || !vistaApp) return;
+  const [w, h] = mainWindow.getContentSize();
+  const arriba = (ventanaFijada || mainWindow.isFullScreen()) ? 0 : ALTO_BARRA;
+  vistaApp.setBounds({ x: 0, y: arriba, width: w, height: Math.max(0, h - arriba) });
+}
+
+function estadoVentana() {
+  if (!mainWindow) return {};
+  return {
+    maximizada: mainWindow.isMaximized(),
+    fijada: ventanaFijada,
+    enfocada: mainWindow.isFocused(),
+    pantallaCompleta: mainWindow.isFullScreen(),
+  };
+}
+// A la barra de título y a la aplicación, que pinta el botón de fijar.
+function mandaEstadoVentana() {
+  const est = estadoVentana();
+  try { if (mainWindow) mainWindow.webContents.send('ventana:estado', est); } catch (e) {}
+  try { if (vistaApp) vistaApp.webContents.send('ventana:estado', est); } catch (e) {}
+}
 let activeVaultPath = '';
 
 // Setup a logging path in the app's persistent user data directory
@@ -53,14 +93,14 @@ function createWindow() {
           label: 'Toggle Developer Tools',
           accelerator: 'F12',
           click: (item, focusedWindow) => {
-            if (focusedWindow) focusedWindow.webContents.toggleDevTools();
+            if (appWC()) appWC().toggleDevTools();
           }
         },
         {
           label: 'Toggle Developer Tools (CmdOrCtrl+Shift+I)',
           accelerator: 'CmdOrCtrl+Shift+I',
           click: (item, focusedWindow) => {
-            if (focusedWindow) focusedWindow.webContents.toggleDevTools();
+            if (appWC()) appWC().toggleDevTools();
           }
         }
       ]
@@ -80,6 +120,15 @@ function createWindow() {
     return 'light';
   })();
 
+  const fondoVentana = savedTheme === 'dark' ? '#232123' : '#F4F3EF';
+  // Sin el marco de Windows. Un marco no se puede quitar ni poner con la
+  // ventana abierta, y el modo "siempre encima" tiene que quedar sin bordes
+  // (como PureRef) sin recargar la aplicación. Así que la barra de título la
+  // pinta la propia ventana (barra-titulo.html, igual que la de Windows: icono,
+  // nombre, minimizar, maximizar y cerrar; arrastrarla, el doble clic y el
+  // encaje a los bordes de la pantalla funcionan como siempre) y la aplicación
+  // va en una vista debajo. Los bordes para cambiar el tamaño y la sombra los
+  // sigue poniendo Windows.
   mainWindow = new BrowserWindow({
     width: 1280,
     height: 800,
@@ -88,7 +137,16 @@ function createWindow() {
     icon: path.join(__dirname, 'Icon/Icon.ico'),
     title: 'Oddinote',
     show: false,
-    backgroundColor: savedTheme === 'dark' ? '#232123' : '#F4F3EF',
+    frame: false,
+    backgroundColor: fondoVentana,
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+      preload: path.join(__dirname, 'barra-preload.js')
+    }
+  });
+
+  vistaApp = new BrowserView({
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
@@ -102,6 +160,20 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.js')
     }
   });
+  vistaApp.setBackgroundColor(fondoVentana);
+  mainWindow.setBrowserView(vistaApp);
+  colocaVistas();
+  mainWindow.loadFile(path.join(__dirname, 'barra-titulo.html'), { query: { tema: savedTheme === 'dark' ? 'dark' : 'light' } });
+
+  ['resize', 'maximize', 'unmaximize', 'restore', 'enter-full-screen', 'leave-full-screen', 'show'].forEach(ev => {
+    mainWindow.on(ev, () => { colocaVistas(); mandaEstadoVentana(); });
+  });
+  mainWindow.on('blur', () => { paraArrastre(); mandaEstadoVentana(); });
+  // Al volver a la ventana, el teclado es de la aplicación y no de la barra.
+  mainWindow.on('focus', () => {
+    try { if (vistaApp) vistaApp.webContents.focus(); } catch (e) {}
+    mandaEstadoVentana();
+  });
 
   mainWindow.once('ready-to-show', () => {
     mainWindow.show();
@@ -114,9 +186,9 @@ function createWindow() {
       session.defaultSession.setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
     } catch(e) {}
   }
-  if (mainWindow.webContents && mainWindow.webContents.session) {
+  if (appWC() && appWC().session) {
     try {
-      mainWindow.webContents.session.clearCache();
+      appWC().session.clearCache();
     } catch(e) {}
   }
 
@@ -140,14 +212,14 @@ function createWindow() {
   mainWindow.setMenuBarVisibility(false);
 
   // Redirect renderer console messages to main log
-  mainWindow.webContents.on('console-message', (event, level, message, line, sourceId) => {
+  appWC().on('console-message', (event, level, message, line, sourceId) => {
     logToFile(`[RENDERER CONSOLE] [Level ${level}] ${message} (at ${sourceId}:${line})`);
   });
 
   // Handle spellcheck suggestions and custom HTML context menu
-  mainWindow.webContents.on('context-menu', (event, params) => {
+  appWC().on('context-menu', (event, params) => {
     event.preventDefault();
-    mainWindow.webContents.send('show-context-menu', {
+    appWC().send('show-context-menu', {
       x: params.x,
       y: params.y,
       misspelledWord: params.misspelledWord,
@@ -158,7 +230,7 @@ function createWindow() {
   });
 
   // Open external links in default browser instead of new Electron windows
-  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+  appWC().setWindowOpenHandler(({ url }) => {
     if (url.startsWith('http:') || url.startsWith('https:')) {
       shell.openExternal(url);
       return { action: 'deny' };
@@ -166,7 +238,7 @@ function createWindow() {
     return { action: 'allow' };
   });
 
-  mainWindow.webContents.on('will-navigate', (event, url) => {
+  appWC().on('will-navigate', (event, url) => {
     if (url.startsWith('http://') || url.startsWith('https://')) {
       const localPrefix = 'http://127.0.0.1:';
       if (!url.startsWith(localPrefix)) {
@@ -301,7 +373,7 @@ function createWindow() {
   serverInstance.on('listening', () => {
     const port = serverInstance.address().port;
     logToFile(`Static server running at: http://127.0.0.1:${port}`);
-    mainWindow.loadURL(`http://127.0.0.1:${port}/index.html`);
+    appWC().loadURL(`http://127.0.0.1:${port}/index.html`);
   });
   serverInstance.on('error', (err) => {
     if (err.code === 'EADDRINUSE') {
@@ -532,14 +604,14 @@ ipcMain.handle('save-media', async (event, { folderPath, fileName, base64Data, c
 
 ipcMain.handle('replace-misspelling', async (event, suggestion) => {
   if (mainWindow) {
-    mainWindow.webContents.replaceMisspelling(suggestion);
+    appWC().replaceMisspelling(suggestion);
   }
   return true;
 });
 
 ipcMain.handle('add-to-dictionary', async (event, word) => {
-  if (mainWindow && mainWindow.webContents.session) {
-    mainWindow.webContents.session.addWordToSpellCheckerDictionary(word);
+  if (appWC() && appWC().session) {
+    appWC().session.addWordToSpellCheckerDictionary(word);
   }
   return true;
 });
@@ -734,7 +806,8 @@ ipcMain.handle('mostrar-en-carpeta', async (event, datos) => {
 // (las mismas del Explorador), así que salen igual para una foto, un PDF, un
 // vídeo o una carpeta, sin tener que saber abrir cada tipo aquí.
 ipcMain.handle('carpeta-elegir', async (event, desde) => {
-  const r = await dialog.showOpenDialog(BrowserWindow.fromWebContents(event.sender), {
+  // Desde la vista de la aplicación no hay "ventana de la página": se usa la principal.
+  const r = await dialog.showOpenDialog(BrowserWindow.fromWebContents(event.sender) || mainWindow, {
     properties: ['openDirectory'],
     defaultPath: typeof desde === 'string' && desde && fs.existsSync(desde) ? desde : undefined,
   });
@@ -1164,7 +1237,7 @@ function startAuthServer() {
           };
           logToFile(`Received auth-success via POST for ${profile.email}`);
           if (mainWindow) {
-            mainWindow.webContents.send('google-signin-completed', profile);
+            appWC().send('google-signin-completed', profile);
           }
           res.writeHead(200, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ success: true }));
@@ -1204,7 +1277,7 @@ function startAuthServer() {
       if (errorGoogle) {
         logToFile(`OAuth: Google devolvió error "${errorGoogle}"`);
         cierra('No se pudo conectar', 'Vuelve a Oddinote e inténtalo otra vez.', false);
-        if (mainWindow) mainWindow.webContents.send('google-signin-failed', { error: errorGoogle });
+        if (mainWindow) appWC().send('google-signin-failed', { error: errorGoogle });
         return;
       }
       if (!code || !estado || estado !== pkceState || !pkceVerifier) {
@@ -1229,7 +1302,7 @@ function startAuthServer() {
         const perfil = await pidePerfil(tok.access_token);
         logToFile(`OAuth: sesión iniciada para ${perfil.email || '?'} (refresco ${guardado ? 'guardado' : 'NO guardado'})`);
         if (mainWindow) {
-          mainWindow.webContents.send('google-signin-completed', {
+          appWC().send('google-signin-completed', {
             name: perfil.name || 'Google User',
             email: perfil.email || '',
             picture: perfil.picture || '',
@@ -1249,7 +1322,7 @@ function startAuthServer() {
       }).catch((err) => {
         logToFile(`OAuth: fallo al canjear el código — ${err.message}`);
         cierra('No se pudo completar', err.message, false);
-        if (mainWindow) mainWindow.webContents.send('google-signin-failed', { error: err.message });
+        if (mainWindow) appWC().send('google-signin-failed', { error: err.message });
       });
     } else if (req.url.startsWith('/local-login.html') || req.url === '/' || req.url.startsWith('/?code=')) {
       const filePath = path.join(__dirname, 'local-login.html');
@@ -1291,7 +1364,70 @@ ipcMain.handle('set-window-theme', async (event, theme) => {
     const configPath = path.join(app.getPath('userData'), 'window-theme.txt');
     fs.writeFileSync(configPath, theme === 'dark' ? 'dark' : 'light', 'utf-8');
   } catch (e) {}
+  // La barra de título es nuestra: cambia de tema con la aplicación.
+  try {
+    const fondo = theme === 'dark' ? '#232123' : '#F4F3EF';
+    if (mainWindow) { mainWindow.setBackgroundColor(fondo); mainWindow.webContents.send('barra:tema', theme === 'dark' ? 'dark' : 'light'); }
+  } catch (e) {}
   return { ok: true };
+});
+
+// ── La ventana: botones de la barra de título y "siempre encima" ──
+// Después de pulsar un botón de la barra, el teclado vuelve a la aplicación:
+// si no, Ctrl+Z o Supr irían a la barra hasta pulsar otra vez en el lienzo.
+const devuelveFoco = () => { try { if (vistaApp) vistaApp.webContents.focus(); } catch (e) {} };
+ipcMain.on('ventana:minimiza', () => { if (mainWindow) mainWindow.minimize(); });
+ipcMain.on('ventana:maximiza', () => {
+  if (!mainWindow) return;
+  if (mainWindow.isMaximized()) mainWindow.unmaximize(); else mainWindow.maximize();
+  devuelveFoco();
+});
+ipcMain.on('ventana:cierra', () => { if (mainWindow) mainWindow.close(); });
+ipcMain.handle('ventana:estado', () => estadoVentana());
+
+// Fijar: siempre encima de las demás ventanas y sin barra ni bordes, y se
+// deja hacer pequeña (para tenerla de referencia en una esquina, como PureRef).
+// Al soltarla vuelve el tamaño mínimo de siempre.
+ipcMain.handle('ventana:fija', (event, si) => {
+  if (!mainWindow) return {};
+  ventanaFijada = !!si;
+  mainWindow.setAlwaysOnTop(ventanaFijada, 'floating');
+  if (ventanaFijada) {
+    mainWindow.setMinimumSize(360, 240);
+  } else {
+    mainWindow.setMinimumSize(1024, 700);
+    const [w, h] = mainWindow.getSize();
+    if (!mainWindow.isMaximized() && (w < 1024 || h < 700)) mainWindow.setSize(Math.max(w, 1024), Math.max(h, 700));
+  }
+  colocaVistas();
+  mandaEstadoVentana();
+  logToFile('ventana: ' + (ventanaFijada ? 'fijada encima, sin bordes' : 'normal'));
+  return estadoVentana();
+});
+
+// Mover la ventana fijada: sin barra de título no hay de dónde agarrarla, así
+// que la aplicación avisa cuando se pulsa en una zona vacía de su barra de
+// arriba y aquí se sigue al puntero hasta que se suelta. (Las zonas de
+// arrastre de Windows, -webkit-app-region, no valen dentro de la vista.)
+let arrastreVentana = null;
+function paraArrastre() {
+  if (arrastreVentana) { clearInterval(arrastreVentana.reloj); arrastreVentana = null; }
+}
+ipcMain.on('ventana:arrastra', (event, que) => {
+  if (!mainWindow) return;
+  paraArrastre();
+  if (que !== 'inicio') return;
+  const c = screen.getCursorScreenPoint();
+  const [x, y] = mainWindow.getPosition();
+  const inicio = Date.now();
+  arrastreVentana = {
+    reloj: setInterval(() => {
+      // Por si el "soltar" no llegara nunca, no se queda enganchada.
+      if (!mainWindow || Date.now() - inicio > 120000) { paraArrastre(); return; }
+      const p = screen.getCursorScreenPoint();
+      mainWindow.setPosition(x + p.x - c.x, y + p.y - c.y);
+    }, 10),
+  };
 });
 
 ipcMain.handle('start-google-login', async () => {
@@ -1367,7 +1503,7 @@ ipcMain.handle('capturar-lienzo', async (evt, recorte) => {
       height: Math.max(1, Math.round(recorte.height)),
     };
 
-    const imagen = await mainWindow.webContents.capturePage(rect);
+    const imagen = await appWC().capturePage(rect);
     if (imagen.isEmpty()) return { ok: false, motivo: 'vacia' };
 
     const sugerido = 'odinote-' + new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-') + '.png';
@@ -1417,7 +1553,7 @@ ipcMain.handle('download-and-run-update', async (event, { url, fileName }) => {
       chunks.push(value);
       received += value.length;
       if (total && mainWindow) {
-        mainWindow.webContents.send('update-download-progress', Math.round((received / total) * 100));
+        appWC().send('update-download-progress', Math.round((received / total) * 100));
       }
     }
     fs.writeFileSync(destPath, Buffer.concat(chunks.map(c => Buffer.from(c))));

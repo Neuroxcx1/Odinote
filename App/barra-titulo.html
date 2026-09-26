@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Oddinote</title>
+<!--
+  La barra de título de la ventana.
+
+  La ventana va sin el marco de Windows para poder quedarse sin bordes en el
+  modo "siempre encima" (como PureRef) sin recargar la aplicación: un marco no
+  se puede quitar con la ventana abierta. Esta página es la barra de siempre,
+  pintada por nosotros y con las medidas de la de Windows 11 (32 px de alto,
+  botones de 46), y la aplicación va en una vista justo debajo. Arrastrarla,
+  el doble clic para maximizar y el encaje a los bordes de la pantalla son los
+  de Windows: los da la zona de arrastre (-webkit-app-region).
+-->
+<style>
+  :root {
+    --fondo: #F4F3EF;
+    --tinta: #1A1A1A;
+    --encima: rgba(0, 0, 0, 0.06);
+    --pulsado: rgba(0, 0, 0, 0.1);
+  }
+  :root[data-tema="dark"] {
+    --fondo: #232123;
+    --tinta: #F0EEF0;
+    --encima: rgba(255, 255, 255, 0.08);
+    --pulsado: rgba(255, 255, 255, 0.12);
+  }
+  html, body {
+    margin: 0; height: 100%; overflow: hidden;
+    background: var(--fondo); color: var(--tinta);
+    font: 12px "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+    user-select: none;
+  }
+  .barra {
+    display: flex; align-items: center;
+    height: 32px;
+    -webkit-app-region: drag;
+  }
+  .icono { width: 16px; height: 16px; margin: 0 9px 0 12px; flex-shrink: 0; }
+  .titulo { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .boton {
+    -webkit-app-region: no-drag;
+    width: 46px; height: 32px; flex-shrink: 0;
+    display: grid; place-items: center;
+    border: 0; padding: 0; margin: 0;
+    background: transparent; color: var(--tinta);
+    font-family: "Segoe Fluent Icons", "Segoe MDL2 Assets";
+    font-size: 10px;
+    transition: background-color 90ms;
+  }
+  .boton:hover { background: var(--encima); }
+  .boton:active { background: var(--pulsado); }
+  /* Cerrar se pone rojo, como en Windows. */
+  .boton.cerrar:hover { background: #C42B1C; color: #FFFFFF; }
+  .boton.cerrar:active { background: #B82A1D; color: #FFFFFF; }
+  /* Con la ventana en segundo plano, apagada como la de Windows. */
+  body.fuera .titulo, body.fuera .icono, body.fuera .boton:not(:hover) { opacity: 0.5; }
+</style>
+</head>
+<body>
+  <div class="barra">
+    <img class="icono" src="Icon/Icon.png" alt="" draggable="false">
+    <div class="titulo">Oddinote</div>
+    <button class="boton" id="minimizar" title="Minimizar" aria-label="Minimizar">&#xE921;</button>
+    <button class="boton" id="maximizar" title="Maximizar" aria-label="Maximizar">&#xE922;</button>
+    <button class="boton cerrar" id="cerrar" title="Cerrar" aria-label="Cerrar">&#xE8BB;</button>
+  </div>
+  <script>
+    (function () {
+      var raiz = document.documentElement;
+      var tema = new URLSearchParams(location.search).get('tema');
+      raiz.setAttribute('data-tema', tema === 'dark' ? 'dark' : 'light');
+      if (!window.barra) return;
+      var max = document.getElementById('maximizar');
+      document.getElementById('minimizar').onclick = function () { window.barra.minimiza(); };
+      max.onclick = function () { window.barra.maximiza(); };
+      document.getElementById('cerrar').onclick = function () { window.barra.cierra(); };
+      var pinta = function (est) {
+        if (!est) return;
+        // Maximizada, el botón es el de restaurar (los dos cuadros).
+        max.innerHTML = est.maximizada ? '&#xE923;' : '&#xE922;';
+        max.title = est.maximizada ? 'Restaurar' : 'Maximizar';
+        document.body.classList.toggle('fuera', est.enfocada === false);
+      };
+      window.barra.alCambiar(pinta);
+      window.barra.alTema(function (t) { raiz.setAttribute('data-tema', t === 'dark' ? 'dark' : 'light'); });
+      window.barra.estado().then(pinta);
+    })();
+  </script>
+</body>
+</html>

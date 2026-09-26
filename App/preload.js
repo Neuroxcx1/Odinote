@@ -50,6 +50,19 @@ contextBridge.exposeInMainWorld('electronAPI', {
     }
     return ipcRenderer.invoke('download-and-run-update', { url, fileName });
   },
+  // La ventana: "siempre encima" sin bordes (la chincheta de arriba a la
+  // izquierda, ver src/Ventana.jsx) y moverla cuando está fijada, que ya no
+  // tiene barra de título de donde agarrarla.
+  ventana: {
+    fija: (si) => ipcRenderer.invoke('ventana:fija', !!si),
+    estado: () => ipcRenderer.invoke('ventana:estado'),
+    alCambiar: (cb) => {
+      const f = (event, est) => cb(est);
+      ipcRenderer.on('ventana:estado', f);
+      return () => ipcRenderer.removeListener('ventana:estado', f);
+    },
+    arrastra: (que) => ipcRenderer.send('ventana:arrastra', que),
+  },
   onGoogleSigninCompleted: (callback) => {
     const listener = (event, profile) => callback(profile);
     ipcRenderer.on('google-signin-completed', listener);

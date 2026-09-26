@@ -228,10 +228,14 @@ function Topbar({
   };
 
   return (
-    <div className="topbar">
+    // data-mueve-ventana: con la ventana fijada (sin barra de título), las
+    // zonas vacías de esta barra la mueven. Ver Ventana.jsx.
+    <div className="topbar" data-mueve-ventana="">
       <button className="brand press" onClick={onHome} title={t.home}>
         <div className="brand-mark"><window.BrandMark/></div>
       </button>
+      {/* La chincheta: siempre encima y sin bordes (solo en el escritorio). */}
+      {window.BotonFijar && <window.BotonFijar/>}
       {/* Retroceder un nivel. Antes solo estaba en móvil, porque en escritorio
           se subía pulsando la miga anterior de la cadena. Al desaparecer esa
           cadena hace falta en todas partes: es el gesto de subir un nivel de un
@@ -296,7 +300,7 @@ function Topbar({
         )}
       </div>
 
-      <div className="topbar-spacer"/>
+      <div className="topbar-spacer" data-mueve-ventana=""/>
 
       {/* Muestra u oculta el raíl de herramientas (solo visible en móvil, donde
           el raíl ocupa el borde derecho de la pantalla). */}
@@ -525,7 +529,7 @@ function Topbar({
       {moreOpen && <div className="topbar-tail-scrim" onClick={() => setMoreOpen(false)}/>}
 
       <div className={`topbar-tail ${moreOpen ? 'open' : ''}`}>
-      <div className="topbar-spacer" style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center' }}>
+      <div className="topbar-spacer" data-mueve-ventana="" style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center' }}>
         <button
           className="feedback-topbar-btn"
           onClick={() => window.open('https://github.com/Neuroxcx1/Odinote/discussions', '_blank', 'noopener,noreferrer')}
