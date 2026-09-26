@@ -635,7 +635,14 @@ body[data-patrocinador="1"] .board-preview-item {
 .boton-fijar .material-symbols-rounded { font-size: 17px; transform: rotate(40deg); transition: transform 460ms var(--muelle); }
 .boton-fijar.fijada { background: var(--olive); color: #FFFFFF; }
 .boton-fijar.fijada .material-symbols-rounded { transform: rotate(0deg); font-variation-settings: 'FILL' 1; }
-.ms-brand .boton-fijar { margin-left: auto; }
+/* En la cabecera de inicio, del tamaño de los botones de al lado y empujada
+   al extremo derecho. */
+.ms-top > .boton-fijar { width: 38px; height: 38px; margin-left: auto; }
+.ms-top > .boton-fijar .material-symbols-rounded { font-size: 20px; }
+/* En el lienzo, a la derecha del todo y a la altura del buscador
+   (.mini-search: top 14px, 37 de alto). */
+.fijar-lienzo { position: absolute; top: 14px; right: 16px; z-index: 40; height: 37px; display: flex; align-items: center; }
+.fijar-lienzo .boton-fijar { width: 34px; height: 34px; }
 /* Con la ventana fijada, lo que la mueve lo dice el cursor. */
 html[data-ventana-fijada] [data-mueve-ventana] { cursor: grab; }
 html[data-ventana-fijada] [data-mueve-ventana]:active { cursor: grabbing; }
@@ -722,6 +729,11 @@ html[data-ventana-fijada] [data-mueve-ventana]:active { cursor: grabbing; }
 .ms-search .material-symbols-rounded { color: var(--ink-3); font-size: 18px; }
 .ms-search kbd { font-family: var(--font-mono); font-size: 11px; padding: 1px 5px; background: var(--bg); border: 1px solid var(--line-soft); border-radius: 2px; color: var(--ink-3); }
 .ms-top-actions { display: flex; align-items: center; gap: 8px; }
+/* El buscador cede sitio antes que los botones: con la chincheta al final de
+   la fila, en una ventana de 1280 px la fila se salía por la derecha (el
+   campo de texto no bajaba de su ancho natural). */
+.ms-search { min-width: 160px; }
+.ms-search input { min-width: 0; }
 
 /* Hero */
 .ms-hero {
@@ -7315,11 +7327,22 @@ html[data-touch="1"] .handle::before {
   70%  { box-shadow: 0 0 0 7px rgba(234, 245, 222, 0); }
   100% { box-shadow: 0 0 0 0 rgba(234, 245, 222, 0); }
 }
-/* En una ventana estrecha se queda solo el icono, para no empujar al resto. */
-@media (max-width: 1100px) {
+/* En una ventana estrecha se queda solo el icono, para no empujar al resto.
+   Desde 1250 px y no 1100: por debajo ya no cabía la fila (y menos con la
+   chincheta al final). */
+@media (max-width: 1250px) {
   .ms-join-top span:not(.material-symbols-rounded) { display: none; }
   .ms-join-top::after { display: none; }
   .ms-join-top { padding: 8px 10px; }
+}
+/* Y más estrecha aún (la ventana normal no baja de 1024), botones algo más
+   pequeños y juntos: si no, la fila se salía por la derecha. */
+@media (max-width: 1130px) {
+  .ms-top { gap: 8px; }
+  .ms-top-actions { gap: 5px; }
+  .ms-top-actions .icon-btn, .ms-top > .boton-fijar { width: 34px; height: 34px; }
+  .ms-top-actions .icon-btn[style] { margin-right: 0 !important; }
+  .ms-join-top { margin-right: 4px; }
 }
 }
 

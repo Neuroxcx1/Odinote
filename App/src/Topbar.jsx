@@ -234,8 +234,6 @@ function Topbar({
       <button className="brand press" onClick={onHome} title={t.home}>
         <div className="brand-mark"><window.BrandMark/></div>
       </button>
-      {/* La chincheta: siempre encima y sin bordes (solo en el escritorio). */}
-      {window.BotonFijar && <window.BotonFijar/>}
       {/* Retroceder un nivel. Antes solo estaba en móvil, porque en escritorio
           se subía pulsando la miga anterior de la cadena. Al desaparecer esa
           cadena hace falta en todas partes: es el gesto de subir un nivel de un

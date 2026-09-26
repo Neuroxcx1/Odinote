@@ -1,11 +1,12 @@
 // =====================================================
 // Oddinote — la ventana: "siempre encima" sin bordes
 //
-// Pedido por el usuario: un botón arriba a la izquierda que deje el programa
-// siempre encima de las demás ventanas y, a la vez, sin los bordes típicos de
-// Windows, como PureRef. Es la chincheta: está en la pantalla de inicio (junto
-// al nombre) y en la barra del lienzo (junto al avatar), y las dos dicen lo
-// mismo porque leen el estado de la ventana, no uno propio.
+// Pedido por el usuario: un botón que deje el programa siempre encima de las
+// demás ventanas y, a la vez, sin los bordes típicos de Windows, como PureRef.
+// Es la chincheta: arriba a la derecha del todo, en la línea del buscador (en
+// la cabecera de inicio y flotando en el lienzo); primero estuvo a la
+// izquierda, junto al avatar, y no gustó. Las dos dicen lo mismo porque leen
+// el estado de la ventana, no uno propio.
 //
 // Fijada, la ventana no tiene barra de título (ver main.js: la barra es una
 // página aparte y la aplicación, al fijar, la tapa), así que se mueve

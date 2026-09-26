@@ -5962,6 +5962,15 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
           )}
         </div>
 
+        {/* La chincheta (siempre encima y sin bordes), en la línea del
+            buscador y a la derecha del todo: arriba a la izquierda, junto al
+            avatar, no gustó. Solo en el escritorio. */}
+        {window.electronAPI && window.electronAPI.ventana && window.BotonFijar && (
+          <div className="fijar-lienzo" onMouseDown={(e) => e.stopPropagation()}>
+            <window.BotonFijar/>
+          </div>
+        )}
+
         {/* Place hint
             Con el dedo decía "clic simple" y ofrecía una tecla `esc` — en un
             teléfono no hay ni una cosa ni la otra, así que el cartel explicaba

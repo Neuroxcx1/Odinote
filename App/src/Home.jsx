@@ -466,8 +466,6 @@ function Home({ lang, setLang, theme, setTheme, onOpenProject, projects, onCreat
         <div className="ms-brand" data-mueve-ventana="">
           <div className="brand-mark"><BrandMark/></div>
           <span>Oddinote</span>
-          {/* La chincheta: siempre encima y sin bordes (solo en el escritorio). */}
-          {window.BotonFijar && <window.BotonFijar/>}
         </div>
 
         <button className="ms-new-btn" onClick={()=>setModal(true)}>
@@ -777,6 +775,11 @@ function Home({ lang, setLang, theme, setTheme, onOpenProject, projects, onCreat
               </select>
             </div>
           </div>
+          {/* La chincheta: siempre encima y sin bordes (solo en el
+              escritorio). A la derecha del todo, en la línea del buscador:
+              arriba a la izquierda, junto al nombre, no gustó. Fuera del
+              grupo de botones para poder irse al extremo. */}
+          {window.BotonFijar && <window.BotonFijar/>}
         </header>
 
         {section === 'all' && !query && (
