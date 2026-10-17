@@ -321,6 +321,14 @@ function PanelColorLibre({ valor, recientes, onVivo, onListo, onCancela, onFin, 
     if (Math.abs(x) <= medio + 4 && Math.abs(y) <= medio + 4) que = 'cuadro';
     else if (d >= (RUEDA / 2 - GROSOR - 6) * k && d <= (RUEDA / 2 + 4) * k) que = 'tono';
     if (!que) return;
+    // El negro, el blanco y los grises no tienen tono: mover el aro desde ahí
+    // no cambiaba nada, y con el texto negro de siempre parecía roto. Al coger
+    // el aro desde un color así se le da saturación y brillo para que el tono
+    // se vea en el acto.
+    const actual = hsvRef.current;
+    if (que === 'tono' && (actual.s < 8 || actual.v < 15)) {
+      hsvRef.current = { h: actual.h, s: Math.max(actual.s, 80), v: Math.max(actual.v, 80) };
+    }
     arrastre.current = que;
     try { ruedaRef.current.setPointerCapture(e.pointerId); } catch (err) {}
     desdePuntero(e, que);
@@ -446,7 +454,6 @@ function PanelColorLibre({ valor, recientes, onVivo, onListo, onCancela, onFin, 
   const cancelaRef = useRef(onCancela);
   cancelaRef.current = onCancela;
   useEffect(() => {
-    if (incrustado) return;
     const tecla = (e) => {
       if (e.key !== 'Escape' || conGotero) return;
       // En un campo, Escape solo deshace lo escrito en él.
@@ -455,7 +462,9 @@ function PanelColorLibre({ valor, recientes, onVivo, onListo, onCancela, onFin, 
       cancelaRef.current();
     };
     document.addEventListener('keydown', tecla, true);
-    if (enHoja) return () => document.removeEventListener('keydown', tecla, true);
+    // En la hoja del teléfono y dentro de un panel lateral, Escape sí (devuelve
+    // el color), pero pulsar fuera no cierra nada: lo cierra quien lo contiene.
+    if (enHoja || incrustado) return () => document.removeEventListener('keydown', tecla, true);
     const fuera = (e) => {
       if (conGotero) return;
       if (panelRef.current && panelRef.current.contains(e.target)) return;
@@ -594,9 +603,13 @@ function PanelColorLibre({ valor, recientes, onVivo, onListo, onCancela, onFin, 
           <span className="panel-color-ahora" style={{ background: hex }}>
             <span style={{ color: C.luminancia(hex) > 0.45 ? '#1A1A1A' : '#FFFFFF' }}>{window.t('Ahora', 'Now')}</span>
           </span>
-          <button type="button" className="panel-color-listo" onClick={() => onListo && onListo(ultimo.current)}>
-            {window.t('Listo', 'Done')}
-          </button>
+          {/* En la hoja del teléfono no: abajo ya está «Aceptar», a todo lo
+              ancho, y dos botones que hacen lo mismo hacían dudar. */}
+          {!enHoja && (
+            <button type="button" className="panel-color-listo" onClick={() => onListo && onListo(ultimo.current)}>
+              {window.t('Listo', 'Done')}
+            </button>
+          )}
         </div>
         {fila('hex', 'HEX')}
         {fila('rgb', 'RGB')}
@@ -738,6 +751,8 @@ window.SelectorColor = function SelectorColor({
   const [libreAbierto, setLibreAbierto] = useState(false);
 
   const [recientes, setRecientes] = useState(leeRecientes);
+  // El color que había al abrir el panel grande: Escape vuelve a él.
+  const alAbrirEntero = useRef(valor);
 
   // Mientras se mueve el panel el color se va aplicando —es la única forma de
   // acertar un tono— pero NO se da por bueno hasta cerrarlo, y por eso hay que
@@ -1052,7 +1067,12 @@ window.SelectorColor = function SelectorColor({
             // El panel que lo contiene se cierra (lo escuchan las barras).
             try { window.dispatchEvent(new CustomEvent('odi-color-listo')); } catch (e) {}
           }}
-          onCancela={() => {}}
+          onCancela={() => {
+            // Escape: se devuelve el color que había al abrir y se cierra.
+            const antes = alAbrirEntero.current;
+            if (antes && norm(antes) !== actual) { devuelveSeleccion(); onCambio(antes); }
+            try { window.dispatchEvent(new CustomEvent('odi-color-listo')); } catch (e) {}
+          }}
         />
       </div>
     );

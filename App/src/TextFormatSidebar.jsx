@@ -411,10 +411,12 @@ function TextFormatSidebar({ item, lang, onUpdate, onClose, variant }) {
                 } else {
                   exec('foreColor', c);
                 }
-                // Con un color de la paleta se cierra, porque ya esta elegido.
-                // Con el selector libre no: la gente lo mueve y mira, y cerrar
-                // en el primer arrastre obligaria a abrirlo otra vez.
-                if ((window.COLORES_ODINOTE || []).indexOf(c) !== -1) setColorOpen(false);
+                // No se cierra al cambiar: aquí ya solo está el panel grande, y
+                // la gente lo mueve y mira. Antes se cerraba con los colores de
+                // la paleta de siempre, y como el negro del texto es uno de
+                // ellos, el primer toque del aro de tono (que con el texto negro
+                // sigue dando negro) cerraba el panel sin dejar elegir. Se
+                // cierra con «Listo» (odi-color-listo) o pulsando fuera.
               }}
             />
           </div>

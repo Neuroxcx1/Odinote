@@ -175,7 +175,18 @@ function pickLang(v, lang) {
   // app en francés le sirve más. Lo que escribe la gente se guarda igual en
   // las dos, así que esto solo cambia lo que trae la app (plantillas, títulos
   // por defecto).
-  if (lang !== 'es') return v[lang] || v.en || v.es || '';
+  if (lang !== 'es') {
+    if (v[lang]) return v[lang];
+    // Un texto que puso la app (el título de una lista nueva) se guarda como
+    // { es, en } y en francés salía «To-do». Si la pareja exacta está en el
+    // catálogo se traduce; lo que escribe la gente no casa con ninguna y sigue
+    // igual.
+    if (lang !== 'en' && window.odiTraduce && window.odiTraduce.fija && typeof v.es === 'string') {
+      const t = window.odiTraduce.fija(lang, v.es, v.en);
+      if (t) return t;
+    }
+    return v.en || v.es || '';
+  }
   return v.es || v.en || '';
 }
 // Se cuelga de window a proposito. Antes funcionaba solo porque Babel deja las
@@ -5623,13 +5634,10 @@ window.rutaDeArchivo = function (archivo) {
 function ItemRenderer({ item, lang, editing, callbacks }) {
   const cb = callbacks || {};
   const onUpdate = (patch) => {
-    if (patch.h !== undefined) {
-      console.log('[DEBUG-HEIGHT] ItemRenderer onUpdate height update for item.id =', item.id, 'patch.h =', patch.h);
-    }
     if (cb.updateItem) {
       cb.updateItem(item.id, patch);
     } else {
-      console.log('[DEBUG-HEIGHT] error: cb.updateItem is undefined in ItemRenderer');
+      console.warn('ItemRenderer: falta callbacks.updateItem, el cambio no se guarda');
     }
   };
   switch (item.type) {

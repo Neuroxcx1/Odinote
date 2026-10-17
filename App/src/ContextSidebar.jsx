@@ -851,7 +851,7 @@ function ContextSidebar({
         <button
           className={`ctx-btn ${pane === 'comments' ? 'active' : ''}`}
           onClick={()=>setPane(pane === 'comments' ? null : 'comments')}
-          title="Comentarios"
+          title={window.t('Comentarios', 'Comments')}
         >
           <span className="material-symbols-rounded">chat_bubble</span>
           <span>{window.t('Comentar', 'Comment')}</span>
@@ -2454,7 +2454,7 @@ function ContextSidebar({
       )}
 
       {/* ── Paneles del dibujo ── */}
-      {pane === 'drawColor' && (
+      {pane === 'drawColor' && isDrawingNow && (
         <div className="ctx-popout">
           <div className="ctx-pop-section">
             <div className="ctx-pop-title">
@@ -2478,7 +2478,7 @@ function ContextSidebar({
         </div>
       )}
 
-      {pane === 'drawWidth' && (
+      {pane === 'drawWidth' && isDrawingNow && (
         <div className="ctx-popout">
           <div className="ctx-pop-section">
             <div className="ctx-pop-title">{window.t('Grosor del trazo', 'Stroke thickness')}</div>
@@ -2503,7 +2503,7 @@ function ContextSidebar({
         </div>
       )}
 
-      {pane === 'drawPressure' && (
+      {pane === 'drawPressure' && isDrawingNow && (
         <div className="ctx-popout">
           <div className="ctx-pop-section">
             <div className="ctx-pop-title">{window.t('Cómo varía el trazo', 'How the stroke varies')}</div>
@@ -2536,7 +2536,7 @@ function ContextSidebar({
         </div>
       )}
 
-      {pane === 'drawEstab' && (
+      {pane === 'drawEstab' && isDrawingNow && (
         <div className="ctx-popout">
           <div className="ctx-pop-section">
             <div className="ctx-pop-title">{window.t('Estabilizador', 'Stabiliser')}</div>

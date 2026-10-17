@@ -27,6 +27,9 @@
   raiz.ODI_IDIOMAS = raiz.ODI_IDIOMAS || {};
 
   let indice = null;      // español → número, para las frases fijas
+  let parejas = null;     // español + inglés → número: la misma frase española
+                          // puede tener dos sentidos («Reacciones»: React /
+                          // Reactions) y cada uno su traducción
   let plantillas = null;  // las de huecos, con su patrón en las dos lenguas
 
   const aPatron = (texto) => {
@@ -37,6 +40,7 @@
 
   function prepara() {
     indice = new Map();
+    parejas = new Map();
     plantillas = [];
     (raiz.ODI_FRASES || []).forEach((par, i) => {
       if (!par) return;
@@ -44,8 +48,10 @@
       if (/\{\d+\}/.test(es) || /\{\d+\}/.test(en)) {
         const huecosEn = (String(en).match(/\{(\d+)\}/g) || []).map(h => +h.slice(1, -1));
         plantillas.push({ i, es: aPatron(es), en: aPatron(en), huecosEn });
-      } else if (!indice.has(es)) {
-        indice.set(es, i);
+      } else {
+        if (!indice.has(es)) indice.set(es, i);
+        const k = es + '\u0001' + en;
+        if (!parejas.has(k)) parejas.set(k, i);
       }
     });
   }
@@ -54,7 +60,8 @@
     const dic = raiz.ODI_IDIOMAS[idioma];
     if (!dic || typeof es !== 'string') return null;
     if (!indice) prepara();
-    const i = indice.get(es);
+    const exacta = typeof en === 'string' ? parejas.get(es + '\u0001' + en) : undefined;
+    const i = exacta != null ? exacta : indice.get(es);
     if (i != null) return dic[i] || null;
     for (const p of plantillas) {
       if (!p.es.test(es)) continue;
@@ -75,8 +82,17 @@
     return null;
   }
 
+  // Solo las frases fijas: para pickLang, que también ve textos de la gente.
+  traduce.fija = (idioma, es, en) => {
+    const dic = raiz.ODI_IDIOMAS[idioma];
+    if (!dic || typeof es !== 'string') return null;
+    if (!indice) prepara();
+    const exacta = typeof en === 'string' ? parejas.get(es + '\u0001' + en) : undefined;
+    return exacta != null ? (dic[exacta] || null) : null;
+  };
+
   // Si se añaden frases con la app abierta (pruebas), que se vuelva a mirar.
-  traduce.olvida = () => { indice = null; plantillas = null; };
+  traduce.olvida = () => { indice = null; parejas = null; plantillas = null; };
   raiz.odiTraduce = traduce;
   if (typeof module !== 'undefined' && module.exports) module.exports = { traduce };
 })();

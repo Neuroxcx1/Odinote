@@ -5,7 +5,7 @@
 // traducirlas todas, con sus huecos {0}, {1}… intactos.
 const fs = require('fs');
 const path = require('path');
-const { catalogo } = require('./saca-frases.js');
+const { catalogo, clave } = require('./saca-frases.js');
 
 let fallos = 0;
 const check = (nombre, ok, extra) => {
@@ -21,8 +21,8 @@ const IDIOMAS = ['fr', 'de', 'it', 'pt', 'zh', 'ja', 'ko', 'ar', 'ru'];
 IDIOMAS.forEach(l => new Function('window', fs.readFileSync(path.join(DIR, l + '.js'), 'utf8'))(caja));
 
 // ── frases.js tiene todo lo del código ──
-const enFrases = new Set(frases.map(p => p[0]));
-const faltan = catalogo.filter(f => !enFrases.has(f.es));
+const enFrases = new Set(frases.map(p => clave(p[0], p[1])));
+const faltan = catalogo.filter(f => !enFrases.has(clave(f.es, f.en)));
 check('frases.js tiene todas las frases del código', faltan.length === 0,
   faltan.length ? `${faltan.length} sin apuntar (node scripts/saca-frases.js --escribe), p. ej. «${faltan[0].es.slice(0, 50)}»` : `${frases.length} frases`);
 
@@ -55,6 +55,12 @@ if (iHueco >= 0) {
   const [es, en] = frases[iHueco];
   const sale = window.odiTraduce('fr', es.replace('{0}', 'COSA-ES'), en.replace('{0}', 'THING-EN'));
   check('una frase con hueco pone en él lo de la frase inglesa', !!sale && sale.includes('THING-EN') && !sale.includes('{0}'), sale);
+}
+// La misma frase española con dos sentidos en inglés: cada uno con lo suyo.
+const doble = frases.findIndex((p, i) => !/{d+}/.test(p[0]) && frases.some((q, j) => j !== i && q[0] === p[0] && q[1] !== p[1] && caja.ODI_IDIOMAS.fr[j] && caja.ODI_IDIOMAS.fr[j] !== caja.ODI_IDIOMAS.fr[i]));
+if (doble >= 0) {
+  const [es, en] = frases[doble];
+  check('una frase con dos sentidos se traduce según su inglés', window.odiTraduce('fr', es, en) === caja.ODI_IDIOMAS.fr[doble], es + ' / ' + en + ' → ' + window.odiTraduce('fr', es, en));
 }
 check('lo que no está en frases.js no se inventa', window.odiTraduce('fr', 'Frase que no existe en ningún sitio', 'Nope') === null);
 check('sin archivo de un idioma, nada', window.odiTraduce('xx', frases[0][0], frases[0][1]) === null);

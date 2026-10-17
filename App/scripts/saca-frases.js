@@ -46,6 +46,17 @@ function frasesDe(archivo) {
       const es = texto(n.arguments[0]), en = texto(n.arguments[1]);
       if (es && en && es.t.trim()) fuera.push({ es: es.t, en: en.t, huecos: Math.max(es.n, en.n), plantilla: es.n > 0 || en.n > 0, archivo: path.basename(archivo), linea: n.loc ? n.loc.start.line : 0 });
     }
+    // Los textos por defecto que la app guarda en el propio nodo como
+    // { es: '…', en: '…' } (el título de una lista nueva, «Nuevo tablero»):
+    // pickLang (items.jsx) los busca aquí para los otros nueve idiomas.
+    if (n.type === 'ObjectExpression') {
+      const props = n.properties.filter(p => p.type === 'ObjectProperty');
+      const de = (k) => props.find(p => p.key && (p.key.name || p.key.value) === k);
+      const pes = de('es'), pen = de('en');
+      if (props.length === 2 && pes && pen && pes.value.type === 'StringLiteral' && pen.value.type === 'StringLiteral' && pes.value.value.trim()) {
+        fuera.push({ es: pes.value.value, en: pen.value.value, huecos: 0, plantilla: false, archivo: path.basename(archivo), linea: n.loc ? n.loc.start.line : 0 });
+      }
+    }
     for (const k of Object.keys(n)) {
       if (k === 'loc' || k === 'start' || k === 'end') continue;
       const v = n[k];
@@ -64,15 +75,20 @@ for (const a of archivos) {
   if (r.error) errores.push(path.basename(a) + ': ' + r.error);
   todas.push(...r.fuera);
 }
-// Una por frase en español (la clave de window.t); si una misma frase en
-// español tiene dos traducciones al inglés, se queda la primera y se avisa.
+// Una por pareja español–inglés. Casi siempre es una por frase en español,
+// pero no siempre: «Reacciones» es «React» en un botón y «Reactions» en un
+// título, y en francés son «Réagir» y «Réactions». Antes se quedaba la primera
+// y el título salía como verbo. Ahora cada pareja tiene su número.
+const clave = (es, en) => es + '\u0001' + en;
+const porPareja = new Map();
 const porEs = new Map();
 const dobles = [];
 for (const f of todas) {
+  if (!porPareja.has(clave(f.es, f.en))) porPareja.set(clave(f.es, f.en), f);
   if (!porEs.has(f.es)) porEs.set(f.es, f);
-  else if (porEs.get(f.es).en !== f.en) dobles.push(f.es);
+  else if (porEs.get(f.es).en !== f.en && !dobles.includes(f.es)) dobles.push(f.es);
 }
-const catalogo = [...porEs.values()].map(f => ({ es: f.es, en: f.en, huecos: f.huecos, plantilla: f.plantilla, donde: f.archivo + ':' + f.linea }));
+const catalogo = [...porPareja.values()].map(f => ({ es: f.es, en: f.en, huecos: f.huecos, plantilla: f.plantilla, donde: f.archivo + ':' + f.linea }));
 
 // ── src/idiomas/frases.js: el catálogo numerado ──
 // Solo se añade al final: el número de una frase es su clave en los archivos
@@ -87,8 +103,8 @@ function leeFrases() {
 }
 function escribeFrases() {
   const antes = leeFrases();
-  const ya = new Set(antes.map(p => p[0]));
-  const nuevas = catalogo.filter(f => !ya.has(f.es)).map(f => [f.es, f.en]);
+  const ya = new Set(antes.map(p => clave(p[0], p[1])));
+  const nuevas = catalogo.filter(f => !ya.has(clave(f.es, f.en))).map(f => [f.es, f.en]);
   const todas = antes.concat(nuevas);
   const lineas = todas.map((p, i) => `  /* ${i} */ ${JSON.stringify(p)},`);
   const texto = [
@@ -104,7 +120,7 @@ function escribeFrases() {
   return { antes: antes.length, nuevas: nuevas.length, total: todas.length };
 }
 
-module.exports = { catalogo, dobles, errores, leeFrases };
+module.exports = { catalogo, dobles, errores, leeFrases, clave };
 
 if (require.main === module) {
   const i = process.argv.indexOf('--json');
@@ -115,6 +131,6 @@ if (require.main === module) {
   }
   const plantillas = catalogo.filter(f => f.plantilla).length;
   console.log(`${todas.length} llamadas, ${catalogo.length} frases distintas (${catalogo.length - plantillas} fijas, ${plantillas} con partes que cambian)`);
-  if (dobles.length) console.log(`${dobles.length} frases en español con dos traducciones al inglés distintas (se usa la primera)`);
+  if (dobles.length) console.log(`${dobles.length} frases en español con más de un sentido en inglés (cada uno con su número)`);
   if (errores.length) console.log('No se pudieron leer: ' + errores.join(' | '));
 }

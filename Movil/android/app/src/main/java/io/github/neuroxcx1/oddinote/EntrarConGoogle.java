@@ -96,6 +96,16 @@ public class EntrarConGoogle extends Plugin {
         }, "oddinote-google").start();
     }
 
+    // «Cancelar» en la app: se deja de escuchar y la llamada de entrar acaba
+    // con «cancelado», que la app ya no espera.
+    @PluginMethod
+    public void cancelar(PluginCall call) {
+        synchronized (this) {
+            if (enCurso != null) enCurso.cancela();
+        }
+        call.resolve();
+    }
+
     @PluginMethod
     public void renovar(PluginCall call) {
         if (!hayCredenciales()) { call.reject("Sin credenciales.", "sin-credenciales"); return; }

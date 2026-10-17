@@ -1279,7 +1279,10 @@ html[data-ventana-fijada] [data-mueve-ventana]:active { cursor: grabbing; }
 .tool { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 4px 7px; border-radius: 6px; transition: transform 120ms var(--e-out), background 100ms; }
 .tool:hover { transform: translateY(-1px); background: var(--line-softer); }
 .tool .tool-icon { width: 31px; height: 31px; border-radius: 8px; display: grid; place-items: center; border: 1.5px solid var(--line); box-shadow: var(--pop-sm); color: var(--ink); background: var(--tool-bg); transition: transform 100ms var(--e-out); }
-.tool .tool-label { font-size: 11px; font-weight: 600; letter-spacing: -0.01em; color: var(--ink-2); }
+/* nowrap: en japonés o chino no hay espacios, y sin esto «ドキュメント» se partía
+   letra a letra en tres líneas y la barra crecía de 65 a 102 px. La tira ya se
+   desplaza de lado si no cabe. */
+.tool .tool-label { font-size: 11px; font-weight: 600; letter-spacing: -0.01em; color: var(--ink-2); white-space: nowrap; }
 .tool.active .tool-icon { background: var(--olive); color: white; transform: scale(1.05); border-color: var(--line); }
 .tool.active { background: color-mix(in srgb, var(--olive) 14%, transparent); }
 .tool.active .tool-label { color: var(--ink); }
@@ -6226,6 +6229,12 @@ html[data-mobile="1"] .canvas-content textarea,
 html[data-mobile="1"] .canvas-content select {
   font-size: inherit;
 }
+/* Menos el nodo de código: tiene dos capas que tienen que medir lo mismo al
+   píxel (la de escribir encima, la de colores debajo), y con el tamaño heredado
+   la de escribir crecía a 16px y el cursor se iba separando del texto. */
+html[data-mobile="1"] .canvas-content textarea.code-area {
+  font-size: calc(12.5px * var(--node-scale, 1));
+}
 
 /* ── Barra superior ──────────────────────────────────────────────────── */
 html[data-mobile="1"] .topbar {
@@ -6515,7 +6524,10 @@ html[data-mobile="1"] .mini-search.plegada .mini-search-global,
 html[data-mobile="1"] .mini-search.plegada > button:not(.mini-search-lupa) {
   display: none;
 }
-html[data-mobile="1"] .mini-search.plegada .mini-search-lupa { padding: 4px; }
+/* La lupa ocupa la cajita entera: antes solo respondía su centro (25 px de
+   46×37) y tocar el borde no hacía nada. */
+html[data-mobile="1"] .mini-search.plegada { padding: 0; height: 37px; }
+html[data-mobile="1"] .mini-search.plegada .mini-search-lupa { padding: 4px; width: 100%; height: 100%; }
 
 html[data-mobile="1"] .mini-search {
   width: auto;
@@ -6758,6 +6770,11 @@ html[data-mobile="1"] .ms-hero-art { display: none; }
   border: 1.5px solid var(--line-soft);
   color: var(--ink-3);
   white-space: nowrap;
+  /* En el teléfono no cabe entera al lado del título: baja a su línea y, si
+     ni así cabe, se corta con puntos en vez de empujar la X fuera. */
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
   cursor: pointer;
 }
 .odi-touch-diag {
@@ -7477,6 +7494,10 @@ html[data-touch="1"] .handle::before {
 .ms-grid-list .ms-project-cover { position: static; }
 /* Con el dedo no hay "pasar por encima", así que se ven siempre. */
 html[data-touch="1"] .ms-grid-list .ms-card-actions { opacity: 1; }
+/* Y en la cuadrícula también, y que se puedan pulsar: con opacidad 0 y sin
+   eventos, en el teléfono editar, favorito y papelera solo salían con una
+   pulsación larga que nadie adivina. */
+html[data-touch="1"] .ms-card-actions { opacity: 1; pointer-events: auto; }
 
 /* ── Online / Compartir, en la barra de arriba ──
    Antes era una pastilla gris en la fila de abajo, entre "Guardado" y el
@@ -7798,6 +7819,21 @@ body.arrastrando-proyecto .ms-sacar-card { border-color: var(--wine) !important;
 /* En el teléfono la fila de abajo no tiene sitio para el texto. */
 html[data-mobile="1"] .plantillas-boton span:not(.material-symbols-rounded) { display: none; }
 html[data-mobile="1"] .plantillas-panel { width: min(320px, calc(100vw - 24px)); }
+/* Y en la fila de abajo del teléfono (ver «Franja inferior del lienzo»), detrás
+   del botón del fondo. Con el right fijo de escritorio (205 px) caía encima de
+   ese botón en una pantalla de 375. El panel se abre desde el borde izquierdo,
+   que es donde cabe. */
+html[data-mobile="1"] .plantillas-esquina {
+  left: 196px !important;
+  right: auto !important;
+  bottom: calc(14px + env(safe-area-inset-bottom)) !important;
+  align-items: flex-start;
+}
+html[data-mobile="1"] .plantillas-panel {
+  position: fixed;
+  left: max(12px, env(safe-area-inset-left));
+  bottom: calc(66px + env(safe-area-inset-bottom));
+}
 
 
 /* ── El panel de color propio (ColorPicker.jsx, PanelColorLibre) ──
@@ -7982,6 +8018,13 @@ body.odi-cuentagotas, body.odi-cuentagotas * { cursor: crosshair !important; }
 .code-run:hover { transform: scale(1.12); }
 .code-run:active { transform: scale(0.92); }
 .code-run.corriendo { background: var(--wine); }
+/* Con el dedo, al menos 30 px de pantalla: alejado al 70 %, los 22 px del nodo
+   se quedaban en 15 y no había quien le diera. --handle-libre es 1/zoom. */
+html[data-mobile="1"] .code-run {
+  width: max(22px, calc(30px * var(--handle-libre, 1)));
+  height: max(22px, calc(30px * var(--handle-libre, 1)));
+}
+html[data-mobile="1"] .code-run .material-symbols-rounded { font-size: max(16px, calc(20px * var(--handle-libre, 1))); }
 /* El ▶ y la terminal se pueden usar sin elegir antes el nodo (el resto de la
    tarjeta no recibe clics hasta elegirlo, ver «Node-first editing»). */
 .item:not(.selected):not(.editing) .code-run,

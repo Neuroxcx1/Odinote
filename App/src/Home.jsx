@@ -433,6 +433,26 @@ function Home({ lang, setLang, theme, setTheme, onOpenProject, projects, onCreat
     if (carpetaAbierta && !carpetas.includes(carpetaAbierta)) setCarpetaAbierta(null);
   }, [carpetaAbierta, carpetas]);
 
+  // Escape cierra la ventana de inicio que esté abierta (proyecto nuevo,
+  // editar, nombrar o llenar una carpeta, mover a carpeta), como en app.jsx.
+  // El panel de color de la portada, si está abierto, se queda su Escape.
+  useEffectHome(() => {
+    if (!modal && !editProject && !nombrando && !anadiendo && !moviendo) return;
+    const alPulsar = (e) => {
+      if (e.key !== 'Escape' || e.defaultPrevented) return;
+      if (document.querySelector('.panel-color')) return;
+      if (editProject) setEditProject(null);
+      else if (modal) setModal(false);
+      else if (nombrando) setNombrando(null);
+      else if (anadiendo) setAnadiendo(null);
+      else if (moviendo) setMoviendo(null);
+      e.preventDefault();
+      e.stopImmediatePropagation();
+    };
+    window.addEventListener('keydown', alPulsar, true);
+    return () => window.removeEventListener('keydown', alPulsar, true);
+  }, [modal, editProject, nombrando, anadiendo, moviendo]);
+
   const colorDeCarpeta = (nombre) => {
     const con = projects.find(p => !p.deleted && carpetaDe(p) === nombre && p.carpetaColor);
     return (con && con.carpetaColor) || coloresVacias[nombre] || null;
@@ -841,7 +861,7 @@ function Home({ lang, setLang, theme, setTheme, onOpenProject, projects, onCreat
             <button
               className="icon-btn lift"
               onClick={()=>setTheme(theme === 'dark' ? 'light' : 'dark')}
-              title={theme === 'dark' ? 'Light mode' : 'Dark mode'}
+              title={theme === 'dark' ? window.t('Modo claro', 'Light mode') : window.t('Modo oscuro', 'Dark mode')}
             >
               <span className="material-symbols-rounded">{theme === 'dark' ? 'light_mode' : 'dark_mode'}</span>
             </button>

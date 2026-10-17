@@ -36,6 +36,12 @@
       return p.entrar();
     },
 
+    // Deja de esperar a Google (el teléfono cierra su escucha).
+    cancelar: () => {
+      const p = plugin();
+      if (p && p.cancelar) p.cancelar().catch(() => {});
+    },
+
     googleRefreshAccess: async () => {
       const p = plugin();
       if (!p) return { ok: false, reason: 'sin-puente' };

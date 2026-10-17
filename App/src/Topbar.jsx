@@ -588,7 +588,7 @@ function Topbar({
         )}
         <button
           className="icon-btn lift"
-          title="Undo (⌘Z)"
+          title={window.t('Deshacer', 'Undo') + ' (' + ((window.shortcuts && window.shortcuts.undo && window.shortcuts.undo.label) || 'Ctrl + Z') + ')'}
           onClick={() => { onUndo(); window.playAudioTone && window.playAudioTone('click'); }}
           style={{ opacity: canUndo ? 1 : 0.4 }}
         >
@@ -596,7 +596,7 @@ function Topbar({
         </button>
         <button
           className="icon-btn lift"
-          title="Redo (⌘⇧Z)"
+          title={window.t('Rehacer', 'Redo') + ' (' + ((window.shortcuts && window.shortcuts.redo && window.shortcuts.redo.label) || 'Ctrl + Y') + ')'}
           onClick={() => { onRedo(); window.playAudioTone && window.playAudioTone('click'); }}
           style={{ opacity: canRedo ? 1 : 0.4 }}
         >
@@ -694,7 +694,7 @@ function Topbar({
         </button>
         <button
           className="icon-btn lift theme-btn"
-          title={theme==='dark'?'Light mode':'Dark mode'}
+          title={theme==='dark' ? window.t('Modo claro', 'Light mode') : window.t('Modo oscuro', 'Dark mode')}
           onClick={() => { setTheme(theme === 'dark' ? 'light' : 'dark'); window.playAudioTone && window.playAudioTone('click'); }}
         >
           <span className="material-symbols-rounded">{theme === 'dark' ? 'light_mode' : 'dark_mode'}</span>

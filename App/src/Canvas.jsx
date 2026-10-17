@@ -2585,9 +2585,6 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
 
   // ───── Item updates ─────
   const updateItem = useCallbackCanvas((itemId, patch) => {
-    if (patch.h !== undefined) {
-      console.log('[DEBUG-HEIGHT] Canvas updateItem updating height for itemId =', itemId, 'patch.h =', patch.h);
-    }
     setCanvases(prev => {
       const c = prev[currentId];
       const it = c.items.find(x => x.id === itemId);
@@ -3257,8 +3254,23 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
     if (!pl) return;
     const { w, h } = P.caja(pl);
     const rect = surfaceRef.current ? surfaceRef.current.getBoundingClientRect() : { width: window.innerWidth, height: window.innerHeight };
-    const ox = Math.round((rect.width / 2 - pan.x) / scale - w / 2);
+    let ox = Math.round((rect.width / 2 - pan.x) / scale - w / 2);
     const oy = Math.round((rect.height / 2 - pan.y) / scale - h / 2);
+    // Que no caiga encima de lo que ya hay: si su caja pisa algún nodo, se
+    // corre a la derecha de lo que pisa (hasta veinte veces) y la vista va con
+    // ella. Antes se ponía en el centro aunque hubiera un tablero lleno debajo.
+    const existentes = (current && current.items) || [];
+    const margen = 40;
+    const pisa = (x0) => existentes.filter(it => it.x < x0 + w + margen && it.x + (it.w || 0) > x0 - margen
+      && it.y < oy + h + margen && it.y + (it.h || 0) > oy - margen);
+    let corrida = false;
+    for (let i = 0; i < 20; i++) {
+      const p = pisa(ox);
+      if (!p.length) break;
+      ox = Math.round(Math.max(...p.map(it => it.x + (it.w || 0))) + 60);
+      corrida = true;
+    }
+    if (corrida) setPan({ x: Math.round(rect.width / 2 - (ox + w / 2) * scale), y: pan.y });
     const sello = Date.now();
     const porRef = {};
     // Sin «const { a, ...resto } = n»: el Babel del navegador lo convierte en
@@ -5276,9 +5288,6 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
     editingChild,
     setEditingChild: (colId, childId) => setEditingChildState({ colId, childId }),
     updateColChild: (columnId, childId, patch) => {
-      if (patch.h !== undefined) {
-        console.log('[DEBUG-HEIGHT] Canvas updateColChild updating height for columnId =', columnId, 'childId =', childId, 'patch.h =', patch.h);
-      }
       setCanvases(prev => {
         const c = prev[currentId];
         const col = c.items.find(x => x.id === columnId);
@@ -6505,7 +6514,13 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
           </button>
           <div className="status-pill">
             <span className="material-symbols-rounded" style={{fontSize:14}}>category</span>
-            {current.items.length} {window.TRANSLATIONS[lang].items_count}
+            {current.items.length} {(() => {
+              // «1 nodos» no: uno en singular. Y el ruso tiene una forma para 2–4.
+              const T = window.TRANSLATIONS[lang] || window.TRANSLATIONS.en, n = current.items.length;
+              if (n === 1) return T.items_count_one || T.items_count;
+              if (lang === 'ru' && n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 12 || n % 100 > 14)) return 'узла';
+              return T.items_count;
+            })()}
           </div>
           {stack.length > 1 && (
             <div className="status-pill accent">
@@ -6547,13 +6562,13 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
 
         {/* Zoom controls */}
         <div className="zoom-ctrls">
-          <button title="Zoom out" onClick={()=>setScale(s => Math.max(0.2, s - 0.1))}>
+          <button title={window.t('Alejar', 'Zoom out')} onClick={()=>setScale(s => Math.max(0.2, s - 0.1))}>
             <span className="material-symbols-rounded" style={{fontSize:15}}>remove</span>
           </button>
           <button className="zoom-level" onClick={()=>{ setScale(1); setPan({x:40, y:20}); }}>
             {Math.round(scale * 100)}%
           </button>
-          <button title="Zoom in" onClick={()=>setScale(s => Math.min(2.5, s + 0.1))}>
+          <button title={window.t('Acercar', 'Zoom in')} onClick={()=>setScale(s => Math.min(2.5, s + 0.1))}>
             <span className="material-symbols-rounded" style={{fontSize:15}}>add</span>
           </button>
         </div>

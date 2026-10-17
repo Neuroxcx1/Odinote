@@ -288,7 +288,15 @@ function App() {
   const [loading, setLoading]   = useStateApp(true);
 
   const [view, setView]         = useStateApp({ kind: 'home' });
-  const [lang, setLang]         = useStateApp('en');
+  // La primera vez, sin nada guardado: el idioma del sistema si es uno de los
+  // once (antes siempre inglés, también en un teléfono en español). Lo guardado
+  // lo pone después la carga de los datos (migrated.lang).
+  const [lang, setLang]         = useStateApp(() => {
+    try {
+      const nav = String((navigator.languages && navigator.languages[0]) || navigator.language || '').toLowerCase().slice(0, 2);
+      return ['es', 'en', 'fr', 'de', 'it', 'pt', 'zh', 'ja', 'ko', 'ar', 'ru'].includes(nav) ? nav : 'en';
+    } catch (e) { return 'en'; }
+  });
   const [theme, setTheme]       = useStateApp('light');
   const [projects, setProjects] = useStateApp(window.SAMPLE_PROJECTS);
   const [canvases, setCanvases] = useStateApp(JSON.parse(JSON.stringify(window.INITIAL_CANVASES)));
@@ -342,6 +350,9 @@ function App() {
   const [loginError, setLoginError] = useStateApp(null);
   const [waitingForWebLogin, setWaitingForWebLogin] = useStateApp(false);
   const [localGuestOpen, setLocalGuestOpen] = useStateApp(false);
+  // Al abrir otra vez la ventana de la cuenta, el error del intento anterior
+  // ya no pinta nada: se veía como si acabara de fallar.
+  useEffectApp(() => { if (userModalOpen && !waitingForWebLogin) setLoginError(null); }, [userModalOpen]);
   const [localGuestName, setLocalGuestName] = useStateApp('');
   const [localGuestAvatar, setLocalGuestAvatar] = useStateApp('🦊');
   const [customDialog, setCustomDialog] = useStateApp(null);
@@ -640,6 +651,12 @@ function App() {
   // Flujo de autenticación con Google, compartido entre el primer login y la
   // renovación del token de Drive (que caduca ~1 hora). En la renovación no se
   // fuerza el selector de cuenta, así el popup se resuelve casi solo.
+  // Cada intento de entrar desde el teléfono lleva su número: si se cancela o
+  // se empieza otro, lo que conteste el teléfono para el viejo se tira. Antes,
+  // pulsar «Cancelar» solo cambiaba la pantalla, y si luego llegaba la sesión
+  // se iniciaba igual.
+  const intentoMovilRef = React.useRef(0);
+
   const startGoogleAuthFlow = (isRenewal) => {
     setLoginError(null);
     if (window.electronAPI && window.electronAPI.startGoogleLogin) {
@@ -680,8 +697,10 @@ function App() {
         return;
       }
       setWaitingForWebLogin(true);
+      const intento = ++intentoMovilRef.current;
       movil.entrar()
         .then(async (r) => {
+          if (intento !== intentoMovilRef.current) return;
           identificaEnFirebase(r.idToken);
           // El nombre y la foto, como hace main.js en el escritorio.
           let perfil = {};
@@ -705,6 +724,7 @@ function App() {
           avisaSiFaltaDrive(r.accessToken);
         })
         .catch((err) => {
+          if (intento !== intentoMovilRef.current) return;
           setWaitingForWebLogin(false);
           const codigo = (err && err.code) || '';
           console.warn('[GOOGLE] el teléfono no pudo entrar:', codigo, err && err.message);
@@ -717,7 +737,9 @@ function App() {
           };
           setLoginError(textos[codigo]
             || (/^google:access_denied/.test(codigo) ? window.t('No diste permiso en Google.', 'You did not grant permission in Google.') : null)
-            || (err && err.message) || String(err));
+            // Un rechazo sin mensaje salía como «[object Object]».
+            || (err && typeof err.message === 'string' && err.message)
+            || window.t('No se pudo entrar con Google.', 'Could not sign in with Google.'));
         });
     } else {
       const provider = new firebase.auth.GoogleAuthProvider();
@@ -1201,6 +1223,33 @@ function App() {
   const [shState, setShState] = useStateApp(window.shortcuts || {});
   const [listeningKey, setListeningKey] = useStateApp(null); // 'undo' | 'redo' | etc.
 
+  // Escape cierra la ventana que esté delante (Ajustes, la cuenta, compartir,
+  // unirse, la corona, un aviso). Antes no lo hacía ninguna: había que buscar
+  // la X o el botón del final. Va en captura y se queda el Escape para que el
+  // lienzo no lo use además para soltar la selección por debajo de la ventana.
+  // Si hay un panel de color abierto, el Escape es suyo (devuelve el color).
+  useEffectApp(() => {
+    const alPulsar = (e) => {
+      if (e.key !== 'Escape' || e.defaultPrevented || listeningKey) return;
+      if (document.querySelector('.panel-color')) return;
+      let cerrada = true;
+      if (customDialog) {
+        if (customDialog.type === 'confirm' && customDialog.onCancel) customDialog.onCancel();
+        else if (customDialog.onAccept) customDialog.onAccept();
+      }
+      else if (settingsOpen) setSettingsOpen(false);
+      else if (coronaOpen) setCoronaOpen(false);
+      else if (userModalOpen) setUserModalOpen(false);
+      else if (sharingModalOpen) setSharingModalOpen(false);
+      else if (joiningModalOpen) setJoiningModalOpen(false);
+      else if (updateModal) setUpdateModal(null);
+      else cerrada = false;
+      if (cerrada) { e.preventDefault(); e.stopImmediatePropagation(); }
+    };
+    window.addEventListener('keydown', alPulsar, true);
+    return () => window.removeEventListener('keydown', alPulsar, true);
+  }, [customDialog, settingsOpen, coronaOpen, userModalOpen, sharingModalOpen, joiningModalOpen, updateModal, listeningKey]);
+
   useEffectApp(() => {
     if (!listeningKey) return;
     const handleCapture = (e) => {
@@ -1563,6 +1612,8 @@ function App() {
   useEffectApp(() => {
     document.body.setAttribute('data-theme', theme);
     document.body.setAttribute('data-lang', lang);
+    // Para el corrector, la voz del sistema y los buscadores: decía siempre en.
+    document.documentElement.lang = lang;
     window.currentLang = lang;
     // Persistir el tema para que el splash del próximo arranque combine sin destello
     try { localStorage.setItem('odinote.theme', theme); } catch (e) {}
@@ -3314,7 +3365,10 @@ function App() {
           <div 
             className="doc-modal-window" 
             style={{ 
-              width: '680px', 
+              // En el teléfono 680 px no caben: la X de cerrar se quedaba fuera
+              // de la pantalla y solo se podía salir por el botón del final.
+              width: 'min(680px, calc(100vw - 24px))',
+              boxSizing: 'border-box',
               // 90vh de una página ya ampliada se quedan cortos: se compensa como el zoom.
               maxHeight: (90 * (escalaUI || 1)) + 'vh', 
               padding: '24px', 
@@ -3332,8 +3386,8 @@ function App() {
             }} 
             onClick={(e) => e.stopPropagation()}
           >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--line-soft, #E5E1DD)', paddingBottom: '12px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--wine, #7B2D26)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', borderBottom: '1px solid var(--line-soft, #E5E1DD)', paddingBottom: '12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', minWidth: 0, color: 'var(--wine, #7B2D26)' }}>
                 <span className="material-symbols-rounded" style={{ fontSize: '24px' }}>settings</span>
                 <span style={{ fontWeight: '700', fontSize: '18px' }}>
                   {window.t('Ajustes de Oddinote', 'Oddinote Settings')}
@@ -3361,7 +3415,7 @@ function App() {
               <button 
                 className="icon-btn" 
                 onClick={() => setSettingsOpen(false)}
-                style={{ background: 'transparent', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                style={{ background: 'transparent', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
               >
                 <span className="material-symbols-rounded" style={{ fontSize: '20px', color: 'var(--text-soft, #595459)' }}>close</span>
               </button>
@@ -3837,6 +3891,9 @@ function App() {
                       onClick={() => {
                         if (window.electronAPI && window.electronAPI.startGoogleLogin) {
                           window.electronAPI.startGoogleLogin();
+                        } else if (window.ODINOTE_PLATFORM === 'android') {
+                          // En el teléfono, un intento nuevo: el viejo se abandona.
+                          startGoogleAuthFlow(false);
                         }
                       }}
                       style={{ padding: '8px 12px', fontSize: '12px', fontWeight: '700', borderRadius: '6px', border: '1.5px solid var(--line)', background: '#FFFFFF', color: '#1A1A1A', cursor: 'pointer' }}
@@ -3848,6 +3905,10 @@ function App() {
                       className="btn lift"
                       onClick={() => {
                         setWaitingForWebLogin(false);
+                        // En el teléfono se corta de verdad la espera (deja de
+                        // escuchar en 127.0.0.1) y lo que llegue luego se ignora.
+                        intentoMovilRef.current++;
+                        if (window.ODINOTE_PLATFORM === 'android' && window.odiGoogleMovil) window.odiGoogleMovil.cancelar();
                         window.playAudioTone && window.playAudioTone('click');
                       }}
                       style={{ marginTop: '8px', padding: '6px 14px', borderRadius: '6px', border: '1.5px solid var(--wine, #E6544F)', color: 'var(--wine, #E6544F)', background: 'transparent', fontWeight: '700', fontSize: '11.5px', cursor: 'pointer' }}
