@@ -18,6 +18,15 @@ const ALTO_BARRA = 32;
 let serverInstance;
 
 // El contenido de la aplicación (no el de la barra de título).
+let cierreListo = false;
+let esperandoCierre = false;
+ipcMain.handle('listo-para-cerrar', () => {
+  logToFile('Cerrar: la app ya guardó; se cierra');
+  cierreListo = true;
+  if (mainWindow && !mainWindow.isDestroyed()) mainWindow.close();
+  return true;
+});
+
 function appWC() {
   if (vistaApp && !vistaApp.webContents.isDestroyed()) return vistaApp.webContents;
   return mainWindow ? mainWindow.webContents : null;
@@ -401,6 +410,30 @@ function createWindow() {
   });
   serverInstance.listen(FIXED_PORT, '127.0.0.1');
 
+  // ── Cerrar sin perder lo último ──
+  // El guardado espera un momento de calma, y al cerrar con la X lo hecho en
+  // ese momento se perdía: el aviso de la página llegaba, pero la app se
+  // cerraba antes de que el guardado llegara al disco (lo midió un bot: lo
+  // de 100 ms antes de cerrar no se guardaba). Ahora se le pide a la app que
+  // guarde, se espera su «listo» y entonces se cierra. Tres segundos como
+  // mucho: una app colgada no puede impedir cerrar.
+  mainWindow.on('close', (e) => {
+    if (cierreListo) return;
+    const wc = appWC();
+    if (!wc || wc.isDestroyed()) return;
+    e.preventDefault();
+    if (esperandoCierre) return;
+    esperandoCierre = true;
+    logToFile('Cerrar: se pide a la app que guarde lo último');
+    wc.send('app-cerrando');
+    setTimeout(() => {
+      if (cierreListo) return;
+      logToFile('Cerrar: la app no contestó en 3 s; se cierra igual');
+      cierreListo = true;
+      try { if (mainWindow && !mainWindow.isDestroyed()) mainWindow.close(); } catch (err) {}
+    }, 3000);
+  });
+
   mainWindow.on('closed', () => {
     mainWindow = null;
   });
@@ -518,8 +551,17 @@ ipcMain.handle('read-vault', async (event, folderPath) => {
   const filePath = path.join(folderPath, 'odinote.json');
   try {
     const porCarpetas = Boveda.leeCarpetas(IO, folderPath);
-    const split = Boveda.leeRepartoAnterior(IO, folderPath);
-    const legacy = fs.existsSync(filePath) ? JSON.parse(fs.readFileSync(filePath, 'utf-8')) : null;
+    let split = null;
+    try { split = Boveda.leeRepartoAnterior(IO, folderPath); } catch (e) { logToFile(`read-vault: projects/ ilegible (${e.message}), se ignora`); }
+    // odinote.json es la red de seguridad, no la única fuente: si está cortado
+    // (un apagón a media escritura), se ignora y mandan las carpetas, que
+    // estaban bien. Antes ese fallo tumbaba la lectura entera, la app se
+    // quedaba sin bóveda, y al volver a abrirla guardaba una lista vacía.
+    let legacy = null;
+    if (fs.existsSync(filePath)) {
+      try { legacy = JSON.parse(fs.readFileSync(filePath, 'utf-8')); }
+      catch (e) { logToFile(`read-vault: odinote.json ilegible (${e.message}); se usan las carpetas de los proyectos`); }
+    }
 
     // Gana quien traiga MÁS proyectos. No es un capricho de orden: si un
     // reparto se quedó a medias por un corte a media escritura, elegirlo
@@ -554,8 +596,12 @@ ipcMain.handle('write-vault', async (event, { folderPath, data, carpetas }) => {
   const filePath = path.join(folderPath, 'odinote.json');
   try {
     // 1. El archivo completo de siempre. Se escribe PRIMERO y pase lo que pase:
-    // es el respaldo del que tira la lectura si el reparto sale mal.
-    fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf-8');
+    // es el respaldo del que tira la lectura si el reparto sale mal. A un
+    // temporal y luego se renombra, como project.json: si se corta a medias, el
+    // de antes sigue entero.
+    const tmp = filePath + '.tmp';
+    fs.writeFileSync(tmp, JSON.stringify(data, null, 2), 'utf-8');
+    fs.renameSync(tmp, filePath);
 
     // 2. Y además, una carpeta por proyecto, con su nombre.
     try {

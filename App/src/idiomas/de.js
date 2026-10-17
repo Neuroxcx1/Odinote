@@ -1031,4 +1031,6 @@ window.ODI_IDIOMAS.de = {
   1026: "Zurück auf 100 %",
   1027: "Striche",
   1028: "Zur Leinwand hinzufügen",
+  1029: "dieses Projekt",
+  1030: "„{0}“ endgültig löschen? Das lässt sich nicht rückgängig machen.",
 };

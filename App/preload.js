@@ -68,6 +68,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
     escala: (f, guardar) => ipcRenderer.invoke('ventana:escala', f, !!guardar),
     leeEscala: () => ipcRenderer.invoke('ventana:escala-lee'),
   },
+  // Al cerrar la ventana: la app guarda lo último y avisa (main.js).
+  alCerrar: (callback) => {
+    const listener = () => callback();
+    ipcRenderer.on('app-cerrando', listener);
+    return () => ipcRenderer.removeListener('app-cerrando', listener);
+  },
+  listoParaCerrar: () => ipcRenderer.invoke('listo-para-cerrar'),
   onGoogleSigninCompleted: (callback) => {
     const listener = (event, profile) => callback(profile);
     ipcRenderer.on('google-signin-completed', listener);

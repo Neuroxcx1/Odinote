@@ -1031,4 +1031,6 @@ window.ODI_IDIOMAS.fr = {
   1026: "Revenir à 100 %",
   1027: "Traits",
   1028: "Ajouter au canevas",
+  1029: "ce projet",
+  1030: "Supprimer « {0} » définitivement ? Cette action est irréversible.",
 };

@@ -1031,4 +1031,6 @@ window.ODI_FRASES = [
   /* 1026 */ ["Volver al 100 %","Back to 100 %"],
   /* 1027 */ ["Trazos","Strokes"],
   /* 1028 */ ["Añadir al lienzo","Add to the canvas"],
+  /* 1029 */ ["este proyecto","this project"],
+  /* 1030 */ ["¿Eliminar «{0}» para siempre? Esto no se puede deshacer.","Delete “{0}” forever? This cannot be undone."],
 ];

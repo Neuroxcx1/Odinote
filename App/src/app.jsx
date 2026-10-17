@@ -1324,6 +1324,8 @@ function App() {
   }, [volume]);
 
   const ignoreNextPersistRef = React.useRef(false);
+  // Desde cuándo hay un guardado pendiente (ver el guardado automático).
+  const guardadoPendienteDesdeRef = React.useRef(0);
   const isIncomingRemoteChangeRef = React.useRef(false);
   // Modo instantáneo. `acordado` es la última foto que quedó en común con el
   // servidor, la haya mandado yo o la haya recibido: comparando contra ella se
@@ -2132,7 +2134,14 @@ function App() {
       isIncomingRemoteChangeRef.current = false;
       return;
     }
+    // Se espera un momento de calma (400 ms), pero no para siempre: quien no
+    // para de editar tampoco puede pasar más de 2 s sin que se guarde. Antes
+    // cada cambio volvía a poner el reloj a cero y una ráfaga larga no llegaba
+    // al disco hasta que se paraba (lo encontró un bot de pruebas).
+    if (!guardadoPendienteDesdeRef.current) guardadoPendienteDesdeRef.current = Date.now();
+    const esperaGuardado = Math.max(0, Math.min(400, 2000 - (Date.now() - guardadoPendienteDesdeRef.current)));
     const id = setTimeout(async () => {
+      guardadoPendienteDesdeRef.current = 0;
       // 0. Marca de edición local: solo cuando los canvases realmente cambiaron
       // y el cambio no vino de una importación de Drive
       if (lastSeenCanvasesRef.current === null) {
@@ -2291,7 +2300,7 @@ function App() {
           }
         }
       }
-    }, 400);
+    }, esperaGuardado);
     return () => clearTimeout(id);
   }, [view, lang, theme, projects, canvases, loading, vaultPath]);
 
@@ -2351,6 +2360,31 @@ function App() {
     return () => off();
   }, [view.projectId, projects, userProfile]);
 
+  // Al cerrar la ventana del escritorio: guardar lo último y avisar (main.js
+  // espera este «listo» antes de cerrar). Lee el estado de una referencia
+  // para no reenganchar el oyente en cada cambio.
+  const paraCerrarRef = React.useRef(null);
+  paraCerrarRef.current = { view, lang, theme, projects, canvases, vaultPath, loading, carpetas: carpetasProyecto };
+  useEffectApp(() => {
+    const api = window.electronAPI;
+    if (!api || !api.alCerrar || !api.listoParaCerrar) return;
+    return api.alCerrar(async () => {
+      const e = paraCerrarRef.current || {};
+      try {
+        if (!e.loading && e.vaultPath) {
+          // El mapa de carpetas de AHORA, no el del primer render: con uno viejo
+          // los proyectos nuevos se quedaban sin carpeta.
+          await api.writeVault(e.vaultPath, sinCamposDelMomento({ view: e.view, lang: e.lang, theme: e.theme, projects: e.projects, canvases: e.canvases, templatesVersion: 2 }), e.carpetas);
+        } else if (!e.loading) {
+          await saveStateToDB({ view: e.view, lang: e.lang, theme: e.theme, projects: e.projects, canvases: e.canvases, templatesVersion: 2 });
+        }
+      } catch (err) {
+        console.error('[SAVE] al cerrar:', err);
+      }
+      api.listoParaCerrar();
+    });
+  }, []);
+
   // Flush immediately on tab close / window unload so no pending change is lost
   useEffectApp(() => {
     if (loading) return;
@@ -2392,6 +2426,11 @@ function App() {
         await window.electronAPI.writeVault(path, sinCamposDelMomento({ view, lang, theme, projects, canvases, templatesVersion: 2 }));
       }
     } catch (err) {
+      // Que no se quede elegida: con la bóveda puesta y la lectura fallida, el
+      // guardado automático escribía encima el estado vacío de la app.
+      if (window.electronAPI.setVaultPath) await window.electronAPI.setVaultPath(null);
+      localStorage.removeItem('odinote.vault_path');
+      setVaultPath(null);
       alert(window.t('No se pudo leer la boveda seleccionada.', 'Could not read the selected vault.'));
     } finally {
       setLoading(false);

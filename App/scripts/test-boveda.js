@@ -229,6 +229,99 @@ const check = (nombre, ok, extra) => {
   fs.rmSync(raiz, { recursive: true, force: true });
 }
 
+// ── Lo que encontró el bot de datos (17/10) ──
+{
+  const os = require('os');
+  const io = { fs, path, log: () => {} };
+  const p = (id, nombre) => ({ id, name: { es: nombre, en: nombre } });
+  const datos = (proyectos, canvases) => ({ lang: 'es', projects: proyectos, canvases: canvases || {} });
+  const nota = (id, texto) => ({ items: [{ id: 'n-' + id, type: 'note', text: texto }] });
+  const textoDe = (raiz, carpeta, id) => JSON.parse(fs.readFileSync(path.join(raiz, carpeta, 'project.json'), 'utf-8')).canvases[id].items[0].text;
+  const carpetasCon = (raiz) => B.carpetasConProyecto(io, raiz);
+
+  // 1. Retirar no borra: va a .retirados, con su json y sus imágenes.
+  {
+    const raiz = fs.mkdtempSync(path.join(os.tmpdir(), 'boveda-retira-'));
+    B.escribeCarpetas(io, raiz, datos([p('a', 'Uno'), p('b', 'Dos')], { a: nota('a', 'x'), b: nota('b', 'y') }));
+    fs.mkdirSync(path.join(raiz, 'Dos', 'media'), { recursive: true });
+    fs.writeFileSync(path.join(raiz, 'Dos', 'media', 'foto.png'), 'png');
+    const hecho = B.escribeCarpetas(io, raiz, datos([p('a', 'Uno')], { a: nota('a', 'x') }));
+    const ret = fs.readdirSync(path.join(raiz, B.RETIRADOS));
+    check('un proyecto borrado se retira, no se borra', hecho.retirados.includes('Dos') && !fs.existsSync(path.join(raiz, 'Dos')) && ret.length === 1, ret.join(','));
+    check('y en .retirados sigue su json y su imagen', fs.existsSync(path.join(raiz, B.RETIRADOS, ret[0], 'project.json')) && fs.existsSync(path.join(raiz, B.RETIRADOS, ret[0], 'media', 'foto.png')));
+    check('.retirados no se lee como un proyecto', B.leeCarpetas(io, raiz).projects.length === 1);
+
+    // 2. Una lista vacía (una lectura fallida) no retira nada.
+    const vacio = B.escribeCarpetas(io, raiz, datos([], {}));
+    check('una lista sin proyectos no retira ninguna carpeta', vacio.retirados.length === 0 && fs.existsSync(path.join(raiz, 'Uno', 'project.json')));
+  }
+
+  // 3. El «gemelo» del bot: dos «Doble», se borra el que tenía el nombre
+  // limpio, se edita el otro, y al leer tiene que salir uno, con lo último.
+  {
+    const raiz = fs.mkdtempSync(path.join(os.tmpdir(), 'boveda-gemelo-'));
+    const A = p('proj-a8618', 'Doble'), Bp = p('proj-b0001', 'Doble');
+    B.escribeCarpetas(io, raiz, datos([A], { [A.id]: nota('a', 'v1') }));
+    // B es nuevo y va primero en la lista: se queda el nombre limpio.
+    B.escribeCarpetas(io, raiz, datos([Bp, A], { [A.id]: nota('a', 'v1'), [Bp.id]: nota('b', 'B') }));
+    const antes = carpetasCon(raiz).map(c => c.carpeta + '=' + c.id).sort().join(' | ');
+    // B se borra para siempre y A se edita.
+    B.escribeCarpetas(io, raiz, datos([A], { [A.id]: nota('a', 'v3') }));
+    const despues = carpetasCon(raiz);
+    const deA = despues.filter(c => c.id === A.id);
+    check('borrado el otro, el proyecto queda en UNA carpeta', deA.length === 1, despues.map(c => c.carpeta + '=' + c.id).join(' | ') + ' (antes: ' + antes + ')');
+    check('y es la del nombre limpio', deA.length === 1 && deA[0].carpeta === 'Doble', deA.map(c => c.carpeta).join(','));
+    const leido = B.leeCarpetas(io, raiz);
+    check('al leer sale una vez y con lo último', leido.projects.length === 1 && leido.canvases[A.id].items[0].text === 'v3', leido.projects.length + ' · ' + (leido.canvases[A.id] && leido.canvases[A.id].items[0].text));
+  }
+
+  // 4. Una bóveda que YA tiene gemelos (de antes de este arreglo): al leer gana
+  // la carpeta más reciente, y la siguiente escritura retira la vieja.
+  {
+    const raiz = fs.mkdtempSync(path.join(os.tmpdir(), 'boveda-gemelos-viejos-'));
+    const A = p('proj-zz77', 'Rico');
+    const escribe = (carpeta, texto, cuando) => {
+      fs.mkdirSync(path.join(raiz, carpeta), { recursive: true });
+      const f = path.join(raiz, carpeta, 'project.json');
+      fs.writeFileSync(f, JSON.stringify({ meta: {}, project: A, canvases: { [A.id]: nota('a', texto) } }));
+      fs.utimesSync(f, cuando, cuando);
+    };
+    escribe('Rico', 'nuevo', new Date(Date.now() - 1000));
+    escribe('CON-', 'viejo', new Date(Date.now() - 86400000));
+    const leido = B.leeCarpetas(io, raiz);
+    check('dos carpetas del mismo proyecto: se lee una, la más reciente', leido.projects.length === 1 && leido.canvases[A.id].items[0].text === 'nuevo', leido.projects.length + ' · ' + leido.canvases[A.id].items[0].text);
+    B.escribeCarpetas(io, raiz, datos([A], leido.canvases));
+    const quedan = carpetasCon(raiz).map(c => c.carpeta);
+    check('y al guardar, la copia vieja se retira', quedan.length === 1 && quedan[0] === 'Rico' && fs.readdirSync(path.join(raiz, B.RETIRADOS)).length === 1, quedan.join(','));
+  }
+
+  // 4b. Un guardado con el mapa de carpetas vacío o incompleto (lo hizo el
+  // guardado de última hora al cerrar, con un mapa del primer render) no
+  // retira ninguna carpeta como «copia vieja».
+  {
+    const raiz = fs.mkdtempSync(path.join(os.tmpdir(), 'boveda-mapa-vacio-'));
+    const ps = [p('a1', 'Uno'), p('b2', 'Dos'), p('c3', 'Tres')];
+    const cs = { a1: nota('a1', 'x'), b2: nota('b2', 'y'), c3: nota('c3', 'z') };
+    B.escribeCarpetas(io, raiz, datos(ps, cs));
+    const vacio = B.escribeCarpetas(io, raiz, datos(ps, cs), {});
+    const medio = B.escribeCarpetas(io, raiz, datos(ps, cs), { a1: 'Uno' });
+    check('con el mapa vacío no se retira ninguna carpeta', vacio.retirados.length === 0 && carpetasCon(raiz).length === 3, vacio.retirados.join(','));
+    check('con el mapa a medias tampoco', medio.retirados.length === 0 && carpetasCon(raiz).length === 3, medio.retirados.join(','));
+  }
+
+  // 5. Lo de .retirados con más de 30 días se borra; lo reciente no.
+  {
+    const raiz = fs.mkdtempSync(path.join(os.tmpdir(), 'boveda-limpia-'));
+    const dir = path.join(raiz, B.RETIRADOS);
+    fs.mkdirSync(path.join(dir, 'viejo'), { recursive: true });
+    fs.mkdirSync(path.join(dir, 'nuevo'), { recursive: true });
+    const hace40 = new Date(Date.now() - 40 * 86400000);
+    fs.utimesSync(path.join(dir, 'viejo'), hace40, hace40);
+    const n = B.limpiaRetirados(io, raiz);
+    check('.retirados: se borra lo de más de 30 días y se queda lo reciente', n === 1 && !fs.existsSync(path.join(dir, 'viejo')) && fs.existsSync(path.join(dir, 'nuevo')));
+  }
+}
+
 console.log('');
 console.log(fallos === 0 ? 'Todo en orden.' : fallos + ' fallo(s).');
 process.exit(fallos === 0 ? 0 : 1);

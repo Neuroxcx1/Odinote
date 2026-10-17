@@ -195,11 +195,32 @@
   }
 
   // Junta los proyectos de todas esas carpetas.
+  // Si dos carpetas dicen ser el mismo proyecto (un «gemelo»: lo encontró un
+  // bot de pruebas al renombrar, al borrar uno de dos proyectos con el mismo
+  // nombre o al pasar un tablero a proyecto), se queda la que se escribió la
+  // última. Antes se leían las dos: el proyecto salía repetido y, según el
+  // orden, con la versión vieja encima de la nueva.
+  function sinGemelos(io, folderPath, carpetas) {
+    var porId = {};
+    carpetas.forEach(function (c) {
+      var t = 0;
+      try { t = io.fs.statSync(io.path.join(folderPath, c.carpeta, 'project.json')).mtimeMs || 0; } catch (err) {}
+      var otra = porId[c.id];
+      if (!otra || t > otra.t) {
+        if (otra) io.log && io.log('read-vault: "' + otra.c.carpeta + '" y "' + c.carpeta + '" son el mismo proyecto; se usa "' + c.carpeta + '", la más reciente');
+        porId[c.id] = { c: c, t: t };
+      } else {
+        io.log && io.log('read-vault: "' + c.carpeta + '" y "' + otra.c.carpeta + '" son el mismo proyecto; se usa "' + otra.c.carpeta + '", la más reciente');
+      }
+    });
+    return carpetas.filter(function (c) { return porId[c.id] && porId[c.id].c === c; });
+  }
+
   function leeCarpetas(io, folderPath) {
     var proyectos = [];
     var canvases = {};
     var meta = {};
-    carpetasConProyecto(io, folderPath).forEach(function (c) {
+    sinGemelos(io, folderPath, carpetasConProyecto(io, folderPath)).forEach(function (c) {
       var archivo = io.path.join(folderPath, c.carpeta, 'project.json');
       try {
         var leido = JSON.parse(io.fs.readFileSync(archivo, 'utf-8'));
@@ -317,8 +338,46 @@
     return traidos;
   }
 
-  // Escribe una carpeta por proyecto: renombra las que cambiaron de nombre,
-  // guarda cada json, y retira las de los proyectos borrados.
+  // ── Retirar una carpeta ──
+  // Nunca se borra: se mueve a .retirados, dentro de la propia bóveda, con la
+  // fecha. Un bot de pruebas encontró que un odinote.json cortado acababa con
+  // la app guardando una lista vacía, y el borrado de entonces (rmSync) se
+  // llevaba TODAS las carpetas de proyectos con sus imágenes, sin papelera.
+  // Desde aquí se pueden recuperar a mano. Lo que lleva allí más de 30 días
+  // sí se borra: eran proyectos que la persona eliminó a propósito.
+  var RETIRADOS = '.retirados';
+  function retira(io, folderPath, carpeta) {
+    var destino = io.path.join(folderPath, RETIRADOS);
+    io.fs.mkdirSync(destino, { recursive: true });
+    var sello = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
+    var nombre = carpeta + ' (' + sello + ')';
+    var n = 2;
+    while (io.fs.existsSync(io.path.join(destino, nombre))) nombre = carpeta + ' (' + sello + '-' + (n++) + ')';
+    io.fs.renameSync(io.path.join(folderPath, carpeta), io.path.join(destino, nombre));
+    return nombre;
+  }
+  function limpiaRetirados(io, folderPath, ahora) {
+    var dir = io.path.join(folderPath, RETIRADOS);
+    var entradas;
+    try { entradas = io.fs.readdirSync(dir, { withFileTypes: true }); } catch (err) { return 0; }
+    var limite = (ahora || Date.now()) - 30 * 24 * 3600 * 1000;
+    var quitados = 0;
+    entradas.forEach(function (e) {
+      if (!e.isDirectory()) return;
+      var ruta = io.path.join(dir, e.name);
+      try {
+        if (io.fs.statSync(ruta).mtimeMs < limite) {
+          io.fs.rmSync(ruta, { recursive: true, force: true });
+          quitados++;
+        }
+      } catch (err) {}
+    });
+    return quitados;
+  }
+
+  // Escribe una carpeta por proyecto: retira las de los proyectos borrados,
+  // renombra las que cambiaron de nombre, guarda cada json y retira las copias
+  // viejas de un mismo proyecto.
   function escribeCarpetas(io, folderPath, data, mapa) {
     var datos = data || {};
     var proyectos = datos.projects || [];
@@ -329,6 +388,29 @@
     });
     var carpetas = mapa || carpetasDeProyectos(proyectos);
     var hecho = { escritos: [], renombrados: [], retirados: [], traidos: 0 };
+    var ids = {};
+    proyectos.forEach(function (p) { if (p && p.id) ids[p.id] = true; });
+
+    // 0. Primero se retiran las carpetas de los proyectos que ya no existen,
+    // para que su nombre quede libre ANTES de renombrar: si no, un proyecto que
+    // recupera el nombre de uno borrado no podía mudarse a esa carpeta y se
+    // escribía en ella dejando su carpeta de antes viva (los «gemelos»).
+    // Una lista sin ningún proyecto no retira nada: es mucho más probable que
+    // venga de una lectura fallida que de que se hayan borrado todos.
+    if (proyectos.length) {
+      carpetasConProyecto(io, folderPath).forEach(function (c) {
+        if (ids[c.id]) return;
+        try {
+          var a = retira(io, folderPath, c.carpeta);
+          hecho.retirados.push(c.carpeta);
+          io.log && io.log('write-vault: retirada la carpeta del proyecto eliminado "' + c.carpeta + '" (en ' + RETIRADOS + '/' + a + ')');
+        } catch (err) {
+          io.log && io.log('write-vault: no se pudo retirar "' + c.carpeta + '" (' + err.message + ')');
+        }
+      });
+    } else {
+      io.log && io.log('write-vault: la lista llega sin proyectos; no se retira ninguna carpeta');
+    }
 
     // 1. Un proyecto renombrado no empieza una carpeta nueva: se le MUEVE la
     // suya, con su json y sus imágenes dentro. Se reconoce por el identificador
@@ -377,18 +459,28 @@
       hecho.traidos += reparaMedios(io, folderPath, carpetas[proyecto.id], canvasesDeProyecto(canvases, proyecto.id));
     });
 
-    // 3. Las carpetas de proyectos que ya no existen. Se retiran SOLO si llevan
-    // un project.json nuestro y su identificador no está en la lista: una
-    // carpeta cualquiera que alguien haya dejado ahí no se toca jamás.
-    var ids = {};
-    proyectos.forEach(function (p) { if (p && p.id) ids[p.id] = true; });
+    // 3. Copias viejas: una carpeta con el identificador de un proyecto vivo que
+    // no es la suya (la suya se acaba de escribir). Sus imágenes ya se trajeron
+    // en el paso 2b. Solo carpetas con un project.json nuestro: una carpeta
+    // cualquiera que alguien haya dejado ahí no se toca jamás.
     carpetasConProyecto(io, folderPath).forEach(function (c) {
-      if (vivas[c.carpeta] || ids[c.id]) return;
-      io.fs.rmSync(io.path.join(folderPath, c.carpeta), { recursive: true, force: true });
-      hecho.retirados.push(c.carpeta);
-      io.log && io.log('write-vault: retirada la carpeta del proyecto eliminado "' + c.carpeta + '"');
+      // Solo si a ese proyecto le toca OTRA carpeta y esa se acaba de escribir:
+      // con un mapa incompleto (un proyecto sin carpeta asignada) su carpeta de
+      // siempre NO es una copia vieja. Sin esta condición, un guardado con el
+      // mapa vacío retiró las setenta carpetas de una bóveda de pruebas.
+      var suya = carpetas[c.id];
+      if (vivas[c.carpeta] || !ids[c.id] || !suya || suya === c.carpeta || !vivas[suya]) return;
+      try {
+        var a = retira(io, folderPath, c.carpeta);
+        hecho.retirados.push(c.carpeta);
+        io.log && io.log('write-vault: "' + c.carpeta + '" era una copia vieja de "' + carpetas[c.id] + '"; retirada (en ' + RETIRADOS + '/' + a + ')');
+      } catch (err) {
+        io.log && io.log('write-vault: no se pudo retirar la copia vieja "' + c.carpeta + '" (' + err.message + ')');
+      }
     });
 
+    var limpios = limpiaRetirados(io, folderPath);
+    if (limpios) io.log && io.log('write-vault: ' + limpios + ' carpetas de ' + RETIRADOS + ' tenían más de 30 días; borradas');
     return hecho;
   }
 
@@ -402,6 +494,9 @@
     leeCarpetas: leeCarpetas,
     leeRepartoAnterior: leeRepartoAnterior,
     escribeCarpetas: escribeCarpetas,
+    sinGemelos: sinGemelos,
+    limpiaRetirados: limpiaRetirados,
+    RETIRADOS: RETIRADOS,
     mediosDeLienzos: mediosDeLienzos,
     buscaMedio: buscaMedio,
     reparaMedios: reparaMedios,

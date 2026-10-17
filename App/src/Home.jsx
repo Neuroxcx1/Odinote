@@ -1236,7 +1236,18 @@ function ProjectCard({ project, lang, t, onOpen, onDelete, onRenameClick, onRest
                 <span className="material-symbols-rounded">restore_from_trash</span>
               </button>
               <button className="ms-card-btn danger" title={window.t('Eliminar definitivamente', 'Delete forever')}
-                onClick={(e)=>{ e.stopPropagation(); onPurge && onPurge(); }}>
+                onClick={(e)=>{
+                  e.stopPropagation();
+                  // Es lo único de inicio que no tiene vuelta atrás (lo encontró
+                  // un bot de pruebas: un clic y la carpeta desaparecía).
+                  const nombre = window.pickLang(project.name, lang) || window.t('este proyecto', 'this project');
+                  const pregunta = window.t(
+                    `¿Eliminar «${nombre}» para siempre? Esto no se puede deshacer.`,
+                    `Delete “${nombre}” forever? This cannot be undone.`
+                  );
+                  (window.customConfirm ? window.customConfirm(pregunta) : Promise.resolve(window.confirm(pregunta)))
+                    .then((ok) => { if (ok && onPurge) onPurge(); });
+                }}>
                 <span className="material-symbols-rounded">delete_forever</span>
               </button>
             </>

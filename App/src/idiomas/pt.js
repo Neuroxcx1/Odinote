@@ -1031,4 +1031,6 @@ window.ODI_IDIOMAS.pt = {
   1026: "Voltar para 100 %",
   1027: "Traços",
   1028: "Adicionar à tela",
+  1029: "este projeto",
+  1030: "Excluir “{0}” para sempre? Isso não pode ser desfeito.",
 };

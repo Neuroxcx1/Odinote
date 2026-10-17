@@ -1031,4 +1031,6 @@ window.ODI_IDIOMAS.it = {
   1026: "Torna al 100 %",
   1027: "Tratti",
   1028: "Aggiungi alla tela",
+  1029: "questo progetto",
+  1030: "Eliminare «{0}» per sempre? Non si può annullare.",
 };

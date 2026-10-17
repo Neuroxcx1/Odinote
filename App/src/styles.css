@@ -4251,7 +4251,10 @@ html[data-mobile="1"] .connector-hit { stroke-width: 40; }
    ============================================ */
 .modal-backdrop { position: fixed; inset: 0; background: color-mix(in srgb, var(--ink) 50%, transparent); backdrop-filter: blur(3px); z-index: 200; display: grid; place-items: center; animation: fade-in 160ms var(--e-out); }
 @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
-.modal { background: var(--paper); border: 1.5px solid var(--line); border-radius: 2px; box-shadow: var(--pop-deep); padding: 22px; width: 420px; max-width: calc(100vw - 40px); animation: scale-in 200ms var(--e-out); }
+/* max-height y desplazamiento propio: con las 60 portadas 3D, «Editar
+   proyecto» medía 834 px y a 1280×768 sus botones quedaban por debajo de la
+   pantalla, sin forma de llegar a ellos (lo encontraron dos bots). */
+.modal { background: var(--paper); border: 1.5px solid var(--line); border-radius: 2px; box-shadow: var(--pop-deep); padding: 22px; width: 420px; max-width: calc(100vw - 40px); max-height: calc(100vh - 40px); max-height: calc(100dvh - 40px); overflow-y: auto; box-sizing: border-box; animation: scale-in 200ms var(--e-out); }
 @keyframes scale-in { from { transform: scale(0.94); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 .modal h2 { font-family: var(--font-display); font-size: 22px; font-weight: 800; letter-spacing: -0.02em; margin: 0 0 6px; }
 .modal p { color: var(--ink-2); font-size: 13px; margin: 0 0 16px; }
