@@ -79,14 +79,47 @@ como táctil y no le falta ni un archivo.
 ninguno enchufado. Eso incluye lo que solo se ve allí: el rendimiento al mover
 el lienzo con el dedo, el teclado tapando los nodos y el botón de "atrás".
 
+## Entrar con Google (desde la 1.2.0)
+
+Google **bloquea a propósito** su ventana de inicio de sesión dentro de un
+WebView: con la ventana emergente de la web, Firebase contestaba
+`auth/internal-error` en el teléfono. Así que el teléfono lo hace por su cuenta
+y en su navegador, con el MISMO flujo que el escritorio:
+
+1. `EntrarConGoogle.java` (un plugin de Capacitor, registrado en
+   `MainActivity`) se pone a escuchar en `127.0.0.1`, en un puerto libre.
+2. Abre la página de Google en el navegador del teléfono, pidiendo que vuelva
+   a esa dirección. La lógica está en `GoogleLoopback.java`, sin nada de
+   Android: PKCE, la espera de la vuelta y el canje del código por los tokens.
+3. Al volver, la página de `127.0.0.1` lleva un botón (y un salto solo) a
+   `intent://login` con el esquema `oddinote`, que el manifiesto manda a la app.
+4. El token de refresco se guarda **cifrado** con una llave del almacén de
+   Android, para renovar el permiso de Drive cada hora sin pedir la cuenta.
+
+En la app, `App/src/google-movil.js` le da a todo esto la forma de
+`window.electronAPI` (`googleRefreshAccess`, `googleHasRefresh`,
+`googleSignOut`), así que `app.jsx` no distingue entre escritorio y teléfono.
+
+**Las credenciales son las del escritorio**, de `App/google-oauth.json`: el
+`build.gradle` las mete en el APK como dos constantes (`BuildConfig`), igual
+que el archivo entra en el `.exe`. No hace falta crear un cliente de Android en
+la consola de Google. Sin el archivo el APK se compila igual y el botón dice
+que se compiló sin credenciales.
+
+**Comprobado en el ordenador:** `npm test` (aquí, en `Movil/`) compila
+`GoogleLoopback.java` con el JDK y lo pone contra un Google de mentira: la
+dirección de vuelta, PKCE, las pestañas que no son la vuelta, el «no doy
+permiso», cancelar, el tiempo agotado, el canje y la renovación. Y el lado de
+la app, en el navegador con un plugin de mentira: entrar, renovar al arrancar,
+cerrar sesión (borra el refresco) y cancelar.
+
+**Sin comprobar:** en un teléfono de verdad (no había ninguno enchufado, y el
+emulador no arranca en este equipo sin aceleración por hardware). Lo que solo se
+ve allí: que el navegador del teléfono se abra, que Google acepte la vuelta a
+`127.0.0.1` desde un móvil, la vuelta a la app y el guardado cifrado.
+
 **Lo que se sabe que NO va a funcionar, y hay que rehacer:**
 
-- **Entrar con Google.** Comprobado en el teléfono: Firebase contesta
-  `auth/internal-error` en cuanto se intenta. La aplicación usa una ventana emergente
-  (`signInWithPopup`), y Google **bloquea a propósito** el inicio de sesión
-  dentro de un WebView. Sin eso no hay Drive, ni salas en vivo, ni corona. La
-  solución es abrir la sesión en el navegador del teléfono (Custom Tabs) y
-  devolver el resultado a la aplicación.
 - **La bóveda en carpeta.** En Android no hay carpeta de la bóveda: se guarda en
   el propio teléfono (IndexedDB), igual que hace hoy la versión web.
 - **Lo que era de Electron:** el corrector, el menú del botón derecho, la

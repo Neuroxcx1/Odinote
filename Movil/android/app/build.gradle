@@ -14,6 +14,20 @@ def versionApp = paqueteApp.version
 def cifras = (versionApp.tokenize('.') + ['0', '0', '0', '0']).take(4)*.toInteger()
 def codigoVersion = cifras[0] * 1000000 + cifras[1] * 10000 + cifras[2] * 100 + cifras[3]
 
+// Las credenciales de Google para entrar desde el teléfono son las MISMAS que
+// usa el escritorio, y salen del mismo sitio: App/google-oauth.json, que no va
+// al repositorio. Entran en el APK como dos constantes (BuildConfig), igual que
+// el archivo entra en el .exe: en una app que se descarga ese secreto no lo es,
+// y lo que protege el inicio de sesión es PKCE (ver GoogleLoopback.java). Sin
+// el archivo el APK se compila igual y el botón dice que no hay credenciales.
+def credencialesGoogle = [client_id: '', client_secret: '']
+def archivoGoogle = file("../../../App/google-oauth.json")
+if (archivoGoogle.exists()) {
+    def leido = new groovy.json.JsonSlurper().parse(archivoGoogle)
+    credencialesGoogle.client_id = (leido.client_id ?: '').toString()
+    credencialesGoogle.client_secret = (leido.client_secret ?: '').toString()
+}
+
 android {
     namespace = "io.github.neuroxcx1.oddinote"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -23,12 +37,17 @@ android {
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode codigoVersion
         versionName versionApp
+        buildConfigField "String", "GOOGLE_CLIENT_ID", "\"${credencialesGoogle.client_id}\""
+        buildConfigField "String", "GOOGLE_CLIENT_SECRET", "\"${credencialesGoogle.client_secret}\""
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
              // Default: https://android.googlesource.com/platform/frameworks/base/+/282e181b58cf72b6ca770dc7ca5f91f135444502/tools/aapt/AaptAssets.cpp#61
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
+    }
+    buildFeatures {
+        buildConfig = true
     }
     buildTypes {
         release {

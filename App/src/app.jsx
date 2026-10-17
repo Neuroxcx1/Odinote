@@ -665,25 +665,60 @@ function App() {
           ));
         });
     } else if (window.ODINOTE_PLATFORM === 'android') {
-      // ── Entrar con Google desde el APK: todavía no ──
+      // ── Entrar con Google desde el APK ──
       //
-      // Google BLOQUEA a propósito su ventana de inicio de sesión dentro de una
-      // aplicación que lleva un navegador incrustado, que es lo que es un APK
-      // como este. No es un fallo de Oddinote ni hay forma de sortearlo desde
-      // aquí: comprobado en el teléfono, Firebase contesta auth/internal-error
-      // en cuanto se intenta.
-      //
-      // Arreglarlo de verdad es otro trabajo: abrir la sesión en el navegador
-      // del propio teléfono y que vuelva a la aplicación, lo que necesita unas
-      // credenciales de Android nuevas —las crea el mantenedor en su cuenta de
-      // Google Cloud— y un plugin para recoger la vuelta.
-      //
-      // Mientras tanto, decirlo claro. Lo que NO se puede hacer es lo de antes:
-      // pulsar, esperar y que no ocurra nada.
-      setLoginError(window.t(
-        'Entrar con Google todavía no funciona en la aplicación del móvil: Google no permite su ventana de inicio de sesión dentro de una app. Todo lo demás sí va, y tus notas se guardan en el teléfono. Para la nube y las salas, usa Oddinote en el ordenador o ábrela en el navegador del móvil.',
-        'Signing in with Google does not work yet in the phone app: Google does not allow its sign-in window inside an app. Everything else works, and your notes are saved on the phone. For the cloud and live sessions, use Oddinote on a computer or open it in the phone browser.'
-      ));
+      // Google BLOQUEA su ventana de inicio de sesión dentro del navegador
+      // incrustado de una app (comprobado en el teléfono: Firebase contestaba
+      // auth/internal-error). Así que lo hace el teléfono por su cuenta, en su
+      // navegador y con el mismo flujo que el escritorio: src/google-movil.js.
+      const movil = window.odiGoogleMovil;
+      if (!movil || !movil.disponible()) {
+        setLoginError(window.t(
+          'Entrar con Google todavía no funciona en la aplicación del móvil: Google no permite su ventana de inicio de sesión dentro de una app. Todo lo demás sí va, y tus notas se guardan en el teléfono. Para la nube y las salas, usa Oddinote en el ordenador o ábrela en el navegador del móvil.',
+          'Signing in with Google does not work yet in the phone app: Google does not allow its sign-in window inside an app. Everything else works, and your notes are saved on the phone. For the cloud and live sessions, use Oddinote on a computer or open it in the phone browser.'
+        ));
+        return;
+      }
+      setWaitingForWebLogin(true);
+      movil.entrar()
+        .then(async (r) => {
+          identificaEnFirebase(r.idToken);
+          // El nombre y la foto, como hace main.js en el escritorio.
+          let perfil = {};
+          try {
+            const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', { headers: { Authorization: 'Bearer ' + r.accessToken } });
+            if (res.ok) perfil = await res.json();
+          } catch (e) {}
+          const userProfileData = {
+            name: perfil.name || 'Google User',
+            email: perfil.email || null,
+            picture: perfil.picture || (perfil.name ? perfil.name.charAt(0) : 'G'),
+            accessToken: r.accessToken,
+          };
+          setUserProfile(userProfileData);
+          localStorage.setItem('odinote.google_profile', JSON.stringify(userProfileData));
+          setWaitingForWebLogin(false);
+          setUserModalOpen(false);
+          showToast(isRenewal
+            ? window.t('Acceso a Google Drive renovado.', 'Google Drive access renewed.')
+            : window.t('¡Sesión iniciada con éxito mediante Google!', 'Successfully signed in with Google!'));
+          avisaSiFaltaDrive(r.accessToken);
+        })
+        .catch((err) => {
+          setWaitingForWebLogin(false);
+          const codigo = (err && err.code) || '';
+          console.warn('[GOOGLE] el teléfono no pudo entrar:', codigo, err && err.message);
+          const textos = {
+            cancelado: window.t('Se cerró el inicio de sesión antes de terminar.', 'Sign-in was closed before it finished.'),
+            tiempo: window.t('Google no volvió a tiempo. Vuelve a intentarlo.', 'Google did not come back in time. Try again.'),
+            'sin-credenciales': window.t('Este APK se compiló sin las credenciales de Google, así que no puede entrar.', 'This APK was built without the Google credentials, so it cannot sign in.'),
+            red: window.t('Sin conexión con Google. Revisa tu internet.', 'No connection to Google. Check your internet.'),
+            navegador: window.t('No se pudo abrir el navegador del teléfono.', 'Could not open the phone browser.'),
+          };
+          setLoginError(textos[codigo]
+            || (/^google:access_denied/.test(codigo) ? window.t('No diste permiso en Google.', 'You did not grant permission in Google.') : null)
+            || (err && err.message) || String(err));
+        });
     } else {
       const provider = new firebase.auth.GoogleAuthProvider();
       if (!isRenewal) provider.setCustomParameters({ prompt: 'select_account' });
@@ -742,8 +777,17 @@ function App() {
   // que cuando el permiso de una hora caduca se pide otro y no se entera nadie.
   // Solo si eso falla —porque el usuario revocó el acceso, o porque nunca llegó
   // a guardarse— se le pide que vuelva a conectarse.
+  // Quien guarda el token de refresco: el escritorio (main.js, por
+  // window.electronAPI) o el teléfono (src/google-movil.js). Los dos tienen
+  // la misma forma, así que lo de abajo no distingue.
+  const apiGoogle = () => {
+    const e = window.electronAPI;
+    if (e && e.googleRefreshAccess) return e;
+    return window.odiGoogleMovil || null;
+  };
+
   const renuevaAccesoDrive = async () => {
-    const api = window.electronAPI;
+    const api = apiGoogle();
     if (!api || !api.googleRefreshAccess) return null;
     try {
       const r = await api.googleRefreshAccess();
@@ -763,7 +807,7 @@ function App() {
     }
   };
 
-  // ── Recuperar la sesión de Firebase al arrancar (solo escritorio) ──
+  // ── Recuperar la sesión de Firebase al arrancar (escritorio y teléfono) ──
   //
   // Este era el agujero: el perfil de Google se guarda en el disco, así que
   // al reabrir la aplicación parecía que seguías dentro. Ante Firebase no.
@@ -776,7 +820,7 @@ function App() {
   // negativo y pediría un carnet que no hacía falta.
   useEffectApp(() => {
     if (!userProfile) return;
-    const api = window.electronAPI;
+    const api = apiGoogle();
     if (!api || !api.googleRefreshAccess) return;
 
     let vivo = true;
@@ -828,7 +872,8 @@ function App() {
   // la primera petición de cada hora fallaba y había que reintentarla.
   useEffectApp(() => {
     if (!userProfile || !userProfile.accessToken) return;
-    if (!window.electronAPI || !window.electronAPI.googleRefreshAccess) return;
+    const api = apiGoogle();
+    if (!api || !api.googleRefreshAccess) return;
     const t = setInterval(() => { renuevaAccesoDrive(); }, 50 * 60 * 1000);
     return () => clearInterval(t);
   }, [userProfile && userProfile.accessToken]);
@@ -836,7 +881,7 @@ function App() {
   // Al arrancar, si hay un token de refresco guardado se recupera la sesión sola
   // aunque el permiso guardado en el navegador esté muerto.
   useEffectApp(() => {
-    const api = window.electronAPI;
+    const api = apiGoogle();
     if (!api || !api.googleHasRefresh) return;
     const perfil = userProfile;
     if (!perfil || perfil.accessToken) return;   // ya hay permiso, o no hay sesión
@@ -3864,6 +3909,8 @@ function App() {
                       window.customConfirm(window.t('¿Seguro que quieres cerrar sesión? Perderás acceso temporal a la colaboración en la nube.', 'Are you sure you want to sign out? You will temporarily lose access to cloud collaboration.'))
                         .then((accepted) => {
                           if (accepted) {
+                            const g = apiGoogle();
+                            if (g && g.googleSignOut) g.googleSignOut();
                             setUserProfile(null);
                             localStorage.removeItem('odinote.google_profile');
                             window.playAudioTone && window.playAudioTone('click');

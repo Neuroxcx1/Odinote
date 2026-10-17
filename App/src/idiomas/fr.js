@@ -964,4 +964,9 @@ window.ODI_IDIOMAS.fr = {
   959: "Sur cet écran, cela va jusqu'à {0} % : plus grand, l'application ne tiendrait plus et passerait à l'affichage téléphone.",
   960: "à l'instant",
   961: "Synchronisé",
+  962: "La connexion a été fermée avant la fin.",
+  963: "Google n'est pas revenu à temps. Réessayez.",
+  964: "Cet APK a été compilé sans les identifiants Google : il ne peut pas se connecter.",
+  965: "Impossible d'ouvrir le navigateur du téléphone.",
+  966: "Vous n'avez pas donné l'autorisation dans Google.",
 };

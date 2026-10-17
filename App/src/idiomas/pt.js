@@ -964,4 +964,9 @@ window.ODI_IDIOMAS.pt = {
   959: "Nesta tela vai até {0} %: maior que isso, o app não caberia mais e mudaria para o modo de celular.",
   960: "agora mesmo",
   961: "Sincronizado",
+  962: "O login foi fechado antes de terminar.",
+  963: "O Google não voltou a tempo. Tente de novo.",
+  964: "Este APK foi compilado sem as credenciais do Google, então não consegue entrar.",
+  965: "Não foi possível abrir o navegador do celular.",
+  966: "Você não deu permissão no Google.",
 };

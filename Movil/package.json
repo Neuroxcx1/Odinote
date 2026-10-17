@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "Oddinote para Android: envoltorio de Capacitor sobre la misma aplicacion de App/",
   "scripts": {
+    "test": "node scripts/test-google-loopback.js",
     "web": "node scripts/preparar-web.js",
     "apk": "node scripts/preparar-web.js && cap copy android && node scripts/compilar-apk.js",
     "movil": "node scripts/preparar-web.js && cap copy android && node scripts/compilar-apk.js && node scripts/instalar-en-movil.js",

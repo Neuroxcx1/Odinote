@@ -34,6 +34,9 @@ public class MainActivity extends BridgeActivity {
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
+        // Entrar con Google en el navegador del teléfono (EntrarConGoogle.java).
+        // Los plugins propios se registran ANTES de crear el puente.
+        registerPlugin(EntrarConGoogle.class);
         super.onCreate(savedInstanceState);
 
         View contenido = findViewById(android.R.id.content);

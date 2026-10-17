@@ -964,4 +964,9 @@ window.ODI_FRASES = [
   /* 959 */ ["En esta pantalla llega hasta el {0} %: más grande, la aplicación ya no cabría y se pondría como en el teléfono.","On this screen it goes up to {0} %: any bigger and the app would no longer fit and would switch to the phone layout."],
   /* 960 */ ["ahora","just now"],
   /* 961 */ ["Sincronizado","Synced"],
+  /* 962 */ ["Se cerró el inicio de sesión antes de terminar.","Sign-in was closed before it finished."],
+  /* 963 */ ["Google no volvió a tiempo. Vuelve a intentarlo.","Google did not come back in time. Try again."],
+  /* 964 */ ["Este APK se compiló sin las credenciales de Google, así que no puede entrar.","This APK was built without the Google credentials, so it cannot sign in."],
+  /* 965 */ ["No se pudo abrir el navegador del teléfono.","Could not open the phone browser."],
+  /* 966 */ ["No diste permiso en Google.","You did not grant permission in Google."],
 ];

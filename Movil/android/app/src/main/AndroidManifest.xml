@@ -18,6 +18,14 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <!-- La vuelta del navegador al acabar de entrar con Google: la página de
+                 127.0.0.1 manda aquí (intent://login con el esquema oddinote). -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="oddinote" android:host="login" />
+            </intent-filter>
         </activity>
 
         <provider

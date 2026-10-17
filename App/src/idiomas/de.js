@@ -964,4 +964,9 @@ window.ODI_IDIOMAS.de = {
   959: "Auf diesem Bildschirm geht es bis {0} %: Größer würde die App nicht mehr passen und in die Handy-Ansicht wechseln.",
   960: "gerade eben",
   961: "Synchronisiert",
+  962: "Die Anmeldung wurde vor dem Ende geschlossen.",
+  963: "Google kam nicht rechtzeitig zurück. Versuch es noch einmal.",
+  964: "Diese APK wurde ohne die Google-Zugangsdaten gebaut und kann sich daher nicht anmelden.",
+  965: "Der Browser des Telefons ließ sich nicht öffnen.",
+  966: "Du hast in Google keine Berechtigung erteilt.",
 };
