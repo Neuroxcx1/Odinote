@@ -21,9 +21,9 @@ const BOARD_ICON_CHOICES = [
   // Personas / social
   'group','person','groups','diversity_3','handshake','forum','chat','campaign','volunteer_activism',
   // Naturaleza / elementos
-  'eco','local_florist','pets','bug_report','water_drop','local_fire_department','bolt','wb_sunny','dark_mode','cloud','ac_unit','spa',
+  'eco','local_florist','pets','water_drop','local_fire_department','bolt','wb_sunny','dark_mode','cloud','ac_unit','spa',
   // Objetos / símbolos
-  'star','favorite','diamond','emoji_objects','emoji_events','military_tech','workspace_premium','shield','key','lock','visibility','build','construction','settings','tune','science','rocket','flight','directions_car','sailing','anchor','restaurant','local_cafe','sports_bar','cake','redeem',
+  'star','favorite','diamond','emoji_objects','emoji_events','military_tech','workspace_premium','shield','key','lock','visibility','build','construction','settings','tune','rocket','flight','directions_car','sailing','anchor','restaurant','local_cafe','sports_bar','cake','redeem',
 ];
 
 // Color picker — separate background and header strip for columns
@@ -60,6 +60,19 @@ const STRIP_PALETTE = [
   { key: 'dark',   hex: '#595459' },
   { key: 'black',  hex: '#1A1A1A' },
 ];
+
+// El nombre de cada color de la paleta, en el idioma de la interfaz (en
+// STICKY_PALETTE solo estaba en español).
+function nombreColorPaleta(p) {
+  const nombres = {
+    white: window.t('Blanco', 'White'), mist: window.t('Gris', 'Gray'), cream: window.t('Crema', 'Cream'),
+    yellow: window.t('Amarillo', 'Yellow'), orange: window.t('Naranja', 'Orange'), rose: window.t('Rosa', 'Pink'),
+    red: window.t('Rojo', 'Red'), pink: window.t('Magenta', 'Magenta'), purple: window.t('Púrpura', 'Purple'),
+    sky: window.t('Cielo', 'Sky'), sage: window.t('Verde claro', 'Light green'), green: window.t('Verde', 'Green'),
+    dark: window.t('Gris oscuro', 'Dark gray'), black: window.t('Negro', 'Black'),
+  };
+  return nombres[p.key] || p.label || p.key;
+}
 
 function resolveStickyColor(key) {
   const found = STICKY_PALETTE.find(p => p.key === key);
@@ -535,10 +548,10 @@ function ContextSidebar({
             <button
               className={`ctx-btn ${pane === 'drawColor' ? 'active' : ''}`}
               onClick={()=>setPane(pane === 'drawColor' ? null : 'drawColor')}
-              title="Color"
+              title={window.t('Color', 'Color')}
             >
               <div className="ctx-color-chip" style={{ background: callbacks.drawColor, border: '1.5px solid var(--line-soft)' }}/>
-              <span>Color</span>
+              <span>{window.t('Color', 'Color')}</span>
             </button>
 
             <button
@@ -639,10 +652,10 @@ function ContextSidebar({
               <button
             className={`ctx-btn ${(pane === 'color' || pane === 'colorHex') ? 'active' : ''}`}
             onClick={()=> isColor ? setPane(pane === 'colorHex' ? null : 'colorHex') : setPane(pane === 'color' ? null : 'color')}
-            title="Color"
+            title={window.t('Color', 'Color')}
           >
             <div className="ctx-color-chip" style={{ background: isColor ? (item.hex || '#56B3A7') : isSeparator && !item.color ? 'var(--ink-2)' : isCarpeta && !item.color ? '#F7DA84' : resolveStickyColor(item.color || 'white'), border: '1.5px solid var(--line-soft)' }}/>
-            <span>Color</span>
+            <span>{window.t('Color', 'Color')}</span>
           </button>
         )}
 
@@ -842,7 +855,7 @@ function ContextSidebar({
         <button
           className={`ctx-btn ${pane === 'emoji' ? 'active' : ''}`}
           onClick={()=>setPane(pane === 'emoji' ? null : 'emoji')}
-          title="Reacciones"
+          title={window.t('Reacciones', 'Reactions')}
         >
           <span className="material-symbols-rounded">add_reaction</span>
           <span>{window.t('Reacciones', 'React')}</span>
@@ -962,7 +975,7 @@ function ContextSidebar({
               title={window.t('Mostrar informacion', 'Show info')}
             >
               <span className="material-symbols-rounded">link</span>
-              <span>Info</span>
+              <span>{window.t('Info', 'Info')}</span>
             </button>
             <button
               className={`ctx-btn ${item.showCaption === true ? 'active' : ''}`}
@@ -1007,7 +1020,7 @@ function ContextSidebar({
                 background: (item.strokes && item.strokes[0] && item.strokes[0].color) || '#1A1A1A',
                 border: '1.5px solid var(--line-soft)',
               }}/>
-              <span>Color</span>
+              <span>{window.t('Color', 'Color')}</span>
             </button>
           </>
         )}
@@ -1253,10 +1266,10 @@ function ContextSidebar({
               <button
                 className={`ctx-btn ${item.showInfo === true ? 'active' : ''}`}
                 onClick={()=>onUpdate({ showInfo: item.showInfo !== true })}
-                title="Info"
+                title={window.t('Info', 'Info')}
               >
                 <span className="material-symbols-rounded">info</span>
-                <span>Info</span>
+                <span>{window.t('Info', 'Info')}</span>
               </button>
             )}
             {/* Cambiar el archivo se pide desde aquí. El doble clic sobre la
@@ -1336,10 +1349,10 @@ function ContextSidebar({
             <button
               className={`ctx-btn ${pane === 'tblColor' ? 'active' : ''}`}
               onClick={()=>setPane(pane === 'tblColor' ? null : 'tblColor')}
-              title="Color"
+              title={window.t('Color', 'Color')}
             >
               <div className="ctx-color-chip" style={{ background: tableCell.cellData?.color || '#FFFFFF', border: '1.5px solid var(--line-soft)' }}/>
-              <span>Color</span>
+              <span>{window.t('Color', 'Color')}</span>
             </button>
             <button
               className="ctx-btn"
@@ -2114,7 +2127,7 @@ function ContextSidebar({
                      que no se sabía cómo quitar. */
                   onClick={()=>{ onUpdate({ codeLang: l.id }); setPane(null); window.playAudioTone && window.playAudioTone('click'); }}
                 >
-                  <span>{l.nombre}</span>
+                  <span>{window.nombreLenguaje ? window.nombreLenguaje(l) : l.nombre}</span>
                   {(item.codeLang || 'javascript') === l.id && <span className="material-symbols-rounded">check</span>}
                 </button>
               ))}
@@ -2414,7 +2427,7 @@ function ContextSidebar({
                   className={`ctx-sticky-swatch ${tableCell.cellData?.color === p.hex ? 'active' : ''}`}
                   style={{ background: p.hex, border: p.hex === '#FFFFFF' ? '1.5px solid var(--line-soft)' : '1.5px solid var(--line)' }}
                   onClick={()=>tableCell.updateCell({ color: p.hex })}
-                  title={p.label}
+                  title={nombreColorPaleta(p)}
                 />
               ))}
             </div>

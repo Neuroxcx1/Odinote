@@ -179,7 +179,9 @@ function ponEtiqueta(pre) {
   if (!et) return;
   const idioma = pre.getAttribute('data-lang') || 'auto';
   const det = pre.getAttribute('data-detectado') || '';
-  const legible = (DOC_LANGS.find(l => l.id === idioma) || {}).n || idioma;
+  const legible = idioma === 'auto' ? window.t('Automático', 'Automatic')
+    : idioma === 'plaintext' ? window.t('Texto sin colores', 'Plain text')
+    : ((DOC_LANGS.find(l => l.id === idioma) || {}).n || idioma);
   et.textContent = idioma === 'auto' && det ? 'auto · ' + det : legible;
 }
 

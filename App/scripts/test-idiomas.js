@@ -62,6 +62,9 @@ if (doble >= 0) {
   const [es, en] = frases[doble];
   check('una frase con dos sentidos se traduce según su inglés', window.odiTraduce('fr', es, en) === caja.ODI_IDIOMAS.fr[doble], es + ' / ' + en + ' → ' + window.odiTraduce('fr', es, en));
 }
+// Una plantilla hecha solo de huecos («{0} {1}, {2} {3}») no puede tragarse
+// cualquier frase con esa forma (dejaba en español la pista del tamaño de letra).
+check('una plantilla sin texto propio no casa con frases ajenas', window.odiTraduce('fr', 'Hola mundo, adiós mundo', 'Hello world, bye world') === null);
 check('lo que no está en frases.js no se inventa', window.odiTraduce('fr', 'Frase que no existe en ningún sitio', 'Nope') === null);
 check('sin archivo de un idioma, nada', window.odiTraduce('xx', frases[0][0], frases[0][1]) === null);
 

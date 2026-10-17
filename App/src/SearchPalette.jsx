@@ -131,7 +131,7 @@ function SearchPalette({ open, onClose, projects, canvases, lang, onGoTo, mode }
             <span><kbd>↵</kbd> {window.t('abrir', 'open')}</span>
             <span><kbd>Esc</kbd> {window.t('cerrar', 'close')}</span>
             <span className="odi-sp-count">
-              {results.length} {window.t('resultados', 'results')}
+              {results.length} {results.length === 1 ? window.t('resultado', 'result') : window.t('resultados', 'results')}
             </span>
           </div>
         )}

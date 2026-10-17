@@ -46,14 +46,22 @@
       if (!par) return;
       const es = par[0], en = par[1];
       if (/\{\d+\}/.test(es) || /\{\d+\}/.test(en)) {
+        // Una plantilla que no tiene texto propio («{0} {1}, {2} {3}») casa con
+        // cualquier frase de esa forma y se comía a otras: la pista del tamaño
+        // de letra salía en español en los nueve idiomas. No dice nada que
+        // traducir, así que no entra.
+        const propio = String(es).replace(/\{\d+\}/g, '');
+        if (!/[A-Za-zÀ-ÿ\u0100-\uFFFF]{2}/.test(propio)) return;
         const huecosEn = (String(en).match(/\{(\d+)\}/g) || []).map(h => +h.slice(1, -1));
-        plantillas.push({ i, es: aPatron(es), en: aPatron(en), huecosEn });
+        plantillas.push({ i, es: aPatron(es), en: aPatron(en), huecosEn, largo: propio.length });
       } else {
         if (!indice.has(es)) indice.set(es, i);
         const k = es + '\u0001' + en;
         if (!parejas.has(k)) parejas.set(k, i);
       }
     });
+    // Las de más texto propio primero: son las más concretas.
+    plantillas.sort((a, b) => b.largo - a.largo);
   }
 
   function traduce(idioma, es, en) {

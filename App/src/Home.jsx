@@ -1179,7 +1179,7 @@ function RecentCard({ project, lang, t, onOpen, onDelete, onRenameClick, onToggl
               <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--olive, #6A8546)', display: 'inline-block', boxShadow: '0 0 6px var(--olive, #6A8546)' }} />
             </div>
           ) : (
-            <div className="odi-nube" style={{ display: 'flex', alignItems: 'center', color: 'var(--line-soft, #A5A19C)', flexShrink: 0 }} title={window.t('Solo local', 'Local only')}>
+            <div className="odi-nube" style={{ display: 'flex', alignItems: 'center', color: 'var(--ink-3, #8E8A8E)', flexShrink: 0 }} title={window.t('Solo local', 'Local only')}>
               <span className="material-symbols-rounded" style={{ fontSize: '18px' }}>cloud_off</span>
             </div>
           )}
@@ -1295,7 +1295,7 @@ function ProjectCard({ project, lang, t, onOpen, onDelete, onRenameClick, onRest
               <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--olive, #6A8546)', display: 'inline-block', boxShadow: '0 0 6px var(--olive, #6A8546)' }} />
             </div>
           ) : (
-            <div className="odi-nube" style={{ display: 'flex', alignItems: 'center', color: 'var(--line-soft, #A5A19C)', flexShrink: 0 }} title={window.t('Solo local', 'Local only')}>
+            <div className="odi-nube" style={{ display: 'flex', alignItems: 'center', color: 'var(--ink-3, #8E8A8E)', flexShrink: 0 }} title={window.t('Solo local', 'Local only')}>
               <span className="material-symbols-rounded" style={{ fontSize: '18px' }}>cloud_off</span>
             </div>
           )}

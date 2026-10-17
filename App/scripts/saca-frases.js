@@ -46,6 +46,28 @@ function frasesDe(archivo) {
       const es = texto(n.arguments[0]), en = texto(n.arguments[1]);
       if (es && en && es.t.trim()) fuera.push({ es: es.t, en: en.t, huecos: Math.max(es.n, en.n), plantilla: es.n > 0 || en.n > 0, archivo: path.basename(archivo), linea: n.loc ? n.loc.start.line : 0 });
     }
+    // Los avisos del selector de color: tostada('español', 'inglés').
+    if (n.type === 'CallExpression' && n.callee && n.callee.type === 'Identifier' && n.callee.name === 'tostada' && n.arguments.length === 2) {
+      const es = texto(n.arguments[0]), en = texto(n.arguments[1]);
+      if (es && en && es.t.trim()) fuera.push({ es: es.t, en: en.t, huecos: Math.max(es.n, en.n), plantilla: es.n > 0 || en.n > 0, archivo: path.basename(archivo), linea: n.loc ? n.loc.start.line : 0 });
+    }
+    // Las plantillas de tablero (plantillas.js) escriben sus textos con su
+    // propia ayuda, p('español', 'inglés'): también son frases de la interfaz.
+    // Y sus notas, nota(títuloEs, títuloEn, ayudaEs, ayudaEn), y las tareas
+    // como parejas ['es', 'en'].
+    if (path.basename(archivo) === 'plantillas.js') {
+      const apunta = (a, b) => {
+        const es = texto(a), en = texto(b);
+        // Las flechas también son parejas (['b1', 'b2']), pero de referencias, no de texto.
+        const esRef = (x) => /^[a-z]+\d+$/.test(x.t) || /^centro$/.test(x.t);
+        if (es && en && es.t.trim() && es.n === 0 && en.n === 0 && !esRef(es) && !esRef(en)) fuera.push({ es: es.t, en: en.t, huecos: 0, plantilla: false, archivo: path.basename(archivo), linea: n.loc ? n.loc.start.line : 0 });
+      };
+      if (n.type === 'CallExpression' && n.callee && n.callee.type === 'Identifier') {
+        if (n.callee.name === 'p' && n.arguments.length === 2) apunta(n.arguments[0], n.arguments[1]);
+        if (n.callee.name === 'nota' && n.arguments.length === 4) { apunta(n.arguments[0], n.arguments[1]); apunta(n.arguments[2], n.arguments[3]); }
+      }
+      if (n.type === 'ArrayExpression' && n.elements.length === 2 && n.elements.every(e => e && e.type === 'StringLiteral')) apunta(n.elements[0], n.elements[1]);
+    }
     // Los textos por defecto que la app guarda en el propio nodo como
     // { es: '…', en: '…' } (el título de una lista nueva, «Nuevo tablero»):
     // pickLang (items.jsx) los busca aquí para los otros nueve idiomas.

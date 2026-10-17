@@ -107,9 +107,11 @@ function CarpetaItem({ item, lang, onUpdate }) {
   else if (perdida) pie = window.t('No se encuentra', 'Not found');
   else if (info && info.ok) {
     const a = info.archivos, c = info.carpetas;
-    pie = window.t(
-      `${a} ${a === 1 ? 'archivo' : 'archivos'}, ${c} ${c === 1 ? 'carpeta' : 'carpetas'}`,
-      `${a} ${a === 1 ? 'file' : 'files'}, ${c} ${c === 1 ? 'folder' : 'folders'}`);
+    // Cada palabra por su lado: una frase hecha solo de huecos no tiene nada
+    // que traducir y salía en inglés en los otros nueve idiomas.
+    const pa = a === 1 ? window.t('archivo', 'file') : window.t('archivos', 'files');
+    const pc = c === 1 ? window.t('carpeta', 'folder') : window.t('carpetas', 'folders');
+    pie = `${a} ${pa}, ${c} ${pc}`;
   }
 
   return (
