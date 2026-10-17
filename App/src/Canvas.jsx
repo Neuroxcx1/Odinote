@@ -1117,21 +1117,23 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
   const primerCambioRef = useRefCanvas(0);
   const ultimoCambioRef = useRefCanvas(0);
   const pendienteRef = useRefCanvas(null);    // lo que espera su pausa: { snap, obj }
-  // Los ajustes que la app hace sola justo después de deshacer, rehacer o abrir
-  // el lienzo (una nota que vuelve a medir su altura) NO son pasos: antes
-  // entraban como uno nuevo y además borraban el rehacer, así que Ctrl+Y no
-  // devolvía lo deshecho y el siguiente Ctrl+Z solo deshacía esa altura. Si no
-  // ha habido ni tecla ni clic desde entonces, se meten en el paso actual.
+  // Los ajustes que la app hace sola justo después de deshacer, rehacer, abrir
+  // el lienzo o CREAR nodos (una nota que mide su altura al aparecer) NO son
+  // pasos: antes entraban como uno nuevo y además borraban el rehacer, así que
+  // Ctrl+Y no devolvía lo deshecho y el siguiente Ctrl+Z solo deshacía esa
+  // altura. Con una plantilla se veía clarísimo: el primer Ctrl+Z no hacía
+  // nada a la vista. Si no ha habido ni tecla ni clic desde entonces, se meten
+  // en el paso actual.
   const restauradoEnRef = useRefCanvas(Date.now());
   const ultimaEntradaRef = useRefCanvas(0);
   useEffectCanvas(() => {
     const apunta = () => { ultimaEntradaRef.current = Date.now(); };
-    document.addEventListener('pointerdown', apunta, true);
-    document.addEventListener('keydown', apunta, true);
-    return () => {
-      document.removeEventListener('pointerdown', apunta, true);
-      document.removeEventListener('keydown', apunta, true);
-    };
+    // beforeinput también: el dictado, el teclado de la pantalla o pegar desde
+    // el menú escriben sin keydown, y lo escrito se colaba en el paso de crear
+    // la nota (Ctrl+Z dejaba la nota con lo primero que se escribió).
+    const EVENTOS = ['pointerdown', 'keydown', 'beforeinput'];
+    EVENTOS.forEach(ev => document.addEventListener(ev, apunta, true));
+    return () => EVENTOS.forEach(ev => document.removeEventListener(ev, apunta, true));
   }, []);
 
   const pushHistory = useCallbackCanvas((snap, obj) => {
@@ -1198,6 +1200,8 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
       if (!primerCambioRef.current) primerCambioRef.current = ahora;
       ultimoCambioRef.current = ahora;
       pushHistory(snap, obj);
+      // Lo que se mida solo en el próximo segundo y medio, al mismo paso.
+      restauradoEnRef.current = ahora;
       return;
     }
     if (!primerCambioRef.current) primerCambioRef.current = ahora;
