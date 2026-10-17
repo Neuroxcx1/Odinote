@@ -31,8 +31,10 @@ function colChildHeight(c) {
 function colNeededHeight(col, isEmpty) {
   // La franja de arriba lleva el título Y la línea de «3 nodos»: medida en la
   // app, 58 px con los bordes. Con los 40 de antes a toda columna le faltaban
-  // 17 px y salía la barra de desplazamiento cortando la última tarjeta.
-  const headerH = 58;
+  // 17 px y salía la barra de desplazamiento cortando la última tarjeta. Si el
+  // título salta a dos líneas, la columna se mide y lo apunta (altoCabecera,
+  // en ColumnItem).
+  const headerH = col.altoCabecera || 58;
   const padding = 20; // top 10px + bottom 10px
   const gap = 7;
   if (isEmpty) return 160;
@@ -40,6 +42,7 @@ function colNeededHeight(col, isEmpty) {
   const gaps = ((col.children || []).length - 1) * gap;
   return headerH + padding + childrenH + gaps;
 }
+window.colNeededHeight = colNeededHeight;
 function withResizedColumn(items, colId) {
   return items.map(it => {
     if (it.id !== colId) return it;

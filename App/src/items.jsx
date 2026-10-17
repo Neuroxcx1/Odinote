@@ -1731,10 +1731,41 @@ function ColumnItem({ item, lang, onUpdate, editing, callbacks }) {
   const stripIsDark = isColorDark(stripColor);
   const children = item.children || [];
 
+  // La columna calcula su alto sumando el de sus tarjetas y el de la franja de
+  // arriba (colNeededHeight, en Canvas.jsx). La franja mide 58 px con una línea
+  // de título, pero un título largo salta a dos y entonces la última tarjeta
+  // quedaba cortada. Así que se mide de verdad y, si no es lo que se contó, se
+  // apunta en la columna (en silencio: no es un paso de deshacer, es la app
+  // ajustándose). offsetHeight va en px del lienzo: el zoom es una transformación
+  // y no lo cambia.
+  const tiraRef = React.useRef(null);
+  const colRef = React.useRef(item);
+  colRef.current = item;
+  React.useLayoutEffect(() => {
+    const el = tiraRef.current;
+    if (!el || !callbacks || !callbacks.resizeItemSilent || !window.colNeededHeight) return;
+    const mira = () => {
+      const col = colRef.current;
+      if (!(col.children || []).length) return;
+      const alto = Math.round(el.offsetHeight + 3); // + el borde de la tarjeta, arriba y abajo
+      // Con un margen: por un píxel no merece la pena tocar la columna (y
+      // guardarla) cada vez que se abre el proyecto.
+      if (!alto || Math.abs(alto - (col.altoCabecera || 58)) < 3) return;
+      const conAlto = Object.assign({}, col, { altoCabecera: alto });
+      callbacks.resizeItemSilent(col.id, { altoCabecera: alto, h: window.colNeededHeight(conAlto, false) });
+    };
+    mira();
+    if (typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(mira);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [children.length, item.altoCabecera]);
+
   return (
     <div className="column-card" style={{width:'100%', height:'100%'}}>
       <div className="item-card" style={{ overflow: 'hidden', padding: 0 }}>
         <div
+          ref={tiraRef}
           className={`column-strip ${stripIsDark ? 'dark' : ''}`}
           style={{ background: stripColor }}
         >
