@@ -1203,4 +1203,6 @@ window.ODI_IDIOMAS.pt = {
   1198: "Todos já saíram. Coloque-os de volta pela barra.",
   1199: "Saiu",
   1200: "Tirá-lo da roda (dá para colocar de volta pela barra)",
+  1201: "Esta versão do app para celular não permite entrar com o Google: instale a mais recente. Todo o resto funciona, suas notas ficam salvas no celular e as sessões ao vivo funcionam sem conta, com o código delas.",
+  1202: "Tem certeza de que quer sair? Suas telas deixarão de ser salvas no seu Google Drive até você entrar de novo. As sessões ao vivo continuam funcionando sem conta.",
 };

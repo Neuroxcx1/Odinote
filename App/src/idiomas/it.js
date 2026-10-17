@@ -1203,4 +1203,6 @@ window.ODI_IDIOMAS.it = {
   1198: "Sono usciti tutti. Rimettili dalla barra.",
   1199: "È uscito",
   1200: "Toglierlo dalla ruota (si può rimettere dalla barra)",
+  1201: "Questa versione dell'app per il telefono non permette l'accesso con Google: installa l'ultima. Tutto il resto funziona, le note si salvano sul telefono e le sessioni dal vivo funzionano senza account, con il loro codice.",
+  1202: "Vuoi davvero uscire? Le tue tele smetteranno di salvarsi nel tuo Google Drive finché non accedi di nuovo. Le sessioni dal vivo continuano a funzionare senza account.",
 };

@@ -1203,4 +1203,6 @@ window.ODI_FRASES = [
   /* 1198 */ ["Han salido todos. Vuelve a meterlos desde la barra.","They have all come out. Put them back from the bar."],
   /* 1199 */ ["Ha salido","The wheel says"],
   /* 1200 */ ["Quitarlo de la rueda (se puede volver a meter desde la barra)","Take it off the wheel (it can be put back from the bar)"],
+  /* 1201 */ ["Esta versión de la aplicación del móvil no trae el inicio de sesión con Google: instala la última. Todo lo demás sí va, tus notas se guardan en el teléfono y las sesiones en vivo funcionan sin cuenta, con su código.","This version of the phone app cannot sign in with Google: install the latest one. Everything else works, your notes are saved on the phone, and live sessions work without an account, with their code."],
+  /* 1202 */ ["¿Seguro que quieres cerrar sesión? Tus lienzos dejarán de guardarse en tu Google Drive hasta que vuelvas a entrar. Las sesiones en vivo siguen funcionando sin cuenta.","Are you sure you want to sign out? Your canvases will stop saving to your Google Drive until you sign in again. Live sessions keep working without an account."],
 ];

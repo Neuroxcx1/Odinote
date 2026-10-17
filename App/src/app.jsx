@@ -730,8 +730,10 @@ function App() {
       const movil = window.odiGoogleMovil;
       if (!movil || !movil.disponible()) {
         setLoginError(window.t(
-          'Entrar con Google todavía no funciona en la aplicación del móvil: Google no permite su ventana de inicio de sesión dentro de una app. Todo lo demás sí va, y tus notas se guardan en el teléfono. Para la nube y las salas, usa Oddinote en el ordenador o ábrela en el navegador del móvil.',
-          'Signing in with Google does not work yet in the phone app: Google does not allow its sign-in window inside an app. Everything else works, and your notes are saved on the phone. For the cloud and live sessions, use Oddinote on a computer or open it in the phone browser.'
+          // Solo pasa con un APK antiguo, sin el plugin. Las sesiones en vivo no
+          // piden cuenta: decir lo contrario aquí contradecía al resto de ventanas.
+          'Esta versión de la aplicación del móvil no trae el inicio de sesión con Google: instala la última. Todo lo demás sí va, tus notas se guardan en el teléfono y las sesiones en vivo funcionan sin cuenta, con su código.',
+          'This version of the phone app cannot sign in with Google: install the latest one. Everything else works, your notes are saved on the phone, and live sessions work without an account, with their code.'
         ));
         return;
       }
@@ -4125,7 +4127,7 @@ function App() {
                   <button
                     className="btn lift"
                     onClick={() => {
-                      window.customConfirm(window.t('¿Seguro que quieres cerrar sesión? Perderás acceso temporal a la colaboración en la nube.', 'Are you sure you want to sign out? You will temporarily lose access to cloud collaboration.'))
+                      window.customConfirm(window.t('¿Seguro que quieres cerrar sesión? Tus lienzos dejarán de guardarse en tu Google Drive hasta que vuelvas a entrar. Las sesiones en vivo siguen funcionando sin cuenta.', 'Are you sure you want to sign out? Your canvases will stop saving to your Google Drive until you sign in again. Live sessions keep working without an account.'))
                         .then((accepted) => {
                           if (accepted) {
                             const g = apiGoogle();
