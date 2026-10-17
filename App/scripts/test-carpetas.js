@@ -76,13 +76,14 @@ check('da igual cómo esté escrito en mayúsculas',
   nombreLibreDeCarpeta(['CARPETA'], 'Carpeta') === 'Carpeta 2');
 
 // ── Lo que hace la aplicación con esos nombres ──
-check('mover un proyecto solo le cambia un campo',
-  /const setProjectFolder = \(projectId, carpeta\) => \{[\s\S]{0,300}\{ \.\.\.x, carpeta: limpio \|\| null \}/.test(app));
+// La carpeta y su color (carpetaColor), que va con ella; nada más.
+check('mover un proyecto solo le cambia la carpeta (y el color de la carpeta)',
+  /const setProjectFolder = \(projectId, carpeta\) => \{[\s\S]{0,500}\{ \.\.\.x, carpeta: limpio \|\| null(, carpetaColor: color)? \}/.test(app));
 check('renombrar una carpeta arrastra a todos sus proyectos',
   /const renameFolder = \([\s\S]{0,400}String\(x\.carpeta \|\| ''\)\.trim\(\) === de \? \{ \.\.\.x, carpeta: a \}/.test(app));
 // Lo importante de todo esto: quitar la carpeta NO puede borrar un proyecto.
 check('quitar una carpeta solo vacía el campo, no borra nada',
-  /const removeFolder = \([\s\S]{0,400}\{ \.\.\.x, carpeta: null \}/.test(app));
+  /const removeFolder = \([\s\S]{0,400}\{ \.\.\.x, carpeta: null(, carpetaColor: null)? \}/.test(app));
 check('quitar una carpeta no filtra la lista de proyectos',
   !/const removeFolder = \([\s\S]{0,400}\.filter\(/.test(app));
 
