@@ -29,7 +29,10 @@ function colChildHeight(c) {
          c.type === 'calendar' ? 220 : 90;
 }
 function colNeededHeight(col, isEmpty) {
-  const headerH = 40;
+  // La franja de arriba lleva el título Y la línea de «3 nodos»: medida en la
+  // app, 58 px con los bordes. Con los 40 de antes a toda columna le faltaban
+  // 17 px y salía la barra de desplazamiento cortando la última tarjeta.
+  const headerH = 58;
   const padding = 20; // top 10px + bottom 10px
   const gap = 7;
   if (isEmpty) return 160;
