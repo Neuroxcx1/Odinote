@@ -1174,4 +1174,10 @@ window.ODI_IDIOMAS.de = {
   1169: "Bildschirmfoto speichern",
   1170: "PNG-Bild",
   1171: "Dieser Knoten kann nicht angezeigt werden",
+  1172: "Er ist gesperrt, weil einer seiner Knoten gesperrt ist.",
+  1173: "Er ist gesperrt: entsperre ihn (oder seine Knoten), um ihn zu verschieben oder zu löschen.",
+  1174: "Gesperrt, weil einer seiner Knoten gesperrt ist",
+  1175: "Sperren: Er lässt sich nicht verschieben, biegen oder löschen (Strg+Shift+L)",
+  1176: "Gesperrt",
+  1177: "Er ist gesperrt: entsperre ihn (oder seine Knoten), um ihn zu verschieben.",
 };

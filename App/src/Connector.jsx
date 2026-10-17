@@ -154,7 +154,8 @@ function getNodeRect(itemId, items) {
       if (w === undefined) w = def.w;
       if (h === undefined) h = def.h;
     }
-    return { id: topItem.id, x: topItem.x, y: topItem.y, w, h, isColumn: topItem.type === 'column' };
+    // El candado viaja con la caja: la flecha pegada a un nodo bloqueado se queda quieta.
+    return { id: topItem.id, x: topItem.x, y: topItem.y, w, h, isColumn: topItem.type === 'column', bloqueado: !!topItem.bloqueado };
   }
   for (const it of items) {
     if (it.type === 'column' && it.children) {
@@ -190,7 +191,9 @@ function getNodeRect(itemId, items) {
           y: it.y + relY,
           w: it.w || 320,
           h: h,
-          isColumn: true
+          isColumn: true,
+          // Una tarjeta de una columna bloqueada está tan quieta como ella.
+          bloqueado: !!(it.bloqueado || child.bloqueado)
         };
       }
     }
@@ -276,6 +279,10 @@ function Connector({ conn, items, selected, selectedIds, onSelect, onUpdate, onD
   const A = endInfo(from, items);
   const B = endInfo(to, items);
   const cA = A.center, cB = B.center;
+  // Bloqueada: con su propio candado o pegada a un nodo que lo tiene. Así,
+  // bloquear un nodo o un grupo deja quietas también sus flechas: antes,
+  // arrastrar la flecha se llevaba los nodos bloqueados con ella.
+  const bloqueada = !!conn.bloqueado || !!(A.item && A.item.bloqueado) || !!(B.item && B.item.bloqueado);
   const bend = conn.bend || { x: 0, y: 0 };
   const shape = conn.shape || 'curve';
 
@@ -558,6 +565,20 @@ function Connector({ conn, items, selected, selectedIds, onSelect, onUpdate, onD
     e.stopPropagation(); e.preventDefault();
     const startX = e.clientX, startY = e.clientY;
     const scale = panZoom?.scale || 1;
+    // Bloqueada, un clic la elige (para quitarle el candado) y arrastrar no
+    // mueve nada: solo avisa, una vez.
+    if (bloqueada) {
+      let avisada = false;
+      const onMoveB = (ev) => {
+        if (avisada || (Math.abs(ev.clientX - startX) < 4 && Math.abs(ev.clientY - startY) < 4)) return;
+        avisada = true;
+        window.showToast && window.showToast(window.t('Está bloqueada: quítale el candado (a ella o a sus nodos) para moverla.', 'It is locked: unlock it (or its nodes) to move it.'));
+      };
+      const onUpB = () => { window.removeEventListener('mousemove', onMoveB); window.removeEventListener('mouseup', onUpB); onSelect && onSelect(conn.id); };
+      window.addEventListener('mousemove', onMoveB);
+      window.addEventListener('mouseup', onUpB);
+      return;
+    }
     // Capture starting positions of attached nodes and free endpoints
     const nodeStarts = [];
     if (A.item) nodeStarts.push({ id: A.item.id, x: A.item.x, y: A.item.y });
@@ -701,6 +722,21 @@ function Connector({ conn, items, selected, selectedIds, onSelect, onUpdate, onD
     // triple): en coordenadas del lienzo encogían con él y, alejado, no había
     // forma de agarrar una píldora de cuatro píxeles.
     const k = Math.min(3, Math.max(1, 1 / (panZoom?.scale || 1)));
+    // Bloqueada: sin tiradores (no se dobla ni se despega), solo un candado
+    // en el centro para que se vea por qué.
+    if (bloqueada) {
+      return (
+        <g className="connector-bloqueada">
+          {dottedA && <path className="connector-covered" d={dottedA} style={{ stroke: sel }}/>}
+          {dottedB && <path className="connector-covered" d={dottedB} style={{ stroke: sel }}/>}
+          <g transform={`translate(${hx} ${hy}) scale(${k})`} style={{ pointerEvents: 'none' }}>
+            <circle r="11" className="connector-candado-fondo"/>
+            <rect x="-4.5" y="-1.5" width="9" height="7" rx="1.5" className="connector-candado"/>
+            <path d="M -2.6 -1.5 V -3.6 A 2.6 2.6 0 0 1 2.6 -3.6 V -1.5" className="connector-candado-arco"/>
+          </g>
+        </g>
+      );
+    }
     return (
       <g>
         {/* Dotted covered segments — center → node edge, drawn over the node */}

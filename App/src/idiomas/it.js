@@ -1174,4 +1174,10 @@ window.ODI_IDIOMAS.it = {
   1169: "Salva la cattura",
   1170: "Immagine PNG",
   1171: "Impossibile mostrare questo nodo",
+  1172: "È bloccata perché uno dei suoi nodi è bloccato.",
+  1173: "È bloccata: sbloccala (o i suoi nodi) per spostarla o eliminarla.",
+  1174: "Bloccata perché uno dei suoi nodi è bloccato",
+  1175: "Blocca: non si sposta, non si piega e non si elimina (Ctrl+Shift+L)",
+  1176: "Bloccata",
+  1177: "È bloccata: sbloccala (o i suoi nodi) per spostarla.",
 };

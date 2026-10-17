@@ -1174,4 +1174,10 @@ window.ODI_IDIOMAS.fr = {
   1169: "Enregistrer la capture",
   1170: "Image PNG",
   1171: "Impossible d'afficher ce nœud",
+  1172: "Elle est verrouillée car l'un de ses nœuds est verrouillé.",
+  1173: "Elle est verrouillée : déverrouillez-la (ou ses nœuds) pour la déplacer ou la supprimer.",
+  1174: "Verrouillée car l'un de ses nœuds est verrouillé",
+  1175: "Verrouiller : elle ne bouge pas, ne se plie pas et ne se supprime pas (Ctrl+Shift+L)",
+  1176: "Verrouillée",
+  1177: "Elle est verrouillée : déverrouillez-la (ou ses nœuds) pour la déplacer.",
 };

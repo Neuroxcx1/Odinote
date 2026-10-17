@@ -1174,4 +1174,10 @@ window.ODI_IDIOMAS.pt = {
   1169: "Salvar a captura",
   1170: "Imagem PNG",
   1171: "Não foi possível mostrar este nó",
+  1172: "Está bloqueada porque um dos seus nós está bloqueado.",
+  1173: "Está bloqueada: desbloqueie-a (ou os seus nós) para movê-la ou excluí-la.",
+  1174: "Bloqueada porque um dos seus nós está bloqueado",
+  1175: "Bloquear: não se move, não se dobra nem se exclui (Ctrl+Shift+L)",
+  1176: "Bloqueada",
+  1177: "Está bloqueada: desbloqueie-a (ou os seus nós) para movê-la.",
 };

@@ -1174,4 +1174,10 @@ window.ODI_FRASES = [
   /* 1169 */ ["Guardar la captura","Save the screenshot"],
   /* 1170 */ ["Imagen PNG","PNG image"],
   /* 1171 */ ["Error al mostrar este nodo","Could not show this node"],
+  /* 1172 */ ["Está bloqueada porque uno de sus nodos tiene el candado.","It is locked because one of its nodes is locked."],
+  /* 1173 */ ["Está bloqueada: quítale el candado (a ella o a sus nodos) para moverla o borrarla.","It is locked: unlock it (or its nodes) to move or delete it."],
+  /* 1174 */ ["Bloqueada porque uno de sus nodos tiene el candado","Locked because one of its nodes is locked"],
+  /* 1175 */ ["Bloquear: no se mueve, no se dobla ni se borra (Ctrl+Shift+L)","Lock: it cannot be moved, bent or deleted (Ctrl+Shift+L)"],
+  /* 1176 */ ["Bloqueada","Locked"],
+  /* 1177 */ ["Está bloqueada: quítale el candado (a ella o a sus nodos) para moverla.","It is locked: unlock it (or its nodes) to move it."],
 ];

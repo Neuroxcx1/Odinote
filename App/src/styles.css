@@ -3672,6 +3672,13 @@ html[data-mobile="1"] .ctx-popout.cal-dia-color { top: auto; bottom: 8px; left: 
 .connector-path.selected { stroke: var(--wine); stroke-width: 3; }
 .connector-hit { fill: none; stroke: transparent; stroke-width: 18; pointer-events: stroke; cursor: pointer; }
 .connector-handle { fill: var(--wine); stroke: var(--paper); stroke-width: 2; pointer-events: auto; cursor: grab; }
+/* El candado de una flecha bloqueada (Connector.jsx): en su centro, sin tiradores. */
+/* Un botón de la barra que no se puede usar ahora (la forma de una flecha
+   bloqueada): apagado, para que no parezca que no responde. */
+.ctx-btn:disabled { opacity: 0.38; cursor: not-allowed; }
+.connector-candado-fondo { fill: var(--paper); stroke: var(--line, #1E1A1D); stroke-width: 1.5; }
+.connector-candado { fill: var(--ink, #1A1A1A); }
+.connector-candado-arco { fill: none; stroke: var(--ink, #1A1A1A); stroke-width: 1.6; stroke-linecap: round; }
 .connector-handle.endpoint { fill: var(--paper); stroke: var(--wine); stroke-width: 2.5; }
 /* Orthogonal (Miro-style) editing handles */
 .connector-handle.waypoint { fill: var(--wine); stroke: var(--paper); stroke-width: 2; }

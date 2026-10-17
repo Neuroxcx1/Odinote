@@ -1808,7 +1808,10 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
         }
       }
       if ((e.key === 'Backspace' || e.key === 'Delete') && selectedConn) {
-        e.preventDefault(); deleteConnector(selectedConn);
+        e.preventDefault();
+        const co = (current.connectors || []).find(x => x.id === selectedConn);
+        if (flechaBloqueada(co)) { avisaFlechaBloqueada(); return; }
+        deleteConnector(selectedConn);
       }
       if (matchShortcut(window.shortcuts.duplicate) && selected) {
         e.preventDefault(); duplicateItem(selected);
@@ -1825,7 +1828,9 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
         if (e.shiftKey) desagrupaSeleccion(); else agrupaSeleccion();
       }
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && !e.altKey && (e.key === 'l' || e.key === 'L')) {
-        e.preventDefault(); alternaBloqueo();
+        e.preventDefault();
+        if (selectedConn && !selected && !selectedIds.length) alternaBloqueoFlecha(selectedConn);
+        else alternaBloqueo();
       }
       // Cortar/Copiar nodos desde el teclado. Los eventos nativos 'cut'/'copy' solo se
       // disparan cuando el foco está en un elemento editable (el interceptor oculto);
@@ -2312,6 +2317,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
             ...co,
             id: newConnId,
           };
+          delete copy.bloqueado;
           if (copy.fromEnd && idMap[copy.fromEnd.itemId]) {
             copy.fromEnd = { ...copy.fromEnd, itemId: idMap[copy.fromEnd.itemId] };
           }
@@ -2935,6 +2941,23 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
     });
   };
 
+  // El candado de una flecha. Si está bloqueada por sus nodos, quitarle el
+  // suyo no la suelta: se explica en vez de no hacer nada.
+  const alternaBloqueoFlecha = (connId) => {
+    const co = (current.connectors || []).find(x => x.id === connId);
+    if (!co) return;
+    if (!co.bloqueado && flechaPorNodos(co)) {
+      window.showToast && window.showToast(window.t('Está bloqueada porque uno de sus nodos tiene el candado.', 'It is locked because one of its nodes is locked.'));
+      return;
+    }
+    setCanvases(prev => {
+      const c = prev[currentId];
+      if (!c) return prev;
+      return { ...prev, [currentId]: { ...c, connectors: (c.connectors || []).map(x => x.id === connId ? { ...x, bloqueado: !co.bloqueado } : x) } };
+    });
+    window.playAudioTone && window.playAudioTone('click');
+  };
+
   const deleteConnector = (connId) => {
     window.playAudioTone && window.playAudioTone('delete');
     setCanvases(prev => {
@@ -3325,6 +3348,20 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
   const avisaBloqueado = () => window.showToast && window.showToast(window.t(
     'Está bloqueado: quítale el candado para moverlo o borrarlo.',
     'It is locked: unlock it to move or delete it.'));
+  // Una flecha está bloqueada si tiene su candado o si está pegada a un nodo
+  // que lo tiene (Connector.jsx hace la misma cuenta para no dejarla mover).
+  // Con la misma caja que pinta la flecha (window.getNodeRect): así cuenta
+  // también una tarjeta dentro de una columna bloqueada.
+  const nodoDeExtremo = (end) => (end && end.itemId && window.getNodeRect) ? window.getNodeRect(end.itemId, current.items || []) : null;
+  const flechaPorNodos = (conn) => {
+    const a = nodoDeExtremo(conn.fromEnd || (conn.from ? { itemId: conn.from } : null));
+    const b = nodoDeExtremo(conn.toEnd || (conn.to ? { itemId: conn.to } : null));
+    return !!((a && a.bloqueado) || (b && b.bloqueado));
+  };
+  const flechaBloqueada = (conn) => !!(conn && (conn.bloqueado || flechaPorNodos(conn)));
+  const avisaFlechaBloqueada = () => window.showToast && window.showToast(window.t(
+    'Está bloqueada: quítale el candado (a ella o a sus nodos) para moverla o borrarla.',
+    'It is locked: unlock it (or its nodes) to move or delete it.'));
 
   // ── Las plantillas (window.OdiPlantillas) ──
   // Se ponen en el centro de lo que se está viendo, de una vez (un solo paso de
@@ -5954,6 +5991,8 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
         if (!conn) return null;
         const style = conn.style || 'solid';
         const shape = conn.shape || 'curve';
+        const conCandado = flechaBloqueada(conn);
+        const porNodos = flechaPorNodos(conn);
 
         return (
           <div className="ctx-side" onMouseDown={(e)=>e.stopPropagation()}>
@@ -5961,17 +6000,34 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
               <span className="material-symbols-rounded">arrow_back</span>
             </button>
 
-            <button className={`ctx-btn ${shape==='curve' ? 'active' : ''}`} onClick={()=>updateConnector(conn.id, { shape: 'curve' })}>
+            {/* El candado de la flecha: quieta, sin doblarse ni borrarse. Si
+                lo tiene uno de sus nodos, la flecha va con él. */}
+            <button
+              className={`ctx-btn ${conCandado ? 'active' : ''}`}
+              onClick={()=>alternaBloqueoFlecha(conn.id)}
+              title={porNodos && !conn.bloqueado
+                ? window.t('Bloqueada porque uno de sus nodos tiene el candado', 'Locked because one of its nodes is locked')
+                : conCandado
+                  ? window.t('Quitar el candado (Ctrl+Shift+L)', 'Unlock (Ctrl+Shift+L)')
+                  : window.t('Bloquear: no se mueve, no se dobla ni se borra (Ctrl+Shift+L)', 'Lock: it cannot be moved, bent or deleted (Ctrl+Shift+L)')}
+            >
+              <span className="material-symbols-rounded">{conCandado ? 'lock' : 'lock_open'}</span>
+              <span>{conCandado ? window.t('Bloqueada', 'Locked') : window.t('Bloquear', 'Lock')}</span>
+            </button>
+
+            <div className="ctx-sep-h"/>
+
+            <button className={`ctx-btn ${shape==='curve' ? 'active' : ''}`} disabled={conCandado} onClick={()=>updateConnector(conn.id, { shape: 'curve' })}>
               <span className="material-symbols-rounded">show_chart</span>
               <span>{window.t('Curva', 'Curve')}</span>
             </button>
-            <button className={`ctx-btn ${shape==='orthogonal' ? 'active' : ''}`} onClick={()=>updateConnector(conn.id, { ...(window.FlechaRecta ? window.FlechaRecta.patchAutomatica(conn) : { ortho: undefined, orthoManual: undefined }), shape: 'orthogonal', bend: { x: 0, y: 0 } })}>
+            <button className={`ctx-btn ${shape==='orthogonal' ? 'active' : ''}`} disabled={conCandado} onClick={()=>updateConnector(conn.id, { ...(window.FlechaRecta ? window.FlechaRecta.patchAutomatica(conn) : { ortho: undefined, orthoManual: undefined }), shape: 'orthogonal', bend: { x: 0, y: 0 } })}>
               <span className="material-symbols-rounded">stairs</span>
               <span>{window.t('Recta', 'Right-angle')}</span>
             </button>
             {/* Con el recorrido hecho a mano, volver al automático: el que se
                 rehace solo al mover los nodos. */}
-            {shape === 'orthogonal' && window.FlechaRecta && window.FlechaRecta.esAMano(conn) && (
+            {shape === 'orthogonal' && !conCandado && window.FlechaRecta && window.FlechaRecta.esAMano(conn) && (
               <button
                 className="ctx-btn"
                 onClick={()=>{ updateConnector(conn.id, window.FlechaRecta.patchAutomatica(conn)); window.playAudioTone && window.playAudioTone('click'); }}
@@ -6045,7 +6101,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
 
             <div className="ctx-sep-h"/>
 
-            <button className="ctx-btn danger" onClick={()=>deleteConnector(conn.id)}>
+            <button className="ctx-btn danger" onClick={()=>{ if (conCandado) { avisaFlechaBloqueada(); return; } deleteConnector(conn.id); }}>
               <span className="material-symbols-rounded">delete</span>
               <span>{window.t('Eliminar', 'Delete')}</span>
             </button>
