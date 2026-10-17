@@ -392,8 +392,13 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
 
   const setCanvases = (updater) => {
     _setCanvases(prev => {
-      const next = typeof updater === 'function' ? updater(prev) : updater;
-      return next;
+      if (typeof updater !== 'function') return updater;
+      // Si el lienzo en el que estás ya no existe (lo quitó un deshacer, o un
+      // cambio que llegó de otro equipo), los cambios que lo leen fallarían
+      // DENTRO de React y la app entera se quedaría en blanco. Se ignoran: el
+      // efecto de abajo recorta la pila hasta un lienzo que siga existiendo.
+      if (prev && !prev[currentId]) return prev;
+      return updater(prev);
     });
   };
 
@@ -416,6 +421,15 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
   });
 
   // Se avisa hacia arriba para que el rastro se guarde con el resto del estado.
+  // Deshacer la creación de un tablero quita su lienzo, y la pila seguía
+  // apuntando a él: el bot de pruebas dejó la app en blanco así (Ctrl+Z dentro
+  // de un tablero recién creado y luego un clic en una herramienta). Se vuelve
+  // al último lienzo de la pila que siga existiendo.
+  useEffectCanvas(() => {
+    const i = stack.findIndex(id => !canvases[id]);
+    if (i > 0) setStack(stack.slice(0, i));
+  }, [canvases, stack]);
+
   const onTrailChangeRef = useRefCanvas(onTrailChange);
   onTrailChangeRef.current = onTrailChange;
   useEffectCanvas(() => {
@@ -1151,6 +1165,9 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
 
   const pushHistory = useCallbackCanvas((snap, obj) => {
     if (lastSnapRef.current === snap) return; // sin cambios reales
+    // Ni un paso igual al que ya está en el historial: dos Ctrl+Z seguidos que
+    // no hacían nada (lo vio el bot tras crear un to-do y tras el candado).
+    if (historyRef.current[historyIdxRef.current] === snap) { lastSnapRef.current = snap; if (obj) ultimoObjRef.current = obj; return; }
     const cambio = obj ? queCambio(ultimoObjRef.current, obj) : new Set();
     const ids = [...cambio].sort().join('|');
     const soloModifica = !cambio.altas;
@@ -1184,11 +1201,22 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
   // lo mismo que el paso anterior sin pausa larga, se juntan con él).
   useEffectCanvas(() => {
     if (skipHistory.current) { skipHistory.current = false; return; }
+    // Mientras se arrastra, se estira o se gira, cada fotograma cambia el
+    // estado, y la instantánea es un JSON de TODOS los lienzos (el bot midió
+    // 1,3 MB y 17 ms cada una): el arrastre de varios nodos iba a tirones solo
+    // por esto. Al soltar, el arrastre hace su cambio final y ese sí se apunta.
+    if (document.body.classList.contains('odi-busy')) return;
     const snap = instantanea(canvases);
     const obj = canvases;
     // La primera instantánea se guarda de inmediato (estado base del lienzo)
     if (lastSnapRef.current === null) { pushHistory(snap, obj); return; }
-    if (snap === lastSnapRef.current) return; // solo cambió algo del momento
+    if (snap === lastSnapRef.current) {
+      // Ha vuelto a como estaba en el último paso (una altura que crece al
+      // elegir un nodo y vuelve al soltarlo): lo que esperaba su pausa ya no
+      // existe, y si se apuntaba dejaba un paso fantasma.
+      if (historyTimerRef.current) { clearTimeout(historyTimerRef.current); historyTimerRef.current = null; pendienteRef.current = null; }
+      return;
+    }
     const ahora = Date.now();
     // Un ajuste solo de la app tras deshacer/rehacer/abrir: al paso actual.
     if (ahora - restauradoEnRef.current < 1500 && ultimaEntradaRef.current < restauradoEnRef.current &&
@@ -1343,10 +1371,18 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
     return () => clearTimeout(t);
   }, [current?.items, currentId]);
 
+  // Los nodos van memorizados y no se pintan otra vez con cada paso del zoom:
+  // el que necesite saberlo (la galería, para pedir sus miniaturas al tamaño
+  // de la pantalla) escucha este aviso.
+  useEffectCanvas(() => {
+    window.dispatchEvent(new CustomEvent('odi-zoom', { detail: scale }));
+  }, [scale]);
+
   // ───── Wheel pan/zoom ─────
   useEffectCanvas(() => {
     const el = surfaceRef.current;
     if (!el) return;
+    let zoomCrudo = null;
     const onWheel = (e) => {
       const target = e.target;
       const isScrollable = (element) => {
@@ -1371,8 +1407,15 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
         const my = e.clientY - rect.top;
         const delta = -e.deltaY * 0.0015;
         setScale(s => {
-          const raw = Math.min(2.5, Math.max(0.2, s * (1 + delta)));
+          // El zoom se redondea a pasos de 0,05, pero lo que pide la rueda se
+          // va sumando sin redondear: el pellizco de un panel táctil manda
+          // pasos tan pequeños (deltaY de 4 o 10) que, redondeado cada uno por
+          // su cuenta, a 100 % se quedaba siempre en 100 % (lo vio el bot).
+          const base = (zoomCrudo != null && Math.abs(Math.round(zoomCrudo * 20) / 20 - s) < 1e-6) ? zoomCrudo : s;
+          const raw = Math.min(2.5, Math.max(0.2, base * (1 + delta)));
+          zoomCrudo = raw;
           const ns = Math.round(raw * 20) / 20;
+          if (ns === s) return s;
           setPan(p => ({ x: mx - (mx - p.x) * (ns / s), y: my - (my - p.y) * (ns / s) }));
           return ns;
         });
@@ -2987,8 +3030,14 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
       e.target.classList.contains('canvas-content') ||
       e.target.classList.contains('connectors') ||
       e.target.classList.contains('board-cover-grid');
+    // Con una herramienta elegida, un clic ENCIMA de un nodo también pone el
+    // nodo nuevo (como en Miro o FigJam). Antes no pasaba nada: la herramienta
+    // seguía elegida y lo que se tecleaba después se perdía. Los campos de
+    // texto se quedan fuera: ahí el clic es para escribir.
+    const sobreNodo = activeTool && activeTool !== 'line' && !!e.target.closest('[data-item-id]') &&
+      !e.target.closest('input, textarea, select, [contenteditable="true"]');
 
-    if (!isSurface) return;
+    if (!isSurface && !sobreNodo) return;
 
     // Commit any open inline editor (cell/event/etc.) — the marquee preventDefault below would
     // otherwise keep the focused input from blurring, leaving it stuck in edit mode.
@@ -3323,6 +3372,34 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
     // una variable global _excluded, y otro archivo ya tiene la suya; al
     // cargarlos juntos la página se quedaba en blanco.
     const sinCampos = (o, fuera) => { const r = {}; Object.keys(o).forEach(k => { if (fuera.indexOf(k) === -1) r[k] = o[k]; }); return r; };
+    // En los otros nueve idiomas, cada texto { es, en } de la plantilla se
+    // traduce al ponerla (y se guarda en su idioma dentro del propio texto,
+    // que es lo primero que mira pickLang). Las notas son «título + ayuda» en
+    // HTML: se traduce cada trozo. Lo que no está en el catálogo se queda en
+    // inglés, como antes.
+    const traduceTextos = (o) => {
+      if (lang === 'es' || lang === 'en' || !window.odiTraduce || !window.odiTraduce.fija) return o;
+      const fija = (es, en) => window.odiTraduce.fija(lang, es, en);
+      const visita = (v) => {
+        if (Array.isArray(v)) { v.forEach(visita); return; }
+        if (!v || typeof v !== 'object') return;
+        if (typeof v.es === 'string' && typeof v.en === 'string' && !v[lang]) {
+          let t = fija(v.es, v.en);
+          if (!t) {
+            const re = /^<p><b>([\s\S]*?)<\/b><\/p><p>([\s\S]*?)<\/p>$/;
+            const me = v.es.match(re), mn = v.en.match(re);
+            if (me && mn) {
+              const ti = fija(me[1], mn[1]), ay = fija(me[2], mn[2]);
+              if (ti || ay) t = '<p><b>' + (ti || mn[1]) + '</b></p><p>' + (ay || mn[2]) + '</p>';
+            }
+          }
+          if (t) v[lang] = t;
+        }
+        Object.keys(v).forEach(k => visita(v[k]));
+      };
+      visita(o);
+      return o;
+    };
     const nuevos = pl.nodos.map((n, k) => {
       const { ref, tipo, x, y, w: nw, h: nh, hijos } = n;
       const resto = sinCampos(n, ['ref', 'tipo', 'x', 'y', 'w', 'h', 'hijos']);
@@ -3330,13 +3407,13 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
       // makeNewItem pone el id con la hora en milisegundos: doce nodos en el
       // mismo milisegundo podrían repetirlo.
       it.id = `it-${sello}-pl${k}-${Math.floor(Math.random() * 99999)}`;
-      Object.assign(it, JSON.parse(JSON.stringify(resto)));
+      Object.assign(it, traduceTextos(JSON.parse(JSON.stringify(resto))));
       if (hijos) {
         it.children = hijos.map((hj, j) => {
           const tipoHijo = hj.tipo;
           const restoHijo = sinCampos(hj, ['tipo']);
           const hijo = makeNewItem(tipoHijo, 0, 0, undefined, hj.h, lang);
-          return { ...hijo, ...JSON.parse(JSON.stringify(restoHijo)), id: `${it.id}-h${j}` };
+          return { ...hijo, ...traduceTextos(JSON.parse(JSON.stringify(restoHijo))), id: `${it.id}-h${j}` };
         });
       }
       porRef[ref] = it.id;
@@ -3462,7 +3539,9 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
     {
       const draggedItem = current.items.find(i => i.id === itemId);
       if (draggedItem && draggedItem.type === 'column' && e.target.closest('.column-body')) {
-        if (!e.target.closest('.col-child-wrap')) {
+        // Con una herramienta elegida el clic sigue hasta el lienzo, que pone
+        // ahí el nodo nuevo.
+        if (!e.target.closest('.col-child-wrap') && !(activeTool && activeTool !== 'line')) {
           e.stopPropagation();
           setSelected(itemId); setSelectedIds([]); setSelectedConn(null); setContextMenu(null);
           setEditingChildState(null);
@@ -3573,6 +3652,10 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
     let currentDropTodo = null;
 
     const onMove = (ev) => {
+      // Si el mouseup se perdió (se soltó encima de la barra de título, que es
+      // otra página, o fuera de la ventana), el nodo seguía al ratón sin botón
+      // pulsado hasta el siguiente clic. Un movimiento sin botones lo termina.
+      if (ev.buttons === 0) { onUp(); return; }
       const dx = (ev.clientX - startX) / scale;
       const dy = (ev.clientY - startY) / scale;
       if (!moved && (Math.abs(dx) > 2 || Math.abs(dy) > 2)) {
@@ -3893,13 +3976,39 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
       wasSnappedX = currentlySnappedX;
       wasSnappedY = currentlySnappedY;
     };
-    const onUp = () => {
+    // Escape a mitad de arrastre lo deshace: todo vuelve a donde estaba y no
+    // queda ningún paso en el historial. Antes solo quitaba la selección y el
+    // nodo seguía pegado al ratón.
+    const onKey = (ev) => {
+      if (ev.key !== 'Escape') return;
+      ev.preventDefault(); ev.stopPropagation();
+      quitaEscuchas();
+      if (!moved) return;
+      const origen = new Map();
+      origen.set(itemId, { x: startItemX, y: startItemY });
+      (multiStart || []).forEach(m => origen.set(m.id, m));
+      (frameChildrenStart || []).forEach(m => origen.set(m.id, m));
+      skipHistory.current = true;
+      _setCanvases(prev => {
+        const c = prev[currentId];
+        if (!c) return prev;
+        return { ...prev, [currentId]: { ...c,
+          items: c.items.map(it => { const o = origen.get(it.id); return o ? { ...it, x: o.x, y: o.y, _dragging: false } : it; }),
+          connectors: (c.connectors || []).map(co => { const sc = startConnectors.find(x => x.id === co.id); return (sc && sc.ortho.length) ? { ...co, ortho: sc.ortho } : co; }),
+        } };
+      });
+    };
+    const quitaEscuchas = () => {
       document.body.classList.remove('odi-busy');
       window.removeEventListener('mousemove', onMove);
       window.removeEventListener('mouseup', onUp);
+      window.removeEventListener('keydown', onKey, true);
       setDropTargetCol(null);
       setDropTargetTodo(null);
       setGuides(null);
+    };
+    const onUp = () => {
+      quitaEscuchas();
 
       if (moved) {
         window.playAudioTone && window.playAudioTone('drag_end');
@@ -3990,6 +4099,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
     };
     window.addEventListener('mousemove', onMove);
     window.addEventListener('mouseup', onUp);
+    window.addEventListener('keydown', onKey, true);
   };
 
   // ───── Drag a child OUT of a column (extract on movement) ─────
@@ -5648,7 +5758,8 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
       await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
 
       const r = zona.getBoundingClientRect();
-      const res = await api.capturarLienzo({ x: r.left, y: r.top, width: r.width, height: r.height });
+      const res = await api.capturarLienzo({ x: r.left, y: r.top, width: r.width, height: r.height,
+        titulo: window.t('Guardar la captura', 'Save the screenshot'), tipo: window.t('Imagen PNG', 'PNG image') });
 
       if (res && res.ok) {
         window.showToast && window.showToast(window.t('Captura guardada.', 'Screenshot saved.'));
@@ -6179,7 +6290,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
                   }}
                 >
                   <window.NodeErrorBoundary key={`eb-${item.id}`}>
-                    <window.ItemRenderer item={item} lang={lang} editing={isEditing} callbacks={callbacks}/>
+                    <window.ItemRenderer item={item} lang={lang} editing={isEditing} callbacks={callbacks} tema={theme}/>
                   </window.NodeErrorBoundary>
                   {item.reactions && Object.keys(item.reactions).length > 0 && (
                     <div className="item-reactions" style={{position:'absolute', left: 6, bottom: -10, zIndex: 6}}>

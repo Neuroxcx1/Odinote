@@ -344,16 +344,20 @@ function GaleriaItem({ item, lang, onUpdate }) {
     if (!M || !M.observa) { setActiva(true); return; }
     return M.observa(raizRef.current, (si) => { if (si) setActiva(true); });
   }, []);
-  // El lienzo pinta de nuevo todos los nodos a cada paso del zoom, así que
-  // basta con mirarlo después de cada vez: el zoom está en --handle-libre
-  // (1/zoom) de la superficie.
-  React.useEffect(() => {
+  // El zoom está en --handle-libre (1/zoom) de la superficie. Se mira al
+  // pintarse y cada vez que el lienzo avisa de que cambió ('odi-zoom'): los
+  // nodos van memorizados y ya no se pintan otra vez con cada paso del zoom.
+  const mideEscala = () => {
     if (!M) return;
     const sup = raizRef.current && raizRef.current.closest('.canvas-surface');
     const libre = sup ? parseFloat(sup.style.getPropertyValue('--handle-libre')) : 0;
-    const e = M.escalaRedonda((libre > 0 ? 1 / libre : 1) * (window.devicePixelRatio || 1));
-    if (e !== escala) setEscala(e);
-  });
+    setEscala(M.escalaRedonda((libre > 0 ? 1 / libre : 1) * (window.devicePixelRatio || 1)));
+  };
+  React.useEffect(() => { mideEscala(); });
+  React.useEffect(() => {
+    window.addEventListener('odi-zoom', mideEscala);
+    return () => window.removeEventListener('odi-zoom', mideEscala);
+  }, []);
 
   const W = Math.max(40, (item.w || 420) - GALERIA_BORDE * 2);
   const H = Math.max(40, (item.h || 320) - GALERIA_BORDE * 2);

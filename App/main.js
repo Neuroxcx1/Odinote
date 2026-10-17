@@ -1434,6 +1434,17 @@ ipcMain.handle('set-window-theme', async (event, theme) => {
   return { ok: true };
 });
 
+// Los nombres de los botones de la barra de título, en el idioma de la
+// aplicación: la barra es otra página y no sabe en qué idioma va la app. Se
+// guardan para dárselos también cuando la barra se carga después.
+let textosBarra = null;
+ipcMain.on('barra:textos', (event, textos) => {
+  if (!textos || typeof textos !== 'object') return;
+  textosBarra = textos;
+  try { if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('barra:textos', textos); } catch (e) {}
+});
+ipcMain.handle('barra:pide-textos', () => textosBarra);
+
 // ── La ventana: botones de la barra de título y "siempre encima" ──
 // Después de pulsar un botón de la barra, el teclado vuelve a la aplicación:
 // si no, Ctrl+Z o Supr irían a la barra hasta pulsar otra vez en el lienzo.
@@ -1625,9 +1636,10 @@ ipcMain.handle('capturar-lienzo', async (evt, recorte) => {
 
     const sugerido = 'odinote-' + new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-') + '.png';
     const destino = await dialog.showSaveDialog(mainWindow, {
-      title: 'Guardar la captura',
+      // Los textos vienen del renderer, en el idioma de la aplicación.
+      title: (recorte && recorte.titulo) || 'Guardar la captura',
       defaultPath: path.join(app.getPath('pictures'), sugerido),
-      filters: [{ name: 'Imagen PNG', extensions: ['png'] }],
+      filters: [{ name: (recorte && recorte.tipo) || 'Imagen PNG', extensions: ['png'] }],
     });
     if (destino.canceled || !destino.filePath) return { ok: false, motivo: 'cancelado' };
 

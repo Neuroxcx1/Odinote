@@ -39,6 +39,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Renovar el acceso a Drive sin molestar al usuario, y saber si se puede.
   googleRefreshAccess: () => ipcRenderer.invoke('google-refresh-access'),
   capturarLienzo: (recorte) => ipcRenderer.invoke('capturar-lienzo', recorte),
+  // Los nombres de los botones de la barra de título, en el idioma de la app.
+  textosBarra: (textos) => ipcRenderer.send('barra:textos', textos),
   googleHasRefresh: () => ipcRenderer.invoke('google-has-refresh'),
   googleSignOut: () => ipcRenderer.invoke('google-sign-out'),
   // Descarga el instalador del release y lo ejecuta (auto-actualización).

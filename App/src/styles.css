@@ -2065,6 +2065,13 @@ body.odi-busy iframe { pointer-events: none !important; }
   transform: translateX(-50%);
   animation: ruleta-premio 620ms var(--muelle) both;
 }
+/* Un premio largo se parte en dos líneas y con la letra más pequeña: en una
+   sola, «Elemento con nombre largo 41» se cortaba justo en lo que lo distingue. */
+.ruleta-premio.largo {
+  white-space: normal; text-align: center; line-height: 1.15;
+  font-size: 4.4cqw; border-radius: 1.2em; width: max-content;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3;
+}
 /* El confeti del final (ruletaConfeti en Ruleta.jsx): el doble de la rueda
    y centrado en ella, para que los triángulos puedan salir fuera. */
 .ruleta-confeti {
@@ -5904,7 +5911,9 @@ html[data-mobile="1"] .connector-hit { stroke-width: 40; }
   animation: mas-nodo-entra 420ms var(--muelle) both;
   animation-delay: 200ms;
 }
-.mas-grupo-nodos { display: flex; gap: 2px; }
+/* flex-wrap: en una ventana estrecha un grupo entero no cabía y la tira se salía
+   por la izquierda («TRUCTURE»); así el grupo se parte en dos filas. */
+.mas-grupo-nodos { display: flex; flex-wrap: wrap; gap: 2px; }
 .mas-nodo { animation: mas-nodo-entra 520ms var(--muelle) both; animation-delay: var(--retraso, 0ms); }
 @keyframes mas-nodo-entra {
   from { opacity: 0; translate: 28px var(--ola, 0px); scale: 0.4; }
@@ -8393,4 +8402,103 @@ html[data-mobile="1"][data-orient="landscape"] .plantillas-esquina { bottom: cal
 @keyframes hoja-fondo { from { opacity: 0; } to { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) {
   .hoja-nodos, .hoja-nodos-fondo { animation: none; }
+}
+
+/* ==========================================================================
+   Ventana estrecha: los botones de la derecha, al panel «⋯»
+   ==========================================================================
+   De 860 a 1100 px (por debajo ya es el modo teléfono) los trece botones de
+   la derecha dejaban a la barra de nodos con nodo y medio a la vista. Aquí van
+   al mismo panel «⋯» que en el teléfono (estas reglas son copia de las suyas,
+   con otro selector). Solo con la barra de nodos arriba: a un lado o abajo,
+   la barra de arriba tiene sitio de sobra. */
+@media (max-width: 1100px) {
+  html:not([data-mobile="1"]):not([data-barra]) .topbar-more {
+    display: grid; place-items: center;
+    flex: 0 0 auto;
+    width: 38px; height: 38px;
+    border-radius: 10px;
+    border: 1.5px solid var(--line);
+    background: var(--paper);
+    color: var(--ink);
+    box-shadow: var(--pop-sm);
+  }
+  html:not([data-mobile="1"]):not([data-barra]) .topbar-more .material-symbols-rounded { font-size: 21px; }
+
+  html:not([data-mobile="1"]):not([data-barra]) .topbar-tail { display: none; }
+  html:not([data-mobile="1"]):not([data-barra]) .topbar-tail.open {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+    position: fixed;
+    top: calc(var(--alto-topbar, 54px) + 6px);
+    right: 6px;
+    left: auto;
+    width: min(320px, calc(100vw - 12px));
+    max-height: calc(100dvh - var(--alto-topbar, 54px) - 18px);
+    overflow-y: auto;
+    padding: 12px;
+    background: var(--paper);
+    border: 1.5px solid var(--line);
+    border-radius: 14px;
+    box-shadow: var(--pop-deep);
+    z-index: 320;
+    animation: scale-in 140ms var(--e-out);
+  }
+  html:not([data-mobile="1"]):not([data-barra]) .topbar-tail.open > .topbar-spacer {
+    flex: 0 0 auto !important;
+    justify-content: flex-start !important;
+    gap: 10px;
+  }
+  html:not([data-mobile="1"]):not([data-barra]) .topbar-tail.open .topbar-actions {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  /* Dentro del panel sí hay sitio: devolvemos el texto a Feedback y Apoyar */
+  html:not([data-mobile="1"]):not([data-barra]) .topbar-tail.open .feedback-topbar-btn,
+  html:not([data-mobile="1"]):not([data-barra]) .topbar-tail.open .kofi-topbar-btn {
+    width: auto; height: 38px;
+    padding: 0 14px;
+    border-radius: 10px;
+  }
+  html:not([data-mobile="1"]):not([data-barra]) .topbar-tail.open .feedback-topbar-btn span:not(.material-symbols-rounded),
+  html:not([data-mobile="1"]):not([data-barra]) .topbar-tail.open .kofi-topbar-btn span:not(.material-symbols-rounded) {
+    display: inline;
+  }
+  html:not([data-mobile="1"]):not([data-barra]) .topbar-tail.open .icon-btn { width: 44px; height: 44px; }
+  /* En el movil el deslizador no puede depender del raton: no hay raton. Aqui se
+     deshace lo flotante y vuelve a ir en linea, dentro del cajon que se abre con
+     el boton de los tres puntos. */
+  html:not([data-mobile="1"]):not([data-barra]) .volume-ctrl {
+    position: static;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    width: auto;
+    height: auto;
+    padding: 0 10px 0 0;
+  }
+  html:not([data-mobile="1"]):not([data-barra]) .volume-ctrl::after { display: none; }
+  html:not([data-mobile="1"]):not([data-barra]) .volume-ctrl .icon-btn-mute { width: 44px; height: 44px; }
+  html:not([data-mobile="1"]):not([data-barra]) .topbar-tail.open .volume-slider {
+    position: static;
+    display: block;
+    width: 90px;
+    height: 4px;
+    padding: 0;
+    margin: 0;
+    background: var(--line-soft);
+    border: none;
+    border-radius: 99px;
+    box-shadow: none;
+    opacity: 1;
+    visibility: visible;
+    transform: none;
+  }
+  html:not([data-mobile="1"]):not([data-barra]) .volume-slider::-webkit-slider-runnable-track { background: transparent; }
+  html:not([data-mobile="1"]):not([data-barra]) .volume-slider::-webkit-slider-thumb { margin-top: 0; }
+  html:not([data-mobile="1"]):not([data-barra]) .topbar-more + .topbar-tail-scrim,
+  html:not([data-mobile="1"]):not([data-barra]) .topbar-tail-scrim { display: block; position: fixed; inset: 0; z-index: 310; }
+  html:not([data-mobile="1"]):not([data-barra]) .topbar-more { width: 38px; height: 38px; margin-left: 6px; }
 }

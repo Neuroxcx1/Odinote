@@ -41,16 +41,42 @@ const CAL_AVISOS = [0, 5, 10, 15, 30, 60, 120, 1440, 2880, 10080];
 // Los nombres de los días y de los meses los pone el propio navegador en el
 // idioma de la aplicación. Antes estaban escritos a mano en español e inglés, y
 // en los otros nueve idiomas el calendario salía en inglés.
+//
+// Cada toLocaleDateString crea por dentro un formateador nuevo, y eso es caro:
+// un calendario pide decenas de nombres en cada pintada, y con muchos
+// calendarios en el lienzo era lo que más tiempo se llevaba al panear o hacer
+// zoom (lo midió el bot del lienzo: 300 calendarios panean a 3 fps). Se guarda
+// un formateador por idioma y forma, y los nombres ya sacados.
+const calFormatos = new Map();
+function calFormato(lang, opciones) {
+  const clave = lang + '|' + JSON.stringify(opciones);
+  let fmt = calFormatos.get(clave);
+  if (!fmt) { fmt = new Intl.DateTimeFormat(lang, opciones); calFormatos.set(clave, fmt); }
+  return fmt;
+}
+const calNombres = new Map();
 function calNombreDia(lang, f, forma) {
-  try { return f.toLocaleDateString(lang, { weekday: forma || 'short' }).replace(/\.$/, ''); }
-  catch (e) { return ['D', 'L', 'M', 'X', 'J', 'V', 'S'][f.getDay()]; }
+  const clave = 'd|' + lang + '|' + f.getDay() + '|' + (forma || 'short');
+  let n = calNombres.get(clave);
+  if (n == null) {
+    try { n = calFormato(lang, { weekday: forma || 'short' }).format(f).replace(/\.$/, ''); }
+    catch (e) { n = ['D', 'L', 'M', 'X', 'J', 'V', 'S'][f.getDay()]; }
+    calNombres.set(clave, n);
+  }
+  return n;
 }
 function calNombreMes(lang, m, forma) {
-  try { return new Date(2024, m, 1).toLocaleDateString(lang, { month: forma || 'long' }).replace(/\.$/, ''); }
-  catch (e) { return String(m + 1); }
+  const clave = 'm|' + lang + '|' + m + '|' + (forma || 'long');
+  let n = calNombres.get(clave);
+  if (n == null) {
+    try { n = calFormato(lang, { month: forma || 'long' }).format(new Date(2024, m, 1)).replace(/\.$/, ''); }
+    catch (e) { n = String(m + 1); }
+    calNombres.set(clave, n);
+  }
+  return n;
 }
 function calFecha(lang, f, opciones) {
-  try { return f.toLocaleDateString(lang, opciones); } catch (e) { return f.toDateString(); }
+  try { return calFormato(lang, opciones || {}).format(f); } catch (e) { return f.toDateString(); }
 }
 const calFechaCorta = (lang, f) => calFecha(lang, f, { weekday: 'short', day: 'numeric', month: 'short' });
 // Para los campos de fecha del editor: "2026-09-24".

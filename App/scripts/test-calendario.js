@@ -54,8 +54,11 @@ check('un segundo clic en el día elegido lo suelta',
 // ── Lo de Google ──
 check('las cinco vistas', /const CAL_VISTAS = \['dia', 'semana', 'mes', 'anio', 'agenda'\];/.test(cal));
 check('la vista elegida se guarda en el nodo', /onUpdate\(\{ vista: v \}\)/.test(cal));
+// Con un formateador guardado por idioma y forma (crear uno en cada llamada
+// era lo que más pesaba al panear un lienzo con muchos calendarios).
 check('los nombres de días y meses los da el navegador en el idioma de la aplicación',
-  /toLocaleDateString\(lang, \{ weekday: forma \|\| 'short' \}\)/.test(cal));
+  /new Intl\.DateTimeFormat\(lang, opciones\)/.test(cal) && /calFormato\(lang, \{ weekday: forma \|\| 'short' \}\)/.test(cal) &&
+  /calFormato\(lang, \{ month: forma \|\| 'long' \}\)/.test(cal));
 check('el editor guarda según se escribe, sin botón de guardar', /onChange=\{\(e\) => cambia\(\{ text: e\.target\.value \}\)\}/.test(cal));
 check('uno nuevo que se cierra sin título no se queda', /if \(ev && !String\(ev\.text \|\| ''\)\.trim\(\)\)/.test(cal));
 check('borrar uno que se repite pregunta: solo este, los siguientes o todos',

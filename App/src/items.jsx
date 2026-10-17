@@ -124,7 +124,7 @@ class NodeErrorBoundary extends React.Component {
     if (this.state.err) {
       return (
         <div style={{ width:'100%', height:'100%', display:'grid', placeItems:'center', background:'var(--paper)', border:'1.5px solid var(--wine)', borderRadius:2, color:'var(--wine)', fontSize:11, fontWeight:600, padding:8, textAlign:'center' }}>
-          ⚠ Error al mostrar este nodo
+          ⚠ {window.t('Error al mostrar este nodo', 'Could not show this node')}
         </div>
       );
     }
@@ -1437,14 +1437,21 @@ function TodoItem({ item, lang, onUpdate, editing, callbacks }) {
     // Restore the original styles so DOM matches state until update completes
     restores.forEach(restore => restore?.());
 
+    // La altura que se pone sola va en silencio, sin paso de deshacer: al
+    // elegir la lista aparece la barra de la tarea enfocada y crece, y al
+    // soltarla vuelve. Con onUpdate, solo elegir un to-do gastaba un Ctrl+Z
+    // (de 22 tipos de nodo, era el único; lo vio el bot del lienzo).
+    // Dentro de una columna no: el silencioso busca el nodo en el lienzo y
+    // la tarea de una columna no está ahí, así que no crecería nunca.
+    const ponAlto = (h) => (callbacks && callbacks.resizeItemSilent && !item._inColumn ? callbacks.resizeItemSilent(item.id, { h }) : onUpdate({ h }));
     // Con altura fijada a mano respetamos ese tamaño, pero crecemos si el
     // contenido ya no cabe (si no, "Nueva tarea" quedaría cortado abajo).
     if (item.manualH) {
-      if (calculatedHeight > (item.h || 0)) onUpdate({ h: calculatedHeight });
+      if (calculatedHeight > (item.h || 0)) ponAlto(calculatedHeight);
       return;
     }
     if (Math.abs((item.h || 0) - calculatedHeight) > 3) {
-      onUpdate({ h: calculatedHeight });
+      ponAlto(calculatedHeight);
     }
   // focusedRowId y la selección entran en las dependencias: al enfocar una tarea
   // aparece su barra de controles (~20px) y sin recalcular aquí el contenido
@@ -3749,8 +3756,18 @@ const LENGUAJES_CODIGO = [
 window.LENGUAJES_CODIGO = LENGUAJES_CODIGO;
 
 function lenguajeCodigo(id) {
-  return LENGUAJES_CODIGO.find(l => l.id === id) || LENGUAJES_CODIGO[0];
+  const l = LENGUAJES_CODIGO.find(x => x.id === id) || LENGUAJES_CODIGO[0];
+  return Object.assign({}, l, { nombre: nombreLenguaje(l) });
 }
+// Los dos que no son un lenguaje de verdad se dicen en el idioma de la
+// interfaz; los demás se llaman igual en todas partes.
+function nombreLenguaje(l) {
+  if (!l) return '';
+  if (l.id === 'auto') return window.t('Automático', 'Auto');
+  if (l.id === 'plaintext') return window.t('Texto plano', 'Plain text');
+  return l.nombre;
+}
+window.nombreLenguaje = nombreLenguaje;
 window.lenguajeCodigo = lenguajeCodigo;
 
 // Colorea un trozo de código. Si el lenguaje no está o el resaltador falla, se
@@ -5671,10 +5688,16 @@ function ItemRenderer({ item, lang, editing, callbacks }) {
     default:         return <NoteItem  item={item} lang={lang}/>;
   }
 }
+// Memorizado: al panear o hacer zoom el lienzo se vuelve a pintar entero, y
+// con él TODOS los nodos, aunque ninguno haya cambiado (mismo item, mismo
+// idioma, mismos callbacks). Con 500 nodos el paneo iba a 6 fps (lo midió el
+// bot del lienzo). Lo que un nodo necesita saber del zoom no puede venir de
+// pintarse otra vez: la galería lo escucha con el evento 'odi-zoom'.
+const ItemRendererMemo = React.memo(ItemRenderer);
 
 
 Object.assign(window, {
-  ItemRenderer, COLOR_HEX_RESOLVED, STICKY_COLORS_NEW, BOARD_ICONS,
+  ItemRenderer: ItemRendererMemo, COLOR_HEX_RESOLVED, STICKY_COLORS_NEW, BOARD_ICONS,
   // La barra de la derecha pinta las mismas figuras para elegirlas, así que el
   // dibujo vive en un solo sitio.
   FIGURAS, FiguraSVG,

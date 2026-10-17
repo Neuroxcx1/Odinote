@@ -15,4 +15,6 @@ contextBridge.exposeInMainWorld('barra', {
   estado: () => ipcRenderer.invoke('ventana:estado'),
   alCambiar: (cb) => ipcRenderer.on('ventana:estado', (event, est) => cb(est)),
   alTema: (cb) => ipcRenderer.on('barra:tema', (event, tema) => cb(tema)),
+  alTextos: (cb) => ipcRenderer.on('barra:textos', (event, textos) => cb(textos)),
+  textos: () => ipcRenderer.invoke('barra:pide-textos'),
 });

@@ -284,6 +284,32 @@ function eligePublicacionDeEscritorio(publicaciones) {
   return estables.find(paraEscritorio) || publicaciones.find(paraEscritorio) || null;
 }
 
+// Si el lienzo o el inicio fallan al pintarse, React quita TODO lo de debajo y
+// la ventana se queda en blanco, sin un botón para salir (el bot de pruebas lo
+// consiguió con un deshacer). Esto deja un aviso con salida. Lo guardado no se
+// toca: el guardado va por su lado y ya tiene lo último que se escribió.
+class VistaSegura extends React.Component {
+  constructor(props) { super(props); this.state = { fallo: null }; }
+  static getDerivedStateFromError(e) { return { fallo: e || true }; }
+  componentDidCatch(e, info) { console.error('[Odinote] la vista no se pudo pintar:', e, info && info.componentStack); }
+  render() {
+    if (!this.state.fallo) return this.props.children;
+    const boton = { padding: '9px 16px', borderRadius: 10, border: '1.5px solid var(--line, #1E1A1D)', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', fontSize: 14 };
+    return (
+      <div className="vista-segura" style={{ position: 'fixed', inset: 0, display: 'grid', placeItems: 'center', background: 'var(--bg, #F4F2EE)', color: 'var(--ink, #1E1A1D)', padding: 16 }}>
+        <div style={{ maxWidth: 420, textAlign: 'center' }}>
+          <div style={{ fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 800, marginBottom: 8 }}>{window.t('Algo falló al mostrar esto', 'Something went wrong showing this')}</div>
+          <div style={{ fontSize: 14, lineHeight: 1.5, opacity: 0.8, marginBottom: 18 }}>{window.t('Tus notas siguen guardadas. Vuelve al inicio o recarga la ventana.', 'Your notes are still saved. Go back home or reload the window.')}</div>
+          <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
+            <button style={{ ...boton, background: 'var(--paper, #FFFFFF)', color: 'inherit' }} onClick={() => { this.setState({ fallo: null }); if (this.props.onHome) this.props.onHome(); }}>{window.t('Volver al inicio', 'Back to home')}</button>
+            <button style={{ ...boton, background: 'var(--ink-3, #8E8A8E)', color: '#FFFFFF' }} onClick={() => location.reload()}>{window.t('Recargar', 'Reload')}</button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+}
+
 function App() {
   const [loading, setLoading]   = useStateApp(true);
 
@@ -1635,6 +1661,13 @@ function App() {
     // Y para que el fondo de la ventana nativa de Electron también combine
     if (window.electronAPI && window.electronAPI.setWindowTheme) {
       window.electronAPI.setWindowTheme(theme);
+    }
+    // La barra de título es otra página: sus botones se nombran desde aquí.
+    if (window.electronAPI && window.electronAPI.textosBarra) {
+      window.electronAPI.textosBarra({
+        minimizar: window.t('Minimizar', 'Minimize'), maximizar: window.t('Maximizar', 'Maximize'),
+        restaurar: window.t('Restaurar', 'Restore'), cerrar: window.t('Cerrar', 'Close'),
+      });
     }
   }, [theme, lang]);
 
@@ -3280,7 +3313,7 @@ function App() {
 
   return (
     <>
-      {activeView}
+      <VistaSegura key={view.kind === 'canvas' ? view.projectId : 'inicio'} onHome={goHome}>{activeView}</VistaSegura>
       <window.SearchPalette
         open={searchOpen}
         mode={searchMode}
@@ -3790,25 +3823,25 @@ function App() {
                         help: window.t('Copia y elimina en un paso, para mover nodos entre tableros.', 'Copies and deletes in one step, to move nodes between boards.') },
                       { keys: ['F12', 'Ctrl+Shift+I'], desc: window.t('Consola de depuración', 'Toggle DevTools'),
                         help: window.t('Abre las herramientas de desarrollo del navegador. Útil solo para diagnosticar fallos: si algo va mal, aquí aparece el motivo.', 'Opens the browser developer tools. Only useful for diagnosing problems: if something breaks, the reason shows up here.') },
-                      { keys: ['Ctrl', 'Botón Central'], desc: window.t('Paneo de cámara global', 'Global camera panning'),
+                      { keys: ['Ctrl', window.t('Botón central', 'Middle button')], desc: window.t('Paneo de cámara global', 'Global camera panning'),
                         help: window.t('Mueve el lienzo arrastrando con la rueda presionada, sin tocar ningún nodo por el camino.', 'Moves the canvas by dragging with the wheel pressed, without touching any node along the way.') },
                       { keys: ['Shift', 'Click'], desc: window.t('Selección múltiple individual', 'Toggle item selection'),
                         help: window.t('Añade o quita un nodo de la selección sin perder los que ya tenías elegidos.', 'Adds or removes one node from the selection without losing the ones already picked.') },
-                      { keys: ['Shift', 'Arrastrar'], desc: window.t('Seleccionar por recuadro', 'Box selection'),
+                      { keys: ['Shift', window.t('Arrastrar', 'Drag')], desc: window.t('Seleccionar por recuadro', 'Box selection'),
                         help: window.t('Dibuja un rectángulo y selecciona todo lo que quede dentro, sumándolo a lo ya seleccionado.', 'Draws a rectangle and selects everything inside it, adding to the current selection.') },
-                      { keys: ['Alt', 'Arrastrar'], desc: window.t('Desplazar lienzo (Paneo)', 'Pan the canvas'),
+                      { keys: ['Alt', window.t('Arrastrar', 'Drag')], desc: window.t('Desplazar lienzo (Paneo)', 'Pan the canvas'),
                         help: window.t('Mueve la vista arrastrando desde cualquier punto, incluso encima de un nodo, sin moverlo.', 'Moves the view by dragging from anywhere, even over a node, without moving it.') },
-                      { keys: ['Ctrl', 'Rueda'], desc: window.t('Acercar / Alejar (Zoom)', 'Zoom In / Out'),
+                      { keys: ['Ctrl', window.t('Rueda', 'Wheel')], desc: window.t('Acercar / Alejar (Zoom)', 'Zoom In / Out'),
                         help: window.t('Acerca o aleja manteniendo bajo el cursor el punto que estabas mirando.', 'Zooms in or out keeping the point under the cursor where it was.') },
                       { keys: ['↑', '↓', '←', '→'], desc: window.t('Mover nodo seleccionado', 'Move selected node'),
                         help: window.t('Desplaza el nodo elegido paso a paso, para ajustarlo con precisión cuando arrastrar se queda corto.', 'Nudges the selected node step by step, for precision that dragging cannot give.') },
-                      { keys: ['Doble Clic'], desc: window.t('Editar texto / Renombrar', 'Edit text / Rename'),
+                      { keys: [window.t('Doble clic', 'Double click')], desc: window.t('Editar texto / Renombrar', 'Edit text / Rename'),
                         help: window.t('Entra a editar el nodo. En pantallas táctiles NO se usa: ahí se edita con el botón "Editar" de la barra del nodo, porque dos toques seguidos son lo que uno hace al arrastrar.', 'Enters edit mode. NOT used on touch screens: there you edit with the "Edit" button on the node bar, since two quick taps is what dragging looks like.') },
-                      { keys: ['Clic Derecho'], desc: window.t('Creación rápida / Opciones', 'Quick-create / Options'),
+                      { keys: [window.t('Clic derecho', 'Right click')], desc: window.t('Creación rápida / Opciones', 'Quick-create / Options'),
                         help: window.t('Sobre el lienzo vacío abre el menú de crear nodos. Sobre un texto seleccionado ofrece cortar, copiar, pegar y enlazar. Con el dedo equivale a dejar el dedo puesto.', 'On empty canvas it opens the create menu. On selected text it offers cut, copy, paste and link. With a finger, press and hold does the same.') },
                       { keys: ['Tab', 'Enter'], desc: window.t('Navegar y editar celdas (Tablas)', 'Navigate and edit cells (Tables)'),
                         help: window.t('Dentro de una tabla, Tab salta a la celda siguiente y Enter entra a editarla, como en una hoja de cálculo.', 'Inside a table, Tab moves to the next cell and Enter starts editing it, like a spreadsheet.') },
-                      { keys: ['Supr', 'Backspace'], desc: window.t('Eliminar elemento', 'Delete item'),
+                      { keys: [window.t('Supr', 'Del'), 'Backspace'], desc: window.t('Eliminar elemento', 'Delete item'),
                         help: window.t('Borra los nodos o conectores seleccionados. Dentro de una celda de tabla borra su contenido en lugar del nodo entero.', 'Deletes the selected nodes or connectors. Inside a table cell it clears the cell instead of the whole node.') },
                       { keys: ['Esc'], desc: window.t('Limpiar selección / Cerrar', 'Clear selection / Close'),
                         help: window.t('Sale del modo edición, suelta la herramienta activa y cierra menús y ventanas.', 'Leaves edit mode, drops the active tool, and closes menus and dialogs.') }

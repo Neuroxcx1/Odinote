@@ -77,13 +77,27 @@
       document.getElementById('minimizar').onclick = function () { window.barra.minimiza(); };
       max.onclick = function () { window.barra.maximiza(); };
       document.getElementById('cerrar').onclick = function () { window.barra.cierra(); };
+      // Los nombres de los botones llegan de la aplicación en su idioma.
+      var nombres = { minimizar: 'Minimizar', maximizar: 'Maximizar', restaurar: 'Restaurar', cerrar: 'Cerrar' };
+      var ultimo = null;
+      var pon = function (el, texto) { el.title = texto; el.setAttribute('aria-label', texto); };
       var pinta = function (est) {
         if (!est) return;
+        ultimo = est;
         // Maximizada, el botón es el de restaurar (los dos cuadros).
         max.innerHTML = est.maximizada ? '&#xE923;' : '&#xE922;';
-        max.title = est.maximizada ? 'Restaurar' : 'Maximizar';
+        pon(max, est.maximizada ? nombres.restaurar : nombres.maximizar);
         document.body.classList.toggle('fuera', est.enfocada === false);
       };
+      var nombra = function (t) {
+        if (!t) return;
+        for (var k in nombres) if (typeof t[k] === 'string' && t[k]) nombres[k] = t[k];
+        pon(document.getElementById('minimizar'), nombres.minimizar);
+        pon(document.getElementById('cerrar'), nombres.cerrar);
+        pinta(ultimo || { maximizada: false });
+      };
+      if (window.barra.alTextos) window.barra.alTextos(nombra);
+      if (window.barra.textos) window.barra.textos().then(nombra);
       window.barra.alCambiar(pinta);
       window.barra.alTema(function (t) { raiz.setAttribute('data-tema', t === 'dark' ? 'dark' : 'light'); });
       window.barra.estado().then(pinta);

@@ -372,6 +372,11 @@ function RuletaItem({ item, lang, onUpdate }) {
       d: `M0 0 L${x0.toFixed(3)} ${y0.toFixed(3)} A96 96 0 ${grande} 1 ${x1.toFixed(3)} ${y1.toFixed(3)} Z` };
   });
   const maxLetras = m <= 4 ? 16 : m <= 8 ? 12 : 9;
+  // La letra de cada porción no puede ser más alta que lo que mide la porción
+  // de ancho donde empieza el texto (a unos 38 del centro, con el texto
+  // centrado a 61): con 60 elementos se montaban unos encima de otros. Hasta
+  // 24 se queda en su tamaño de siempre.
+  const letraPorcion = Math.min(8.5, Math.max(3, (2 * Math.PI * 38 / Math.max(1, m)) * 0.9));
   const conFotos = lista.some(el => el.imagen && !el.hueco);
 
   return (
@@ -459,6 +464,7 @@ function RuletaItem({ item, lang, onUpdate }) {
                 // que quedan cabeza abajo se den la vuelta girando en su sitio
                 // (y al añadir una porción, los demás se deslicen a la suya).
                 transform: `rotate(${p.giroTexto}deg) translateX(${RULETA_RADIO_TEXTO}px) rotate(${p.volteado ? 180 : 0}deg)`,
+                fontSize: letraPorcion < 8.5 ? letraPorcion + 'px' : undefined,
               }}
             >
               {p.el.texto.length > maxLetras ? p.el.texto.slice(0, maxLetras - 1) + '…' : p.el.texto}
@@ -481,7 +487,7 @@ function RuletaItem({ item, lang, onUpdate }) {
           {girando ? '' : window.t('Girar', 'Spin')}
         </button>
         {elegido && !girando && (
-          <div className="ruleta-premio" key={elegido.id + String(item.giro)} style={{ '--ev': elegido.color }}>
+          <div className={'ruleta-premio' + (elegido.texto.length > 22 ? ' largo' : '')} key={elegido.id + String(item.giro)} style={{ '--ev': elegido.color }}>
             {elegido.texto}
           </div>
         )}
