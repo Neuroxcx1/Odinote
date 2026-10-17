@@ -1541,18 +1541,24 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
         }
         e.preventDefault();
         if (selectedIds.length > 1) {
-          // Delete all multi-selected items in a single state update
+          // Delete all multi-selected items in a single state update.
+          // Los bloqueados se quedan (y sus flechas con ellos).
+          const fuera = current.items.filter(it => selectedIds.includes(it.id) && !it.bloqueado).map(it => it.id);
+          if (fuera.length < selectedIds.length) avisaBloqueado();
+          if (!fuera.length) return;
           window.playAudioTone && window.playAudioTone('delete');
           setCanvases(prev => {
             const c = prev[currentId];
             return { ...prev, [currentId]: {
               ...c,
-              items: c.items.filter(it => !selectedIds.includes(it.id)),
-              connectors: (c.connectors || []).filter(co => !selectedIds.includes(co.id) && !selectedIds.includes(co.fromEnd?.itemId) && !selectedIds.includes(co.toEnd?.itemId)),
+              items: c.items.filter(it => !fuera.includes(it.id)),
+              connectors: (c.connectors || []).filter(co => !fuera.includes(co.id) && !fuera.includes(co.fromEnd?.itemId) && !fuera.includes(co.toEnd?.itemId)),
             }};
           });
           setSelectedIds([]); setSelected(null);
         } else if (selected) {
+          const el = current.items.find(it => it.id === selected);
+          if (el && el.bloqueado) { avisaBloqueado(); return; }
           deleteItem(selected);
         }
       }
@@ -1567,6 +1573,15 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
       }
       if (matchShortcut(window.shortcuts.undo)) { e.preventDefault(); undo(); }
       if (matchShortcut(window.shortcuts.redo)) { e.preventDefault(); redo(); }
+      // Agrupar y desagrupar (Ctrl+G, Ctrl+Shift+G) y el candado
+      // (Ctrl+Shift+L), como en los demás editores.
+      if ((e.ctrlKey || e.metaKey) && !e.altKey && (e.key === 'g' || e.key === 'G')) {
+        e.preventDefault();
+        if (e.shiftKey) desagrupaSeleccion(); else agrupaSeleccion();
+      }
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && !e.altKey && (e.key === 'l' || e.key === 'L')) {
+        e.preventDefault(); alternaBloqueo();
+      }
       // Cortar/Copiar nodos desde el teclado. Los eventos nativos 'cut'/'copy' solo se
       // disparan cuando el foco está en un elemento editable (el interceptor oculto);
       // si un nodo roba el foco (botones, celdas, etc.) nunca llegan, por lo que Ctrl+X
@@ -1600,7 +1615,8 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
               const c = prev[currentId];
               return { ...prev, [currentId]: {
                 ...c,
-                items: c.items.filter(it => !selectedItemIds.includes(it.id)),
+                // Cortar copia también los bloqueados, pero no se los lleva.
+                items: c.items.filter(it => !selectedItemIds.includes(it.id) || it.bloqueado),
                 connectors: (c.connectors || []).filter(co => !selectedItemIds.includes(co.id) && !selectedItemIds.includes(co.fromEnd?.itemId) && !selectedItemIds.includes(co.toEnd?.itemId)),
               }};
             });
@@ -2000,6 +2016,10 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
 
         const idMap = {};
         const canvasDuplications = [];
+        // Lo pegado forma su propio grupo (si lo copiado lo era), no se mete en
+        // el del original. Y llega sin candado: un candado pegado se quedaría
+        // donde cae sin poder moverlo.
+        const gruposNuevos = {};
         const pastedItems = data.items.map(it => {
           const newId = `it-${Date.now()}-${Math.floor(Math.random()*99999)}-${Math.floor(Math.random()*99999)}`;
           idMap[it.id] = newId;
@@ -2010,6 +2030,8 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
             y: Math.round(it.y + dy),
             _new: true,
           };
+          if (copy.grupo) copy.grupo = gruposNuevos[copy.grupo] || (gruposNuevos[copy.grupo] = `g-${Date.now()}-${Math.floor(Math.random() * 99999)}`);
+          delete copy.bloqueado;
           if (copy.type === 'board' && copy.canvasId) {
             const origCanvasId = copy.canvasId;
             const newCid = `b-${Date.now()}-${Math.floor(Math.random()*99999)}`;
@@ -2883,12 +2905,13 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
       const ry = Math.min(startPt.y, p.y);
       const rw = Math.abs(p.x - startPt.x);
       const rh = Math.abs(p.y - startPt.y);
-      const hits = current.items.filter(it => {
+      // Tocar un nodo de un grupo con el recuadro coge el grupo entero.
+      const hits = conGrupos(current.items.filter(it => {
         const ix = it.x, iy = it.y, iw = it.w;
         const ih = it.type === 'frame' ? 36 : it.h;
         // intersection test (any overlap counts)
         return !(ix + iw < rx || ix > rx + rw || iy + ih < ry || iy > ry + rh);
-      }).map(it => it.id);
+      }).map(it => it.id));
 
       if (e.shiftKey || ev.shiftKey) {
         // Seleccion aditiva con Shift
@@ -2975,6 +2998,55 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
   };
 
   // ───── Item drag (with column drop detection) ─────
+  // ── Grupos y candados ──
+  //
+  // Un grupo es una marca en cada nodo (grupo: 'g-…'), no un objeto aparte:
+  // así viaja, se copia y se deshace con el nodo sin tocar nada más. Pulsar
+  // cualquiera coge el grupo entero (ver startDragItem). Un nodo bloqueado
+  // (bloqueado: true) se puede elegir —para desbloquearlo— pero no se mueve,
+  // no se estira, no se gira ni se borra: el candado que pidió quien probó.
+  const conGrupos = (ids) => {
+    const items = current.items || [];
+    const grupos = new Set(items.filter(it => ids.includes(it.id) && it.grupo).map(it => it.grupo));
+    if (!grupos.size) return ids;
+    return Array.from(new Set([...ids, ...items.filter(it => it.grupo && grupos.has(it.grupo)).map(it => it.id)]));
+  };
+  const idsElegidos = () => (selectedIds.length ? selectedIds : (selected ? [selected] : []));
+  const agrupaSeleccion = () => {
+    const ids = conGrupos(selectedIds);
+    if (ids.length < 2) return;
+    const g = `g-${Date.now()}-${Math.floor(Math.random() * 99999)}`;
+    setCanvases(prev => {
+      const c = prev[currentId];
+      return { ...prev, [currentId]: { ...c, items: c.items.map(it => ids.includes(it.id) ? { ...it, grupo: g } : it) } };
+    });
+    setSelected(null); setSelectedIds(ids);
+    window.playAudioTone && window.playAudioTone('create');
+  };
+  const desagrupaSeleccion = () => {
+    const ids = idsElegidos();
+    const grupos = new Set(current.items.filter(it => ids.includes(it.id) && it.grupo).map(it => it.grupo));
+    if (!grupos.size) return;
+    setCanvases(prev => {
+      const c = prev[currentId];
+      return { ...prev, [currentId]: { ...c, items: c.items.map(it => (it.grupo && grupos.has(it.grupo)) ? { ...it, grupo: null } : it) } };
+    });
+    window.playAudioTone && window.playAudioTone('click');
+  };
+  const alternaBloqueo = () => {
+    const ids = idsElegidos();
+    if (!ids.length) return;
+    const bloquear = current.items.some(it => ids.includes(it.id) && !it.bloqueado);
+    setCanvases(prev => {
+      const c = prev[currentId];
+      return { ...prev, [currentId]: { ...c, items: c.items.map(it => ids.includes(it.id) ? { ...it, bloqueado: bloquear } : it) } };
+    });
+    window.playAudioTone && window.playAudioTone('click');
+  };
+  const avisaBloqueado = () => window.showToast && window.showToast(window.t(
+    'Está bloqueado: quítale el candado para moverlo o borrarlo.',
+    'It is locked: unlock it to move or delete it.'));
+
   const startDragItem = (e, itemId) => {
     if (panearSiEspacio(e)) return;
     if (e.target.closest('input, textarea, button, .todo-check, .swatch-btn, .anchor, .todo-add, .cal-mb-input, .cal-mb-cell, .cal-mb-nav')) return;
@@ -3041,10 +3113,10 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
         const ry = Math.min(startPt.y, p.y);
         const rw = Math.abs(p.x - startPt.x);
         const rh = Math.abs(p.y - startPt.y);
-        const hits = current.items.filter(it => {
+        const hits = conGrupos(current.items.filter(it => {
           const ix = it.x, iy = it.y, iw = it.w, ih = it.h;
           return !(ix + iw < rx || ix > rx + rw || iy + ih < ry || iy > ry + rh);
-        }).map(it => it.id);
+        }).map(it => it.id));
 
         // Agregamos los nuevos elementos seleccionados a los que ya estaban
         let baseSelected = [...selectedIds];
@@ -3100,10 +3172,24 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
     if (activeTool === 'line') return; // handled by startLineDrag
     if (activeTool) return;
     e.stopPropagation();
-    // Multi-drag: if the clicked item is part of multi-selection, move all together
-    const isMultiDrag = selectedIds.length > 1 && selectedIds.includes(itemId);
-    if (!isMultiDrag) setSelectedIds([]);
+    // Multi-drag: if the clicked item is part of multi-selection, move all together.
+    // Y un grupo se coge entero: pulsar cualquiera de sus nodos los coge a
+    // todos. Si el grupo ya estaba cogido, pulsar uno sin moverlo lo elige a
+    // él solo (para escribir en él o cambiarle el color), como en cualquier
+    // editor.
+    const pulsado = current.items.find(i => i.id === itemId);
+    const delGrupo = pulsado && pulsado.grupo ? current.items.filter(it => it.grupo === pulsado.grupo).map(it => it.id) : [];
+    const grupoYaCogido = delGrupo.length > 1 && delGrupo.every(id => selectedIds.includes(id));
+    const enSeleccion = selectedIds.length > 1 && selectedIds.includes(itemId);
+    const multiIds = enSeleccion ? conGrupos(selectedIds) : (delGrupo.length > 1 ? delGrupo : null);
+    const isMultiDrag = !!multiIds;
+    if (!isMultiDrag) setSelectedIds([]); else setSelectedIds(multiIds);
     setSelected(isMultiDrag ? null : itemId);
+    // Bloqueado: se elige (para poder desbloquearlo) pero no se mueve.
+    if (pulsado && pulsado.bloqueado && !isMultiDrag) {
+      setEditingChildState(null); setSelectedConn(null); setContextMenu(null);
+      return;
+    }
     setEditingChildState(null);
     setSelectedConn(null);
     setContextMenu(null);
@@ -3113,8 +3199,9 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
     if (!item) { document.body.classList.remove('odi-busy'); return; }
     const startItemX = item.x, startItemY = item.y;
     // Snapshot original positions for multi-drag
+    // Los bloqueados de la selección se quedan quietos.
     const multiStart = isMultiDrag
-      ? current.items.filter(it => selectedIds.includes(it.id)).map(it => ({ id: it.id, x: it.x, y: it.y }))
+      ? current.items.filter(it => multiIds.includes(it.id) && !it.bloqueado).map(it => ({ id: it.id, x: it.x, y: it.y }))
       : null;
     
     // Frame drag: snapshot geometrically-contained items, incluyendo MARCOS ANIDADOS
@@ -3413,7 +3500,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
             }),
             connectors: (c.connectors || []).map(co => {
               const sc = startConnectors.find(x => x.id === co.id);
-              if (sc && sc.ortho.length && co.shape === 'orthogonal' && co.fromEnd && selectedIds.includes(co.fromEnd.itemId) && co.toEnd && selectedIds.includes(co.toEnd.itemId)) {
+              if (sc && sc.ortho.length && co.shape === 'orthogonal' && co.fromEnd && multiIds.includes(co.fromEnd.itemId) && co.toEnd && multiIds.includes(co.toEnd.itemId)) {
                 return {
                   ...co,
                   ortho: sc.ortho.map(p => ({ x: p.x + finalDx, y: p.y + finalDy }))
@@ -3507,12 +3594,17 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
       }
 
       if (isMultiDrag) {
+        // Un clic sin mover sobre un grupo que ya estaba cogido: ese nodo solo.
+        if (!moved && grupoYaCogido) {
+          setSelectedIds([]); setSelected(itemId);
+          return;
+        }
         // Commit a non-silent update so history snapshots the new positions, and clear _dragging
         setCanvases(prev => {
           const c = prev[currentId];
           return { ...prev, [currentId]: {
             ...c,
-            items: c.items.map(it => selectedIds.includes(it.id) ? { ...it, _dragging: false } : it),
+            items: c.items.map(it => multiIds.includes(it.id) ? { ...it, _dragging: false } : it),
           }};
         });
         return;
@@ -4237,6 +4329,9 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
       copy.id = `it-${Date.now()}-${Math.floor(Math.random()*9999)}`;
       copy.x += 28; copy.y += 28;
       copy._new = true;
+      // La copia de uno solo no entra en el grupo del original ni lleva candado.
+      delete copy.grupo;
+      delete copy.bloqueado;
       const next = { ...prev, [currentId]: { ...c, items: [...c.items, copy] } };
       if (copy.type === 'board' && copy.canvasId) {
         const newCid = `b-${Date.now()}-${Math.floor(Math.random()*9999)}`;
@@ -4267,6 +4362,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
   const ANCLA_GIRO = 90;
   const TOLERANCIA_GIRO = 7;      // grados para pegarse a un múltiplo de 90
   const startRotate = (e, itemId) => {
+    { const it0 = current.items.find(i => i.id === itemId); if (it0 && it0.bloqueado) return; }
     if (panearSiEspacio(e)) return;
     e.stopPropagation(); e.preventDefault();
     const item = current.items.find(i => i.id === itemId);
@@ -4314,6 +4410,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
     e.stopPropagation(); e.preventDefault();
     const item = current.items.find(i => i.id === itemId);
     if (!item) return;
+    if (item.bloqueado) return;
     document.body.classList.add('odi-busy');
     const startX = e.clientX, startY = e.clientY;
     const sx = item.x, sy = item.y, sw = item.w, sh = item.h;
@@ -5680,7 +5777,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
                 <div
                   key={item.id}
                   data-item-id={item.id}
-                  className={`item ${item.type === 'frame' ? 'item-frame' : ''} ${(selected === item.id || selectedIds.includes(item.id)) ? 'selected' : ''} ${item._dragging ? 'dragging' : ''} ${isEditing ? 'editing' : ''} ${item._new ? 'new-item' : ''} ${isDropTarget ? 'drop-target' : ''} ${linkTargetId === item.id ? 'link-target' : ''} ${jumpHighlight === item.id ? 'jump-target' : ''}`}
+                  className={`item ${item.bloqueado ? 'bloqueado' : ''} ${item.type === 'frame' ? 'item-frame' : ''} ${(selected === item.id || selectedIds.includes(item.id)) ? 'selected' : ''} ${item._dragging ? 'dragging' : ''} ${isEditing ? 'editing' : ''} ${item._new ? 'new-item' : ''} ${isDropTarget ? 'drop-target' : ''} ${linkTargetId === item.id ? 'link-target' : ''} ${jumpHighlight === item.id ? 'jump-target' : ''}`}
                   style={{
                     left: item.x, top: item.y,
                     width: item.w !== undefined ? item.w : def.w,
@@ -5834,8 +5931,15 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
                     />
                   )}
 
+                  {/* El candado: se ve al elegirlo, y es lo que dice por qué no
+                      se deja mover. */}
+                  {item.bloqueado && (selected === item.id || selectedIds.includes(item.id)) && (
+                    <div className="nodo-candado" title={window.t('Bloqueado', 'Locked')}>
+                      <span className="material-symbols-rounded">lock</span>
+                    </div>
+                  )}
                   {/* Resize handles */}
-                  {(selected === item.id || (selectedIds.includes(item.id) && selectedIds.length > 1)) && !isEditing && croppingId !== item.id && (
+                  {(selected === item.id || (selectedIds.includes(item.id) && selectedIds.length > 1)) && !isEditing && croppingId !== item.id && !item.bloqueado && (
                     <div className="handles">
                       <div className="handle tl" onMouseDown={(e)=>startResize(e, item.id, 'tl')}/>
                       <div className="handle tr" onMouseDown={(e)=>startResize(e, item.id, 'tr')}/>
@@ -5859,6 +5963,21 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
                 </div>
               );
             })}
+
+            {/* El borde de puntos de cada grupo elegido: dice que esos nodos van
+                juntos y hasta dónde llega el grupo. */}
+            {(() => {
+              const ids = selectedIds.length ? selectedIds : (selected ? [selected] : []);
+              const grupos = [...new Set(current.items.filter(it => ids.includes(it.id) && it.grupo).map(it => it.grupo))];
+              return grupos.map(g => {
+                const m = current.items.filter(it => it.grupo === g);
+                if (m.length < 2) return null;
+                const tam = (it) => ({ w: it.w !== undefined ? it.w : defaultDims(it.type).w, h: it.h !== undefined ? it.h : defaultDims(it.type).h });
+                const x0 = Math.min(...m.map(it => it.x)), y0 = Math.min(...m.map(it => it.y));
+                const x1 = Math.max(...m.map(it => it.x + tam(it).w)), y1 = Math.max(...m.map(it => it.y + tam(it).h));
+                return <div key={'grupo-' + g} className="grupo-marco" style={{ left: x0 - 10, top: y0 - 10, width: x1 - x0 + 20, height: y1 - y0 + 20 }}/>;
+              });
+            })()}
 
             {/* Connector handles layer — drawn ABOVE the nodes so the center
                 anchors stay grabbable even when they sit inside a node. */}
@@ -6013,6 +6132,36 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
             </button>
           )}
         </div>
+
+        {/* Con varios elegidos no sale la barra lateral (es de un nodo): esta
+            barrita encima de la selección agrupa y bloquea. */}
+        {selectedIds.length > 1 && !drawingId && (() => {
+          const sel = current.items.filter(it => selectedIds.includes(it.id));
+          if (sel.length < 2) return null;
+          const tam = (it) => ({ w: it.w !== undefined ? it.w : defaultDims(it.type).w, h: it.h !== undefined ? it.h : defaultDims(it.type).h });
+          const x0 = Math.min(...sel.map(it => it.x)), y0 = Math.min(...sel.map(it => it.y));
+          const x1 = Math.max(...sel.map(it => it.x + tam(it).w));
+          const grupos = new Set(sel.map(it => it.grupo).filter(Boolean));
+          const unGrupo = grupos.size === 1 && sel.every(it => it.grupo);
+          const todosBloqueados = sel.every(it => it.bloqueado);
+          const cx = ((x0 + x1) / 2) * scale + pan.x;
+          const arriba = y0 * scale + pan.y - 56;
+          return (
+            <div className="seleccion-barra" style={{ left: cx, top: Math.max(60, arriba) }} onMouseDown={(e) => e.stopPropagation()}>
+              <span className="seleccion-cuenta">{window.t(`${sel.length} nodos`, `${sel.length} nodes`)}</span>
+              <button onClick={unGrupo ? desagrupaSeleccion : agrupaSeleccion}
+                title={unGrupo ? window.t('Desagrupar (Ctrl+Shift+G)', 'Ungroup (Ctrl+Shift+G)') : window.t('Agrupar: se mueven, se copian y se borran juntos (Ctrl+G)', 'Group: they move, copy and delete together (Ctrl+G)')}>
+                <span className="material-symbols-rounded">{unGrupo ? 'link_off' : 'link'}</span>
+                <span>{unGrupo ? window.t('Desagrupar', 'Ungroup') : window.t('Agrupar', 'Group')}</span>
+              </button>
+              <button onClick={alternaBloqueo} className={todosBloqueados ? 'activo' : ''}
+                title={todosBloqueados ? window.t('Quitar el candado (Ctrl+Shift+L)', 'Unlock (Ctrl+Shift+L)') : window.t('Bloquear: no se mueven, no se estiran ni se borran (Ctrl+Shift+L)', 'Lock: they cannot be moved, resized or deleted (Ctrl+Shift+L)')}>
+                <span className="material-symbols-rounded">{todosBloqueados ? 'lock' : 'lock_open'}</span>
+                <span>{todosBloqueados ? window.t('Bloqueados', 'Locked') : window.t('Bloquear', 'Lock')}</span>
+              </button>
+            </div>
+          );
+        })()}
 
         {/* La chincheta (siempre encima y sin bordes), en la línea del
             buscador y a la derecha del todo: arriba a la izquierda, junto al

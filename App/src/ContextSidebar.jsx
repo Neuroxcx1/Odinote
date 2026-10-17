@@ -1617,11 +1617,31 @@ function ContextSidebar({
           <span className="material-symbols-rounded">rotate_right</span>
           <span>{item.rot ? `${Math.round(item.rot)}°` : window.t('Girar', 'Rotate')}</span>
         </button>
+        {/* El candado: bloqueado no se mueve, no se estira ni se borra. */}
+        <button
+          className={`ctx-btn ${item.bloqueado ? 'active' : ''}`}
+          onClick={() => { onUpdate({ bloqueado: !item.bloqueado }); window.playAudioTone && window.playAudioTone('click'); }}
+          title={item.bloqueado
+            ? window.t('Quitar el candado (Ctrl+Shift+L)', 'Unlock (Ctrl+Shift+L)')
+            : window.t('Bloquear: no se mueve, no se estira ni se borra (Ctrl+Shift+L)', 'Lock: it cannot be moved, resized or deleted (Ctrl+Shift+L)')}
+        >
+          <span className="material-symbols-rounded">{item.bloqueado ? 'lock' : 'lock_open'}</span>
+          <span>{item.bloqueado ? window.t('Bloqueado', 'Locked') : window.t('Bloquear', 'Lock')}</span>
+        </button>
+        {/* Elegido uno solo de un grupo (segundo clic): sacarlo de él. */}
+        {item.grupo && (
+          <button className="ctx-btn" onClick={() => { onUpdate({ grupo: null }); window.playAudioTone && window.playAudioTone('click'); }}
+            title={window.t('Sacar este nodo de su grupo', 'Take this node out of its group')}>
+            <span className="material-symbols-rounded">link_off</span>
+            <span>{window.t('Sacar del grupo', 'Ungroup this')}</span>
+          </button>
+        )}
         <button className="ctx-btn" onClick={onDuplicate} title={window.t('Duplicar', 'Duplicate')}>
           <span className="material-symbols-rounded">content_copy</span>
           <span>{window.t('Duplicar', 'Duplicate')}</span>
         </button>
-        <button className="ctx-btn danger" onClick={onDelete} title={window.t('Eliminar', 'Delete')}>
+        <button className="ctx-btn danger" onClick={item.bloqueado ? undefined : onDelete} disabled={!!item.bloqueado}
+          title={item.bloqueado ? window.t('Está bloqueado: quítale el candado para borrarlo', 'It is locked: unlock it to delete it') : window.t('Eliminar', 'Delete')}>
           <span className="material-symbols-rounded">delete</span>
           <span>{window.t('Eliminar', 'Delete')}</span>
         </button>
