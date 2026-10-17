@@ -177,6 +177,15 @@ function createWindow() {
   });
 
   mainWindow.once('ready-to-show', () => {
+    // Solo para las pruebas automáticas (--pruebas-fuera-de-pantalla): la
+    // ventana se abre fuera del monitor y sin quitar el foco. Así se sigue
+    // pintando —minimizada no pinta y las pruebas se quedan colgadas— y no le
+    // aparece delante a quien está usando el ordenador. Nadie más la usa.
+    if (process.argv.includes('--pruebas-fuera-de-pantalla')) {
+      mainWindow.setPosition(-4000, 40);
+      mainWindow.showInactive();
+      return;
+    }
     mainWindow.show();
   });
 
