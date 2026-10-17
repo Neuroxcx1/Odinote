@@ -969,4 +969,13 @@ window.ODI_IDIOMAS.pt = {
   964: "Este APK foi compilado sem as credenciais do Google, então não consegue entrar.",
   965: "Não foi possível abrir o navegador do celular.",
   966: "Você não deu permissão no Google.",
+  967: "Padrão",
+  968: "Cinza",
+  969: "Areia",
+  970: "Menta",
+  971: "Celeste",
+  972: "Rosa",
+  973: "Texto sem cores",
+  974: "Seu navegador está com esta página ampliada ({0}%), por isso tudo parece gigante. Volte para 100% no menu ⋮ do navegador → Zoom.",
+  975: "Entendi",
 };

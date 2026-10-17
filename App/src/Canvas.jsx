@@ -6619,12 +6619,12 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px' }}>
                 {['default', 'gray', 'sand', 'mint', 'sky', 'pink'].map(bgOpt => {
                   const colorsMap = {
-                    default: { light: '#FAF8F6', dark: '#2A282A', label: { es: 'Por defecto', en: 'Default' } },
-                    gray: { light: '#ECEAE6', dark: '#1E1C1E', label: { es: 'Gris', en: 'Gray' } },
-                    sand: { light: '#F4EFE6', dark: '#38322B', label: { es: 'Arena', en: 'Sand' } },
-                    mint: { light: '#EAF2EB', dark: '#25332A', label: { es: 'Menta', en: 'Mint' } },
-                    sky: { light: '#E6F0FA', dark: '#232F3D', label: { es: 'Celeste', en: 'Sky' } },
-                    pink: { light: '#FAEBEF', dark: '#3A232F', label: { es: 'Rosa', en: 'Pink' } }
+                    default: { light: '#FAF8F6', dark: '#2A282A', label: window.t('Por defecto', 'Default') },
+                    gray: { light: '#ECEAE6', dark: '#1E1C1E', label: window.t('Gris', 'Gray') },
+                    sand: { light: '#F4EFE6', dark: '#38322B', label: window.t('Arena', 'Sand') },
+                    mint: { light: '#EAF2EB', dark: '#25332A', label: window.t('Menta', 'Mint') },
+                    sky: { light: '#E6F0FA', dark: '#232F3D', label: window.t('Celeste', 'Sky') },
+                    pink: { light: '#FAEBEF', dark: '#3A232F', label: window.t('Rosa', 'Pink') }
                   };
                   const colorHex = theme === 'dark' ? colorsMap[bgOpt].dark : colorsMap[bgOpt].light;
                   const active = (current.bgColor || 'default') === bgOpt;
@@ -6650,7 +6650,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
                           }
                         }));
                       }}
-                      title={lang === 'es' ? colorsMap[bgOpt].label.es : colorsMap[bgOpt].label.en}
+                      title={colorsMap[bgOpt].label}
                     />
                   );
                 })}
@@ -6685,12 +6685,12 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
             <div style={{ display: 'flex', gap: '6px', padding: '4px 12px 10px 12px', justifyContent: 'space-between', width: '100%', boxSizing: 'border-box' }} onMouseDown={(e)=>e.stopPropagation()}>
               {['default', 'gray', 'sand', 'mint', 'sky', 'pink'].map(bgOpt => {
                 const colorsMap = {
-                  default: { light: '#FAF8F6', dark: '#2A282A', label: { es: 'Por defecto', en: 'Default' } },
-                  gray: { light: '#ECEAE6', dark: '#1E1C1E', label: { es: 'Gris', en: 'Gray' } },
-                  sand: { light: '#F4EFE6', dark: '#38322B', label: { es: 'Arena', en: 'Sand' } },
-                  mint: { light: '#EAF2EB', dark: '#25332A', label: { es: 'Menta', en: 'Mint' } },
-                  sky: { light: '#E6F0FA', dark: '#232F3D', label: { es: 'Celeste', en: 'Sky' } },
-                  pink: { light: '#FAEBEF', dark: '#3A232F', label: { es: 'Rosa', en: 'Pink' } }
+                  default: { light: '#FAF8F6', dark: '#2A282A', label: window.t('Por defecto', 'Default') },
+                  gray: { light: '#ECEAE6', dark: '#1E1C1E', label: window.t('Gris', 'Gray') },
+                  sand: { light: '#F4EFE6', dark: '#38322B', label: window.t('Arena', 'Sand') },
+                  mint: { light: '#EAF2EB', dark: '#25332A', label: window.t('Menta', 'Mint') },
+                  sky: { light: '#E6F0FA', dark: '#232F3D', label: window.t('Celeste', 'Sky') },
+                  pink: { light: '#FAEBEF', dark: '#3A232F', label: window.t('Rosa', 'Pink') }
                 };
                 const colorHex = theme === 'dark' ? colorsMap[bgOpt].dark : colorsMap[bgOpt].light;
                 const active = (current.bgColor || 'default') === bgOpt;
@@ -6721,7 +6721,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
                       }));
                       setContextMenu(null);
                     }}
-                    title={lang === 'es' ? colorsMap[bgOpt].label.es : colorsMap[bgOpt].label.en}
+                    title={colorsMap[bgOpt].label}
                   />
                 );
               })}

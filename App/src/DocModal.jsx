@@ -1577,7 +1577,7 @@ function DocModal({ docItem, lang, onClose, onUpdate }) {
                     className={active.langCodigo === l.id ? 'active' : ''}
                     onClick={()=>{ cambiaIdiomaCodigo(l.id); setPop(null); }}
                   >
-                    {lang === 'es' ? l.n : (l.en || l.n)}
+                    {l.id === 'auto' ? window.t('Automático', 'Automatic') : l.id === 'plaintext' ? window.t('Texto sin colores', 'Plain text') : l.n}
                   </button>
                 ))}
               </div>

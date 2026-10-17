@@ -276,11 +276,13 @@
     ].join(';');
     const text = document.createElement('div');
     text.style.flex = '1';
-    text.textContent = es
-      ? 'Tu navegador tiene esta página ampliada (' + Math.round(pageZoomFactor() * 100) + '%), por eso se ve todo gigante. Ponla al 100% en el menú ⋮ del navegador → Zoom.'
-      : 'Your browser has this page zoomed in (' + Math.round(pageZoomFactor() * 100) + '%), which is why everything looks huge. Set it back to 100% from the browser ⋮ menu → Zoom.';
+    const ampliada = Math.round(pageZoomFactor() * 100);
+    // window.t puede no estar aún si esto sale nada más cargar (data.js va después).
+    text.textContent = window.t
+      ? window.t(`Tu navegador tiene esta página ampliada (${ampliada}%), por eso se ve todo gigante. Ponla al 100% en el menú ⋮ del navegador → Zoom.`, `Your browser has this page zoomed in (${ampliada}%), which is why everything looks huge. Set it back to 100% from the browser ⋮ menu → Zoom.`)
+      : (es ? `Tu navegador tiene esta página ampliada (${ampliada}%), por eso se ve todo gigante. Ponla al 100% en el menú ⋮ del navegador → Zoom.` : `Your browser has this page zoomed in (${ampliada}%), which is why everything looks huge. Set it back to 100% from the browser ⋮ menu → Zoom.`);
     const close = document.createElement('button');
-    close.textContent = es ? 'Vale' : 'Got it';
+    close.textContent = window.t ? window.t('Vale', 'Got it') : (es ? 'Vale' : 'Got it');
     close.style.cssText = 'background:#90B968;color:#1A1A1A;border:0;border-radius:8px;padding:8px 12px;font:700 13px system-ui,sans-serif;flex:0 0 auto';
     close.onclick = () => bar.remove();
     bar.appendChild(text);

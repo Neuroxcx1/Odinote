@@ -969,4 +969,13 @@ window.ODI_IDIOMAS.fr = {
   964: "Cet APK a été compilé sans les identifiants Google : il ne peut pas se connecter.",
   965: "Impossible d'ouvrir le navigateur du téléphone.",
   966: "Vous n'avez pas donné l'autorisation dans Google.",
+  967: "Par défaut",
+  968: "Gris",
+  969: "Sable",
+  970: "Menthe",
+  971: "Ciel",
+  972: "Rose",
+  973: "Texte sans couleurs",
+  974: "Votre navigateur affiche cette page agrandie ({0}%), c'est pour ça que tout paraît énorme. Remettez-la à 100% dans le menu ⋮ du navigateur → Zoom.",
+  975: "D'accord",
 };

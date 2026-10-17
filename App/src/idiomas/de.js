@@ -969,4 +969,13 @@ window.ODI_IDIOMAS.de = {
   964: "Diese APK wurde ohne die Google-Zugangsdaten gebaut und kann sich daher nicht anmelden.",
   965: "Der Browser des Telefons ließ sich nicht öffnen.",
   966: "Du hast in Google keine Berechtigung erteilt.",
+  967: "Standard",
+  968: "Grau",
+  969: "Sand",
+  970: "Minze",
+  971: "Himmelblau",
+  972: "Rosa",
+  973: "Text ohne Farben",
+  974: "Dein Browser zeigt diese Seite vergrößert ({0}%), deshalb wirkt alles riesig. Stell sie im Browsermenü ⋮ → Zoom wieder auf 100%.",
+  975: "Verstanden",
 };

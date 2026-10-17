@@ -969,4 +969,13 @@ window.ODI_FRASES = [
   /* 964 */ ["Este APK se compiló sin las credenciales de Google, así que no puede entrar.","This APK was built without the Google credentials, so it cannot sign in."],
   /* 965 */ ["No se pudo abrir el navegador del teléfono.","Could not open the phone browser."],
   /* 966 */ ["No diste permiso en Google.","You did not grant permission in Google."],
+  /* 967 */ ["Por defecto","Default"],
+  /* 968 */ ["Gris","Gray"],
+  /* 969 */ ["Arena","Sand"],
+  /* 970 */ ["Menta","Mint"],
+  /* 971 */ ["Celeste","Sky"],
+  /* 972 */ ["Rosa","Pink"],
+  /* 973 */ ["Texto sin colores","Plain text"],
+  /* 974 */ ["Tu navegador tiene esta página ampliada ({0}%), por eso se ve todo gigante. Ponla al 100% en el menú ⋮ del navegador → Zoom.","Your browser has this page zoomed in ({0}%), which is why everything looks huge. Set it back to 100% from the browser ⋮ menu → Zoom."],
+  /* 975 */ ["Vale","Got it"],
 ];
