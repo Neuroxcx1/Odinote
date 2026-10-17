@@ -53,7 +53,7 @@ const extras = lee('EXTRA_TOOLS');
 check('la barra de arriba tiene sus catorce nodos', barra.length === 14, 'hay ' + barra.length);
 // Once en la 1.0.9: el separador y la ruleta con la estructura, en rojo, y la
 // carpeta y la galería con los archivos, en gris.
-check('y el menú del "+" los once que sobran', extras.length === 11, 'hay ' + extras.length);
+check('y el menú del "+" los doce que sobran (con el de progreso)', extras.length === 12, 'hay ' + extras.length);
 
 const malBarra = enOrden(barra);
 check('la barra va verde → gris → rojo → blanco', malBarra === null, malBarra || undefined);
@@ -73,9 +73,9 @@ check('y acaba con la estructura y las herramientas',
 
 // Que reordenar no se haya llevado ningún nodo por delante.
 const ids = [...barra, ...extras].map(x => x.id).sort();
-check('están los veinticinco nodos, sin repetidos',
-  ids.length === 25 && new Set(ids).size === 25, ids.length + ' ids');
-for (const quien of ['comment', 'code', 'file', 'map', 'carpeta', 'galeria', 'shape', 'separator', 'calendar', 'timer', 'ruleta']) {
+check('están los veintiséis nodos, sin repetidos',
+  ids.length === 26 && new Set(ids).size === 26, ids.length + ' ids');
+for (const quien of ['comment', 'code', 'file', 'map', 'carpeta', 'galeria', 'shape', 'separator', 'calendar', 'timer', 'progreso', 'ruleta']) {
   check('sigue estando ' + quien, ids.indexOf(quien) !== -1);
 }
 
