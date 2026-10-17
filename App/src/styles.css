@@ -8016,3 +8016,45 @@ body.odi-cuentagotas, body.odi-cuentagotas * { cursor: crosshair !important; }
 .code-linea.error { color: #FF8A80; }
 .code-linea.resultado { color: #9AD27A; }
 .code-linea.vacia { opacity: 0.5; font-style: italic; }
+
+
+/* ── 1.2: el muelle en el resto de la aplicación ──
+   Lo dijo el usuario: la 1.2 es de animaciones «tipo iPhone». La carpeta, la
+   ruleta, la galería y el caracol de More ya estrenaron --muelle (una curva
+   que se pasa un poco y vuelve); aquí va al resto de lo que más se ve. Lo que
+   aparece crece un pelo de más y se asienta; lo que se pulsa se hunde rápido
+   y rebota al soltarlo.
+   Con «backwards» y no «both»: al acabar, cada cosa vuelve a SU transform
+   (las que se colocan con uno no se quedan pegadas al final de la animación). */
+@keyframes muelle-aparece { from { opacity: 0; transform: scale(0.92) translateY(6px); } to { opacity: 1; transform: none; } }
+@keyframes muelle-lado { from { opacity: 0; transform: translateX(-10px) scale(0.97); } to { opacity: 1; transform: none; } }
+@keyframes nodo-aparece { from { opacity: 0; transform: scale(0.88) translateY(8px); } to { opacity: 1; transform: none; } }
+
+/* Ventanas y menús. */
+.modal { animation: muelle-aparece 320ms var(--muelle) backwards; }
+.doc-modal-window { animation: muelle-aparece 340ms var(--muelle) backwards; }
+.context-menu { transform-origin: top left; animation: muelle-aparece 240ms var(--muelle) backwards; }
+/* La barra del nodo y sus paneles, desde la izquierda, que es de donde salen. */
+.ctx-side { animation: muelle-lado 300ms var(--muelle) backwards; }
+.ctx-popout { transform-origin: left top; animation: muelle-lado 280ms var(--muelle) backwards; }
+
+/* Un nodo nuevo cae en su sitio con un pequeño rebote. */
+.item.new-item .item-card { animation: nodo-aparece 380ms var(--muelle) backwards; }
+
+/* Pulsar: abajo rápido (70 ms, sin rebote) y vuelta con muelle. */
+.press { transition: transform 300ms var(--muelle); }
+.press:active { transform: scale(0.94); transition-duration: 70ms; transition-timing-function: var(--e-out); }
+.icon-btn { transition: transform 260ms var(--muelle), box-shadow 160ms var(--e-out); }
+.icon-btn:active { transform: translate(1px, 1px) scale(0.96); box-shadow: 0 0 0 0 var(--line); transition-duration: 70ms; transition-timing-function: var(--e-out); }
+.tool { transition: transform 260ms var(--muelle), background 100ms; }
+.tool:active { transform: scale(0.94); transition-duration: 70ms; transition-timing-function: var(--e-out); }
+
+/* Las tarjetas de inicio y todo lo que «se levanta» al pasar el ratón. */
+.ms-project-card, .ms-recent-card, .lift { transition: transform 280ms var(--muelle), box-shadow 180ms var(--e-out); }
+
+/* Quien pide menos movimiento en el sistema no lo tiene. */
+@media (prefers-reduced-motion: reduce) {
+  .modal, .doc-modal-window, .context-menu, .ctx-side, .ctx-popout,
+  .item.new-item .item-card, .panel-color, .plantillas-panel, .code-terminal { animation-duration: 1ms !important; }
+  .press, .icon-btn, .tool, .ms-project-card, .ms-recent-card, .lift { transition-duration: 1ms !important; }
+}
