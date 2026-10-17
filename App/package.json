@@ -6,7 +6,7 @@
   "scripts": {
     "start": "electron main.js",
     "dev:web": "node dev-server.js",
-    "test:drive": "node scripts/test-drive.js && node scripts/test-oauth.js && node scripts/test-todo.js && node scripts/test-connector.js",
+    "test:drive": "node scripts/test-drive.js && node scripts/test-drive-fallos.js && node scripts/test-oauth.js && node scripts/test-todo.js && node scripts/test-connector.js",
     "test:search": "node scripts/test-search.js",
     "test:links": "node scripts/test-links.js",
     "test:graph": "node scripts/test-graph.js",

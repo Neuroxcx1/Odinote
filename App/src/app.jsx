@@ -341,6 +341,9 @@ function App() {
   const [toast, setToast] = useStateApp(null);
   const [isSyncingDrive, setIsSyncingDrive] = useStateApp(false);
   const lastGoogleDriveSyncTimeRef = React.useRef(0);
+  // El último fallo de una subida a Drive ({ paso, status, reason }): la subida
+  // devuelve null, y con esto el aviso puede decir por qué (OdiDriveFallos).
+  const falloDriveRef = React.useRef(null);
   // true mientras el último cambio de canvases vino de una importación de Drive
   // (para no marcarlo como edición local y evitar guerras de re-subida)
   const driveImportRef = React.useRef(false);
@@ -527,6 +530,7 @@ function App() {
         setWaitingForWebLogin(false);
         setUserModalOpen(false);
         showToast(window.t('¡Sesión iniciada con éxito mediante Google!', 'Successfully signed in with Google!'));
+        avisaSiFaltaDrive(paraGuardar.accessToken);
       });
       return unsubscribe;
     }
@@ -579,7 +583,10 @@ function App() {
     window._odiLastDriveBlockToast = now;
     const reason = (check && check.reason) || '';
     const apiDisabled = reason.includes('disabled') || reason.includes('has not been used');
-    if (apiDisabled) {
+    if (window.OdiDriveFallos && window.OdiDriveFallos.esFaltaDePermiso(check)) {
+      // El caso de quien entra por primera vez: ver window.OdiDriveFallos.
+      showToast(window.OdiDriveFallos.explica(check), 'error');
+    } else if (apiDisabled) {
       showToast(window.t(
         'La API de Google Drive está desactivada en tu proyecto de Google Cloud (odinote-firebase). Actívala en la consola de Google Cloud y vuelve a intentarlo.',
         'The Google Drive API is disabled in your Google Cloud project (odinote-firebase). Enable it in the Google Cloud console and try again.'
@@ -605,6 +612,22 @@ function App() {
   // Ahora isPublic solo lo cambia el usuario al publicar o retirar un proyecto,
   // y que Drive esté alcanzable es este estado aparte, que no se persiste.
   const [driveReachable, setDriveReachable] = useStateApp(true);
+
+  // Nada más entrar con Google: ¿dio permiso para Drive? Google pide la cuenta
+  // y Drive a la vez, y Drive es una casilla que hay que MARCAR; quien no la
+  // marca entra igual y todo lo de Drive le falla después sin explicación (le
+  // pasó a un compañero del mantenedor en la web). Se pregunta a Drive y, si
+  // dice que no hay permiso, se avisa ya. Ver window.OdiDriveFallos.
+  const avisaSiFaltaDrive = (accessToken) => {
+    const F = window.OdiDriveFallos;
+    if (!F || !accessToken) return;
+    F.compruebaDrive(accessToken).then((fallo) => {
+      if (fallo && F.esFaltaDePermiso(fallo)) {
+        console.warn('[DRIVE] Sesión sin permiso de Drive:', JSON.stringify(fallo));
+        showToast(F.avisoSinPermiso(), 'error');
+      }
+    });
+  };
 
   // Flujo de autenticación con Google, compartido entre el primer login y la
   // renovación del token de Drive (que caduca ~1 hora). En la renovación no se
@@ -673,6 +696,7 @@ function App() {
           showToast(isRenewal
             ? window.t('Acceso a Google Drive renovado.', 'Google Drive access renewed.')
             : window.t('¡Sesión iniciada con éxito mediante Google!', 'Successfully signed in with Google!'));
+          avisaSiFaltaDrive(userProfileData.accessToken);
         })
         .catch((err) => {
           console.error('Auth web error:', err);
@@ -1646,6 +1670,15 @@ function App() {
     const projectName = projectNameString(project.name);
     const safeName = projectName.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
     setIsSyncingDrive(true);
+    falloDriveRef.current = null;
+    const F = window.OdiDriveFallos;
+    // Apunta el fallo de un paso y devuelve null, para poder escribir
+    // `if (!res.ok) return apunta(...)` donde antes había un `return null` mudo.
+    const apunta = async (paso, res) => {
+      if (F && res) falloDriveRef.current = await F.deRespuesta(paso, res);
+      return null;
+    };
+    let pasoActual = '';
     try {
       const headers = {
         'Authorization': `Bearer ${accessToken}`,
@@ -1653,23 +1686,21 @@ function App() {
       };
       const driveGet = async (url) => {
         const res = await fetch(url, { headers });
-        if (res.status === 401) { invalidateDriveSession(); return null; }
+        if (res.status === 401) { await apunta(pasoActual, res); invalidateDriveSession(); return null; }
         if (res.status === 403) {
-          let reason = '';
-          try {
-            const data = await res.clone().json();
-            reason = (data.error && data.error.message) || '';
-          } catch (e) {}
-          notifyDriveBlocked({ status: 403, reason });
+          await apunta(pasoActual, res);
+          notifyDriveBlocked(falloDriveRef.current || { status: 403, reason: '' });
           return null;
         }
         return res;
       };
 
       // 1. Obtener o crear la carpeta "Odinote"
+      pasoActual = window.t('buscar la carpeta Odinote', 'finding the Odinote folder');
       const searchRootUrl = `https://www.googleapis.com/drive/v3/files?q=name='Odinote' and mimeType='application/vnd.google-apps.folder' and trashed=false&fields=files(id)`;
       const searchRootRes = await driveGet(searchRootUrl);
-      if (!searchRootRes || !searchRootRes.ok) return null;
+      if (!searchRootRes) return null;
+      if (!searchRootRes.ok) return apunta(pasoActual, searchRootRes);
       const searchRootData = await searchRootRes.json();
       let rootFolderId = '';
 
@@ -1684,7 +1715,7 @@ function App() {
             mimeType: 'application/vnd.google-apps.folder'
           })
         });
-        if (!createRootRes.ok) return null;
+        if (!createRootRes.ok) return apunta(window.t('crear la carpeta Odinote', 'creating the Odinote folder'), createRootRes);
         const createRootData = await createRootRes.json();
         rootFolderId = createRootData.id;
       }
@@ -1704,9 +1735,11 @@ function App() {
       }
 
       if (!projFolderId) {
+        pasoActual = window.t('buscar la carpeta del proyecto', 'finding the project folder');
         const searchProjFolderUrl = `https://www.googleapis.com/drive/v3/files?q=name='${encodeURIComponent(safeName)}' and '${rootFolderId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false&fields=files(id)`;
         const searchProjFolderRes = await driveGet(searchProjFolderUrl);
-        if (!searchProjFolderRes || !searchProjFolderRes.ok) return null;
+        if (!searchProjFolderRes) return null;
+        if (!searchProjFolderRes.ok) return apunta(pasoActual, searchProjFolderRes);
         const searchProjFolderData = await searchProjFolderRes.json();
 
         if (searchProjFolderData.files && searchProjFolderData.files.length > 0) {
@@ -1721,7 +1754,7 @@ function App() {
               parents: [rootFolderId]
             })
           });
-          if (!createProjFolderRes.ok) return null;
+          if (!createProjFolderRes.ok) return apunta(window.t('crear la carpeta del proyecto', 'creating the project folder'), createProjFolderRes);
           const createProjFolderData = await createProjFolderRes.json();
           projFolderId = createProjFolderData.id;
         }
@@ -1733,9 +1766,11 @@ function App() {
       localStorage.setItem(`odinote.gdrive_folder_${projectId}`, projFolderId);
 
       // 3. Buscar si ya existe "canvas_state.json" en esa carpeta
+      pasoActual = window.t('buscar el archivo del proyecto', 'finding the project file');
       const searchFileUrl = `https://www.googleapis.com/drive/v3/files?q=name='canvas_state.json' and '${projFolderId}' in parents and trashed=false&fields=files(id)`;
       const fileSearchRes = await driveGet(searchFileUrl);
-      if (!fileSearchRes || !fileSearchRes.ok) return null;
+      if (!fileSearchRes) return null;
+      if (!fileSearchRes.ok) return apunta(pasoActual, fileSearchRes);
       const fileSearchData = await fileSearchRes.json();
       let fileId = '';
 
@@ -1764,7 +1799,7 @@ function App() {
           },
           body: projectDataContent
         });
-        if (!updateRes.ok) return null;
+        if (!updateRes.ok) return apunta(window.t('guardar el archivo del proyecto', 'saving the project file'), updateRes);
       } else {
         // Crear canvas_state.json
         const boundary = '-------314159265358979323846';
@@ -1795,7 +1830,7 @@ function App() {
           },
           body: multipartBody
         });
-        if (!createRes.ok) return null;
+        if (!createRes.ok) return apunta(window.t('crear el archivo del proyecto', 'creating the project file'), createRes);
       }
       // Registrar qué versión quedó en Drive: es la referencia para saber si hay
       // cambios locales pendientes o si lo remoto trae algo más nuevo
@@ -1803,8 +1838,12 @@ function App() {
       return projFolderId;
     } catch (err) {
       console.error('Error synchronizing project file to Google Drive:', err);
+      if (F) falloDriveRef.current = F.deExcepcion(pasoActual, err);
       return null;
     } finally {
+      // Al registro (el del escritorio lo recoge): sin esto, de un fallo en
+      // casa de otro no quedaba ni rastro.
+      if (falloDriveRef.current) console.warn('[DRIVE] La subida falló:', JSON.stringify(falloDriveRef.current));
       setTimeout(() => setIsSyncingDrive(false), 800);
     }
   };
@@ -2549,7 +2588,11 @@ function App() {
           setProjects(p => p.map(x => x.id === projectId ? { ...x, isPublic: true, useGoogleDrive: true, shareToken: nextToken } : x));
           showToast(window.t(`"${projectNameString(target.name)}" ya está online, guardado en tu Google Drive (carpeta Odinote).`, `"${projectNameString(target.name)}" is now online, saved to your Google Drive (Odinote folder).`));
         } else {
-          showToast(window.t('No se pudo subir a Google Drive: el proyecto se queda offline.', 'Could not upload to Google Drive: the project stays offline.'), 'error');
+          // Con el porqué (OdiDriveFallos): el aviso de siempre no dejaba saber
+          // si faltaba el permiso, caducó la sesión o no había conexión.
+          const F = window.OdiDriveFallos;
+          showToast(F ? F.explica(falloDriveRef.current)
+            : window.t('No se pudo subir a Google Drive: el proyecto se queda offline.', 'Could not upload to Google Drive: the project stays offline.'), 'error');
         }
       });
   };
@@ -2741,7 +2784,7 @@ function App() {
         folderId = await uploadToGoogleDriveReal(project, canvases, userProfile.accessToken);
       }
       if (!folderId) {
-        showToast(window.t('No se pudo preparar la carpeta del proyecto en Drive.', 'Could not prepare the project folder on Drive.'), 'error');
+        showToast(window.OdiDriveFallos ? window.OdiDriveFallos.explica(falloDriveRef.current) : window.t('No se pudo preparar la carpeta del proyecto en Drive.', 'Could not prepare the project folder on Drive.'), 'error');
         return false;
       }
       const res = await fetch(`https://www.googleapis.com/drive/v3/files/${folderId}/permissions?sendNotificationEmail=true`, {
@@ -3996,7 +4039,7 @@ function App() {
                           uploadToGoogleDriveReal({ ...project, useGoogleDrive: true }, canvases, userProfile.accessToken)
                             .then(folderId => showToast(folderId
                               ? window.t('Proyecto sincronizado con tu Google Drive.', 'Project synced with your Google Drive.')
-                              : window.t('No se pudo subir a Google Drive.', 'Could not upload to Google Drive.'), folderId ? 'success' : 'error'));
+                              : (window.OdiDriveFallos ? window.OdiDriveFallos.explica(falloDriveRef.current) : window.t('No se pudo subir a Google Drive.', 'Could not upload to Google Drive.')), folderId ? 'success' : 'error'));
                         }
                         window.playAudioTone && window.playAudioTone('click');
                       }}
