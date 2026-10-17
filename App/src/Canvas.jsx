@@ -4312,7 +4312,11 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
     document.body.classList.add('odi-busy');
     const startX = e.clientX, startY = e.clientY;
     const sx = item.x, sy = item.y, sw = item.w, sh = item.h;
-    const minW = 100, minH = 50;
+    // Una imagen se encoge todo lo que quieras (lo pidió quien probó): el tope
+    // de 100×50 es para los nodos con texto, que por debajo ya no se leen.
+    // Hacia arriba no hay tope: el lienzo crece con lo que tiene dentro.
+    const libre = item.type === 'image';
+    const minW = libre ? 8 : 100, minH = libre ? 8 : 50;
     const aspectRatio = sw / sh;
     // Nodos en modo compacto (sin vista previa): el redimensionado mantiene la
     // proporción (no se puede poner "más gordo o más flaco"), igual que con Shift.
