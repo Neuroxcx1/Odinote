@@ -1983,20 +1983,31 @@ body.odi-busy iframe { pointer-events: none !important; }
   position: relative;
   width: min(100cqw, 100cqh); height: min(100cqw, 100cqh);
   container-type: inline-size;
+  /* La letra del sistema, como en las apps de Apple (en Windows, Segoe UI). */
+  --ruleta-letra: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI Variable Text', 'Segoe UI', var(--font-body), sans-serif;
+  --ruleta-tinta: #1D1D1F;
+  --ruleta-gris: #6E6E73;
+  --ruleta-plato: #FFFFFF;
+  --ruleta-cristal: rgba(255, 255, 255, 0.78);
 }
-/* Lo que no gira (Ruleta.jsx): debajo la sombra dura y la base; encima el aro
-   con las luces y el brillo. Entre los dos, la rueda, que es lo único que da
-   vueltas. Tinta y sombra dura, como las tarjetas de toda la aplicación: la
-   de antes, con una sombra borrosa y degradados, al usuario le parecía «muy
-   simple». */
+[data-theme="dark"] .ruleta-rueda-caja {
+  --ruleta-plato: #2C2C2E;
+  --ruleta-cristal: rgba(44, 44, 46, 0.8);
+  --ruleta-gris: #A1A1A6;
+}
+/* Lo que no gira (Ruleta.jsx): debajo el plato con su sombra suave; encima
+   un brillo leve y el filo. Entre los dos, la rueda, que es lo único que da
+   vueltas. Estilo Apple, como pidió el usuario: nada de tinta gruesa, aros
+   ni bombillas (la versión de feria le pareció más fea que la de antes). */
 .ruleta-fondo, .ruleta-marco {
   position: absolute; inset: 0; width: 100%; height: 100%;
   pointer-events: none; overflow: visible;
 }
-.ruleta-fondo { z-index: 0; }
+.ruleta-fondo { z-index: 0; filter: drop-shadow(0 2.4cqw 5cqw rgba(0, 0, 0, 0.14)) drop-shadow(0 0.5cqw 1.2cqw rgba(0, 0, 0, 0.08)); }
 .ruleta-marco { z-index: 2; }
-.ruleta-sombra { fill: var(--line); }
-.ruleta-base { fill: var(--paper); }
+.ruleta-plato { fill: var(--ruleta-plato); }
+.ruleta-plato-borde { fill: none; stroke: rgba(0, 0, 0, 0.06); stroke-width: 0.6; }
+.ruleta-filo { fill: none; stroke: rgba(0, 0, 0, 0.05); stroke-width: 0.6; }
 .ruleta-rueda {
   position: relative; z-index: 1;
   width: 100%; height: 100%;
@@ -2004,131 +2015,102 @@ body.odi-busy iframe { pointer-events: none !important; }
   border-radius: 50%;
   will-change: transform;
 }
-.ruleta-porcion { stroke: none; transition: opacity 300ms, transform 460ms var(--muelle); }
-.ruleta-porcion.apagada { opacity: 0.38; }
-/* La que ha salido se adelanta hacia fuera y lleva un filo claro. */
-.ruleta-porcion.sale { stroke: #FFFFFF; stroke-width: 1.5; stroke-linejoin: round; }
+.ruleta-porcion { stroke: none; transition: opacity 420ms ease, transform 520ms var(--muelle), filter 420ms ease; }
+/* Al salir el premio, las demás se apagan y pierden color; la que sale se
+   adelanta un poco. */
+.ruleta-porcion.apagada { opacity: 0.4; filter: saturate(0.35); }
 /* La porción que se acaba de añadir entra desde el centro con rebote: es la
    respuesta a haber escrito algo. El centro de la rueda es el 0 0 del dibujo. */
 .ruleta-porcion.nueva { transform-origin: 0 0; animation: ruleta-porcion-entra 560ms var(--muelle) backwards; }
 @keyframes ruleta-porcion-entra { from { transform: scale(0.35); opacity: 0.2; } to { transform: scale(1); opacity: 1; } }
 /* El hueco del segundo elemento cuando solo hay uno: sin color, con borde de
    puntos, y con lo que se va escribiendo dentro según se teclea. */
-.ruleta-porcion.fantasma { fill: var(--paper-2); stroke: var(--ink-3); stroke-width: 0.9; stroke-dasharray: 3 2.4; }
+.ruleta-porcion.fantasma { fill: var(--paper-2); stroke: var(--ink-3); stroke-width: 0.8; stroke-dasharray: 3 2.4; }
 /* Su transform va en CSS (ver Ruleta.jsx) para que la vuelta de los que quedan
    cabeza abajo al parar se vea girar en su sitio. El origen, el centro de la
    rueda, como el atributo transform de siempre. */
-.ruleta-texto { fill: #1A1A1A; font-family: var(--font-display); font-weight: 800; font-size: 8px; letter-spacing: -0.01em; pointer-events: none; transform-box: view-box; transform-origin: 0 0; transition: opacity 300ms, transform 520ms var(--muelle); }
-.ruleta-texto.fantasma { fill: var(--ink-3); }
-/* Sobre una foto o un color oscuro, el nombre negro lleva un halo claro. */
-.ruleta-texto.con-halo { paint-order: stroke; stroke: rgba(255,255,255,0.92); stroke-width: 2.4px; stroke-linejoin: round; }
-/* Las rayas entre porciones: tinta fina; con fotos, blancas y más gruesas
-   para que no se mezclen las de al lado. */
-.ruleta-raya { stroke: rgba(26,26,26,0.55); stroke-width: 0.8; stroke-linecap: round; pointer-events: none; }
-.ruleta-raya.con-fotos { stroke: #FFFFFF; stroke-width: 1.6; }
+.ruleta-texto { fill: #1D1D1F; font-family: var(--ruleta-letra); font-weight: 600; font-size: 8px; letter-spacing: -0.015em; pointer-events: none; transform-box: view-box; transform-origin: 0 0; transition: opacity 420ms ease, transform 520ms var(--muelle); }
+.ruleta-texto.fantasma { fill: var(--ink-3); font-weight: 500; }
+/* Sobre una foto, el nombre lleva un halo claro para leerse. */
+.ruleta-texto.con-halo { paint-order: stroke; stroke: rgba(255,255,255,0.9); stroke-width: 2.2px; stroke-linejoin: round; }
+/* Las líneas blancas entre porciones. */
+.ruleta-raya { stroke: var(--ruleta-plato); stroke-width: 1.4; stroke-linecap: round; pointer-events: none; }
 .ruleta-fotos { pointer-events: none; }
-/* Las tachuelas: una por raya, junto al aro. */
-.ruleta-tachuela { fill: #FFF8E6; stroke: #1E1A1D; stroke-width: 0.7; }
-/* El aro de las luces, oscuro en los dos temas: si fuera del color del
-   papel, las bombillas no se verían encendidas. */
-.ruleta-aro { fill: none; stroke: #2A2629; }
-.ruleta-aro-borde { fill: none; stroke: var(--line); stroke-width: 1.6; }
-.ruleta-aro-dentro { fill: none; stroke: #1E1A1D; stroke-width: 1.2; }
-/* Las bombillas: medio encendidas en reposo; al girar, una ola que corre
-   alrededor; al salir el premio, todas parpadean un momento. */
-.ruleta-luz { fill: #F3D98B; stroke: rgba(0,0,0,0.4); stroke-width: 0.5; }
-.ruleta-luz:nth-of-type(odd) { fill: #FFF4CC; }
-.ruleta.girando .ruleta-luz { animation: ruleta-luz-corre 720ms linear infinite; animation-delay: calc(var(--luz) * -30ms); }
-.ruleta-marco.celebra .ruleta-luz { animation: ruleta-luz-premio 300ms steps(2, jump-none) 6; }
-@keyframes ruleta-luz-corre {
-  0%, 70% { fill: #8C7A4C; }
-  80% { fill: #FFF7D6; }
-  100% { fill: #F7DA84; }
-}
-@keyframes ruleta-luz-premio { from { fill: #FFFFFF; } to { fill: #E6544F; } }
-/* La flecha: una gota roja con borde de tinta y sombra dura, clavada en el
-   aro por su tornillo. No tiembla sin parar: se mueve cuando la golpea una
-   tachuela (golpeFlecha en Ruleta.jsx), así que al frenar la rueda los golpes
-   se espacian y se va quedando quieta, como en una de verdad. Gira sobre el
-   tornillo. */
+/* La flecha: un triángulo pequeño de puntas redondeadas, oscuro y con una
+   sombra suave. Se mueve un poco cuando pasa cada porción (golpeFlecha en
+   Ruleta.jsx), así que al frenar se va quedando quieta. Gira sobre su base. */
 .ruleta-flecha {
-  position: absolute; left: 50%; top: -6%; z-index: 3;
-  width: 12.5%; aspect-ratio: 40 / 52;
+  position: absolute; left: 50%; top: -1.5%; z-index: 3;
+  width: 8.5%; aspect-ratio: 24 / 26;
   transform: translateX(-50%);
-  transform-origin: 50% 33%;
+  transform-origin: 50% 15%;
   pointer-events: none;
+  filter: drop-shadow(0 0.6cqw 1cqw rgba(0, 0, 0, 0.25));
 }
 .ruleta-flecha svg { width: 100%; height: 100%; display: block; overflow: visible; }
-.ruleta-flecha-sombra { fill: var(--line); }
-.ruleta-flecha-cuerpo { fill: #E6544F; stroke: #1E1A1D; stroke-width: 2.4; stroke-linejoin: round; }
-.ruleta-flecha-tornillo { fill: #FAF9F6; stroke: #1E1A1D; stroke-width: 2.2; }
-/* El botón del centro: como cualquier botón de la aplicación, con su sombra
-   dura; se levanta al pasar el ratón y se hunde al pulsarlo. */
+.ruleta-flecha-cuerpo { fill: var(--ruleta-tinta); stroke: var(--ruleta-plato); stroke-width: 1.6; stroke-linejoin: round; }
+[data-theme="dark"] .ruleta-flecha-cuerpo { fill: #F5F5F7; stroke: #2C2C2E; }
+/* El botón del centro, como uno de iOS: blanco, redondo, con su sombra suave;
+   crece un poco al pasar el ratón y se encoge al pulsarlo. */
 .ruleta-centro {
   position: absolute; left: 50%; top: 50%; z-index: 3;
-  width: 27%; aspect-ratio: 1;
+  width: 26%; aspect-ratio: 1;
   display: grid; place-items: center;
   transform: translate(-50%, -50%);
   border-radius: 50%;
-  background: var(--paper); color: var(--ink);
-  border: 0.9cqw solid #1E1A1D;
-  box-shadow: 1cqw 1.2cqw 0 var(--line);
-  font-family: var(--font-display); font-weight: 800; font-size: 5.4cqw;
+  border: none;
+  background: linear-gradient(180deg, var(--ruleta-plato) 0%, color-mix(in srgb, var(--ruleta-plato) 92%, #000) 100%);
+  color: var(--ruleta-tinta);
+  box-shadow: 0 1.2cqw 3.4cqw rgba(0, 0, 0, 0.18), 0 0 0 0.3cqw rgba(0, 0, 0, 0.04), inset 0 0.2cqw 0 rgba(255, 255, 255, 0.7);
+  font-family: var(--ruleta-letra); font-weight: 600; font-size: 5.2cqw; letter-spacing: -0.01em;
   cursor: pointer;
-  transition: transform 260ms var(--muelle), background 150ms, box-shadow 150ms, opacity 300ms;
+  transition: transform 320ms var(--muelle), box-shadow 200ms ease, opacity 300ms;
 }
-.ruleta-centro:hover:not(:disabled) { transform: translate(-50%, -50%) translate(-0.4cqw, -0.5cqw); box-shadow: 1.5cqw 1.8cqw 0 var(--line); background: #90B968; color: #1A1A1A; }
-.ruleta-centro:active:not(:disabled) { transform: translate(-50%, -50%) translate(0.7cqw, 0.9cqw); box-shadow: 0 0 0 var(--line); }
+[data-theme="dark"] .ruleta-centro { color: #F5F5F7; box-shadow: 0 1.2cqw 3.4cqw rgba(0, 0, 0, 0.4), 0 0 0 0.3cqw rgba(255, 255, 255, 0.06); }
+.ruleta-centro:hover:not(:disabled) { transform: translate(-50%, -50%) scale(1.05); box-shadow: 0 1.8cqw 4.6cqw rgba(0, 0, 0, 0.22), 0 0 0 0.3cqw rgba(0, 0, 0, 0.04); }
+.ruleta-centro:active:not(:disabled) { transform: translate(-50%, -50%) scale(0.95); }
 .ruleta-centro:disabled { cursor: default; }
-.ruleta-centro-gira { font-size: 8cqw; display: inline-flex; animation: ruleta-gira-icono 700ms linear infinite; }
+.ruleta-centro-gira { font-size: 7cqw; display: inline-flex; color: var(--ruleta-gris); animation: ruleta-gira-icono 900ms linear infinite; }
 @keyframes ruleta-gira-icono { to { transform: rotate(360deg); } }
 /* Con un solo elemento el botón ya está, pero apagado: dice qué viene después. */
-.ruleta-centro.espera { color: var(--ink-3); }
-/* El cartel del que ha salido: una tarjeta de la aplicación (tinta y sombra
-   dura) con su etiqueta verde encima, el color de su porción y el botón de
-   quitarlo de la rueda. Abajo, lejos de la flecha, que es donde está él. */
+.ruleta-centro.espera { color: var(--ruleta-gris); }
+/* El que ha salido: una tarjeta de cristal esmerilado, con el color de su
+   porción, «Ha salido» en gris pequeño y el nombre debajo. Abajo, lejos de
+   la flecha, que es donde está él. */
 .ruleta-premio {
-  position: absolute; left: 50%; bottom: 3%; z-index: 4;
-  max-width: 88%;
-  display: flex; align-items: center; gap: 2cqw;
-  padding: 2cqw 2cqw 1.8cqw 2.8cqw;
-  border-radius: 3cqw;
-  background: var(--paper); color: var(--ink);
-  border: 0.7cqw solid #1E1A1D;
-  box-shadow: 1.2cqw 1.4cqw 0 var(--line);
+  position: absolute; left: 50%; bottom: 4%; z-index: 4;
+  max-width: 86%;
+  display: flex; align-items: center; gap: 2.4cqw;
+  padding: 2.2cqw 2.4cqw 2.2cqw 2.8cqw;
+  border-radius: 4.2cqw;
+  background: var(--ruleta-cristal);
+  -webkit-backdrop-filter: blur(16px) saturate(1.8);
+  backdrop-filter: blur(16px) saturate(1.8);
+  color: var(--ruleta-tinta);
+  box-shadow: 0 2.4cqw 6cqw rgba(0, 0, 0, 0.18), 0 0 0 0.25cqw rgba(0, 0, 0, 0.04);
+  font-family: var(--ruleta-letra);
   transform: translateX(-50%);
-  animation: ruleta-premio 620ms var(--muelle) backwards;
+  animation: ruleta-premio 560ms var(--muelle) backwards;
 }
-.ruleta-premio-eti {
-  position: absolute; top: -2.9cqw; left: 2.8cqw;
-  padding: 0.3cqw 1.5cqw;
-  border-radius: 1.6cqw;
-  background: #90B968; color: #1A1A1A;
-  border: 0.5cqw solid #1E1A1D;
-  font-size: 2.6cqw; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase;
-  white-space: nowrap;
-}
-.ruleta-premio-nombre {
-  display: flex; align-items: center; gap: 1.6cqw; min-width: 0;
-  font-family: var(--font-display); font-weight: 800; font-size: 6cqw; line-height: 1.15;
-}
-.ruleta-premio-nombre > span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.ruleta-premio-color { width: 3.6cqw; height: 3.6cqw; flex-shrink: 0; border-radius: 50%; border: 0.5cqw solid #1E1A1D; }
+[data-theme="dark"] .ruleta-premio { color: #F5F5F7; box-shadow: 0 2.4cqw 6cqw rgba(0, 0, 0, 0.45), 0 0 0 0.25cqw rgba(255, 255, 255, 0.06); }
+.ruleta-premio-color { width: 4.6cqw; height: 4.6cqw; flex-shrink: 0; border-radius: 50%; box-shadow: inset 0 0 0 0.25cqw rgba(0, 0, 0, 0.08); }
+.ruleta-premio-texto { display: flex; flex-direction: column; min-width: 0; line-height: 1.15; }
+.ruleta-premio-eti { font-size: 2.9cqw; font-weight: 500; color: var(--ruleta-gris); letter-spacing: 0; }
+.ruleta-premio-nombre { font-size: 5.6cqw; font-weight: 700; letter-spacing: -0.02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ruleta-premio-quitar {
   flex-shrink: 0;
-  padding: 0.8cqw 1.8cqw;
-  border-radius: 2cqw;
-  border: 0.5cqw solid #1E1A1D;
-  background: var(--paper-2); color: var(--ink);
-  font-size: 3cqw; font-weight: 700; cursor: pointer;
+  padding: 1cqw 2.2cqw;
+  border-radius: 999px;
+  border: none;
+  background: rgba(120, 120, 128, 0.16); color: inherit;
+  font-family: var(--ruleta-letra); font-size: 3cqw; font-weight: 600; cursor: pointer;
   transition: background 150ms, color 150ms;
 }
 .ruleta-premio-quitar:hover { background: #E6544F; color: #FFFFFF; }
 /* Un premio largo se parte en dos líneas y con la letra más pequeña: en una
    sola, «Elemento con nombre largo 41» se cortaba justo en lo que lo distingue. */
-.ruleta-premio.largo .ruleta-premio-nombre { font-size: 4.4cqw; }
-.ruleta-premio.largo .ruleta-premio-nombre > span {
-  white-space: normal;
+.ruleta-premio.largo .ruleta-premio-nombre {
+  font-size: 4.2cqw; white-space: normal;
   display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2;
 }
 /* El confeti del final (ruletaConfeti en Ruleta.jsx): el doble de la rueda
@@ -2138,7 +2120,7 @@ body.odi-busy iframe { pointer-events: none !important; }
   z-index: 5; pointer-events: none; overflow: visible;
 }
 @keyframes ruleta-premio {
-  from { opacity: 0; transform: translateX(-50%) translateY(14px) scale(0.6); }
+  from { opacity: 0; transform: translateX(-50%) translateY(3cqw) scale(0.92); }
   to   { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
 }
 /* El botón de la foto en la lista de elementos: con foto, la enseña. */
@@ -8235,8 +8217,8 @@ html[data-mobile="1"] .code-run .material-symbols-rounded { font-size: max(16px,
   .modal, .doc-modal-window, .context-menu, .ctx-side, .ctx-popout,
   .item.new-item .item-card, .panel-color, .plantillas-panel, .code-terminal { animation-duration: 1ms !important; }
   .press, .icon-btn, .tool, .ms-project-card, .ms-recent-card, .lift { transition-duration: 1ms !important; }
-  /* La ruleta gira igual (es lo que hace), pero sin luces corriendo ni parpadeos. */
-  .ruleta .ruleta-luz, .ruleta-centro-gira, .ruleta-premio { animation: none !important; }
+  /* La ruleta gira igual (es lo que hace), pero sin lo demás que se mueve. */
+  .ruleta-centro-gira, .ruleta-premio, .ruleta-porcion.nueva { animation: none !important; }
 }
 
 

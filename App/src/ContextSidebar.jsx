@@ -1796,7 +1796,8 @@ function ContextSidebar({
                         gusto (lo pidió el usuario). */}
                     <button
                       className={`ruleta-fila-color ${colorRuleta === el.id ? 'abierto' : ''}`}
-                      style={{ background: el.color }}
+                      // Como se pinta en la rueda: suavizado (ver ruletaSuave).
+                      style={{ background: window.ruletaSuave ? window.ruletaSuave(el.color) : el.color }}
                       onClick={() => setColorRuleta(colorRuleta === el.id ? null : el.id)}
                       title={window.t('Cambiar el color', 'Change the colour')}
                     />
@@ -1915,7 +1916,7 @@ function ContextSidebar({
                 <div className="ruleta-historial">
                   {historial.map((h, k) => (
                     <div key={k} className="ruleta-historial-fila">
-                      <i style={{ background: h.color || '#E1DFE3' }}/>
+                      <i style={{ background: h.color ? (window.ruletaSuave ? window.ruletaSuave(h.color) : h.color) : '#E1DFE3' }}/>
                       <span>{h.texto}</span>
                       <small>{hora(h.t)}</small>
                     </div>

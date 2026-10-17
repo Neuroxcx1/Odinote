@@ -7,11 +7,13 @@
 // pasa por la flecha y, al parar, un sonido corto de premio, confeti y un
 // cartel con el que ha salido.
 //
-// Rehecha el 17/10 porque al usuario le parecía «muy simple»: ahora tiene el
-// dibujo del resto de la aplicación —tinta, sombra dura y colores planos— y
-// partes de ruleta de feria. Lo que gira (las porciones, sus nombres y las
-// tachuelas) va en un SVG; lo que no gira (la sombra, el aro de luces, el
-// brillo y la flecha) va aparte, quieto, como en una de verdad.
+// Rehecha el 17/10 dos veces. Al usuario le parecía «muy simple»; la primera
+// vuelta, de feria (tinta gruesa, aro con bombillas), le pareció más fea: la
+// quiere con estilo Apple. Ahora es un plato blanco con sombra suave, las
+// porciones en colores suaves separadas por líneas blancas, una flecha
+// pequeña, el botón como los de iOS y el premio en una tarjeta de cristal.
+// Lo que gira (las porciones y sus nombres) va en un SVG; lo que no gira (el
+// plato, el brillo y la flecha) va aparte, quieto.
 //
 // Sin elementos se enseña un círculo en blanco que lo dice, con el botón para
 // ir añadiéndolos ahí mismo. Con uno ya se dibuja la rueda, con ese y el hueco
@@ -29,11 +31,11 @@
 const RULETA_COLORES = ['#E6544F', '#F7DA84', '#90B968', '#3D5A80', '#955BA5', '#F2A65A', '#5BB5A2', '#E58FB0'];
 // Cuánto dura una tirada, según lo elegido en la barra.
 const RULETA_DURACIONES = { corta: 3000, normal: 5200, larga: 8500 };
-// Hasta dónde llegan las porciones; de ahí al borde va el aro de las luces.
-const RULETA_R = 86;
+// Hasta dónde llegan las porciones; de ahí al borde, el filo blanco del plato.
+const RULETA_R = 92;
 // A qué distancia del centro va el centro de cada nombre: a medio camino
-// entre el botón de girar (radio ~27) y las tachuelas.
-const RULETA_RADIO_TEXTO = 56;
+// entre el botón de girar (radio ~27) y el borde.
+const RULETA_RADIO_TEXTO = 60;
 // Cuántos resultados se recuerdan.
 const RULETA_HISTORIAL = 20;
 
@@ -91,8 +93,10 @@ function ruletaConfeti(caja) {
     const p = document.createElementNS(NS, 'polygon');
     p.setAttribute('points', `0,${(-lado).toFixed(2)} ${(lado * 0.9).toFixed(2)},${(lado * 0.6).toFixed(2)} ${(-lado * 0.9).toFixed(2)},${(lado * 0.6).toFixed(2)}`);
     p.setAttribute('fill', RULETA_CONFETI[i % RULETA_CONFETI.length]);
-    p.setAttribute('stroke', '#1A1A1A');
-    p.setAttribute('stroke-width', '0.55');
+    // Con la ruleta al estilo Apple, el borde ya no es de tinta: un filo
+    // suave, que basta para que los blancos se vean sobre el lienzo claro.
+    p.setAttribute('stroke', 'rgba(0,0,0,0.22)');
+    p.setAttribute('stroke-width', '0.4');
     p.setAttribute('stroke-linejoin', 'round');
     svg.appendChild(p);
     const ang = Math.random() * Math.PI * 2;
@@ -214,9 +218,9 @@ function RuletaItem({ item, lang, onUpdate }) {
     const f = flechaRef.current;
     if (!f || !f.animate) return;
     f.animate([
-      { transform: 'translateX(-50%) rotate(-24deg)' },
+      { transform: 'translateX(-50%) rotate(-16deg)' },
       { transform: 'translateX(-50%) rotate(0deg)' },
-    ], { duration: 260, easing: 'cubic-bezier(0.34, 1.56, 0.64, 1)' });
+    ], { duration: 240, easing: 'cubic-bezier(0.34, 1.56, 0.64, 1)' });
   };
   const animacion = React.useRef(null);
   // Lo último del nodo, para cuando la tirada acaba: el cierre del giro se
@@ -382,46 +386,31 @@ function RuletaItem({ item, lang, onUpdate }) {
     </div>
   );
 
-  // Lo que no gira: la sombra dura de todo lo de la aplicación, debajo, y
-  // encima el aro con las luces y un brillo que no se mueve con la rueda.
+  // Lo que no gira: el plato (blanco, con su sombra suave, debajo) y encima un
+  // brillo muy leve que se queda quieto mientras la rueda da vueltas.
   const fondo = (
     <svg className="ruleta-fondo" viewBox="-100 -100 200 200" aria-hidden="true" key="fondo">
-      <circle cx="4.5" cy="5.5" r="99" className="ruleta-sombra"/>
-      <circle r="99" className="ruleta-base"/>
+      <circle r="99" className="ruleta-plato"/>
     </svg>
   );
   const marco = (
     <svg className={`ruleta-marco ${celebra ? 'celebra' : ''}`} viewBox="-100 -100 200 200" aria-hidden="true" key="marco">
       <defs>
-        <linearGradient id={`${idBase}-brillo`} x1="0" y1="-1" x2="0" y2="1" gradientUnits="objectBoundingBox">
-          <stop offset="0%" stopColor="#FFFFFF" stopOpacity="0.30"/>
-          <stop offset="45%" stopColor="#FFFFFF" stopOpacity="0.04"/>
-          <stop offset="100%" stopColor="#FFFFFF" stopOpacity="0"/>
-        </linearGradient>
-        <radialGradient id={`${idBase}-hondo`} cx="0" cy="0" r={RULETA_R} gradientUnits="userSpaceOnUse">
-          <stop offset="72%" stopColor="#000000" stopOpacity="0"/>
-          <stop offset="100%" stopColor="#000000" stopOpacity="0.18"/>
+        <radialGradient id={`${idBase}-luz`} cx="0" cy={-RULETA_R * 0.35} r={RULETA_R * 1.1} gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="#FFFFFF" stopOpacity="0.22"/>
+          <stop offset="60%" stopColor="#FFFFFF" stopOpacity="0"/>
         </radialGradient>
       </defs>
-      {n >= 1 && <circle r={RULETA_R} fill={`url(#${idBase}-hondo)`}/>}
-      {n >= 1 && <ellipse cx="0" cy={-RULETA_R * 0.42} rx={RULETA_R * 0.78} ry={RULETA_R * 0.5} fill={`url(#${idBase}-brillo)`}/>}
-      <circle r={(RULETA_R + 99) / 2} className="ruleta-aro" strokeWidth={99 - RULETA_R}/>
-      <circle r="99.2" className="ruleta-aro-borde"/>
-      <circle r={RULETA_R} className="ruleta-aro-dentro"/>
-      {Array.from({ length: 24 }, (_, i) => {
-        const [x, y] = ruletaPunto(i * 15, (RULETA_R + 99) / 2);
-        return <circle key={'l' + i} cx={x} cy={y} r="2.5" className="ruleta-luz" style={{ '--luz': i }}/>;
-      })}
+      {n >= 1 && <circle r={RULETA_R} fill={`url(#${idBase}-luz)`}/>}
+      <circle r={RULETA_R} className="ruleta-filo"/>
+      <circle r="99" className="ruleta-plato-borde"/>
     </svg>
   );
-  // La flecha: una gota roja con su borde de tinta y su sombra dura, clavada
-  // en el aro por un tornillo.
+  // La flecha: un triángulo pequeño de puntas redondeadas, como los de iOS.
   const flecha = (
     <div className="ruleta-flecha" ref={flechaRef} key="flecha">
-      <svg viewBox="0 0 40 52" aria-hidden="true">
-        <path d="M22.5 52.5 L8.5 26.5 A16 16 0 1 1 36.5 26.5 Z" className="ruleta-flecha-sombra"/>
-        <path d="M20 50 L6 24 A16 16 0 1 1 34 24 Z" className="ruleta-flecha-cuerpo"/>
-        <circle cx="20" cy="17" r="5" className="ruleta-flecha-tornillo"/>
+      <svg viewBox="0 0 24 26" aria-hidden="true">
+        <path d="M4.2 2.5 H19.8 A2.6 2.6 0 0 1 22 6.4 L14.2 22.6 A2.5 2.5 0 0 1 9.8 22.6 L2 6.4 A2.6 2.6 0 0 1 4.2 2.5 Z" className="ruleta-flecha-cuerpo"/>
       </svg>
     </div>
   );
@@ -452,7 +441,9 @@ function RuletaItem({ item, lang, onUpdate }) {
     const [x1, y1] = ruletaPunto(a1, RULETA_R);
     const grande = a1 - a0 > 180 ? 1 : 0;
     const medio = (a0 + a1) / 2;
-    const color = el.hueco ? null : (el.color || RULETA_COLORES[i % RULETA_COLORES.length]);
+    // El color del elemento, suavizado (ver ruletaSuave): vivos y oscuros a la
+    // vez cansan, y el nombre negro tiene que leerse en todos.
+    const color = el.hueco ? null : ruletaSuave(el.color || RULETA_COLORES[i % RULETA_COLORES.length]);
     // El nombre va a lo largo del radio, CENTRADO en su porción y a la misma
     // distancia del centro en todas (RULETA_RADIO_TEXTO). En la mitad que
     // queda a la izquierda en pantalla se da la vuelta para no leerse cabeza
@@ -460,12 +451,12 @@ function RuletaItem({ item, lang, onUpdate }) {
     const giroTexto = medio - 90;
     const enPantalla = (((giroTexto + reposoRef.current) % 360) + 360) % 360;
     const volteado = enPantalla > 90 && enPantalla < 270;
-    // Siempre negro, lo pidió así: elegirlo según lo oscuro de cada porción
-    // hacía que unos salieran blancos y otros negros, y parecía al azar. En
-    // las porciones oscuras lleva un halo claro para leerse.
-    const oscura = color && ruletaBrillo(color) < 0.42;
+    // Siempre oscuro, lo pidió así: elegirlo según lo oscuro de cada porción
+    // hacía que unos salieran blancos y otros negros, y parecía al azar. Con
+    // los colores suavizados se lee en todas; sobre una foto lleva halo.
+    const oscura = false;
     // La que ha salido se adelanta un poco hacia fuera, como si saliera.
-    const [sx, sy] = ruletaPunto(medio, 3.2);
+    const [sx, sy] = ruletaPunto(medio, 2.4);
     return { el, i, color, medio, volteado, giroTexto, oscura, sx, sy,
       d: `M0 0 L${x0.toFixed(3)} ${y0.toFixed(3)} A${RULETA_R} ${RULETA_R} 0 ${grande} 1 ${x1.toFixed(3)} ${y1.toFixed(3)} Z` };
   });
@@ -540,17 +531,12 @@ function RuletaItem({ item, lang, onUpdate }) {
               })}
             </g>
           )}
-          {/* Las rayas de tinta entre porciones, desde el botón hasta el aro. */}
+          {/* Una línea blanca entre porciones, del botón al borde: las separa
+              sin pintar nada encima (con muchas, más fina). */}
           {n >= 2 && lista.map((el, i) => {
             const [x0, y0] = ruletaPunto(i * paso, 15);
-            const [x, y] = ruletaPunto(i * paso, RULETA_R);
-            return <line key={'s' + el.id} x1={x0} y1={y0} x2={x} y2={y} className={`ruleta-raya ${conFotos ? 'con-fotos' : ''}`}/>;
-          })}
-          {/* Las tachuelas, una en cada raya junto al aro: son las que golpean
-              la flecha (y las que suenan). Con muchas porciones se quitan. */}
-          {n >= 2 && m <= 40 && lista.map((el, i) => {
-            const [x, y] = ruletaPunto(i * paso, RULETA_R - 4.5);
-            return <circle key={'t' + el.id} cx={x} cy={y} r={m > 20 ? 1.4 : 2.1} className="ruleta-tachuela"/>;
+            const [x, y] = ruletaPunto(i * paso, RULETA_R + 1);
+            return <line key={'s' + el.id} x1={x0} y1={y0} x2={x} y2={y} className="ruleta-raya" style={m > 24 ? { strokeWidth: 0.8 } : undefined}/>;
           })}
           {porciones.map(p => (
             <text
@@ -585,10 +571,10 @@ function RuletaItem({ item, lang, onUpdate }) {
         </button>
         {hayElegido && (
           <div className={'ruleta-premio' + (elegido.texto.length > 22 ? ' largo' : '')} key={elegido.id + String(item.giro)}>
-            <span className="ruleta-premio-eti">{window.t('Ha salido', 'The wheel says')}</span>
-            <span className="ruleta-premio-nombre">
-              <i className="ruleta-premio-color" style={{ background: elegido.color }}/>
-              <span>{elegido.texto}</span>
+            <i className="ruleta-premio-color" style={{ background: ruletaSuave(elegido.color || RULETA_COLORES[0]) }}/>
+            <span className="ruleta-premio-texto">
+              <span className="ruleta-premio-eti">{window.t('Ha salido', 'The wheel says')}</span>
+              <span className="ruleta-premio-nombre">{elegido.texto}</span>
             </span>
             {n > 2 && (
               <button className="ruleta-premio-quitar" onMouseDown={(e) => e.stopPropagation()} onClick={quitaElegido}
@@ -604,14 +590,32 @@ function RuletaItem({ item, lang, onUpdate }) {
   );
 }
 
-// Lo claro que es un color (0 negro, 1 blanco), para saber si el nombre
-// negro necesita halo encima.
+// Lo claro que es un color (0 negro, 1 blanco).
 function ruletaBrillo(hex) {
   const m = /^#?([0-9a-f]{6})$/i.exec(hex || '');
   if (!m) return 1;
   const v = parseInt(m[1], 16);
   return (0.299 * (v >> 16) + 0.587 * ((v >> 8) & 255) + 0.114 * (v & 255)) / 255;
 }
+// El color de una porción, suavizado como los de Apple: se mezcla con blanco
+// lo justo para que quede claro (brillo de al menos 0,62) y el nombre oscuro
+// se lea encima; un amarillo casi no cambia y un azul oscuro pasa a un azul
+// suave. Lo guardado no cambia: es solo cómo se pinta.
+const ruletaSuaves = {};
+function ruletaSuave(hex) {
+  if (ruletaSuaves[hex]) return ruletaSuaves[hex];
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex || '');
+  if (!m) return hex;
+  const v = parseInt(m[1], 16);
+  const r = v >> 16, g = (v >> 8) & 255, b = v & 255;
+  let k = 0.12;
+  const mezcla = (c, f) => Math.round(c + (255 - c) * f);
+  while (k < 0.8 && (0.299 * mezcla(r, k) + 0.587 * mezcla(g, k) + 0.114 * mezcla(b, k)) / 255 < 0.62) k += 0.04;
+  const sale = '#' + [mezcla(r, k), mezcla(g, k), mezcla(b, k)].map(c => c.toString(16).padStart(2, '0')).join('');
+  ruletaSuaves[hex] = sale;
+  return sale;
+}
+window.ruletaSuave = ruletaSuave;
 
 window.RuletaItem = RuletaItem;
 // El confeti de triangulitos, para quien más celebre algo (el nodo de
