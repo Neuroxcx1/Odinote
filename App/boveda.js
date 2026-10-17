@@ -378,6 +378,26 @@
   // Escribe una carpeta por proyecto: retira las de los proyectos borrados,
   // renombra las que cambiaron de nombre, guarda cada json y retira las copias
   // viejas de un mismo proyecto.
+  // Lo último que se escribió en cada project.json: su proyecto y sus lienzos
+  // (sin la vista, el idioma y el tema, que cambian con solo moverse y que se
+  // leen de odinote.json), con el tamaño y la fecha del archivo que quedó. Si
+  // no ha cambiado nada y el archivo sigue siendo el que se dejó, no se
+  // vuelve a escribir: antes cada guardado reescribía todos los proyectos.
+  // Vive en memoria: al abrir la app, el primer guardado escribe todo.
+  var yaEscrito = {};
+  function sigueIgual(io, ruta, firma) {
+    var antes = yaEscrito[ruta];
+    if (!antes || antes.firma !== firma) return false;
+    try {
+      var st = io.fs.statSync(ruta);
+      return st.size === antes.size && st.mtimeMs === antes.mtimeMs;
+    } catch (e) { return false; }
+  }
+  function apuntaEscrito(io, ruta, firma) {
+    try { var st = io.fs.statSync(ruta); yaEscrito[ruta] = { firma: firma, size: st.size, mtimeMs: st.mtimeMs }; }
+    catch (e) { delete yaEscrito[ruta]; }
+  }
+
   function escribeCarpetas(io, folderPath, data, mapa) {
     var datos = data || {};
     var proyectos = datos.projects || [];
@@ -387,7 +407,7 @@
       if (k !== 'projects' && k !== 'canvases') meta[k] = datos[k];
     });
     var carpetas = mapa || carpetasDeProyectos(proyectos);
-    var hecho = { escritos: [], renombrados: [], retirados: [], traidos: 0 };
+    var hecho = { escritos: [], iguales: [], renombrados: [], retirados: [], traidos: 0 };
     var ids = {};
     proyectos.forEach(function (p) { if (p && p.id) ids[p.id] = true; });
 
@@ -440,13 +460,17 @@
       var dir = io.path.join(folderPath, carpeta);
       io.fs.mkdirSync(dir, { recursive: true });
       var suyos = canvasesDeProyecto(canvases, proyecto.id);
+      var destino = io.path.join(dir, 'project.json');
+      var firma = JSON.stringify({ project: proyecto, canvases: suyos });
+      if (sigueIgual(io, destino, firma)) { hecho.iguales.push(carpeta); return; }
       var carga = { meta: meta, project: proyecto, canvases: suyos };
       // Escritura atómica: a un temporal y luego renombrar. Si se corta la
       // corriente a media escritura, el project.json anterior sigue entero en
       // vez de quedarse truncado.
       var tmp = io.path.join(dir, 'project.json.tmp');
       io.fs.writeFileSync(tmp, JSON.stringify(carga, null, 2), 'utf-8');
-      io.fs.renameSync(tmp, io.path.join(dir, 'project.json'));
+      io.fs.renameSync(tmp, destino);
+      apuntaEscrito(io, destino, firma);
       hecho.escritos.push(carpeta);
     });
 

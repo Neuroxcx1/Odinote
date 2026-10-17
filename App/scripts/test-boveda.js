@@ -320,6 +320,28 @@ const check = (nombre, ok, extra) => {
     const n = B.limpiaRetirados(io, raiz);
     check('.retirados: se borra lo de más de 30 días y se queda lo reciente', n === 1 && !fs.existsSync(path.join(dir, 'viejo')) && fs.existsSync(path.join(dir, 'nuevo')));
   }
+  // 6. Solo se escribe lo que cambia: un segundo guardado igual no toca nada,
+  // uno con un proyecto cambiado escribe solo ese, cambiar solo la vista no
+  // reescribe ninguno, y un project.json tocado por fuera se vuelve a escribir.
+  {
+    const raiz = fs.mkdtempSync(path.join(os.tmpdir(), 'boveda-iguales-'));
+    const cv = { a: { items: [{ id: 'n1', type: 'note' }] }, b: { items: [] } };
+    const pa = { id: 'a', name: { es: 'Alfa' } }, pb = { id: 'b', name: { es: 'Beta' } };
+    const d = (canv, extra) => Object.assign({ lang: 'es', theme: 'light', projects: [pa, pb], canvases: canv }, extra || {});
+    const h1 = B.escribeCarpetas(io, raiz, d(cv));
+    const h2 = B.escribeCarpetas(io, raiz, d(cv));
+    check('un guardado igual no reescribe ningún proyecto', h1.escritos.length === 2 && h2.escritos.length === 0 && h2.iguales.length === 2, JSON.stringify(h2));
+    const h3 = B.escribeCarpetas(io, raiz, d(cv, { view: { kind: 'canvas', projectId: 'a' } }));
+    check('cambiar solo la vista tampoco', h3.escritos.length === 0, JSON.stringify(h3));
+    const cv2 = { a: { items: [{ id: 'n1', type: 'note', content: { es: 'hola' } }] }, b: { items: [] } };
+    const h4 = B.escribeCarpetas(io, raiz, d(cv2));
+    check('un proyecto cambiado se escribe, solo ese', h4.escritos.length === 1 && h4.escritos[0] === 'Alfa', JSON.stringify(h4));
+    const leido = JSON.parse(fs.readFileSync(path.join(raiz, 'Alfa', 'project.json'), 'utf-8'));
+    check('y lleva lo nuevo', leido.canvases.a.items[0].content && leido.canvases.a.items[0].content.es === 'hola');
+    fs.writeFileSync(path.join(raiz, 'Beta', 'project.json'), '{"roto": true}');
+    const h5 = B.escribeCarpetas(io, raiz, d(cv2));
+    check('un project.json tocado por fuera se vuelve a escribir', h5.escritos.length === 1 && h5.escritos[0] === 'Beta', JSON.stringify(h5));
+  }
 }
 
 console.log('');

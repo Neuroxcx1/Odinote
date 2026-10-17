@@ -583,6 +583,15 @@ ipcMain.handle('read-vault', async (event, folderPath) => {
       if (c.datos.projects.length > elegido.datos.projects.length) elegido = c;
     }
     logToFile(`IPC read-vault: se usa ${elegido.nombre} (${elegido.datos.projects.length} proyectos)`);
+    // La vista, el idioma y el tema salen de odinote.json, que se escribe
+    // siempre que algo cambia. Cada project.json lleva una copia, pero solo se
+    // reescribe cuando cambia SU proyecto: la del último leído podía ser vieja
+    // (abrir en otro proyecto, o con el tema de ayer).
+    if (legacy && elegido.datos !== legacy) {
+      Object.keys(legacy).forEach(k => {
+        if (k !== 'projects' && k !== 'canvases') elegido.datos[k] = legacy[k];
+      });
+    }
     return elegido.datos;
   } catch (err) {
     logToFile(`IPC read-vault ERROR: ${err.message}`);
@@ -590,6 +599,8 @@ ipcMain.handle('read-vault', async (event, folderPath) => {
   }
 });
 
+// Lo último escrito en odinote.json (ver write-vault).
+let ultimoOdinote = null;
 ipcMain.handle('write-vault', async (event, { folderPath, data, carpetas }) => {
   logToFile(`IPC Call: write-vault at ${folderPath}`);
   activeVaultPath = folderPath;
@@ -599,14 +610,27 @@ ipcMain.handle('write-vault', async (event, { folderPath, data, carpetas }) => {
     // es el respaldo del que tira la lectura si el reparto sale mal. A un
     // temporal y luego se renombra, como project.json: si se corta a medias, el
     // de antes sigue entero.
-    const tmp = filePath + '.tmp';
-    fs.writeFileSync(tmp, JSON.stringify(data, null, 2), 'utf-8');
-    fs.renameSync(tmp, filePath);
+    // Si es igual que lo último que se escribió (y el archivo sigue siendo
+    // ese), no se vuelve a escribir: son 650 KB en una bóveda normal, y el
+    // guardado salta a menudo por cosas que no cambian nada.
+    const texto = JSON.stringify(data, null, 2);
+    let igual = false;
+    try {
+      const st = fs.statSync(filePath);
+      igual = !!(ultimoOdinote && ultimoOdinote.ruta === filePath && ultimoOdinote.texto === texto &&
+        st.size === ultimoOdinote.size && st.mtimeMs === ultimoOdinote.mtimeMs);
+    } catch (e) { igual = false; }
+    if (!igual) {
+      const tmp = filePath + '.tmp';
+      fs.writeFileSync(tmp, texto, 'utf-8');
+      fs.renameSync(tmp, filePath);
+      try { const st = fs.statSync(filePath); ultimoOdinote = { ruta: filePath, texto, size: st.size, mtimeMs: st.mtimeMs }; } catch (e) { ultimoOdinote = null; }
+    }
 
     // 2. Y además, una carpeta por proyecto, con su nombre.
     try {
       const hecho = Boveda.escribeCarpetas(IO, folderPath, data, carpetas);
-      logToFile(`write-vault: ${hecho.escritos.length} carpetas escritas, ` +
+      logToFile(`write-vault: ${hecho.escritos.length} carpetas escritas (${(hecho.iguales || []).length} sin cambios), ` +
         `${hecho.renombrados.length} renombradas, ${hecho.retirados.length} retiradas` +
         (hecho.traidos ? `, ${hecho.traidos} archivos traídos de otra carpeta` : ''));
     } catch (splitErr) {
