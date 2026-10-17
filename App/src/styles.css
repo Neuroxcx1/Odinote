@@ -1670,7 +1670,10 @@ body.dragging-task .item-card { pointer-events: auto !important; }
   box-shadow: var(--pop-sm);
   display: grid; place-items: center;
   pointer-events: auto; cursor: crosshair;
-  opacity: 0; transform: scale(calc(0.7 * var(--handle-scale, 1)));
+  /* Escondido NO lee el zoom: cada paso del zoom cambia --handle-scale, y con
+     la transición de transform arrancaba 2.000 animaciones invisibles en un
+     lienzo de 500 nodos (el 90 % del coste del zoom, medido). Lo lee al verse. */
+  opacity: 0; transform: scale(0.7);
   transition: opacity 130ms var(--e-out), transform 130ms var(--e-out), background 100ms;
   z-index: 6;
   transform-origin: center;

@@ -344,14 +344,14 @@ function GaleriaItem({ item, lang, onUpdate }) {
     if (!M || !M.observa) { setActiva(true); return; }
     return M.observa(raizRef.current, (si) => { if (si) setActiva(true); });
   }, []);
-  // El zoom está en --handle-libre (1/zoom) de la superficie. Se mira al
-  // pintarse y cada vez que el lienzo avisa de que cambió ('odi-zoom'): los
-  // nodos van memorizados y ya no se pintan otra vez con cada paso del zoom.
+  // El zoom lo da el lienzo (window.odiZoomActual) y avisa cada vez que
+  // cambia ('odi-zoom'): los nodos van memorizados y ya no se pintan otra vez
+  // con cada paso del zoom. Antes se leía de --handle-libre en la superficie,
+  // que ya no está ahí (ver la regla <style> de Canvas.jsx).
   const mideEscala = () => {
     if (!M) return;
-    const sup = raizRef.current && raizRef.current.closest('.canvas-surface');
-    const libre = sup ? parseFloat(sup.style.getPropertyValue('--handle-libre')) : 0;
-    setEscala(M.escalaRedonda((libre > 0 ? 1 / libre : 1) * (window.devicePixelRatio || 1)));
+    const z = typeof window.odiZoomActual === 'number' && window.odiZoomActual > 0 ? window.odiZoomActual : 1;
+    setEscala(M.escalaRedonda(z * (window.devicePixelRatio || 1)));
   };
   React.useEffect(() => { mideEscala(); });
   React.useEffect(() => {

@@ -351,6 +351,12 @@ function duplicateCanvasState(state, origId, newId) {
 // Zoom con el que se abre un lienzo que aún no tiene cámara guardada.
 const defaultScale = () => (window.odiIsMobile && window.odiIsMobile()) ? 0.7 : 1;
 
+// Los nodos que pintan tiradores DENTRO de su contenido: la columna (los
+// puntos de conexión de sus tarjetas), la imagen (el recorte) y el código (el
+// ▶, que en el teléfono mide lo mismo a cualquier zoom). Solo estos llevan las
+// variables de los tiradores en su caja (ver varsTiradoresRef).
+const TIPOS_CON_TIRADORES = new Set(['column', 'image', 'code']);
+
 function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn, setCanvases: setExtCanvases, updateAvailable, onUpdateClick, volume, onChangeVolume, onSettingsClick, vaultPath, userProfile, esPatrocinador, onAbrirCorona, onUserClick, projects, setProjects, onSharingClick, onManualSync, isSyncingDrive, needsDriveAuth, driveReachable, jumpTarget, onSearchClick, onGoToNode, onGraphClick, initialTrail, onTrailChange }) {
   const currentProject = projects ? projects.find(p => p.id === projectId) : null;
   const [canvases, _setCanvases] = useStateCanvas(() => canvasesIn || JSON.parse(JSON.stringify(window.INITIAL_CANVASES)));
@@ -1060,6 +1066,17 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
   const skipHistory = useRefCanvas(false);
 
   const surfaceRef = useRefCanvas(null);
+  // Lo que mide lo mismo en pantalla a cualquier zoom (los tiradores, los
+  // puntos de conexión, el candado, el recorte, el ▶ del código) lee
+  // --handle-scale (crece hasta el triple al alejarse) y --handle-libre (la
+  // misma cuenta sin tope, para el tirador de girar y los del recorte; el zoom
+  // no baja del 20 %, así que nunca pasa de 5). Van EN LÍNEA en los
+  // contenedores de esos tiradores y no en la superficie: ahí las heredaban
+  // todos los elementos de todos los nodos, y cada paso del zoom recalculaba
+  // el estilo de la página entera (con 500 nodos, 38.000 elementos). Los
+  // nodos que llevan tiradores DENTRO de su contenido (columna, imagen,
+  // código) las llevan en su caja: ver TIPOS_CON_TIRADORES.
+  const varsTiradoresRef = useRefCanvas({});
   const ctxMenuRef = useRefCanvas(null); // right-click menu element (for edge-flip positioning)
   const pasteIntRef = useRefCanvas(null);
   // Last known mouse position (screen coords) — used to paste copied nodes where the cursor is
@@ -1112,6 +1129,25 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
   //    vez. Tocar otro nodo siempre empieza un paso nuevo.
   const sinMomento = (k, v) => (k && k.charCodeAt(0) === 95 /* _ */ ? undefined : v);
   const instantanea = (obj) => JSON.stringify(obj, sinMomento);
+  // Cada paso guarda solo los lienzos de ESTE proyecto (su raíz y lo que se
+  // alcanza desde ella, también los tableros dentro de una columna). Antes
+  // guardaba todos los de todos los proyectos: con una bóveda normal, 1,3 MB y
+  // 17 ms por paso, y un Ctrl+Z podía devolver a su estado de antes otro
+  // proyecto que hubiera cambiado entre tanto (Drive, una sala en vivo).
+  const lienzosDelProyecto = (todos) => {
+    const out = {};
+    const visita = (id) => {
+      const c = todos && todos[id];
+      if (!c || out[id]) return;
+      out[id] = c;
+      (c.items || []).forEach(it => {
+        if (it.canvasId) visita(it.canvasId);
+        (it.children || []).forEach(h => { if (h && h.canvasId) visita(h.canvasId); });
+      });
+    };
+    visita(projectId);
+    return out;
+  };
   // Qué nodos (o flechas, o lienzos) cambiaron entre dos estados. Los nodos que
   // no se tocan conservan su objeto, así que basta con comparar referencias.
   // Las altas y bajas (nodos que aparecen o desaparecen) se marcan aparte: un
@@ -1206,8 +1242,8 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
     // 1,3 MB y 17 ms cada una): el arrastre de varios nodos iba a tirones solo
     // por esto. Al soltar, el arrastre hace su cambio final y ese sí se apunta.
     if (document.body.classList.contains('odi-busy')) return;
-    const snap = instantanea(canvases);
-    const obj = canvases;
+    const obj = lienzosDelProyecto(canvases);
+    const snap = instantanea(obj);
     // La primera instantánea se guarda de inmediato (estado base del lienzo)
     if (lastSnapRef.current === null) { pushHistory(snap, obj); return; }
     if (snap === lastSnapRef.current) {
@@ -1271,7 +1307,43 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
     ultimoPasoRef.current = null;
     primerCambioRef.current = 0;
     restauradoEnRef.current = Date.now();
-    _setCanvases(obj);
+    // Dónde cambia algo. Si no es en el lienzo que se ve, se va allí: el bot
+    // vio que, dentro de un tablero, Ctrl+Z deshacía cosas del lienzo de fuera
+    // sin que se viera nada, y parecía que no hacía nada (o que borraba algo
+    // al azar).
+    const antes = lienzosDelProyecto(canvasesLiveRef.current);
+    const cambiados = Object.keys(Object.assign({}, antes, obj)).filter(id =>
+      !antes[id] || !obj[id] || instantanea(antes[id]) !== instantanea(obj[id]));
+    _setCanvases(prev => {
+      const next = { ...prev };
+      const delProyecto = lienzosDelProyecto(prev);
+      Object.keys(delProyecto).forEach(id => { if (!obj[id]) delete next[id]; });
+      return Object.assign(next, obj);
+    });
+    if (cambiados.length && !cambiados.includes(currentId)) {
+      const destino = cambiados.find(id => obj[id]);
+      const camino = destino ? caminoHasta(obj, destino) : null;
+      if (camino) setStack(camino);
+    }
+  };
+  // El camino de tableros desde la raíz del proyecto hasta un lienzo.
+  const caminoHasta = (lienzos, destino) => {
+    const busca = (id, camino) => {
+      if (id === destino) return camino;
+      const c = lienzos[id];
+      if (!c) return null;
+      for (const it of (c.items || [])) {
+        const hijos = [it, ...(it.children || [])];
+        for (const h of hijos) {
+          if (h && h.canvasId && !camino.includes(h.canvasId)) {
+            const r = busca(h.canvasId, [...camino, h.canvasId]);
+            if (r) return r;
+          }
+        }
+      }
+      return null;
+    };
+    return busca(projectId, [projectId]);
   };
 
   const undo = () => {
@@ -1281,7 +1353,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
     // para que este Ctrl+Z los pueda deshacer en lugar de perderse. También los
     // que llegaron en silencio (una altura automática): sin esto, el Ctrl+Z
     // gastaba su pulsación en deshacerlos, que no se ven.
-    const vivo = canvasesLiveRef.current;
+    const vivo = lienzosDelProyecto(canvasesLiveRef.current);
     const live = instantanea(vivo);
     if (live !== lastSnapRef.current) {
       if (!primerCambioRef.current) primerCambioRef.current = Date.now();
@@ -1375,6 +1447,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
   // el que necesite saberlo (la galería, para pedir sus miniaturas al tamaño
   // de la pantalla) escucha este aviso.
   useEffectCanvas(() => {
+    window.odiZoomActual = scale;
     window.dispatchEvent(new CustomEvent('odi-zoom', { detail: scale }));
   }, [scale]);
 
@@ -5423,7 +5496,15 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
       `"${nombre}" is now a project: it's on your home screen.`));
   };
 
-  const callbacks = useMemoCanvas(() => ({
+  // Lo que los nodos reciben para hablar con el lienzo. Las FUNCIONES van
+  // por una ref y llaman siempre a la versión más nueva, así que no hace falta
+  // rehacer el objeto cuando cambia `canvases`: antes se rehacía en cada
+  // fotograma de un arrastre y, con él, se volvían a pintar TODOS los nodos
+  // (5 fotogramas por segundo arrastrando uno entre 500, medido). El objeto
+  // solo cambia con los valores que los nodos pintan (lo de abajo, en las
+  // dependencias). El progreso y el tablero, que enseñan cosas de otros
+  // lienzos, reciben aparte lo que miran (ver «lienzos» en ItemRenderer).
+  const callbacksVivos = ({
     convertirEnProyecto: convierteEnProyecto,
     openBoard,
     openDoc: (id, colId) => setDocOpen({ id, colId }),
@@ -5522,8 +5603,18 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
     canDrawRedo: !!(drawSession && drawSession.future.length),
     selectedStrokeId,
     deleteSelectedStroke,
+  });
+  const callbacksVivosRef = useRefCanvas(callbacksVivos);
+  callbacksVivosRef.current = callbacksVivos;
+  const callbacks = useMemoCanvas(() => {
+    const r = {};
+    Object.keys(callbacksVivosRef.current).forEach(k => {
+      const v = callbacksVivosRef.current[k];
+      r[k] = typeof v === 'function' ? (...args) => callbacksVivosRef.current[k](...args) : v;
+    });
+    return r;
   // eslint-disable-next-line
-  }), [currentId, canvases, editingChild, selected, croppingId,
+  }, [currentId, editingChild, selected, croppingId,
        drawingId, drawSession, drawTool, drawColor, drawWidth, drawPressureMode, drawEstabilizador, selectedStrokeId]);
 
   // ───── Breadcrumbs ─────
@@ -6212,15 +6303,8 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
             top: 0, 
             transform: `translate(${pan.x}px, ${pan.y}px) scale(${scale})`, 
             transformOrigin: '0 0', 
-            width: bounds.w, 
+            width: bounds.w,
             height: bounds.h,
-            '--handle-scale': Math.min(3, 1 / scale),
-            // La misma cuenta SIN tope, para lo que tiene que medir siempre lo
-            // mismo en la pantalla por lejos que estés: el tirador de girar y
-            // los del recorte. Con el tope de 3, por debajo del 33 % de zoom
-            // encogían hasta hacerse imposibles de agarrar. El zoom no baja del
-            // 20 %, así que esto nunca pasa de 5.
-            '--handle-libre': 1 / scale,
           }}
         >
           <div className="canvas-content" style={{width: bounds.w, height: bounds.h}}>
@@ -6257,6 +6341,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
               </g>
             </svg>
 
+            {(() => { varsTiradoresRef.current = { '--handle-scale': Math.min(3, 1 / scale), '--handle-libre': 1 / scale }; return null; })()}
             {[...current.items].sort((a, b) => {
               const ai = zOrder.indexOf(a.id), bi = zOrder.indexOf(b.id);
               return ai - bi;
@@ -6288,6 +6373,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
                     transform: item.rot ? `rotate(${item.rot}deg)` : undefined,
                     '--node-scale': nodeScale,
                     '--text-scale': textScale,
+                    ...(TIPOS_CON_TIRADORES.has(item.type) ? varsTiradoresRef.current : null),
                     zIndex: (selected === item.id || selectedIds.includes(item.id))
                       ? (item.type === 'frame' ? 1.5 : 100)
                       : (item.type === 'frame' ? 1 : 2),
@@ -6346,7 +6432,8 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
                   }}
                 >
                   <window.NodeErrorBoundary key={`eb-${item.id}`}>
-                    <window.ItemRenderer item={item} lang={lang} editing={isEditing} callbacks={callbacks} tema={theme}/>
+                    <window.ItemRenderer item={item} lang={lang} editing={isEditing} callbacks={callbacks} tema={theme}
+                      lienzos={item.type === 'progreso' ? canvases : (item.type === 'board' ? canvases[item.canvasId] : undefined)}/>
                   </window.NodeErrorBoundary>
                   {item.reactions && Object.keys(item.reactions).length > 0 && (
                     <div className="item-reactions" style={{position:'absolute', left: 6, bottom: -10, zIndex: 6}}>
@@ -6371,7 +6458,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
                   {/* Puntos de conexión estilo Miro en los cuatro lados del nodo.
                       Aparecen al pasar el cursor; arrastra cualquiera hasta otro nodo. */}
                   {!isEditing && !activeTool && item.type !== 'line' && (
-                    <div className="anchors">
+                    <div className="anchors" style={varsTiradoresRef.current}>
                       {['top', 'right', 'bottom', 'left'].map(pos => (
                         <div
                           key={pos}
@@ -6436,13 +6523,13 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
                   {/* El candado: se ve al elegirlo, y es lo que dice por qué no
                       se deja mover. */}
                   {item.bloqueado && (selected === item.id || selectedIds.includes(item.id)) && (
-                    <div className="nodo-candado" title={window.t('Bloqueado', 'Locked')}>
+                    <div className="nodo-candado" style={varsTiradoresRef.current} title={window.t('Bloqueado', 'Locked')}>
                       <span className="material-symbols-rounded">lock</span>
                     </div>
                   )}
                   {/* Resize handles */}
                   {(selected === item.id || (selectedIds.includes(item.id) && selectedIds.length > 1)) && !isEditing && croppingId !== item.id && !item.bloqueado && (
-                    <div className="handles">
+                    <div className="handles" style={varsTiradoresRef.current}>
                       <div className="handle tl" onMouseDown={(e)=>startResize(e, item.id, 'tl')}/>
                       <div className="handle tr" onMouseDown={(e)=>startResize(e, item.id, 'tr')}/>
                       <div className="handle bl" onMouseDown={(e)=>startResize(e, item.id, 'bl')}/>

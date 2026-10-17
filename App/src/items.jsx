@@ -5648,6 +5648,10 @@ window.rutaDeArchivo = function (archivo) {
   }
 };
 
+// «lienzos» (y «tema») no los usa ItemRenderer: van para que React.memo vuelva
+// a pintar el nodo cuando cambian. El progreso recibe todos los lienzos
+// (cuenta casillas de todo el proyecto) y el tablero el suyo (enseña lo que
+// tiene dentro); los demás, nada, y no se repintan cuando cambia otro nodo.
 function ItemRenderer({ item, lang, editing, callbacks }) {
   const cb = callbacks || {};
   const onUpdate = (patch) => {
