@@ -1786,28 +1786,48 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
         document.querySelector('.mini-search input')?.focus();
       }
     };
+    // El botón del medio SOLO mueve la vista, se pulse donde se pulse dentro del
+    // lienzo: antes, encima de un nodo arrastraba el nodo (lo pidió el usuario
+    // así). Se intercepta en captura, antes que nadie, y se paran también el
+    // pointerdown (de él tiran la galería, los tiradores y las flechas) y el
+    // auxclick (que abriría los enlaces en otra ventana). Fuera del lienzo
+    // (Ajustes, el documento abierto…) el botón hace lo de siempre.
+    // También con el modo dibujo abierto: su capa va fuera del lienzo, encima.
+    const enElLienzo = (e) => !!(e.target && ((surfaceRef.current && surfaceRef.current.contains(e.target)) || (e.target.closest && e.target.closest('.draw-layer'))) &&
+      !(e.target.closest && e.target.closest('.modal, .doc-modal-overlay, .doc-modal-backdrop, .panel-color')));
     const onMouseDownCapture = (e) => {
-      if (e.button === 1 && e.ctrlKey) {
-        e.preventDefault();
-        e.stopPropagation();
-        
-        const startX = e.clientX, startY = e.clientY, startPan = { ...panRef.current };
-        const onMove = (ev) => {
-          setPan({ x: startPan.x + ev.clientX - startX, y: startPan.y + ev.clientY - startY });
-        };
-        const onUp = () => {
-          window.removeEventListener('mousemove', onMove);
-          window.removeEventListener('mouseup', onUp);
-        };
-        window.addEventListener('mousemove', onMove);
-        window.addEventListener('mouseup', onUp);
-      }
+      if (e.button !== 1 || !enElLienzo(e)) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const startX = e.clientX, startY = e.clientY, startPan = { ...panRef.current };
+      setPaneando(true);
+      const onMove = (ev) => {
+        setPan({ x: startPan.x + ev.clientX - startX, y: startPan.y + ev.clientY - startY });
+      };
+      const onUp = () => {
+        window.removeEventListener('mousemove', onMove);
+        window.removeEventListener('mouseup', onUp);
+        setPaneando(false);
+      };
+      window.addEventListener('mousemove', onMove);
+      window.addEventListener('mouseup', onUp);
+    };
+    // Al pointerdown NO se le cancela lo de por defecto: entonces Chromium ya
+    // no manda el mousedown, que es de donde arranca el arrastre de la vista.
+    const paraBotonCentral = (e) => {
+      if (e.button !== 1 || !enElLienzo(e)) return;
+      e.stopPropagation();
+      if (e.type === 'auxclick') e.preventDefault();
     };
     window.addEventListener('keydown', onKey);
     window.addEventListener('mousedown', onMouseDownCapture, { capture: true });
+    window.addEventListener('pointerdown', paraBotonCentral, { capture: true });
+    window.addEventListener('auxclick', paraBotonCentral, { capture: true });
     return () => {
       window.removeEventListener('keydown', onKey);
       window.removeEventListener('mousedown', onMouseDownCapture, { capture: true });
+      window.removeEventListener('pointerdown', paraBotonCentral, { capture: true });
+      window.removeEventListener('auxclick', paraBotonCentral, { capture: true });
     };
   });
 
