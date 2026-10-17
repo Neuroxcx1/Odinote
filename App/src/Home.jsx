@@ -334,19 +334,36 @@ function CampoPortada({ cover, onCambio }) {
 // se rellena con el de por defecto, y el "sin icono" se perdería por el camino.
 const SIN_ICONO = 'none';
 
+// Los 3D antiguos ('icon:…') son Fluent Emoji de Microsoft (MIT). Los '3d:…'
+// son 3dicons de Vijay Verma, en dominio público (CC0), en dos estilos del
+// mismo repertorio: color plano y degradado. Ver lib/project-icons/3dicons/ORIGEN.txt.
 const EMOJI_PRESETS = [
   'icon:video_game', 'icon:crossed_swords', 'icon:rocket', 'icon:artist_palette',
   'icon:paintbrush', 'icon:puzzle_piece', 'icon:game_die', 'icon:world_map',
   'icon:open_book', 'icon:musical_notes', 'icon:movie_camera', 'icon:test_tube',
-  'icon:light_bulb', 'icon:fire', 'icon:gem_stone', 'icon:trophy'
+  'icon:light_bulb', 'icon:fire', 'icon:gem_stone', 'icon:trophy',
+  '3d:rocket-color', '3d:bulb-color', '3d:notebook-color', '3d:pencil-color', '3d:paint-brush-color', '3d:color-palette-color',
+  '3d:music-color', '3d:camera-color', '3d:video-camera-color', '3d:chess-color', '3d:puzzle-color', '3d:trophy-color',
+  '3d:crown-color', '3d:star-color', '3d:heart-color', '3d:chart-color', '3d:money-bag-color', '3d:card-color',
+  '3d:travel-color', '3d:map-pin-color', '3d:file-text-color', '3d:folder-color', '3d:computer-color', '3d:lab-color',
+  '3d:gym-color', '3d:tea-cup-color', '3d:gift-color', '3d:key-color', '3d:magic-trick-color', '3d:fire-color',
+  '3d:rocket-gradient', '3d:bulb-gradient', '3d:notebook-gradient', '3d:pencil-gradient', '3d:paint-brush-gradient', '3d:color-palette-gradient',
+  '3d:music-gradient', '3d:camera-gradient', '3d:video-camera-gradient', '3d:chess-gradient', '3d:puzzle-gradient', '3d:trophy-gradient',
+  '3d:crown-gradient', '3d:star-gradient', '3d:heart-gradient', '3d:chart-gradient', '3d:money-bag-gradient', '3d:card-gradient',
+  '3d:travel-gradient', '3d:map-pin-gradient', '3d:file-text-gradient', '3d:folder-gradient', '3d:computer-gradient', '3d:lab-gradient',
+  '3d:gym-gradient', '3d:tea-cup-gradient', '3d:gift-gradient', '3d:key-gradient', '3d:magic-trick-gradient', '3d:fire-gradient'
 ];
 
 // Renderiza el icono del proyecto según su formato:
-//  'icon:nombre' → PNG de Fluent Emoji · snake_case → Material Symbol · otro → emoji de texto
+//  'icon:nombre' → PNG de Fluent Emoji · '3d:nombre' → PNG de 3dicons ·
+//  snake_case → icono de la interfaz (src/iconos) · otro → emoji de texto
 function renderProjectIcon(icon) {
   if (!icon || icon === SIN_ICONO) return null;
   if (icon && icon.startsWith('icon:')) {
     return <img className="project-icon-img" src={`lib/project-icons/${icon.slice(5)}_3d.png`} alt="" draggable={false}/>;
+  }
+  if (icon && icon.startsWith('3d:') && /^3d:[a-z-]+$/.test(icon)) {
+    return <img className="project-icon-img" src={`lib/project-icons/3dicons/${icon.slice(3)}.png`} alt="" draggable={false}/>;
   }
   if (icon && /^[a-z0-9_]+$/.test(icon)) {
     return <span className="material-symbols-rounded">{icon}</span>;

@@ -36,7 +36,13 @@ The following are bundled in App/lib/ and remain under their own licences:
   SheetJS (xlsx)             (c) SheetJS LLC                          — Apache-2.0
   Mammoth.js                 (c) Michael Williamson                   — BSD-2-Clause
   html2pdf.js                (c) Erik Koopmans                        — MIT
-  Material Symbols Rounded   (c) Google                               — Apache-2.0
-  Bricolage Grotesque, Geist, JetBrains Mono                          — SIL OFL 1.1
+  System UIcons (interface icons) (c) Corey Ginnivan                — Unlicense (public domain)
+  Interface icons drawn for Oddinote (App/src/iconos/iconos.js)       — CC0 1.0 (public domain)
+  Material Symbols Rounded (fallback only) (c) Google                 — Apache-2.0
+  Vegur, Aileron             dotcolon (Arro)                          — CC0 1.0 (public domain)
+  JetBrains Mono             (c) JetBrains                            — SIL OFL 1.1
   Fluent Emoji (project icons) (c) Microsoft                          — MIT
     see App/lib/project-icons/LICENSE.txt
+  3dicons (project icons)    Vijay Verma                              — CC0 1.0 (public domain)
+    see App/lib/project-icons/3dicons/LICENSE.txt
+  Full licence texts: App/lib/licenses/ and App/lib/LICENSES.md

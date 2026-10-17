@@ -147,5 +147,6 @@ always credited, but they are not a condition.
 Third-party components keep their own licences — React and Babel (MIT), highlight.js
 (BSD-3-Clause), SheetJS (Apache 2.0), Mammoth.js (BSD-2-Clause), html2pdf.js (MIT), project
 icons from [Fluent Emoji](https://github.com/microsoft/fluentui-emoji) (© Microsoft, MIT) and
-interface icons from [Material Symbols](https://fonts.google.com/icons) (Apache 2.0). The full
-list is in [NOTICE](NOTICE).
+[3dicons](https://3dicons.co) (CC0), and the JetBrains Mono font (SIL OFL 1.1). The interface
+icons come from [System UIcons](https://systemuicons.com) (public domain) plus ones drawn for
+Oddinote, and the Vegur and Aileron fonts are CC0. The full list is in [NOTICE](NOTICE).
