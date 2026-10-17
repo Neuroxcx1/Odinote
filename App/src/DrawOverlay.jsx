@@ -14,7 +14,7 @@
 // =====================================================
 
 function DrawOverlay({
-  strokes, tool, color, width, pressureMode,
+  strokes, tool, color, width, pressureMode, estabilizador,
   scale, pan, bounds, theme,
   selectedStrokeId,
   onCommitStroke, onEraseStroke, onEraseArea, onMoveStroke, onSelectStroke,
@@ -32,8 +32,10 @@ function DrawOverlay({
   strokesRef.current = strokes;
   const viewRef = React.useRef({ scale, pan });
   viewRef.current = { scale, pan };
-  const toolRef = React.useRef({ tool, color, width, pressureMode });
-  toolRef.current = { tool, color, width, pressureMode };
+  const toolRef = React.useRef({ tool, color, width, pressureMode, estabilizador });
+  toolRef.current = { tool, color, width, pressureMode, estabilizador };
+  // El largo de la cuerda en coordenadas del lienzo (ver cuerda en draw.js).
+  const radioCuerda = () => ((D.CUERDA_PX || [0])[toolRef.current.estabilizador || 0] || 0) / viewRef.current.scale;
 
   // ── Coordenadas ──
   // Todo se guarda en coordenadas del lienzo; la pantalla es solo la vista.
@@ -92,6 +94,27 @@ function DrawOverlay({
     const { scale: s, pan: p } = viewRef.current;
     const sx = (pt) => pt[0] * s + p.x;
     const sy = (pt) => pt[1] * s + p.y;
+
+    // Con el estabilizador puesto se ve la cuerda: el aro es hasta dónde se
+    // puede mover el ratón sin que la línea se mueva, y la raya, de qué tira.
+    const rc = radioCuerda();
+    if (rc > 0 && cur.cursor && cur.pluma) {
+      ctx.save();
+      ctx.lineWidth = 1;
+      ctx.strokeStyle = 'rgba(26,26,26,0.45)';
+      ctx.setLineDash([3, 3]);
+      ctx.beginPath();
+      ctx.arc(cur.cursor.x * s + p.x, cur.cursor.y * s + p.y, rc * s, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.beginPath();
+      ctx.moveTo(cur.pluma.x * s + p.x, cur.pluma.y * s + p.y);
+      ctx.lineTo(cur.cursor.x * s + p.x, cur.cursor.y * s + p.y);
+      ctx.stroke();
+      ctx.restore();
+      ctx.strokeStyle = cur.color;
+      ctx.fillStyle = cur.color;
+    }
 
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
@@ -165,10 +188,17 @@ function DrawOverlay({
     // El grosor se mide sobre el puntero de verdad (la velocidad real de la
     // mano), pero la línea se dibuja sobre el punto estabilizado.
     const f = D.factorFor(cur.mode, sample, cur.lastSample, cur.lastFactor);
-    cur.smooth = D.stabilize(cur.smooth, raw);
+    // Con el estabilizador, primero la cuerda (el temblor de dentro del radio
+    // no llega) y luego el suavizado de siempre.
+    const rc = radioCuerda();
+    cur.cursor = raw;
+    cur.pluma = rc > 0 ? D.cuerda(cur.pluma, raw, rc) : raw;
+    cur.smooth = D.stabilize(cur.smooth, cur.pluma);
     // Al levantar el dedo el trazo termina donde está el puntero de verdad: el
     // estabilizador va un poco por detrás y si no, la línea se quedaría corta.
-    const p = isLast ? raw : cur.smooth;
+    // Con la cuerda puesta termina en la punta atada: saltar al puntero
+    // dibujaría un tramo recto del largo de la cuerda.
+    const p = isLast ? (rc > 0 ? cur.pluma : raw) : cur.smooth;
     // Puntos demasiado juntos no aportan forma y sí bytes.
     const last = cur.pts[cur.pts.length - 1];
     if (!isLast && last && Math.hypot(p.x - last[0], p.y - last[1]) * viewRef.current.scale < 1) {
@@ -232,6 +262,8 @@ function DrawOverlay({
       lastSample: null,
       lastFactor: null,
       smooth: null,      // posición estabilizada, la que de verdad se dibuja
+      pluma: null,       // la punta atada a la cuerda (estabilizador)
+      cursor: null,
     };
     sizeLive();
     addSample(e);

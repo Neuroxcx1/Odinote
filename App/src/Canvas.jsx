@@ -1028,6 +1028,16 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
   const [drawColor, setDrawColor] = useStateCanvas('#E6544F');
   const [drawWidth, setDrawWidth] = useStateCanvas(4);
   const [drawPressureMode, setDrawPressureMode] = useStateCanvas('auto');
+  // El estabilizador (0 apagado … 3 fuerte): la «cuerda» de draw.js. Es una
+  // costumbre de quien dibuja (con ratón o con lápiz), así que se recuerda en
+  // el equipo y no va en el proyecto.
+  const [drawEstabilizador, setDrawEstabilizadorEstado] = useStateCanvas(() => {
+    try { const n = parseInt(localStorage.getItem('odinote.dibujo_estabilizador') || '0', 10); return n >= 0 && n <= 3 ? n : 0; } catch (e) { return 0; }
+  });
+  const setDrawEstabilizador = (n) => {
+    setDrawEstabilizadorEstado(n);
+    try { localStorage.setItem('odinote.dibujo_estabilizador', String(n)); } catch (e) {}
+  };
   const [selectedStrokeId, setSelectedStrokeId] = useStateCanvas(null);
 
   // alignment guides and dragged task ghost
@@ -5284,6 +5294,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
     drawColor, setDrawColor: recolorStroke,
     drawWidth, setDrawWidth,
     drawPressureMode, setDrawPressureMode,
+    drawEstabilizador, setDrawEstabilizador,
     drawUndo, drawRedo,
     canDrawUndo: !!(drawSession && drawSession.past.length),
     canDrawRedo: !!(drawSession && drawSession.future.length),
@@ -5291,7 +5302,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
     deleteSelectedStroke,
   // eslint-disable-next-line
   }), [currentId, canvases, editingChild, selected, croppingId,
-       drawingId, drawSession, drawTool, drawColor, drawWidth, drawPressureMode, selectedStrokeId]);
+       drawingId, drawSession, drawTool, drawColor, drawWidth, drawPressureMode, drawEstabilizador, selectedStrokeId]);
 
   // ───── Breadcrumbs ─────
   const crumbs = useMemoCanvas(() => {
@@ -6042,7 +6053,11 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
                     // dejarlo visible aquí lo mostraría dos veces, uno bajo el velo.
                     opacity: drawingId === item.id ? 0 : (matches ? 1 : 0.18),
                     transition: item._dragging ? 'none' : 'opacity 200ms ease',
-                    pointerEvents: 'auto',
+                    // Un dibujo sin elegir solo responde en sus trazos (ver DrawItem): lo
+                    // vacío de su caja deja pasar el clic a lo que haya debajo. Antes
+                    // un dibujo fino encima de unos nodos los tapaba enteros y había
+                    // que apartarlo para llegar a ellos. Elegido, se agarra por toda la caja.
+                    pointerEvents: (item.type === 'draw' && (item.strokes || []).length && selected !== item.id && !selectedIds.includes(item.id)) ? 'none' : 'auto',
                   }}
                   onMouseDown={(e)=>{
                     if (croppingId === item.id) { e.stopPropagation(); return; }
@@ -6331,6 +6346,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
             color={drawColor}
             width={drawWidth}
             pressureMode={drawPressureMode}
+            estabilizador={drawEstabilizador}
             scale={scale}
             pan={pan}
             bounds={bounds}

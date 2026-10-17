@@ -5570,10 +5570,16 @@ function DrawItem({ item }) {
         {strokes.map(s => {
           const g = D.strokeGeometry(s);
           if (!g) return null;
+          // Cada trazo lleva detrás otro igual pero invisible y más gordo: es por
+          // donde se agarra el dibujo (el nodo sin elegir solo responde en sus
+          // trazos), y uno de 1 px no habría forma de atinarle.
+          const agarre = <path key={s.id + '-agarre'} d={g.d} fill={g.mode === 'fill' ? 'transparent' : 'none'} stroke="transparent"
+                    strokeWidth={Math.max(12, (g.width || 0) + 10)} strokeLinecap="round" strokeLinejoin="round"
+                    style={{ pointerEvents: g.mode === 'fill' ? 'visible' : 'stroke', cursor: 'move' }}/>;
           return g.mode === 'fill'
-            ? <path key={s.id} d={g.d} fill={s.color} stroke="none" fillRule="nonzero"/>
-            : <path key={s.id} d={g.d} fill="none" stroke={s.color} strokeWidth={g.width}
-                    strokeLinecap="round" strokeLinejoin="round"/>;
+            ? [agarre, <path key={s.id} d={g.d} fill={s.color} stroke="none" fillRule="nonzero"/>]
+            : [agarre, <path key={s.id} d={g.d} fill="none" stroke={s.color} strokeWidth={g.width}
+                    strokeLinecap="round" strokeLinejoin="round"/>];
         })}
       </svg>
     </div>

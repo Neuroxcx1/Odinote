@@ -48,6 +48,26 @@
     };
   }
 
+  // ── El estabilizador fuerte: la cuerda ──
+  //
+  // Para quien dibuja con ratón (lo pidió el usuario): la mano tiembla más y
+  // perseguir al puntero no basta. Aquí la pluma va atada al puntero con una
+  // cuerda de largo `radio`: mientras el puntero se mueve DENTRO de ese radio,
+  // la pluma no se mueve; cuando lo pasa, la arrastra tras de sí. El temblor
+  // pequeño no llega a la línea y las curvas salen redondas. Es el «lazy brush»
+  // de Krita, SAI o Procreate.
+  function cuerda(pluma, cursor, radio) {
+    if (!pluma || !(radio > 0)) return { x: cursor.x, y: cursor.y };
+    const dx = cursor.x - pluma.x, dy = cursor.y - pluma.y;
+    const d = Math.hypot(dx, dy);
+    if (d <= radio) return { x: pluma.x, y: pluma.y };
+    const k = (d - radio) / d;
+    return { x: pluma.x + dx * k, y: pluma.y + dy * k };
+  }
+  // El largo de la cuerda de cada nivel, en píxeles de pantalla (así se nota
+  // igual con el lienzo cerca o lejos).
+  const CUERDA_PX = [0, 4, 10, 20];
+
   function clampFactor(f) {
     return Math.max(MIN_F, Math.min(MAX_F, f));
   }
@@ -385,7 +405,7 @@
 
   const OdiDraw = {
     MIN_F, MAX_F,
-    factorFromPressure, factorFromSpeed, factorFor, smoothFactor, stabilize, CHASE,
+    factorFromPressure, factorFromSpeed, factorFor, smoothFactor, stabilize, CHASE, cuerda, CUERDA_PX,
     simplify, finishStroke, roundPts,
     scaleStrokes,
     smoothPath, ribbonPath, strokeGeometry, isUniform,

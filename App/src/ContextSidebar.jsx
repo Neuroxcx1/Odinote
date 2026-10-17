@@ -559,6 +559,15 @@ function ContextSidebar({
               <span>{window.t('Trazo', 'Stroke')}</span>
             </button>
 
+            <button
+              className={`ctx-btn ${pane === 'drawEstab' ? 'active' : ''}`}
+              onClick={()=>setPane(pane === 'drawEstab' ? null : 'drawEstab')}
+              title={window.t('Estabilizador: menos temblor al dibujar con ratón', 'Stabiliser: less wobble when drawing with a mouse')}
+            >
+              <span className="material-symbols-rounded">timeline</span>
+              <span>{[window.t('Estabilizar', 'Stabilise'), window.t('Suave', 'Light'), window.t('Medio', 'Medium'), window.t('Fuerte', 'Strong')][callbacks.drawEstabilizador || 0]}</span>
+            </button>
+
             <div className="ctx-sep-h"/>
 
             <div style={{ display: 'flex', gap: 4 }}>
@@ -2521,6 +2530,39 @@ function ContextSidebar({
               {window.t(
                 'Sin lápiz digital el ratón no informa de presión: “Velocidad” es su equivalente.',
                 'Without a digital pen the mouse reports no pressure: “Speed” is its stand-in.'
+              )}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {pane === 'drawEstab' && (
+        <div className="ctx-popout">
+          <div className="ctx-pop-section">
+            <div className="ctx-pop-title">{window.t('Estabilizador', 'Stabiliser')}</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 6 }}>
+              {[
+                { n: 0, icon: 'gesture',      label: window.t('Sin estabilizar', 'Off'),  hint: window.t('La línea sigue a la mano tal cual', 'The line follows your hand as it is') },
+                { n: 1, icon: 'timeline',     label: window.t('Suave', 'Light'),         hint: window.t('Quita el temblor pequeño', 'Removes the small wobble') },
+                { n: 2, icon: 'timeline',     label: window.t('Medio', 'Medium'),        hint: window.t('Para dibujar con ratón', 'For drawing with a mouse') },
+                { n: 3, icon: 'show_chart',   label: window.t('Fuerte', 'Strong'),       hint: window.t('Curvas muy limpias; la línea va más por detrás', 'Very clean curves; the line trails further behind') },
+              ].map(m => (
+                <button
+                  key={m.n}
+                  className={`ctx-btn ${(callbacks.drawEstabilizador || 0) === m.n ? 'active' : ''}`}
+                  onClick={()=>callbacks.setDrawEstabilizador(m.n)}
+                  style={{ flexDirection: 'row', gap: 8, justifyContent: 'flex-start', padding: '5px 8px', textAlign: 'left' }}
+                  title={m.hint}
+                >
+                  <span className="material-symbols-rounded" style={{ fontSize: 16, flex: 'none' }}>{m.icon}</span>
+                  <span style={{ fontSize: 11, lineHeight: 1.2 }}>{m.label}</span>
+                </button>
+              ))}
+            </div>
+            <p style={{ margin: '8px 0 0', fontSize: 10.5, lineHeight: 1.35, color: 'var(--text-soft)' }}>
+              {window.t(
+                'La línea va atada al puntero con una cuerda: mientras el ratón se mueve dentro del aro, no se mueve. Se ve el aro mientras dibujas.',
+                'The line is tied to the pointer with a string: while the mouse moves inside the ring, it does not move. You see the ring while drawing.'
               )}
             </p>
           </div>

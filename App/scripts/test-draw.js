@@ -128,6 +128,33 @@ const check = (nombre, ok, extra) => {
     `acaba en (${fin.x.toFixed(1)}, ${fin.y.toFixed(1)}) y el puntero en (30, 30)`);
 }
 
+// ── La cuerda (el estabilizador fuerte, para el ratón) ──
+{
+  // El temblor que no sale del radio no mueve la pluma.
+  let pluma = OdiDraw.cuerda(null, { x: 0, y: 0 }, 10);
+  const temblor = [{ x: 3, y: -4 }, { x: -6, y: 2 }, { x: 5, y: 5 }, { x: -2, y: -7 }];
+  let quieta = true;
+  for (const t of temblor) { const n = OdiDraw.cuerda(pluma, t, 10); if (n.x !== pluma.x || n.y !== pluma.y) quieta = false; pluma = n; }
+  check('la cuerda: el temblor dentro del radio no mueve la pluma', quieta);
+  // Al pasarse del radio, la pluma va detrás a la distancia justa.
+  pluma = OdiDraw.cuerda(pluma, { x: 50, y: 0 }, 10);
+  check('la cuerda: al tirar, la pluma queda a un radio del puntero',
+    Math.abs(pluma.x - 40) < 1e-9 && Math.abs(pluma.y) < 1e-9, `(${pluma.x}, ${pluma.y})`);
+  // Sin radio, la pluma es el puntero (estabilizador apagado).
+  const libre = OdiDraw.cuerda({ x: 1, y: 1 }, { x: 7, y: 3 }, 0);
+  check('la cuerda: con radio 0 va pegada al puntero', libre.x === 7 && libre.y === 3);
+  // Una línea temblorosa larga sale mucho más recta con la cuerda.
+  const semilla = (() => { let s = 11; return () => (s = (s * 1103515245 + 12345) % 2147483648) / 2147483648 - 0.5; })();
+  // Como en la aplicación: la cuerda y después el suavizado de siempre.
+  const crudoC = []; for (let i = 0; i <= 300; i++) crudoC.push({ x: i, y: semilla() * 12 });
+  const desvioDe = (l) => l.slice(20).reduce((m, p) => Math.max(m, Math.abs(p.y)), 0);
+  const conRadio = (r) => { let pl = null, sm = null; return crudoC.map(c => { pl = OdiDraw.cuerda(pl, c, r); return (sm = OdiDraw.stabilize(sm, pl)); }); };
+  const sinCuerda = desvioDe(conRadio(0)), medio = desvioDe(conRadio(10)), fuerte = desvioDe(conRadio(20));
+  check('la cuerda: cada nivel tiembla menos que el anterior', fuerte < medio && medio < sinCuerda * 0.7,
+    `±${desvioDe(crudoC).toFixed(1)} px de mano → sin cuerda ±${sinCuerda.toFixed(1)}, medio ±${medio.toFixed(1)}, fuerte ±${fuerte.toFixed(1)}`);
+  check('la cuerda: cuatro niveles, el primero apagado', OdiDraw.CUERDA_PX.length === 4 && OdiDraw.CUERDA_PX[0] === 0);
+}
+
 // ── Trazado SVG ──
 {
   const uniforme = { id: 'a', width: 4, pts: [[0, 0, 1], [10, 10, 1], [20, 0, 1]] };
