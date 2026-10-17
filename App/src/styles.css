@@ -637,12 +637,34 @@ body[data-patrocinador="1"] .board-preview-item {
 .boton-fijar.fijada .material-symbols-rounded { transform: rotate(0deg); font-variation-settings: 'FILL' 1; }
 /* En la cabecera de inicio, del tamaño de los botones de al lado y empujada
    al extremo derecho. */
-.ms-top > .boton-fijar { width: 38px; height: 38px; margin-left: auto; }
-.ms-top > .boton-fijar .material-symbols-rounded { font-size: 20px; }
+.ms-top > .fijar-caja { margin-left: auto; }
+.ms-top .boton-fijar { width: 38px; height: 38px; }
+.ms-top .boton-fijar .material-symbols-rounded { font-size: 20px; }
 /* En el lienzo, a la derecha del todo y a la altura del buscador
    (.mini-search: top 14px, 37 de alto). */
 .fijar-lienzo { position: absolute; top: 14px; right: 16px; z-index: 40; height: 37px; display: flex; align-items: center; }
 .fijar-lienzo .boton-fijar { width: 34px; height: 34px; }
+
+/* La transparencia de la ventana fijada: sale al pasar el ratón por la
+   chincheta, debajo y pegada a su borde derecho (está arriba a la derecha del
+   todo). El hueco de 8 px va DENTRO del contenedor (padding), para que al bajar
+   el ratón hasta la barrita no se cierre por el camino. */
+.fijar-caja { position: relative; display: inline-flex; }
+.fijar-opacidad {
+  position: absolute; top: 100%; right: 0; z-index: 60;
+  padding-top: 8px;
+}
+.fijar-opacidad-panel {
+  width: 200px; padding: 9px 11px 10px;
+  background: var(--paper); color: var(--ink);
+  border: 1.5px solid var(--line); border-radius: 8px;
+  box-shadow: var(--pop);
+  animation: fijar-opacidad-entra 220ms var(--muelle) both;
+}
+@keyframes fijar-opacidad-entra { from { opacity: 0; transform: translateY(-4px) scale(0.97); } to { opacity: 1; transform: none; } }
+.fijar-opacidad-fila { display: flex; align-items: baseline; justify-content: space-between; font-size: 11.5px; font-weight: 700; margin-bottom: 6px; }
+.fijar-opacidad-fila span:last-child { font-family: var(--font-mono); color: var(--ink-2); }
+.fijar-opacidad input[type=range] { width: 100%; accent-color: var(--olive); cursor: pointer; }
 /* Con la ventana fijada, lo que la mueve lo dice el cursor. */
 html[data-ventana-fijada] [data-mueve-ventana] { cursor: grab; }
 html[data-ventana-fijada] [data-mueve-ventana]:active { cursor: grabbing; }
@@ -7343,7 +7365,7 @@ html[data-touch="1"] .handle::before {
 @media (max-width: 1130px) {
   .ms-top { gap: 8px; }
   .ms-top-actions { gap: 5px; }
-  .ms-top-actions .icon-btn, .ms-top > .boton-fijar { width: 34px; height: 34px; }
+  .ms-top-actions .icon-btn, .ms-top .boton-fijar { width: 34px; height: 34px; }
   .ms-top-actions .icon-btn[style] { margin-right: 0 !important; }
   .ms-join-top { margin-right: 4px; }
 }

@@ -42,6 +42,7 @@ function estadoVentana() {
     fijada: ventanaFijada,
     enfocada: mainWindow.isFocused(),
     pantallaCompleta: mainWindow.isFullScreen(),
+    opacidad: mainWindow.getOpacity(),
   };
 }
 // A la barra de título y a la aplicación, que pinta el botón de fijar.
@@ -1395,6 +1396,9 @@ ipcMain.handle('ventana:fija', (event, si) => {
   if (ventanaFijada) {
     mainWindow.setMinimumSize(360, 240);
   } else {
+    // Al soltarla vuelve a verse entera: la transparencia es de la ventana
+    // fijada (ver ventana:opacidad).
+    mainWindow.setOpacity(1);
     mainWindow.setMinimumSize(1024, 700);
     const [w, h] = mainWindow.getSize();
     if (!mainWindow.isMaximized() && (w < 1024 || h < 700)) mainWindow.setSize(Math.max(w, 1024), Math.max(h, 700));
@@ -1403,6 +1407,17 @@ ipcMain.handle('ventana:fija', (event, si) => {
   mandaEstadoVentana();
   logToFile('ventana: ' + (ventanaFijada ? 'fijada encima, sin bordes' : 'normal'));
   return estadoVentana();
+});
+
+// La transparencia de la ventana fijada, para poner Oddinote encima de otra
+// cosa y seguir viendo lo de debajo, como en PureRef. Solo con la ventana
+// fijada, y nunca por debajo del 10 %: una ventana invisible encima de todo
+// no habría manera de encontrarla.
+ipcMain.handle('ventana:opacidad', (event, valor) => {
+  if (!mainWindow) return 1;
+  const v = Math.max(0.1, Math.min(1, Number(valor) || 1));
+  mainWindow.setOpacity(ventanaFijada ? v : 1);
+  return mainWindow.getOpacity();
 });
 
 // Mover la ventana fijada: sin barra de título no hay de dónde agarrarla, así

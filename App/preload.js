@@ -55,6 +55,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // tiene barra de título de donde agarrarla.
   ventana: {
     fija: (si) => ipcRenderer.invoke('ventana:fija', !!si),
+    opacidad: (v) => ipcRenderer.invoke('ventana:opacidad', v),
     estado: () => ipcRenderer.invoke('ventana:estado'),
     alCambiar: (cb) => {
       const f = (event, est) => cb(est);

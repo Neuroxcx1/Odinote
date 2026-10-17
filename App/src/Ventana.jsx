@@ -31,11 +31,35 @@ function useVentana() {
   return [est, api];
 }
 
+// La transparencia elegida se recuerda para la próxima vez que se fije. Del 10
+// al 100 %: por debajo, una ventana encima de todo y casi invisible no habría
+// quien la encontrara.
+const OPACIDAD_CLAVE = 'odinote.opacidad_fijada';
+const leeOpacidad = () => {
+  try {
+    const v = parseFloat(localStorage.getItem(OPACIDAD_CLAVE));
+    return v >= 0.1 && v <= 1 ? v : 1;
+  } catch (e) { return 1; }
+};
+
 function BotonFijar({ className }) {
   const [est, api] = useVentana();
+  const [opacidad, setOpacidad] = React.useState(leeOpacidad);
+  const [abierta, setAbierta] = React.useState(false);
+  const cierre = React.useRef(null);
   if (!api) return null;
   const fijada = !!est.fijada;
+  const cambiaOpacidad = (v) => {
+    setOpacidad(v);
+    try { localStorage.setItem(OPACIDAD_CLAVE, String(v)); } catch (e) {}
+    api.opacidad && api.opacidad(v);
+  };
+  // Con un respiro al salir: entre la chincheta y la barrita hay un hueco, y
+  // sin él se cerraba al bajar el ratón hacia ella.
+  const entra = () => { clearTimeout(cierre.current); if (fijada) setAbierta(true); };
+  const sale = () => { clearTimeout(cierre.current); cierre.current = setTimeout(() => setAbierta(false), 260); };
   return (
+    <span className="fijar-caja" onMouseEnter={entra} onMouseLeave={sale}>
     <button
       className={`boton-fijar ${fijada ? 'fijada' : ''} ${className || ''}`}
       onMouseDown={(e) => e.stopPropagation()}
@@ -43,6 +67,10 @@ function BotonFijar({ className }) {
         e.stopPropagation();
         const r = await api.fija(!fijada);
         window.playAudioTone && window.playAudioTone('click');
+        // La transparencia de la última vez, en cuanto se fija (al soltarla
+        // la ventana vuelve sola a verse entera: ver main.js).
+        if (r && r.fijada && api.opacidad) api.opacidad(opacidad);
+        setAbierta(false);
         // La primera vez, cómo se mueve ahora que no tiene barra de título.
         if (r && r.fijada && !window.__odiAvisoFijada) {
           window.__odiAvisoFijada = true;
@@ -58,6 +86,25 @@ function BotonFijar({ className }) {
     >
       <span className="material-symbols-rounded">push_pin</span>
     </button>
+    {/* Solo con la ventana fijada: para ver a través de ella lo de debajo. */}
+    {fijada && abierta && (
+      <div className="fijar-opacidad" onMouseDown={(e) => e.stopPropagation()}>
+        <div className="fijar-opacidad-panel">
+          <div className="fijar-opacidad-fila">
+            <span>{window.t('Opacidad', 'Opacity')}</span>
+            <span>{Math.round(opacidad * 100)} %</span>
+          </div>
+          <input
+            type="range"
+            min="10" max="100" step="5"
+            value={Math.round(opacidad * 100)}
+            onChange={(e) => cambiaOpacidad(Number(e.target.value) / 100)}
+            aria-label={window.t('Opacidad de la ventana', 'Window opacity')}
+          />
+        </div>
+      </div>
+    )}
+    </span>
   );
 }
 
