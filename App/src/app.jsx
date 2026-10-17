@@ -1759,6 +1759,42 @@ function App() {
             }
           })());
         }
+        // Las tarjetas de una columna con imagen (o audio, o archivo): igual que
+        // un nodo suelto. Antes se quedaban como data: dentro del json. La
+        // clave es columna::tarjeta, la misma que usan Drive y la caché.
+        (Array.isArray(item.children) ? item.children : []).forEach(hijo => {
+          if (!hijo || typeof hijo.src !== 'string' || !hijo.src.startsWith('data:')) return;
+          const clave = `${item.id}::${hijo.id}`;
+          if (savingMediaRef.current.has(clave)) return;
+          savingMediaRef.current.add(clave);
+          changed = true;
+          const ext = hijo.fileType || (hijo.type === 'image' ? 'png' : hijo.type === 'audio' ? 'mp3' : 'dat');
+          const nombre = hijo.name || `media_${hijo.id}.${ext}`;
+          saves.push((async () => {
+            try {
+              const carpeta = carpetaPorCanvas[cid] || null;
+              const ruta = String(await window.electronAPI.saveMedia(activeVaultPath, nombre, hijo.src, carpeta)).replace(/\\/g, '/');
+              hijo.src = ruta;
+              setCanvases(prev => {
+                const c = prev[cid];
+                if (!c || !c.items) return prev;
+                return {
+                  ...prev,
+                  [cid]: {
+                    ...c,
+                    items: c.items.map(it => it.id === item.id && Array.isArray(it.children)
+                      ? { ...it, children: it.children.map(h => h.id === hijo.id ? { ...h, src: ruta } : h) }
+                      : it)
+                  }
+                };
+              });
+            } catch (err) {
+              console.error('No se pudo guardar en la bóveda la imagen de una tarjeta de columna:', err);
+            } finally {
+              savingMediaRef.current.delete(clave);
+            }
+          })());
+        });
         // Las fotos de una galería van dentro del nodo, cada una con su id: se
         // guardan una a una igual que la de un nodo de imagen, para que el
         // proyecto no lleve megas de fotos metidos en su json.
