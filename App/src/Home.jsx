@@ -1,7 +1,7 @@
 // =====================================================
 // Odinote — Home v4 (Miro-style with sidebar)
 // =====================================================
-const { useState: useStateHome, useMemo: useMemoHome, useRef: useRefHome } = React;
+const { useState: useStateHome, useMemo: useMemoHome, useRef: useRefHome, useEffect: useEffectHome } = React;
 
 // ──────────────── CARPETAS DE PROYECTOS ────────────────
 //
@@ -31,6 +31,34 @@ function leeCarpetasVacias() {
 
 function guardaCarpetasVacias(nombres) {
   try { localStorage.setItem(CARPETAS_VACIAS_KEY, JSON.stringify(nombres)); } catch (e) {}
+}
+
+// La carpeta en la que estabas. Al entrar en un proyecto la pantalla de
+// inicio se desmonta, y al volver siempre salías a la raíz aunque estuvieras
+// trabajando dentro de una carpeta. Solo de este equipo, como las vacías.
+const CARPETA_ABIERTA_KEY = 'odinote.carpeta_abierta';
+function leeCarpetaAbierta() {
+  try { return localStorage.getItem(CARPETA_ABIERTA_KEY) || null; } catch (e) { return null; }
+}
+function guardaCarpetaAbierta(nombre) {
+  try {
+    if (nombre) localStorage.setItem(CARPETA_ABIERTA_KEY, nombre);
+    else localStorage.removeItem(CARPETA_ABIERTA_KEY);
+  } catch (e) {}
+}
+
+// El color de una carpeta vive en sus proyectos (carpetaColor, ver app.jsx),
+// que es lo que viaja. Una carpeta vacía no tiene proyectos donde apuntarlo:
+// el suyo se guarda aquí, en este equipo, hasta que entre alguien.
+const CARPETAS_COLORES_KEY = 'odinote.carpetas_colores';
+function leeColoresDeVacias() {
+  try {
+    const o = JSON.parse(localStorage.getItem(CARPETAS_COLORES_KEY) || '{}');
+    return o && typeof o === 'object' ? o : {};
+  } catch (e) { return {}; }
+}
+function guardaColoresDeVacias(o) {
+  try { localStorage.setItem(CARPETAS_COLORES_KEY, JSON.stringify(o)); } catch (e) {}
 }
 
 // El nombre de la carpeta de un proyecto, ya limpio. Vale '' si no tiene.
@@ -320,7 +348,7 @@ function CampoIcono({ emoji, onCambio }) {
   );
 }
 
-function Home({ lang, setLang, theme, setTheme, onOpenProject, projects, onCreate, onDelete, onRename, onRestore, onPurge, onToggleStar, onExport, onImport, vaultPath, onOpenVault, onCloseVault, updateAvailable, onUpdateClick, onSettingsClick, userProfile, esPatrocinador, onAbrirCorona, onUserClick, onJoinProjectClick, onTogglePublic, onManualSync, isSyncingDrive, needsDriveAuth, onSetFolder, onSetFolderMany, onRenameFolder, onDeleteFolder }) {
+function Home({ lang, setLang, theme, setTheme, onOpenProject, projects, onCreate, onDelete, onRename, onRestore, onPurge, onToggleStar, onExport, onImport, vaultPath, onOpenVault, onCloseVault, updateAvailable, onUpdateClick, onSettingsClick, userProfile, esPatrocinador, onAbrirCorona, onUserClick, onJoinProjectClick, onTogglePublic, onManualSync, isSyncingDrive, needsDriveAuth, onSetFolder, onSetFolderMany, onRenameFolder, onDeleteFolder, onColorFolder }) {
   const t = window.TRANSLATIONS[lang];
   const [query, setQuery] = useStateHome('');
   const [modal, setModal] = useStateHome(false);
@@ -343,14 +371,34 @@ function Home({ lang, setLang, theme, setTheme, onOpenProject, projects, onCreat
   const [sideOpen, setSideOpen] = useStateHome(false);
 
   // ── Carpetas ──
-  const [carpetaAbierta, setCarpetaAbierta] = useStateHome(null);
+  const [carpetaAbierta, setCarpetaAbiertaCruda] = useStateHome(leeCarpetaAbierta);
+  const setCarpetaAbierta = (nombre) => { setCarpetaAbiertaCruda(nombre); guardaCarpetaAbierta(nombre); };
   const [carpetasVacias, setCarpetasVacias] = useStateHome(leeCarpetasVacias);
+  const [coloresVacias, setColoresVacias] = useStateHome(leeColoresDeVacias);
   const [moviendo, setMoviendo] = useStateHome(null);      // proyecto que se está moviendo
   const [nombrando, setNombrando] = useStateHome(null);    // { inicial } al crear o renombrar
   const [anadiendo, setAnadiendo] = useStateHome(null);    // carpeta a la que se meten varios
 
   const carpetas = useMemoHome(() => carpetasVisibles(projects, carpetasVacias), [projects, carpetasVacias]);
   const cuentas = useMemoHome(() => cuentaPorCarpeta(projects), [projects]);
+
+  // Si la carpeta que se recordaba ya no existe (se quitó, o se renombró en
+  // otro equipo), se vuelve a la raíz en vez de enseñar una carpeta vacía.
+  useEffectHome(() => {
+    if (carpetaAbierta && !carpetas.includes(carpetaAbierta)) setCarpetaAbierta(null);
+  }, [carpetaAbierta, carpetas]);
+
+  const colorDeCarpeta = (nombre) => {
+    const con = projects.find(p => !p.deleted && carpetaDe(p) === nombre && p.carpetaColor);
+    return (con && con.carpetaColor) || coloresVacias[nombre] || null;
+  };
+  const pintaCarpeta = (nombre, color) => {
+    onColorFolder && onColorFolder(nombre, color);
+    const siguiente = { ...coloresVacias };
+    if (color) siguiente[nombre] = color; else delete siguiente[nombre];
+    setColoresVacias(siguiente);
+    guardaColoresDeVacias(siguiente);
+  };
 
   // La lista de vacías es solo para las que todavía no tiene nadie dentro.
   // En cuanto un proyecto la nombra, se deduce sola y hay que soltarla: si
@@ -389,9 +437,21 @@ function Home({ lang, setLang, theme, setTheme, onOpenProject, projects, onCreat
     return salen;
   };
 
+  // Una carpeta vacía guardaba su color aquí (no tenía proyectos donde
+  // apuntarlo): en cuanto entra el primero, el color pasa a él y viaja.
+  const heredaColor = (nombre) => {
+    const color = nombre && coloresVacias[nombre];
+    if (!color) return;
+    onColorFolder && onColorFolder(nombre, color);
+    const siguiente = { ...coloresVacias };
+    delete siguiente[nombre];
+    setColoresVacias(siguiente);
+    guardaColoresDeVacias(siguiente);
+  };
   const mueveACarpeta = (projectId, nombre) => {
     const salen = carpetasQueDejan([projectId]);
     onSetFolder && onSetFolder(projectId, nombre);
+    heredaColor(nombre);
     ajustaVacias(nombre, salen);
     window.playAudioTone && window.playAudioTone('click');
   };
@@ -400,6 +460,7 @@ function Home({ lang, setLang, theme, setTheme, onOpenProject, projects, onCreat
   const anadeACarpeta = (ids, nombre) => {
     const salen = carpetasQueDejan(ids);
     onSetFolderMany && onSetFolderMany(ids, nombre);
+    heredaColor(nombre);
     ajustaVacias(nombre, salen);
     window.playAudioTone && window.playAudioTone('click');
   };
@@ -418,6 +479,12 @@ function Home({ lang, setLang, theme, setTheme, onOpenProject, projects, onCreat
     if (!nuevo || nuevo === viejo) return;
     onRenameFolder && onRenameFolder(viejo, nuevo);
     guardaVacias(carpetasVacias.map(c => (c === viejo ? nuevo : c)));
+    if (coloresVacias[viejo]) {
+      const siguiente = { ...coloresVacias, [nuevo]: coloresVacias[viejo] };
+      delete siguiente[viejo];
+      setColoresVacias(siguiente);
+      guardaColoresDeVacias(siguiente);
+    }
     if (carpetaAbierta === viejo) setCarpetaAbierta(nuevo);
   };
   // Quitar la carpeta no borra nada: sus proyectos vuelven a quedar sueltos.
@@ -425,6 +492,12 @@ function Home({ lang, setLang, theme, setTheme, onOpenProject, projects, onCreat
     onDeleteFolder && onDeleteFolder(nombre);
     // Esta sí se olvida: la está quitando una persona a propósito.
     guardaVacias(carpetasVacias.filter(c => c !== nombre));
+    if (coloresVacias[nombre]) {
+      const siguiente = { ...coloresVacias };
+      delete siguiente[nombre];
+      setColoresVacias(siguiente);
+      guardaColoresDeVacias(siguiente);
+    }
     if (carpetaAbierta === nombre) setCarpetaAbierta(null);
     window.playAudioTone && window.playAudioTone('delete');
   };
@@ -905,6 +978,8 @@ function Home({ lang, setLang, theme, setTheme, onOpenProject, projects, onCreat
             {section === 'all' && <NewProjectCard label={t.new_project} onClick={()=>setModal(true)} lang={lang}/>}
             {section === 'all' && !carpetaAbierta && !buscando && carpetas.map(c => (
               <FolderCard key={'carpeta-' + c} nombre={c} cuantos={cuentas[c] || 0} lang={lang}
+                color={colorDeCarpeta(c)}
+                onColor={(color) => pintaCarpeta(c, color)}
                 portadas={projects.filter(p => !p.deleted && carpetaDe(p) === c).slice(0, 4).map(p => p.cover)}
                 onOpen={()=>{ setCarpetaAbierta(c); window.playAudioTone && window.playAudioTone('board_open'); }}
                 onRename={()=>setNombrando({ inicial: c })}
@@ -1170,13 +1245,17 @@ function ProjectCard({ project, lang, t, onOpen, onDelete, onRenameClick, onRest
 // Una carpeta en la rejilla. Se abre con un clic, como un proyecto, y enseña
 // los colores de portada de lo que guarda: de un vistazo se reconoce el cajón
 // sin tener que leer el nombre.
-function FolderCard({ nombre, cuantos, portadas, onOpen, onRename, onDelete, onSoltar, lang }) {
+function FolderCard({ nombre, cuantos, portadas, color, onColor, onOpen, onRename, onDelete, onSoltar, lang }) {
   // Solo para pintar el borde mientras tienes algo encima: sin esa señal no
   // se sabe si vas a soltarlo dentro o al lado.
   const [encima, setEncima] = useStateHome(false);
+  const [pintando, setPintando] = useStateHome(false);
+  // El color tiñe la portada y el icono: así se reconoce cada carpeta de un
+  // vistazo, que es lo que faltaba (todas se veían iguales).
+  const tinte = color ? { '--carpeta-color': color } : undefined;
   return (
     <div
-      className={`ms-project-card ms-folder-card${encima ? ' soltando' : ''}`}
+      className={`ms-project-card ms-folder-card${encima ? ' soltando' : ''}${color ? ' con-color' : ''}`}
       onClick={onOpen}
       onContextMenu={(e)=>{ e.preventDefault(); onRename && onRename(); }}
       onDragOver={(e)=>{ e.preventDefault(); e.dataTransfer.dropEffect = 'move'; if (!encima) setEncima(true); }}
@@ -1191,7 +1270,7 @@ function FolderCard({ nombre, cuantos, portadas, onOpen, onRename, onDelete, onS
         const id = e.dataTransfer.getData('text/plain');
         if (id && onSoltar) onSoltar(id);
       }}
-      style={{position:'relative'}}
+      style={{ position: 'relative', ...(tinte || {}) }}
     >
       <div className="ms-project-cover ms-folder-cover">
         <div className="ms-folder-peek">
@@ -1200,6 +1279,10 @@ function FolderCard({ nombre, cuantos, portadas, onOpen, onRename, onDelete, onS
             : portadas.map((c, i) => <i key={i} style={{ background: c }}/>)}
         </div>
         <div className="ms-card-actions" onClick={(e)=>e.stopPropagation()}>
+          <button className="ms-card-btn" title={window.t('Color de la carpeta', 'Folder colour')}
+            onClick={(e)=>{ e.stopPropagation(); setPintando(v => !v); }}>
+            <span className="material-symbols-rounded">palette</span>
+          </button>
           <button className="ms-card-btn" title={window.t('Cambiar el nombre', 'Rename')}
             onClick={(e)=>{ e.stopPropagation(); onRename && onRename(); }}>
             <span className="material-symbols-rounded">edit</span>
@@ -1215,13 +1298,30 @@ function FolderCard({ nombre, cuantos, portadas, onOpen, onRename, onDelete, onS
       </div>
       <div className="ms-project-body">
         <div className="ms-project-title" style={{ display:'flex', alignItems:'center', gap:6 }}>
-          <span className="material-symbols-rounded" style={{ fontSize:18, flexShrink:0 }}>folder</span>
+          <span className="material-symbols-rounded ms-folder-icono" style={{ fontSize:18, flexShrink:0 }}>folder</span>
           <span style={{ overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{nombre}</span>
         </div>
         <div className="ms-project-meta">
           <span>{cuantos} {cuantos === 1 ? window.t('proyecto', 'project') : window.t('proyectos', 'projects')}</span>
         </div>
       </div>
+      {/* Sobre la tarjeta entera y en una sola fila: la portada y la tarjeta
+          recortan lo que se sale, y en la portada sola el botón de Listo
+          quedaba fuera, así que el clic caía en la tarjeta y la abría. */}
+      {pintando && (
+        <div className="ms-folder-pintar" onClick={(e)=>e.stopPropagation()} onMouseDown={(e)=>e.stopPropagation()}>
+          <div className="ms-folder-pintar-tit">{window.t('Color de la carpeta', 'Folder colour')}</div>
+          <window.SelectorColor
+            valor={color || ''}
+            incluirTransparente
+            compacto
+            onCambio={(c) => { onColor && onColor(c === 'transparent' ? null : c); }}
+          />
+          <button className="ms-folder-pintar-listo" onClick={(e)=>{ e.stopPropagation(); setPintando(false); }}>
+            {window.t('Listo', 'Done')}
+          </button>
+        </div>
+      )}
     </div>
   );
 }

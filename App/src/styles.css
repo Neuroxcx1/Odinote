@@ -7497,6 +7497,26 @@ html[data-touch="1"] .ms-grid-list .ms-card-actions { opacity: 1; }
    quedarse en un cuadradito arriba a la izquierda. */
 .ms-folder-peek > i:only-child { grid-column: span 2; height: 58px; }
 .ms-folder-vacia { font-size: 40px; color: var(--ink-3); opacity: 0.55; }
+/* Con color propio: la portada se tiñe (suave, para que los colores de dentro
+   se sigan viendo) y el icono de carpeta lleva el color entero. */
+.ms-folder-card.con-color .ms-folder-cover { background: color-mix(in srgb, var(--carpeta-color) 26%, var(--bg)); }
+.ms-folder-card.con-color .ms-folder-icono { color: var(--carpeta-color); font-variation-settings: 'FILL' 1; }
+.ms-folder-card.con-color .ms-folder-vacia { color: var(--carpeta-color); opacity: 0.85; }
+/* El selector de color, encima de la portada: dentro de la tarjeta para no
+   salirse de la rejilla en la última fila. */
+.ms-folder-pintar {
+  position: absolute; inset: 6px; z-index: 5; overflow: auto; cursor: default;
+  padding: 10px; display: flex; flex-direction: column; gap: 8px;
+  background: var(--paper); border: 1.5px solid var(--line); border-radius: 8px;
+  box-shadow: var(--pop);
+  animation: fijar-opacidad-entra 220ms var(--muelle) both;
+}
+.ms-folder-pintar-tit { font-size: 11.5px; font-weight: 700; color: var(--ink-2); }
+.ms-folder-pintar-listo {
+  align-self: flex-end; padding: 4px 12px; border-radius: 6px;
+  border: 1.5px solid var(--line); background: var(--olive); color: #FFFFFF;
+  font-size: 12px; font-weight: 700; cursor: pointer;
+}
 
 /* El botón de crear carpeta, en la fila del título. */
 .ms-carpeta-btn {

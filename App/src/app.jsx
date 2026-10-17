@@ -2497,9 +2497,19 @@ function App() {
   // que lleva escrito el propio proyecto. Por eso agrupar no toca ni la
   // sincronización, ni Google Drive, ni dónde vive ningún archivo — el campo
   // viaja dentro del proyecto como el nombre o el color de la portada.
+  // El color de una carpeta va igual: en cada proyecto de dentro
+  // (carpetaColor). Quien entra se lleva el de la carpeta; quien sale, ninguno.
+  const colorDeLaCarpeta = (lista, nombre) => {
+    if (!nombre) return null;
+    const con = lista.find(x => String(x.carpeta || '').trim() === nombre && x.carpetaColor);
+    return con ? con.carpetaColor : null;
+  };
   const setProjectFolder = (projectId, carpeta) => {
     const limpio = String(carpeta || '').trim();
-    setProjects(p => p.map(x => x.id === projectId ? { ...x, carpeta: limpio || null } : x));
+    setProjects(p => {
+      const color = colorDeLaCarpeta(p, limpio);
+      return p.map(x => x.id === projectId ? { ...x, carpeta: limpio || null, carpetaColor: color } : x);
+    });
   };
 
   // Varios de golpe, en un solo cambio de estado: llamando al de arriba en
@@ -2508,7 +2518,17 @@ function App() {
     const limpio = String(carpeta || '').trim() || null;
     const cuales = new Set(ids || []);
     if (!cuales.size) return;
-    setProjects(p => p.map(x => (cuales.has(x.id) ? { ...x, carpeta: limpio } : x)));
+    setProjects(p => {
+      const color = colorDeLaCarpeta(p, limpio);
+      return p.map(x => (cuales.has(x.id) ? { ...x, carpeta: limpio, carpetaColor: color } : x));
+    });
+  };
+
+  // Ponerle color a una carpeta es ponérselo a todos los proyectos de dentro.
+  const colorFolder = (nombre, color) => {
+    const de = String(nombre || '').trim();
+    if (!de) return;
+    setProjects(p => p.map(x => (String(x.carpeta || '').trim() === de ? { ...x, carpetaColor: color || null } : x)));
   };
 
   const renameFolder = (viejo, nuevo) => {
@@ -2521,7 +2541,7 @@ function App() {
   const removeFolder = (nombre) => {
     const de = String(nombre || '').trim();
     if (!de) return;
-    setProjects(p => p.map(x => (String(x.carpeta || '').trim() === de ? { ...x, carpeta: null } : x)));
+    setProjects(p => p.map(x => (String(x.carpeta || '').trim() === de ? { ...x, carpeta: null, carpetaColor: null } : x)));
   };
 
   const toggleStarProject = (projectId) => {
@@ -3048,6 +3068,7 @@ function App() {
       onSetFolderMany={setProjectFolderMany}
       onRenameFolder={renameFolder}
       onDeleteFolder={removeFolder}
+      onColorFolder={colorFolder}
       onManualSync={manualDriveRefresh}
       isSyncingDrive={isSyncingDrive}
       needsDriveAuth={!!(userProfile && !userProfile.accessToken)}
