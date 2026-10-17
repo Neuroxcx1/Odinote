@@ -784,7 +784,7 @@ function ContextSidebar({
         {/* La ruleta: girarla y editar sus elementos. */}
         {isRuleta && (
           <>
-            {(item.elementos || []).length >= 2 && (
+            {(window.ruletaActivos ? window.ruletaActivos(item) : (item.elementos || [])).length >= 2 && (
               <button className="ctx-btn" onClick={() => window.dispatchEvent(new CustomEvent('odi-ruleta-girar', { detail: item.id }))} title={window.t('Girar la ruleta', 'Spin the wheel')}>
                 <span className="material-symbols-rounded">cached</span>
                 <span>{window.t('Girar', 'Spin')}</span>
@@ -793,6 +793,10 @@ function ContextSidebar({
             <button className={`ctx-btn ${pane === 'ruletaElementos' ? 'active' : ''}`} onClick={() => setPane(pane === 'ruletaElementos' ? null : 'ruletaElementos')} title={window.t('Los elementos de la ruleta', 'The wheel items')}>
               <span className="material-symbols-rounded">format_list_bulleted</span>
               <span>{window.t('Elementos', 'Items')}</span>
+            </button>
+            <button className={`ctx-btn ${pane === 'ruletaOpciones' ? 'active' : ''}`} onClick={() => setPane(pane === 'ruletaOpciones' ? null : 'ruletaOpciones')} title={window.t('Cuánto dura el giro, quitar al que sale y los últimos resultados', 'How long it spins, removing the winner and the latest results')}>
+              <span className="material-symbols-rounded">tune</span>
+              <span>{window.t('Opciones', 'Options')}</span>
             </button>
           </>
         )}
@@ -1756,6 +1760,28 @@ function ContextSidebar({
         const elementos = Array.isArray(item.elementos) ? item.elementos : [];
         const colores = ['#E6544F', '#F7DA84', '#90B968', '#3D5A80', '#955BA5', '#F2A65A', '#5BB5A2', '#E58FB0'];
         const cambia = (id, patch) => onUpdate({ elementos: elementos.map(e => e.id === id ? { ...e, ...patch } : e) });
+        const fuera = elementos.filter(e => e.fuera).length;
+        // Varios de golpe: una lista pegada (uno por línea) entra entera.
+        const anadeVarios = (textos) => {
+          const limpios = textos.map(t => String(t || '').trim()).filter(Boolean);
+          if (!limpios.length) return;
+          const nuevos = limpios.map((t, k) => ({
+            id: `el-${Date.now()}-${k}-${Math.floor(Math.random() * 9999)}`,
+            texto: t,
+            color: colores[(elementos.length + k) % colores.length],
+          }));
+          // Con otros elementos, el elegido de antes ya no dice nada.
+          onUpdate({ ultimo: null, elementos: [...elementos, ...nuevos] });
+          window.playAudioTone && window.playAudioTone('create');
+        };
+        // Mezclar cambia el orden de las porciones (no quién sale: eso ya es
+        // al azar), para que dos parecidos no queden siempre juntos.
+        const mezcla = () => {
+          const c = elementos.slice();
+          for (let i = c.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); const t = c[i]; c[i] = c[j]; c[j] = t; }
+          onUpdate({ ultimo: null, elementos: c });
+          window.playAudioTone && window.playAudioTone('click');
+        };
         return (
           <div className="ctx-popout ruleta-panel" onMouseDown={(e) => e.stopPropagation()}>
             <div className="ctx-pop-section">
@@ -1763,7 +1789,7 @@ function ContextSidebar({
               <div className="ruleta-lista">
                 {elementos.map(el => (
                   <React.Fragment key={el.id}>
-                  <div className="ruleta-fila">
+                  <div className={`ruleta-fila ${el.fuera ? 'fuera' : ''}`} title={el.fuera ? window.t('Ya salió: no está en la rueda', 'Already out: not on the wheel') : undefined}>
                     {/* El color abre el selector de toda la aplicación: cualquier
                         color, con el historial. Antes un toque pasaba al
                         siguiente de una lista fija y no se podía elegir uno a
@@ -1800,6 +1826,11 @@ function ContextSidebar({
                         <span className="material-symbols-rounded">hide_image</span>
                       </button>
                     )}
+                    {el.fuera && (
+                      <button className="ruleta-fila-quitar volver" onClick={() => cambia(el.id, { fuera: false })} title={window.t('Volver a meterlo en la rueda', 'Put it back on the wheel')}>
+                        <span className="material-symbols-rounded">undo</span>
+                      </button>
+                    )}
                     <button className="ruleta-fila-quitar" onClick={() => onUpdate({ ultimo: null, elementos: elementos.filter(e => e.id !== el.id) })} title={window.t('Quitar', 'Remove')}>
                       <span className="material-symbols-rounded">close</span>
                     </button>
@@ -1819,20 +1850,85 @@ function ContextSidebar({
               </div>
               <input
                 className="ruleta-nuevo"
-                placeholder={window.t('Nuevo elemento y Intro', 'New item and Enter')}
+                placeholder={window.t('Nuevo elemento y Intro (o pega una lista)', 'New item and Enter (or paste a list)')}
                 onKeyDown={(e) => {
                   e.stopPropagation();
                   if (e.key !== 'Enter' || !e.target.value.trim()) return;
-                  // Con otros elementos, el elegido de antes ya no dice nada.
-                  onUpdate({ ultimo: null, elementos: [...elementos, {
-                    id: `el-${Date.now()}-${Math.floor(Math.random() * 9999)}`,
-                    texto: e.target.value.trim(),
-                    color: colores[elementos.length % colores.length],
-                  }] });
+                  anadeVarios([e.target.value]);
                   e.target.value = '';
-                  window.playAudioTone && window.playAudioTone('create');
+                }}
+                onPaste={(e) => {
+                  // Una lista pegada (de una nota, de Excel…): un elemento por línea.
+                  const pegado = (e.clipboardData && e.clipboardData.getData('text')) || '';
+                  const lineas = pegado.split(/\r?\n|\t/).map(s => s.trim()).filter(Boolean);
+                  if (lineas.length < 2) return;
+                  // Que no lo coja también el lienzo como una nota pegada.
+                  e.preventDefault(); e.stopPropagation();
+                  anadeVarios(lineas);
                 }}
               />
+              <div className="ruleta-acciones">
+                {elementos.length >= 2 && (
+                  <button className="ruleta-accion" onClick={mezcla} title={window.t('Cambiar el orden de las porciones', 'Shuffle the order of the slices')}>
+                    <span className="material-symbols-rounded">casino</span>{window.t('Mezclar', 'Shuffle')}
+                  </button>
+                )}
+                {fuera > 0 && (
+                  <button className="ruleta-accion" onClick={() => { onUpdate({ elementos: elementos.map(e => e.fuera ? { ...e, fuera: false } : e) }); window.playAudioTone && window.playAudioTone('click'); }}
+                    title={window.t('Volver a meter en la rueda a todos los que salieron', 'Put everyone who came out back on the wheel')}>
+                    <span className="material-symbols-rounded">restore</span>{window.t('Volver a meter a todos', 'Put them all back')} ({fuera})
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+      {pane === 'ruletaOpciones' && (() => {
+        const duracion = item.duracion || 'normal';
+        const historial = Array.isArray(item.historial) ? item.historial : [];
+        const hora = (t) => { try { return new Date(t).toLocaleTimeString(window.currentLang || undefined, { hour: '2-digit', minute: '2-digit' }); } catch (e) { return ''; } };
+        return (
+          <div className="ctx-popout ruleta-panel" onMouseDown={(e) => e.stopPropagation()}>
+            <div className="ctx-pop-section">
+              <div className="ctx-pop-title">{window.t('Cuánto gira', 'How long it spins')}</div>
+              <div className="ruleta-duraciones">
+                {[['corta', window.t('Corto', 'Short')], ['normal', window.t('Normal', 'Normal')], ['larga', window.t('Largo', 'Long')]].map(([k, nombre]) => (
+                  <button key={k} className={`ruleta-duracion ${duracion === k ? 'activa' : ''}`} onClick={() => onUpdate({ duracion: k })}>{nombre}</button>
+                ))}
+              </div>
+            </div>
+            <div className="ctx-pop-section">
+              {/* Para sorteos y turnos: el que sale se va de la rueda al
+                  girar la siguiente vez (se puede volver a meter). */}
+              <label className="ruleta-interruptor">
+                <input type="checkbox" checked={!!item.quitaGanador} onChange={(e) => onUpdate({ quitaGanador: e.target.checked })}/>
+                <span>
+                  <b>{window.t('Quitar al que sale', 'Remove the winner')}</b>
+                  <small>{window.t('Al girar otra vez, el anterior se va de la rueda: para sorteos y turnos.', 'When you spin again, the previous one leaves the wheel: for draws and turns.')}</small>
+                </span>
+              </label>
+            </div>
+            <div className="ctx-pop-section">
+              <div className="ctx-pop-title">{window.t('Últimos resultados', 'Latest results')}</div>
+              {historial.length ? (
+                <div className="ruleta-historial">
+                  {historial.map((h, k) => (
+                    <div key={k} className="ruleta-historial-fila">
+                      <i style={{ background: h.color || '#E1DFE3' }}/>
+                      <span>{h.texto}</span>
+                      <small>{hora(h.t)}</small>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="ruleta-historial-vacio">{window.t('Todavía no ha salido nadie.', 'Nothing has come out yet.')}</div>
+              )}
+              {historial.length > 0 && (
+                <button className="ruleta-accion" onClick={() => onUpdate({ historial: [] })}>
+                  <span className="material-symbols-rounded">delete_sweep</span>{window.t('Borrar los resultados', 'Clear the results')}
+                </button>
+              )}
             </div>
           </div>
         );

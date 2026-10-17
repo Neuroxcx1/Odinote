@@ -2,25 +2,40 @@
 // Oddinote — el nodo de ruleta
 //
 // Lo básico de la ruleta que pidió el usuario, a partir de la de su captura:
-// sin "personas", con elementos, y con la cara de la aplicación. Cada porción
-// lleva su color con un degradado hacia el centro, más claro abajo; al girar
-// frena como una ruleta de verdad, suena un "tic" cada vez que pasa una porción
-// por la flecha y, al parar, un sonido corto de premio y el elegido que salta
-// en medio con un rebote.
+// sin "personas", con elementos, y con la cara de la aplicación. Al girar
+// frena como una ruleta de verdad, suena un "tic" cada vez que una tachuela
+// pasa por la flecha y, al parar, un sonido corto de premio, confeti y un
+// cartel con el que ha salido.
+//
+// Rehecha el 17/10 porque al usuario le parecía «muy simple»: ahora tiene el
+// dibujo del resto de la aplicación —tinta, sombra dura y colores planos— y
+// partes de ruleta de feria. Lo que gira (las porciones, sus nombres y las
+// tachuelas) va en un SVG; lo que no gira (la sombra, el aro de luces, el
+// brillo y la flecha) va aparte, quieto, como en una de verdad.
 //
 // Sin elementos se enseña un círculo en blanco que lo dice, con el botón para
 // ir añadiéndolos ahí mismo. Con uno ya se dibuja la rueda, con ese y el hueco
 // del segundo, que se va rellenando según se escribe.
 //
-// El giro se guarda en el nodo (item.giro) para que la ruleta siga donde se
-// quedó al volver a abrir el proyecto, y el último elegido (item.ultimo) para
-// que se siga viendo cuál salió.
+// En el nodo se guarda: el giro (item.giro) para que siga donde se quedó, el
+// último elegido (item.ultimo), los últimos resultados (item.historial), si
+// el que sale se quita para la siguiente (item.quitaGanador, para sorteos y
+// turnos) y cuánto dura el giro (item.duracion). Un elemento quitado no se
+// borra: lleva fuera: true y se puede volver a meter desde la barra.
 // =====================================================
 
 // Los colores con los que va naciendo cada elemento, por turno. Los cuatro de
 // la aplicación primero.
 const RULETA_COLORES = ['#E6544F', '#F7DA84', '#90B968', '#3D5A80', '#955BA5', '#F2A65A', '#5BB5A2', '#E58FB0'];
-const RULETA_DURACION = 5200;
+// Cuánto dura una tirada, según lo elegido en la barra.
+const RULETA_DURACIONES = { corta: 3000, normal: 5200, larga: 8500 };
+// Hasta dónde llegan las porciones; de ahí al borde va el aro de las luces.
+const RULETA_R = 86;
+// A qué distancia del centro va el centro de cada nombre: a medio camino
+// entre el botón de girar (radio ~27) y las tachuelas.
+const RULETA_RADIO_TEXTO = 56;
+// Cuántos resultados se recuerdan.
+const RULETA_HISTORIAL = 20;
 
 // Un solo reproductor para todos los "tic": el de la aplicación crea uno nuevo
 // en cada sonido, y una ruleta suena decenas de veces por vuelta.
@@ -122,12 +137,11 @@ function ruletaConfeti(caja) {
   requestAnimationFrame(paso);
 }
 
-// Un punto de la circunferencia, con 0 grados ARRIBA y girando como el reloj.
 // La foto de una porción, encogida (360 px por el lado largo, WebP) y DENTRO
 // del elemento como data: URL, igual que la portada de un proyecto. Así no
 // pasa por los cinco sitios por donde viajan los medios de un nodo (bóveda,
 // Drive, reemplazos, caché y tablero a proyecto): ocho fotos así son unos
-// cientos de KB en el proyecto.
+// cientos de KB en el proyecto. Es a propósito, no un olvido.
 function ruletaEncogeFoto(file) {
   return new Promise((resolve) => {
     const url = URL.createObjectURL(file);
@@ -151,25 +165,23 @@ function ruletaEncogeFoto(file) {
 }
 window.ruletaEncogeFoto = ruletaEncogeFoto;
 
-// A qué distancia del centro va el centro de cada nombre: a medio camino
-// entre el botón de girar (radio ~27) y el borde (96), igual en todas.
-const RULETA_RADIO_TEXTO = 61;
-
+// Un punto de la circunferencia, con 0 grados ARRIBA y girando como el reloj.
 function ruletaPunto(grados, radio) {
   const r = (grados - 90) * Math.PI / 180;
   return [Math.cos(r) * radio, Math.sin(r) * radio];
 }
-function ruletaAclara(hex, cuanto) {
-  const m = /^#?([0-9a-f]{6})$/i.exec(hex || '');
-  if (!m) return hex;
-  const n = parseInt(m[1], 16);
-  const mezcla = (c) => Math.round(c + (255 - c) * cuanto);
-  return `rgb(${mezcla(n >> 16)}, ${mezcla((n >> 8) & 255)}, ${mezcla(n & 255)})`;
+
+// Los elementos que están en la rueda: los quitados (fuera: true) se quedan
+// en la lista para poder volver a meterlos, pero no giran.
+function ruletaActivos(item) {
+  return (Array.isArray(item.elementos) ? item.elementos : []).filter(e => e && !e.fuera);
 }
+window.ruletaActivos = ruletaActivos;
 
 function RuletaItem({ item, lang, onUpdate }) {
   const elementos = Array.isArray(item.elementos) ? item.elementos : [];
-  const n = elementos.length;
+  const activos = elementos.filter(e => !e.fuera);
+  const n = activos.length;
   const [giro, setGiro] = React.useState(item.giro || 0);
   const [girando, setGirando] = React.useState(false);
   // Qué nombres van cabeza abajo se decide con el giro EN REPOSO: el de antes
@@ -181,6 +193,8 @@ function RuletaItem({ item, lang, onUpdate }) {
   const reposoRef = React.useRef(giro);
   if (!girando) reposoRef.current = giro;
   const [ganador, setGanador] = React.useState(null);
+  // Las luces celebran un momento al salir el premio.
+  const [celebra, setCelebra] = React.useState(false);
   const [escribiendo, setEscribiendo] = React.useState(false);
   const [texto, setTexto] = React.useState('');
   // El último elemento añadido desde el propio nodo: su porción entra con un
@@ -191,7 +205,7 @@ function RuletaItem({ item, lang, onUpdate }) {
   const textoRef = React.useRef('');
   const ruedaRef = React.useRef(null);
   const flechaRef = React.useRef(null);
-  // La flecha salta un poco cuando la golpea una porción y vuelve con rebote.
+  // La flecha salta un poco cuando la golpea una tachuela y vuelve con rebote.
   // Antes temblaba sin parar mientras la rueda giraba, también a punto de
   // frenar (lo vio el usuario). Así, al frenar, los golpes se espacian y la
   // flecha se queda quieta sola. Hacia la derecha porque la rueda gira como el
@@ -205,15 +219,17 @@ function RuletaItem({ item, lang, onUpdate }) {
     ], { duration: 260, easing: 'cubic-bezier(0.34, 1.56, 0.64, 1)' });
   };
   const animacion = React.useRef(null);
-  const elementosRef = React.useRef(elementos);
-  elementosRef.current = elementos;
+  // Lo último del nodo, para cuando la tirada acaba: el cierre del giro se
+  // creó al empezar, y lo que haya cambiado entre medias se perdería.
+  const itemRef = React.useRef(item);
+  itemRef.current = item;
   const idBase = 'ruleta-' + String(item.id).replace(/[^a-z0-9_-]/gi, '');
 
   const escribe = (v) => { textoRef.current = v; setTexto(v); };
   const anade = (t) => {
     const limpio = String(t || '').trim();
     if (!limpio) return;
-    const actuales = elementosRef.current;
+    const actuales = Array.isArray(itemRef.current.elementos) ? itemRef.current.elementos : [];
     const id = `el-${Date.now()}-${Math.floor(Math.random() * 9999)}`;
     // Con otros elementos, el elegido de antes ya no dice nada: se suelta.
     onUpdate({ ultimo: null, elementos: [...actuales, {
@@ -229,28 +245,44 @@ function RuletaItem({ item, lang, onUpdate }) {
   // segundo. Antes se quedaba el círculo en blanco con un texto que cambiaba,
   // y escribir el primero parecía no haber servido de nada.
   const lista = n === 1
-    ? [elementos[0], { id: '__hueco', texto: texto.trim() || '?', hueco: true }]
-    : elementos;
+    ? [activos[0], { id: '__hueco', texto: texto.trim() || '?', hueco: true }]
+    : activos;
   const m = lista.length;
   const paso = m ? 360 / m : 360;
 
   const gira = () => {
     if (n < 2 || girando) return;
-    const elegido = Math.floor(Math.random() * n);
+    const it = itemRef.current;
+    let todos = Array.isArray(it.elementos) ? it.elementos : [];
+    // Con «quitar al que sale», el de la tirada anterior se va de la rueda
+    // ahora, al empezar la siguiente: así se ha visto salir antes de irse.
+    if (it.quitaGanador && it.ultimo && todos.some(e => e.id === it.ultimo && !e.fuera)) {
+      if (todos.filter(e => !e.fuera).length <= 2) {
+        window.showToast && window.showToast(window.t('Solo quedan dos: vuelve a meter los que salieron para seguir.', 'Only two left: put back the ones that came out to keep going.'));
+        return;
+      }
+      todos = todos.map(e => e.id === it.ultimo ? { ...e, fuera: true } : e);
+    }
+    const enRueda = todos.filter(e => !e.fuera);
+    const pasoTirada = 360 / enRueda.length;
+    const elegido = Math.floor(Math.random() * enRueda.length);
     // Dónde tiene que quedar la flecha dentro de la porción elegida: en
     // cualquier sitio salvo pegada a los bordes, que parecería trampa.
-    const dentro = (0.15 + Math.random() * 0.7) * paso;
-    const objetivo = elegido * paso + dentro;
-    const vueltas = 5 + Math.floor(Math.random() * 3);
+    const dentro = (0.15 + Math.random() * 0.7) * pasoTirada;
+    const objetivo = elegido * pasoTirada + dentro;
+    const duracion = RULETA_DURACIONES[it.duracion] || RULETA_DURACIONES.normal;
+    const vueltas = Math.max(3, Math.round(duracion / 1000)) + Math.floor(Math.random() * 3);
     const base = giro - (((giro % 360) + 360) % 360) + 360 * vueltas;
     const final = base + ((360 - objetivo) % 360);
+    if (todos !== it.elementos) onUpdate({ elementos: todos, ultimo: null });
     setGanador(null);
+    setCelebra(false);
     setGirando(true);
     setGiro(final);
 
-    // Un "tic" cada vez que una porción pasa por la flecha. Se lee el giro que
-    // lleva de verdad la rueda en pantalla (la transición la hace el navegador)
-    // en vez de calcularlo, para que suene justo cuando se ve pasar.
+    // Un "tic" cada vez que una tachuela pasa por la flecha. Se lee el giro
+    // que lleva de verdad la rueda en pantalla (la transición la hace el
+    // navegador) en vez de calcularlo, para que suene justo cuando se ve pasar.
     let ultima = null;
     const mira = () => {
       const el = ruedaRef.current;
@@ -260,7 +292,7 @@ function RuletaItem({ item, lang, onUpdate }) {
         if (mm) {
           const ang = Math.atan2(parseFloat(mm[2]), parseFloat(mm[1])) * 180 / Math.PI;
           const arriba = ((360 - ang) % 360 + 360) % 360;
-          const porcion = Math.floor(arriba / paso);
+          const porcion = Math.floor(arriba / pasoTirada);
           if (ultima !== null && porcion !== ultima) { ruletaSuena('tic'); golpeFlecha(); }
           ultima = porcion;
         }
@@ -273,19 +305,24 @@ function RuletaItem({ item, lang, onUpdate }) {
     setTimeout(() => {
       cancelAnimationFrame(animacion.current);
       setGirando(false);
-      const gano = elementosRef.current[elegido];
+      const gano = enRueda[elegido];
       setGanador(gano ? gano.id : null);
+      setCelebra(true);
+      setTimeout(() => setCelebra(false), 1800);
       ruletaSuena('premio');
       ruletaConfeti(ruedaRef.current && ruedaRef.current.parentElement);
-      onUpdate({ giro: ((final % 360) + 360) % 360, ultimo: gano ? gano.id : null });
+      const antes = Array.isArray(itemRef.current.historial) ? itemRef.current.historial : [];
+      const patch = { giro: ((final % 360) + 360) % 360, ultimo: gano ? gano.id : null };
+      if (gano) patch.historial = [{ id: gano.id, texto: gano.texto, color: gano.color, t: Date.now() }, ...antes].slice(0, RULETA_HISTORIAL);
+      onUpdate(patch);
       // El giro se deja en lo que se guarda: así la siguiente vuelta sale del
       // mismo sitio y no desenrolla las cinco vueltas de antes hacia atrás.
       setGiro(((final % 360) + 360) % 360);
-    }, RULETA_DURACION);
+    }, duracion);
   };
   React.useEffect(() => () => cancelAnimationFrame(animacion.current), []);
   // Lo mismo con el que acaba de salir, si cambian los elementos.
-  React.useEffect(() => { setGanador(null); }, [n]);
+  React.useEffect(() => { if (!girando) setGanador(null); }, [n]);
   // Con dos ya se puede girar: el campo de añadir se va solo.
   React.useEffect(() => { if (n >= 2) { setEscribiendo(false); escribe(''); } }, [n]);
   React.useEffect(() => {
@@ -295,7 +332,19 @@ function RuletaItem({ item, lang, onUpdate }) {
   });
 
   const elegidoId = n >= 2 ? (ganador || (!girando ? item.ultimo : null)) : null;
-  const elegido = elementos.find(e => e.id === elegidoId);
+  const elegido = activos.find(e => e.id === elegidoId);
+  // Quitar al que ha salido, a mano, desde su cartel.
+  const quitaElegido = (e) => {
+    e.stopPropagation();
+    if (!elegido) return;
+    if (n <= 2) {
+      window.showToast && window.showToast(window.t('Hacen falta al menos dos en la rueda.', 'The wheel needs at least two.'));
+      return;
+    }
+    onUpdate({ ultimo: null, elementos: elementos.map(x => x.id === elegido.id ? { ...x, fuera: true } : x) });
+    setGanador(null);
+    window.playAudioTone && window.playAudioTone('delete');
+  };
 
   // El botón de añadir o el campo, para cuando faltan elementos. Va suelto y
   // con su clave para que siga siendo EL MISMO al pasar de cero a uno: si se
@@ -333,14 +382,61 @@ function RuletaItem({ item, lang, onUpdate }) {
     </div>
   );
 
+  // Lo que no gira: la sombra dura de todo lo de la aplicación, debajo, y
+  // encima el aro con las luces y un brillo que no se mueve con la rueda.
+  const fondo = (
+    <svg className="ruleta-fondo" viewBox="-100 -100 200 200" aria-hidden="true" key="fondo">
+      <circle cx="4.5" cy="5.5" r="99" className="ruleta-sombra"/>
+      <circle r="99" className="ruleta-base"/>
+    </svg>
+  );
+  const marco = (
+    <svg className={`ruleta-marco ${celebra ? 'celebra' : ''}`} viewBox="-100 -100 200 200" aria-hidden="true" key="marco">
+      <defs>
+        <linearGradient id={`${idBase}-brillo`} x1="0" y1="-1" x2="0" y2="1" gradientUnits="objectBoundingBox">
+          <stop offset="0%" stopColor="#FFFFFF" stopOpacity="0.30"/>
+          <stop offset="45%" stopColor="#FFFFFF" stopOpacity="0.04"/>
+          <stop offset="100%" stopColor="#FFFFFF" stopOpacity="0"/>
+        </linearGradient>
+        <radialGradient id={`${idBase}-hondo`} cx="0" cy="0" r={RULETA_R} gradientUnits="userSpaceOnUse">
+          <stop offset="72%" stopColor="#000000" stopOpacity="0"/>
+          <stop offset="100%" stopColor="#000000" stopOpacity="0.18"/>
+        </radialGradient>
+      </defs>
+      {n >= 1 && <circle r={RULETA_R} fill={`url(#${idBase}-hondo)`}/>}
+      {n >= 1 && <ellipse cx="0" cy={-RULETA_R * 0.42} rx={RULETA_R * 0.78} ry={RULETA_R * 0.5} fill={`url(#${idBase}-brillo)`}/>}
+      <circle r={(RULETA_R + 99) / 2} className="ruleta-aro" strokeWidth={99 - RULETA_R}/>
+      <circle r="99.2" className="ruleta-aro-borde"/>
+      <circle r={RULETA_R} className="ruleta-aro-dentro"/>
+      {Array.from({ length: 24 }, (_, i) => {
+        const [x, y] = ruletaPunto(i * 15, (RULETA_R + 99) / 2);
+        return <circle key={'l' + i} cx={x} cy={y} r="2.5" className="ruleta-luz" style={{ '--luz': i }}/>;
+      })}
+    </svg>
+  );
+  // La flecha: una gota roja con su borde de tinta y su sombra dura, clavada
+  // en el aro por un tornillo.
+  const flecha = (
+    <div className="ruleta-flecha" ref={flechaRef} key="flecha">
+      <svg viewBox="0 0 40 52" aria-hidden="true">
+        <path d="M22.5 52.5 L8.5 26.5 A16 16 0 1 1 36.5 26.5 Z" className="ruleta-flecha-sombra"/>
+        <path d="M20 50 L6 24 A16 16 0 1 1 34 24 Z" className="ruleta-flecha-cuerpo"/>
+        <circle cx="20" cy="17" r="5" className="ruleta-flecha-tornillo"/>
+      </svg>
+    </div>
+  );
+
   // ── Sin ningún elemento ──
   if (n === 0) {
+    const fuera = elementos.length;
     return (
       <div className="ruleta cero">
         <div className="ruleta-rueda-caja">
           <div className="ruleta-vacia" key="vacia">
             <div className="ruleta-vacia-texto">
-              {window.t('Añade al menos dos elementos para girar la ruleta.', 'Add at least two items to spin the wheel.')}
+              {fuera
+                ? window.t('Han salido todos. Vuelve a meterlos desde la barra.', 'They have all come out. Put them back from the bar.')
+                : window.t('Añade al menos dos elementos para girar la ruleta.', 'Add at least two items to spin the wheel.')}
             </div>
           </div>
           {anadir}
@@ -352,37 +448,39 @@ function RuletaItem({ item, lang, onUpdate }) {
   // ── La rueda ──
   const porciones = lista.map((el, i) => {
     const a0 = i * paso, a1 = (i + 1) * paso;
-    const [x0, y0] = ruletaPunto(a0, 96);
-    const [x1, y1] = ruletaPunto(a1, 96);
+    const [x0, y0] = ruletaPunto(a0, RULETA_R);
+    const [x1, y1] = ruletaPunto(a1, RULETA_R);
     const grande = a1 - a0 > 180 ? 1 : 0;
     const medio = (a0 + a1) / 2;
     const color = el.hueco ? null : (el.color || RULETA_COLORES[i % RULETA_COLORES.length]);
     // El nombre va a lo largo del radio, CENTRADO en su porción y a la misma
-    // distancia del centro en todas (RULETA_RADIO_TEXTO). Antes empezaba junto
-    // al centro en una mitad y junto al borde en la otra, y unos parecían
-    // pegados al botón y otros al borde. En la mitad que queda a la izquierda
-    // en pantalla se da la vuelta para no leerse cabeza abajo.
+    // distancia del centro en todas (RULETA_RADIO_TEXTO). En la mitad que
+    // queda a la izquierda en pantalla se da la vuelta para no leerse cabeza
+    // abajo.
     const giroTexto = medio - 90;
     const enPantalla = (((giroTexto + reposoRef.current) % 360) + 360) % 360;
     const volteado = enPantalla > 90 && enPantalla < 270;
     // Siempre negro, lo pidió así: elegirlo según lo oscuro de cada porción
-    // hacía que unos salieran blancos y otros negros, y parecía al azar.
-    const tinta = '#1A1A1A';
-    return { el, i, color, medio, tinta, volteado, giroTexto,
-      d: `M0 0 L${x0.toFixed(3)} ${y0.toFixed(3)} A96 96 0 ${grande} 1 ${x1.toFixed(3)} ${y1.toFixed(3)} Z` };
+    // hacía que unos salieran blancos y otros negros, y parecía al azar. En
+    // las porciones oscuras lleva un halo claro para leerse.
+    const oscura = color && ruletaBrillo(color) < 0.42;
+    // La que ha salido se adelanta un poco hacia fuera, como si saliera.
+    const [sx, sy] = ruletaPunto(medio, 3.2);
+    return { el, i, color, medio, volteado, giroTexto, oscura, sx, sy,
+      d: `M0 0 L${x0.toFixed(3)} ${y0.toFixed(3)} A${RULETA_R} ${RULETA_R} 0 ${grande} 1 ${x1.toFixed(3)} ${y1.toFixed(3)} Z` };
   });
   const maxLetras = m <= 4 ? 16 : m <= 8 ? 12 : 9;
   // La letra de cada porción no puede ser más alta que lo que mide la porción
-  // de ancho donde empieza el texto (a unos 38 del centro, con el texto
-  // centrado a 61): con 60 elementos se montaban unos encima de otros. Hasta
-  // 24 se queda en su tamaño de siempre.
-  const letraPorcion = Math.min(8.5, Math.max(3, (2 * Math.PI * 38 / Math.max(1, m)) * 0.9));
+  // de ancho donde empieza el texto (a unos 34 del centro): con 60 elementos
+  // se montaban unos encima de otros. Hasta 24 se queda en su tamaño.
+  const letraPorcion = Math.min(8, Math.max(3, (2 * Math.PI * 34 / Math.max(1, m)) * 0.9));
   const conFotos = lista.some(el => el.imagen && !el.hueco);
+  const hayElegido = !!(elegido && !girando);
 
   return (
-    <div className={`ruleta ${n === 1 ? 'uno' : ''} ${girando ? 'girando' : ''} ${elegido && !girando ? 'con-elegido' : ''}`}>
+    <div className={`ruleta ${n === 1 ? 'uno' : ''} ${girando ? 'girando' : ''} ${hayElegido ? 'con-elegido' : ''}`}>
       <div className="ruleta-rueda-caja">
-        <div className="ruleta-flecha" ref={flechaRef} key="flecha"/>
+        {fondo}
         <svg
           key="rueda"
           ref={ruedaRef}
@@ -390,16 +488,10 @@ function RuletaItem({ item, lang, onUpdate }) {
           viewBox="-100 -100 200 200"
           style={{
             transform: `rotate(${giro}deg)`,
-            transition: girando ? `transform ${RULETA_DURACION}ms cubic-bezier(0.12, 0.72, 0.1, 1)` : 'none',
+            transition: girando ? `transform ${RULETA_DURACIONES[item.duracion] || RULETA_DURACIONES.normal}ms cubic-bezier(0.12, 0.72, 0.1, 1)` : 'none',
           }}
         >
           <defs>
-            {porciones.filter(p => p.color).map(p => (
-              <radialGradient key={p.el.id} id={`${idBase}-${p.i}`} cx="0" cy="0" r="96" gradientUnits="userSpaceOnUse">
-                <stop offset="0%" stopColor={ruletaAclara(p.color, 0.62)}/>
-                <stop offset="100%" stopColor={p.color}/>
-              </radialGradient>
-            ))}
             {/* Las fotos: cada una recortada a su porción, y un desvanecido
                 común que las deja enteras en el borde (lo más ancho, donde
                 más lucen) y las borra hacia el centro, donde va el nombre. */}
@@ -407,7 +499,7 @@ function RuletaItem({ item, lang, onUpdate }) {
               <clipPath key={'c' + p.el.id} id={`${idBase}-recorte-${p.i}`}><path d={p.d}/></clipPath>
             ))}
             {conFotos && (
-              <radialGradient id={`${idBase}-desvanece`} cx="0" cy="0" r="96" gradientUnits="userSpaceOnUse">
+              <radialGradient id={`${idBase}-desvanece`} cx="0" cy="0" r={RULETA_R} gradientUnits="userSpaceOnUse">
                 <stop offset="0%" stopColor="#FFFFFF" stopOpacity="0"/>
                 <stop offset="32%" stopColor="#FFFFFF" stopOpacity="0.08"/>
                 <stop offset="100%" stopColor="#FFFFFF" stopOpacity="1"/>
@@ -419,63 +511,68 @@ function RuletaItem({ item, lang, onUpdate }) {
               </mask>
             )}
           </defs>
-          <circle r="99" className="ruleta-borde"/>
-          {porciones.map(p => (
-            <path
-              key={p.el.id}
-              d={p.d}
-              fill={p.color ? `url(#${idBase}-${p.i})` : undefined}
-              className={`ruleta-porcion ${p.el.hueco ? 'fantasma' : ''} ${p.el.id === recien ? 'nueva' : ''} ${elegido && !girando && p.el.id !== elegido.id ? 'apagada' : ''}`}
-              onAnimationEnd={p.el.id === recien ? () => setRecien(null) : undefined}
-            />
-          ))}
+          {porciones.map(p => {
+            const sale = hayElegido && p.el.id === elegido.id;
+            return (
+              <path
+                key={p.el.id}
+                d={p.d}
+                fill={p.color || undefined}
+                className={`ruleta-porcion ${p.el.hueco ? 'fantasma' : ''} ${p.el.id === recien ? 'nueva' : ''} ${hayElegido && !sale ? 'apagada' : ''} ${sale ? 'sale' : ''}`}
+                style={sale ? { transform: `translate(${p.sx}px, ${p.sy}px)` } : undefined}
+                onAnimationEnd={p.el.id === recien ? () => setRecien(null) : undefined}
+              />
+            );
+          })}
           {/* Encima de su color: la foto, girada para que mire hacia fuera y
               tapando su porción sin deformarse (como object-fit: cover). */}
           {conFotos && (
             <g mask={`url(#${idBase}-mascara)`} className="ruleta-fotos">
               {porciones.filter(p => p.el.imagen && !p.el.hueco).map(p => {
-                const ancho = Math.min(192, 2 * 96 * Math.sin(Math.min(paso, 180) / 2 * Math.PI / 180)) + 4;
+                const ancho = Math.min(RULETA_R * 2, 2 * RULETA_R * Math.sin(Math.min(paso, 180) / 2 * Math.PI / 180)) + 4;
                 return (
                   <g key={'f' + p.el.id} clipPath={`url(#${idBase}-recorte-${p.i})`}
-                    style={{ opacity: elegido && !girando && p.el.id !== elegido.id ? 0.45 : 1 }}>
-                    <image href={p.el.imagen} x={-ancho / 2} y={-98} width={ancho} height={98}
+                    style={{ opacity: hayElegido && p.el.id !== elegido.id ? 0.35 : 1 }}>
+                    <image href={p.el.imagen} x={-ancho / 2} y={-RULETA_R - 2} width={ancho} height={RULETA_R + 2}
                       preserveAspectRatio="xMidYMid slice" transform={`rotate(${p.medio})`}/>
                   </g>
                 );
               })}
             </g>
           )}
-          {/* Con fotos, una raya blanca entre porciones: si no, las fotos de al
-              lado se mezclan unas con otras. */}
-          {conFotos && n >= 2 && lista.map((el, i) => {
-            const [x, y] = ruletaPunto(i * paso, 96);
-            return <line key={'s' + el.id} x1="0" y1="0" x2={x} y2={y} className="ruleta-raya"/>;
+          {/* Las rayas de tinta entre porciones, desde el botón hasta el aro. */}
+          {n >= 2 && lista.map((el, i) => {
+            const [x0, y0] = ruletaPunto(i * paso, 15);
+            const [x, y] = ruletaPunto(i * paso, RULETA_R);
+            return <line key={'s' + el.id} x1={x0} y1={y0} x2={x} y2={y} className={`ruleta-raya ${conFotos ? 'con-fotos' : ''}`}/>;
+          })}
+          {/* Las tachuelas, una en cada raya junto al aro: son las que golpean
+              la flecha (y las que suenan). Con muchas porciones se quitan. */}
+          {n >= 2 && m <= 40 && lista.map((el, i) => {
+            const [x, y] = ruletaPunto(i * paso, RULETA_R - 4.5);
+            return <circle key={'t' + el.id} cx={x} cy={y} r={m > 20 ? 1.4 : 2.1} className="ruleta-tachuela"/>;
           })}
           {porciones.map(p => (
             <text
-              key={'t' + p.el.id}
-              className={`ruleta-texto ${p.el.hueco ? 'fantasma' : ''} ${p.el.imagen ? 'con-foto' : ''}`}
-              fill={p.el.hueco ? undefined : p.tinta}
+              key={'n' + p.el.id}
+              className={`ruleta-texto ${p.el.hueco ? 'fantasma' : ''} ${(p.el.imagen || p.oscura) ? 'con-halo' : ''}`}
               textAnchor="middle"
               dominantBaseline="central"
               style={{
-                opacity: elegido && !girando && p.el.id !== elegido.id ? 0.45 : 1,
+                opacity: hayElegido && p.el.id !== elegido.id ? 0.35 : 1,
                 // Con transform de CSS y no el atributo, para que al parar los
                 // que quedan cabeza abajo se den la vuelta girando en su sitio
                 // (y al añadir una porción, los demás se deslicen a la suya).
                 transform: `rotate(${p.giroTexto}deg) translateX(${RULETA_RADIO_TEXTO}px) rotate(${p.volteado ? 180 : 0}deg)`,
-                fontSize: letraPorcion < 8.5 ? letraPorcion + 'px' : undefined,
+                fontSize: letraPorcion < 8 ? letraPorcion + 'px' : undefined,
               }}
             >
               {p.el.texto.length > maxLetras ? p.el.texto.slice(0, maxLetras - 1) + '…' : p.el.texto}
             </text>
           ))}
-          {/* Las luces del borde, como en una ruleta de feria. */}
-          {Array.from({ length: 24 }, (_, i) => {
-            const [x, y] = ruletaPunto(i * 15, 97.5);
-            return <circle key={'l' + i} cx={x} cy={y} r="1.6" className="ruleta-luz"/>;
-          })}
         </svg>
+        {marco}
+        {flecha}
         <button
           key="centro"
           className={`ruleta-centro ${n < 2 ? 'espera' : ''}`}
@@ -484,17 +581,36 @@ function RuletaItem({ item, lang, onUpdate }) {
           onClick={(e) => { e.stopPropagation(); gira(); }}
           title={n < 2 ? window.t('Falta uno más para poder girar', 'One more to be able to spin') : window.t('Girar la ruleta', 'Spin the wheel')}
         >
-          {girando ? '' : window.t('Girar', 'Spin')}
+          {girando ? <span className="material-symbols-rounded ruleta-centro-gira">cached</span> : window.t('Girar', 'Spin')}
         </button>
-        {elegido && !girando && (
-          <div className={'ruleta-premio' + (elegido.texto.length > 22 ? ' largo' : '')} key={elegido.id + String(item.giro)} style={{ '--ev': elegido.color }}>
-            {elegido.texto}
+        {hayElegido && (
+          <div className={'ruleta-premio' + (elegido.texto.length > 22 ? ' largo' : '')} key={elegido.id + String(item.giro)}>
+            <span className="ruleta-premio-eti">{window.t('Ha salido', 'The wheel says')}</span>
+            <span className="ruleta-premio-nombre">
+              <i className="ruleta-premio-color" style={{ background: elegido.color }}/>
+              <span>{elegido.texto}</span>
+            </span>
+            {n > 2 && (
+              <button className="ruleta-premio-quitar" onMouseDown={(e) => e.stopPropagation()} onClick={quitaElegido}
+                title={window.t('Quitarlo de la rueda (se puede volver a meter desde la barra)', 'Take it off the wheel (it can be put back from the bar)')}>
+                {window.t('Quitar', 'Remove')}
+              </button>
+            )}
           </div>
         )}
         {anadir}
       </div>
     </div>
   );
+}
+
+// Lo claro que es un color (0 negro, 1 blanco), para saber si el nombre
+// negro necesita halo encima.
+function ruletaBrillo(hex) {
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex || '');
+  if (!m) return 1;
+  const v = parseInt(m[1], 16);
+  return (0.299 * (v >> 16) + 0.587 * ((v >> 8) & 255) + 0.114 * (v & 255)) / 255;
 }
 
 window.RuletaItem = RuletaItem;

@@ -1981,19 +1981,33 @@ body.odi-busy iframe { pointer-events: none !important; }
   width: min(100cqw, 100cqh); height: min(100cqw, 100cqh);
   container-type: inline-size;
 }
+/* Lo que no gira (Ruleta.jsx): debajo la sombra dura y la base; encima el aro
+   con las luces y el brillo. Entre los dos, la rueda, que es lo único que da
+   vueltas. Tinta y sombra dura, como las tarjetas de toda la aplicación: la
+   de antes, con una sombra borrosa y degradados, al usuario le parecía «muy
+   simple». */
+.ruleta-fondo, .ruleta-marco {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  pointer-events: none; overflow: visible;
+}
+.ruleta-fondo { z-index: 0; }
+.ruleta-marco { z-index: 2; }
+.ruleta-sombra { fill: var(--line); }
+.ruleta-base { fill: var(--paper); }
 .ruleta-rueda {
+  position: relative; z-index: 1;
   width: 100%; height: 100%;
   display: block;
   border-radius: 50%;
-  filter: drop-shadow(0 6px 14px rgba(0,0,0,0.22));
   will-change: transform;
 }
-.ruleta-borde { fill: var(--paper); stroke: var(--line); stroke-width: 2.5; }
-.ruleta-porcion { stroke: rgba(255,255,255,0.75); stroke-width: 0.8; transition: opacity 300ms; }
-.ruleta-porcion.apagada { opacity: 0.42; }
+.ruleta-porcion { stroke: none; transition: opacity 300ms, transform 460ms var(--muelle); }
+.ruleta-porcion.apagada { opacity: 0.38; }
+/* La que ha salido se adelanta hacia fuera y lleva un filo claro. */
+.ruleta-porcion.sale { stroke: #FFFFFF; stroke-width: 1.5; stroke-linejoin: round; }
 /* La porción que se acaba de añadir entra desde el centro con rebote: es la
    respuesta a haber escrito algo. El centro de la rueda es el 0 0 del dibujo. */
-.ruleta-porcion.nueva { transform-origin: 0 0; animation: ruleta-porcion-entra 560ms var(--muelle) both; }
+.ruleta-porcion.nueva { transform-origin: 0 0; animation: ruleta-porcion-entra 560ms var(--muelle) backwards; }
 @keyframes ruleta-porcion-entra { from { transform: scale(0.35); opacity: 0.2; } to { transform: scale(1); opacity: 1; } }
 /* El hueco del segundo elemento cuando solo hay uno: sin color, con borde de
    puntos, y con lo que se va escribiendo dentro según se teclea. */
@@ -2001,76 +2015,118 @@ body.odi-busy iframe { pointer-events: none !important; }
 /* Su transform va en CSS (ver Ruleta.jsx) para que la vuelta de los que quedan
    cabeza abajo al parar se vea girar en su sitio. El origen, el centro de la
    rueda, como el atributo transform de siempre. */
-.ruleta-texto { font-family: var(--font-display); font-weight: 800; font-size: 8.5px; letter-spacing: -0.01em; pointer-events: none; transform-box: view-box; transform-origin: 0 0; transition: opacity 300ms, transform 520ms var(--muelle); }
+.ruleta-texto { fill: #1A1A1A; font-family: var(--font-display); font-weight: 800; font-size: 8px; letter-spacing: -0.01em; pointer-events: none; transform-box: view-box; transform-origin: 0 0; transition: opacity 300ms, transform 520ms var(--muelle); }
 .ruleta-texto.fantasma { fill: var(--ink-3); }
-/* Sobre una foto, el nombre negro lleva un halo claro para leerse. */
-.ruleta-texto.con-foto { paint-order: stroke; stroke: rgba(255,255,255,0.92); stroke-width: 2.4px; stroke-linejoin: round; }
-.ruleta-raya { stroke: #FFFFFF; stroke-width: 1.6; stroke-linecap: round; pointer-events: none; }
+/* Sobre una foto o un color oscuro, el nombre negro lleva un halo claro. */
+.ruleta-texto.con-halo { paint-order: stroke; stroke: rgba(255,255,255,0.92); stroke-width: 2.4px; stroke-linejoin: round; }
+/* Las rayas entre porciones: tinta fina; con fotos, blancas y más gruesas
+   para que no se mezclen las de al lado. */
+.ruleta-raya { stroke: rgba(26,26,26,0.55); stroke-width: 0.8; stroke-linecap: round; pointer-events: none; }
+.ruleta-raya.con-fotos { stroke: #FFFFFF; stroke-width: 1.6; }
 .ruleta-fotos { pointer-events: none; }
-/* El botón de la foto en la lista de elementos: con foto, la enseña. */
-.ruleta-fila-foto {
-  width: 26px; height: 26px; flex-shrink: 0; display: grid; place-items: center;
-  border: 1.5px dashed var(--line-soft); border-radius: 6px;
-  color: var(--ink-3); cursor: pointer;
-  background-size: cover; background-position: center;
+/* Las tachuelas: una por raya, junto al aro. */
+.ruleta-tachuela { fill: #FFF8E6; stroke: #1E1A1D; stroke-width: 0.7; }
+/* El aro de las luces, oscuro en los dos temas: si fuera del color del
+   papel, las bombillas no se verían encendidas. */
+.ruleta-aro { fill: none; stroke: #2A2629; }
+.ruleta-aro-borde { fill: none; stroke: var(--line); stroke-width: 1.6; }
+.ruleta-aro-dentro { fill: none; stroke: #1E1A1D; stroke-width: 1.2; }
+/* Las bombillas: medio encendidas en reposo; al girar, una ola que corre
+   alrededor; al salir el premio, todas parpadean un momento. */
+.ruleta-luz { fill: #F3D98B; stroke: rgba(0,0,0,0.4); stroke-width: 0.5; }
+.ruleta-luz:nth-of-type(odd) { fill: #FFF4CC; }
+.ruleta.girando .ruleta-luz { animation: ruleta-luz-corre 720ms linear infinite; animation-delay: calc(var(--luz) * -30ms); }
+.ruleta-marco.celebra .ruleta-luz { animation: ruleta-luz-premio 300ms steps(2, jump-none) 6; }
+@keyframes ruleta-luz-corre {
+  0%, 70% { fill: #8C7A4C; }
+  80% { fill: #FFF7D6; }
+  100% { fill: #F7DA84; }
 }
-.ruleta-fila-foto:hover { border-color: var(--line); color: var(--ink); }
-.ruleta-fila-foto.con-foto { border-style: solid; border-color: var(--line); }
-.ruleta-fila-foto .material-symbols-rounded { font-size: 16px; }
-.ruleta-luz { fill: #FFF6D8; stroke: rgba(0,0,0,0.12); stroke-width: 0.4; }
-.ruleta.girando .ruleta-luz { animation: ruleta-luces 380ms steps(2, jump-none) infinite; }
-.ruleta.girando .ruleta-luz:nth-child(odd) { animation-delay: 190ms; }
-@keyframes ruleta-luces { from { fill: #FFF6D8; } to { fill: #F7DA84; } }
-/* La flecha de arriba, roja como el resto de lo que señala en la aplicación.
-   No tiembla sin parar: se mueve cuando la golpea una porción (golpeFlecha en
-   Ruleta.jsx), así que al frenar la rueda los golpes se espacian y la flecha
-   se va quedando quieta, como en una de verdad. */
+@keyframes ruleta-luz-premio { from { fill: #FFFFFF; } to { fill: #E6544F; } }
+/* La flecha: una gota roja con borde de tinta y sombra dura, clavada en el
+   aro por su tornillo. No tiembla sin parar: se mueve cuando la golpea una
+   tachuela (golpeFlecha en Ruleta.jsx), así que al frenar la rueda los golpes
+   se espacian y se va quedando quieta, como en una de verdad. Gira sobre el
+   tornillo. */
 .ruleta-flecha {
-  position: absolute; left: 50%; top: -3%; z-index: 3;
-  width: 9%; aspect-ratio: 0.8;
+  position: absolute; left: 50%; top: -6%; z-index: 3;
+  width: 12.5%; aspect-ratio: 40 / 52;
   transform: translateX(-50%);
-  transform-origin: 50% 0;
-  background: #E6544F;
-  clip-path: polygon(0 0, 100% 0, 50% 100%);
-  filter: drop-shadow(0 2px 2px rgba(0,0,0,0.3));
+  transform-origin: 50% 33%;
+  pointer-events: none;
 }
+.ruleta-flecha svg { width: 100%; height: 100%; display: block; overflow: visible; }
+.ruleta-flecha-sombra { fill: var(--line); }
+.ruleta-flecha-cuerpo { fill: #E6544F; stroke: #1E1A1D; stroke-width: 2.4; stroke-linejoin: round; }
+.ruleta-flecha-tornillo { fill: #FAF9F6; stroke: #1E1A1D; stroke-width: 2.2; }
+/* El botón del centro: como cualquier botón de la aplicación, con su sombra
+   dura; se levanta al pasar el ratón y se hunde al pulsarlo. */
 .ruleta-centro {
   position: absolute; left: 50%; top: 50%; z-index: 3;
-  width: 26%; aspect-ratio: 1;
+  width: 27%; aspect-ratio: 1;
+  display: grid; place-items: center;
   transform: translate(-50%, -50%);
   border-radius: 50%;
   background: var(--paper); color: var(--ink);
-  border: 0.8cqw solid var(--line);
-  box-shadow: 0 1cqw 3cqw rgba(0,0,0,0.25);
-  font-family: var(--font-display); font-weight: 800; font-size: 5.2cqw;
+  border: 0.9cqw solid #1E1A1D;
+  box-shadow: 1cqw 1.2cqw 0 var(--line);
+  font-family: var(--font-display); font-weight: 800; font-size: 5.4cqw;
   cursor: pointer;
-  transition: transform 260ms var(--muelle), background 150ms, opacity 300ms;
+  transition: transform 260ms var(--muelle), background 150ms, box-shadow 150ms, opacity 300ms;
 }
-.ruleta-centro:hover:not(:disabled) { transform: translate(-50%, -50%) scale(1.08); background: #90B968; color: #1A1A1A; }
-.ruleta-centro:active:not(:disabled) { transform: translate(-50%, -50%) scale(0.95); }
+.ruleta-centro:hover:not(:disabled) { transform: translate(-50%, -50%) translate(-0.4cqw, -0.5cqw); box-shadow: 1.5cqw 1.8cqw 0 var(--line); background: #90B968; color: #1A1A1A; }
+.ruleta-centro:active:not(:disabled) { transform: translate(-50%, -50%) translate(0.7cqw, 0.9cqw); box-shadow: 0 0 0 var(--line); }
 .ruleta-centro:disabled { cursor: default; }
+.ruleta-centro-gira { font-size: 8cqw; display: inline-flex; animation: ruleta-gira-icono 700ms linear infinite; }
+@keyframes ruleta-gira-icono { to { transform: rotate(360deg); } }
 /* Con un solo elemento el botón ya está, pero apagado: dice qué viene después. */
 .ruleta-centro.espera { color: var(--ink-3); }
-/* El elegido: salta en medio con rebote y se queda, del color de su porción. */
+/* El cartel del que ha salido: una tarjeta de la aplicación (tinta y sombra
+   dura) con su etiqueta verde encima, el color de su porción y el botón de
+   quitarlo de la rueda. Abajo, lejos de la flecha, que es donde está él. */
 .ruleta-premio {
-  position: absolute; left: 50%; bottom: 7%; z-index: 4;
-  max-width: 84%;
-  padding: 0.45em 1em;
-  border-radius: 999px;
+  position: absolute; left: 50%; bottom: 3%; z-index: 4;
+  max-width: 88%;
+  display: flex; align-items: center; gap: 2cqw;
+  padding: 2cqw 2cqw 1.8cqw 2.8cqw;
+  border-radius: 3cqw;
   background: var(--paper); color: var(--ink);
-  border: 0.6cqw solid var(--ev, var(--line));
-  box-shadow: 0 1.8cqw 5.5cqw rgba(0,0,0,0.25);
-  font-family: var(--font-display); font-weight: 800; font-size: 6cqw;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  border: 0.7cqw solid #1E1A1D;
+  box-shadow: 1.2cqw 1.4cqw 0 var(--line);
   transform: translateX(-50%);
-  animation: ruleta-premio 620ms var(--muelle) both;
+  animation: ruleta-premio 620ms var(--muelle) backwards;
 }
+.ruleta-premio-eti {
+  position: absolute; top: -2.9cqw; left: 2.8cqw;
+  padding: 0.3cqw 1.5cqw;
+  border-radius: 1.6cqw;
+  background: #90B968; color: #1A1A1A;
+  border: 0.5cqw solid #1E1A1D;
+  font-size: 2.6cqw; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase;
+  white-space: nowrap;
+}
+.ruleta-premio-nombre {
+  display: flex; align-items: center; gap: 1.6cqw; min-width: 0;
+  font-family: var(--font-display); font-weight: 800; font-size: 6cqw; line-height: 1.15;
+}
+.ruleta-premio-nombre > span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ruleta-premio-color { width: 3.6cqw; height: 3.6cqw; flex-shrink: 0; border-radius: 50%; border: 0.5cqw solid #1E1A1D; }
+.ruleta-premio-quitar {
+  flex-shrink: 0;
+  padding: 0.8cqw 1.8cqw;
+  border-radius: 2cqw;
+  border: 0.5cqw solid #1E1A1D;
+  background: var(--paper-2); color: var(--ink);
+  font-size: 3cqw; font-weight: 700; cursor: pointer;
+  transition: background 150ms, color 150ms;
+}
+.ruleta-premio-quitar:hover { background: #E6544F; color: #FFFFFF; }
 /* Un premio largo se parte en dos líneas y con la letra más pequeña: en una
    sola, «Elemento con nombre largo 41» se cortaba justo en lo que lo distingue. */
-.ruleta-premio.largo {
-  white-space: normal; text-align: center; line-height: 1.15;
-  font-size: 4.4cqw; border-radius: 1.2em; width: max-content;
-  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3;
+.ruleta-premio.largo .ruleta-premio-nombre { font-size: 4.4cqw; }
+.ruleta-premio.largo .ruleta-premio-nombre > span {
+  white-space: normal;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2;
 }
 /* El confeti del final (ruletaConfeti en Ruleta.jsx): el doble de la rueda
    y centrado en ella, para que los triángulos puedan salir fuera. */
@@ -2082,6 +2138,16 @@ body.odi-busy iframe { pointer-events: none !important; }
   from { opacity: 0; transform: translateX(-50%) translateY(14px) scale(0.6); }
   to   { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
 }
+/* El botón de la foto en la lista de elementos: con foto, la enseña. */
+.ruleta-fila-foto {
+  width: 26px; height: 26px; flex-shrink: 0; display: grid; place-items: center;
+  border: 1.5px dashed var(--line-soft); border-radius: 6px;
+  color: var(--ink-3); cursor: pointer;
+  background-size: cover; background-position: center;
+}
+.ruleta-fila-foto:hover { border-color: var(--line); color: var(--ink); }
+.ruleta-fila-foto.con-foto { border-style: solid; border-color: var(--line); }
+.ruleta-fila-foto .material-symbols-rounded { font-size: 16px; }
 /* Vacía: un círculo en blanco que dice lo que falta, como el de la captura.
    Deja sitio abajo para el botón o el campo, que van sueltos (ver
    .ruleta-anadir) para no rehacerse al pasar de cero elementos a uno. */
@@ -2138,6 +2204,37 @@ body.odi-busy iframe { pointer-events: none !important; }
 .ruleta-fila-quitar { width: 26px; height: 26px; flex-shrink: 0; display: grid; place-items: center; border-radius: 2px; color: var(--ink-3); cursor: pointer; }
 .ruleta-fila-quitar:hover { background: color-mix(in srgb, var(--wine) 14%, transparent); color: var(--wine); }
 .ruleta-fila-quitar .material-symbols-rounded { font-size: 16px; }
+.ruleta-fila-quitar.volver:hover { background: color-mix(in srgb, var(--olive) 22%, transparent); color: var(--ink); }
+/* Un elemento que ya salió (con «Quitar al que sale» o el botón del cartel):
+   sigue en la lista, en gris, para poder volver a meterlo. */
+.ruleta-fila.fuera .ruleta-fila-texto { opacity: 0.5; text-decoration: line-through; }
+.ruleta-fila.fuera .ruleta-fila-color, .ruleta-fila.fuera .ruleta-fila-foto { opacity: 0.4; }
+.ruleta-acciones { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.ruleta-accion {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 5px 10px; border-radius: 8px;
+  border: 1.5px solid var(--line); background: var(--paper); color: var(--ink);
+  font-size: 12px; font-weight: 600; cursor: pointer; box-shadow: var(--pop-sm);
+}
+.ruleta-accion:hover { background: var(--paper-2); }
+.ruleta-accion .material-symbols-rounded { font-size: 15px; }
+.ruleta-duraciones { display: flex; gap: 6px; }
+.ruleta-duracion {
+  flex: 1; padding: 6px 8px; border-radius: 8px;
+  border: 1.5px solid var(--line); background: var(--paper); color: var(--ink);
+  font-size: 12px; font-weight: 700; cursor: pointer;
+}
+.ruleta-duracion.activa { background: #90B968; color: #1A1A1A; box-shadow: var(--pop-sm); }
+.ruleta-interruptor { display: flex; gap: 8px; align-items: flex-start; cursor: pointer; }
+.ruleta-interruptor input { margin-top: 3px; accent-color: #90B968; }
+.ruleta-interruptor span { display: flex; flex-direction: column; gap: 2px; font-size: 13px; }
+.ruleta-interruptor small { color: var(--ink-3); font-size: 11.5px; line-height: 1.35; }
+.ruleta-historial { display: flex; flex-direction: column; gap: 4px; max-height: 200px; overflow-y: auto; margin-bottom: 8px; }
+.ruleta-historial-fila { display: flex; align-items: center; gap: 7px; font-size: 13px; }
+.ruleta-historial-fila i { width: 12px; height: 12px; flex-shrink: 0; border-radius: 50%; border: 1.5px solid var(--line); }
+.ruleta-historial-fila span { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ruleta-historial-fila small { color: var(--ink-3); font-size: 11px; font-variant-numeric: tabular-nums; }
+.ruleta-historial-vacio { color: var(--ink-3); font-size: 12.5px; margin-bottom: 4px; }
 
 /* ── Galería ──
    Una tarjeta como las demás (borde, sombra dura, esquinas casi rectas) con
@@ -8135,6 +8232,8 @@ html[data-mobile="1"] .code-run .material-symbols-rounded { font-size: max(16px,
   .modal, .doc-modal-window, .context-menu, .ctx-side, .ctx-popout,
   .item.new-item .item-card, .panel-color, .plantillas-panel, .code-terminal { animation-duration: 1ms !important; }
   .press, .icon-btn, .tool, .ms-project-card, .ms-recent-card, .lift { transition-duration: 1ms !important; }
+  /* La ruleta gira igual (es lo que hace), pero sin luces corriendo ni parpadeos. */
+  .ruleta .ruleta-luz, .ruleta-centro-gira, .ruleta-premio { animation: none !important; }
 }
 
 
