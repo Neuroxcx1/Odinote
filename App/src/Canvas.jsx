@@ -3043,8 +3043,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
       const rh = Math.abs(p.y - startPt.y);
       // Tocar un nodo de un grupo con el recuadro coge el grupo entero.
       const hits = conGrupos(current.items.filter(it => {
-        const ix = it.x, iy = it.y, iw = it.w;
-        const ih = it.type === 'frame' ? 36 : it.h;
+        const { x: ix, y: iy, w: iw, h: ih } = cajaVisible(it);
         // intersection test (any overlap counts)
         return !(ix + iw < rx || ix > rx + rw || iy + ih < ry || iy > ry + rh);
       }).map(it => it.id));
@@ -3141,6 +3140,18 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
   // cualquiera coge el grupo entero (ver startDragItem). Un nodo bloqueado
   // (bloqueado: true) se puede elegir —para desbloquearlo— pero no se mueve,
   // no se estira, no se gira ni se borra: el candado que pidió quien probó.
+  // La caja que ocupa un nodo en pantalla, contando su giro: el recuadro de
+  // selección medía la caja sin girar, y un nodo torcido no se cogía por la
+  // esquina que asoma.
+  const cajaVisible = (it) => {
+    const w = it.w !== undefined ? it.w : defaultDims(it.type).w;
+    const h = it.type === 'frame' ? 36 : (it.h !== undefined ? it.h : defaultDims(it.type).h);
+    if (!it.rot) return { x: it.x, y: it.y, w, h };
+    const a = it.rot * Math.PI / 180, cs = Math.abs(Math.cos(a)), sn = Math.abs(Math.sin(a));
+    const W = w * cs + h * sn, H = w * sn + h * cs;
+    const cx = it.x + w / 2, cy = it.y + h / 2;
+    return { x: cx - W / 2, y: cy - H / 2, w: W, h: H };
+  };
   const conGrupos = (ids) => {
     const items = current.items || [];
     const grupos = new Set(items.filter(it => ids.includes(it.id) && it.grupo).map(it => it.grupo));
@@ -3250,7 +3261,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
         const rw = Math.abs(p.x - startPt.x);
         const rh = Math.abs(p.y - startPt.y);
         const hits = conGrupos(current.items.filter(it => {
-          const ix = it.x, iy = it.y, iw = it.w, ih = it.h;
+          const { x: ix, y: iy, w: iw, h: ih } = cajaVisible(it);
           return !(ix + iw < rx || ix > rx + rw || iy + ih < ry || iy > ry + rh);
         }).map(it => it.id));
 

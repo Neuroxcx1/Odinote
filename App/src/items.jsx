@@ -1811,7 +1811,15 @@ function ColumnItem({ item, lang, onUpdate, editing, callbacks }) {
                 data-col-child-id={child.id}
                 data-col-parent-id={item.id}
                 data-item-id={child.id}
-                style={{ height: h, width: '100%', position: 'relative' }}
+                style={{
+                  height: h, width: '100%', position: 'relative',
+                  // El giro también dentro de una columna: el botón Girar lo
+                  // guardaba (rot) pero aquí no se pintaba. Gira en su sitio,
+                  // sobre su centro, y queda por encima de las de al lado.
+                  transform: child.rot ? `rotate(${child.rot}deg)` : undefined,
+                  transition: 'transform 320ms var(--muelle)',
+                  zIndex: child.rot ? 1 : undefined,
+                }}
                 onMouseDown={(e) => {
                   if (isEditingChild) return;
                   callbacks.startColChildDrag && callbacks.startColChildDrag(e, item.id, child.id);
