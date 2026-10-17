@@ -53,6 +53,12 @@ function TextFormatSidebar({ item, lang, onUpdate, onClose, variant }) {
   const toggleTodoStyle = (key) => applyTodoStyle({ [key]: !(activeTodoRow && activeTodoRow[key]) });
   const [active, setActive] = React.useState({});
   const [colorOpen, setColorOpen] = React.useState(false);
+  // «Listo» del panel de color: se cierra el panel que lo contiene.
+  React.useEffect(() => {
+    const cierra = () => setColorOpen(false);
+    window.addEventListener('odi-color-listo', cierra);
+    return () => window.removeEventListener('odi-color-listo', cierra);
+  }, []);
 
 
 
@@ -395,6 +401,7 @@ function TextFormatSidebar({ item, lang, onUpdate, onClose, variant }) {
               las demás pantallas va en horizontal. */}
           <div>
             <window.SelectorColor
+              entero
               valor={usaTextColor ? (item.textColor || '#1A1A1A') : ((isFrame || isMap || isCode || isTimer) ? (item.titleColor || '#1A1A1A') : '#1A1A1A')}
               onCambio={(c) => {
                 if (usaTextColor) {

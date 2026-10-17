@@ -8058,3 +8058,33 @@ body.odi-cuentagotas, body.odi-cuentagotas * { cursor: crosshair !important; }
   .item.new-item .item-card, .panel-color, .plantillas-panel, .code-terminal { animation-duration: 1ms !important; }
   .press, .icon-btn, .tool, .ms-project-card, .ms-recent-card, .lift { transition-duration: 1ms !important; }
 }
+
+
+/* ── Un solo selector: el panel grande dentro del panel lateral ── */
+.ctx-popout:has(.selector-color-caja.entero) { width: auto; }
+.panel-color.incrustado {
+  position: static; width: 440px; max-width: none;
+  padding: 0; border: none; box-shadow: none; background: transparent;
+  animation: none;
+}
+/* El historial, en su apartado. */
+.panel-color-historial { display: flex; gap: 4px; flex-wrap: wrap; min-height: 22px; align-items: center; padding: 2px; }
+/* Las casillas de las paletas se recortaban: la lista se desplaza y su borde
+   cortaba el aro de la elegida (que va por fuera de la casilla). Con un poco de
+   aire dentro, el aro cabe. */
+.panel-color-paletas { padding: 4px 4px 4px 3px; margin: -4px -4px -4px -3px; }
+.panel-color-paleta-casillas { padding: 2px 0; }
+.panel-color-paleta.fija .panel-color-nombre { font-weight: 700; color: var(--ink); }
+/* «Sin color»: blanca con una raya roja, como en cualquier programa de diseño. */
+.panel-color-casilla.sin-color {
+  background: linear-gradient(135deg, #FFFFFF 44%, #E6544F 44%, #E6544F 56%, #FFFFFF 56%);
+}
+/* El nombre de una paleta mientras se escribe, con su OK. */
+.panel-color-nombre-caja { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
+.panel-color-nombre-caja .panel-color-nombre-campo { width: 84px; }
+.panel-color-ok {
+  height: 22px; padding: 0 7px; flex-shrink: 0; cursor: pointer;
+  background: var(--olive); color: #FFFFFF; font-size: 11px; font-weight: 700;
+  border: 1.5px solid var(--line); border-radius: 4px;
+}
+.panel-color-gotero-texto { font-size: 11.5px; font-weight: 700; color: var(--ink-2); }

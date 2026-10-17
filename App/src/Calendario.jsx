@@ -436,6 +436,12 @@ function CalendarItem({ item, lang, onUpdate, editing }) {
     item.year || item.month != null ? 1 : hoy.getDate()));
   const vista = CAL_VISTAS.includes(item.vista) ? item.vista : 'mes';
   const [dayMenu, setDayMenu] = React.useState(null); // { key }
+  // «Listo» del panel de color: se cierra el panel que lo contiene.
+  React.useEffect(() => {
+    const cierra = () => setDayMenu(d => (d && d.color ? Object.assign({}, d, { color: false }) : d));
+    window.addEventListener('odi-color-listo', cierra);
+    return () => window.removeEventListener('odi-color-listo', cierra);
+  }, []);
   const [editor, setEditor] = React.useState(null);   // { origen, id, ocurrencia, nuevo }
   const [selector, setSelector] = React.useState(null); // el año que enseña el selector, o null
   const [menuVista, setMenuVista] = React.useState(false);
@@ -1302,6 +1308,7 @@ function CalendarItem({ item, lang, onUpdate, editing }) {
                     <div className="ctx-pop-title">{window.t('Color del día', 'Day colour')}</div>
                     {window.SelectorColor && (
                       <window.SelectorColor
+                        entero
                         valor={dayColors[k] || null}
                         onCambio={(c) => setDayColor(k, c)}
                         colores={CAL_COLORES_DIA}

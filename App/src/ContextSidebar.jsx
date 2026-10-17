@@ -250,6 +250,12 @@ function ContextSidebar({
   onClose, isColChild, onStartEdit, callbacks, editando,
 }) {
   const [pane, setPane] = React.useState(null); // 'color' | 'emoji' | 'comments' | 'rename' | null
+  // «Listo» del panel de color: se cierra el panel que lo contiene.
+  React.useEffect(() => {
+    const cierra = () => setPane(null);
+    window.addEventListener('odi-color-listo', cierra);
+    return () => window.removeEventListener('odi-color-listo', cierra);
+  }, []);
   // En la ruleta, el elemento cuyo selector de color está abierto.
   const [colorRuleta, setColorRuleta] = React.useState(null);
   const [focusedRowVersion, setFocusedRowVersion] = React.useState(0);
@@ -1911,6 +1917,7 @@ function ContextSidebar({
                 comparar, y comparar cuesta mas que elegir. Los cuatro cubren lo
                 de siempre y el resto esta en la ultima casilla. */}
             <window.SelectorColor
+              entero
               valor={item.color === 'transparent' ? 'transparent' : (window.resolveStickyColor ? window.resolveStickyColor(item.color || 'white') : item.color)}
               onCambio={(c) => onUpdate({ color: c })}
               colores={window.COLORES_ODINOTE_FONDO}
@@ -2026,6 +2033,7 @@ function ContextSidebar({
           <div className="ctx-pop-section">
             <div className="ctx-pop-title">{window.t('Color de los números', 'Numbers colour')}</div>
             <window.SelectorColor
+              entero
               valor={item.numberColor || '#595459'}
               onCambio={(c) => onUpdate({ numberColor: c })}
               colores={window.COLORES_ODINOTE_FONDO}
@@ -2048,6 +2056,7 @@ function ContextSidebar({
           <div className="ctx-pop-section">
             <div className="ctx-pop-title">{window.t('Color de la barra', 'Bar colour')}</div>
             <window.SelectorColor
+              entero
               valor={item.barColor || '#E6544F'}
               onCambio={(c) => onUpdate({ barColor: c })}
               colores={window.COLORES_ODINOTE_FONDO}
@@ -2062,6 +2071,7 @@ function ContextSidebar({
           <div className="ctx-pop-section">
             <div className="ctx-pop-title">{window.t('Color de los números', 'Numbers colour')}</div>
             <window.SelectorColor
+              entero
               valor={item.numberColor || '#1A1A1A'}
               onCambio={(c) => onUpdate({ numberColor: c })}
               colores={window.COLORES_ODINOTE_TEXTO || window.COLORES_ODINOTE_FONDO}
@@ -2109,6 +2119,7 @@ function ContextSidebar({
           <div className="ctx-pop-section">
             <div className="ctx-pop-title">{window.t('Color de la barra', 'Bar colour')}</div>
             <window.SelectorColor
+              entero
               valor={item.barColor || '#243352'}
               onCambio={(c) => onUpdate({ barColor: c })}
               colores={window.COLORES_ODINOTE_FONDO}
@@ -2152,6 +2163,7 @@ function ContextSidebar({
                 aquí había la ventana de colores de Windows y un campo suelto. */}
             {window.SelectorColor && (
               <window.SelectorColor
+                entero
                 valor={/^#[0-9a-fA-F]{6}$/.test(item.hex || '') ? item.hex : '#56B3A7'}
                 onCambio={(c) => { if (/^#[0-9a-fA-F]{6}$/.test(c || '')) onUpdate({ hex: c.toUpperCase() }); }}
               />
@@ -2443,6 +2455,7 @@ function ContextSidebar({
             </div>
             <div style={{ marginTop: '6px' }}>
               <window.SelectorColor
+                entero
                 valor={callbacks.drawColor}
                 onCambio={(c) => callbacks.setDrawColor(c)}
               />
@@ -2522,6 +2535,7 @@ function ContextSidebar({
               {/* Recolorea el dibujo entero: es lo que se espera de un nodo ya
                   guardado. Para teñir un solo trazo se entra a dibujar. */}
               <window.SelectorColor
+                entero
                 valor={((item.strokes || [])[0] || {}).color || '#1A1A1A'}
                 onCambio={(c) => onUpdate({ strokes: (item.strokes || []).map(s => ({ ...s, color: c })) })}
               />
@@ -2536,6 +2550,7 @@ function ContextSidebar({
             <div className="ctx-pop-title">{window.t('Color del texto', 'Text color')}</div>
             <div style={{ marginTop: '6px' }}>
               <window.SelectorColor
+                entero
                 valor={item.titleColor || item.textColor || '#1A1A1A'}
                 onCambio={(c) => onUpdate({ textColor: c })}
               />

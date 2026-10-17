@@ -203,10 +203,19 @@ function cuentagotasDeLienzo() {
 
 const tostada = (es, en) => { if (window.showToast) window.showToast(window.t(es, en)); };
 
-function PanelColorLibre({ valor, recientes, onVivo, onListo, onCancela, ancla, enHoja }) {
+// incrustado: dentro del panel lateral (el de «Color de fondo», el del texto…)
+// en vez de en una ventana aparte. Lo pidió el usuario al verlos juntos: dos
+// selectores uno al lado del otro sobraban; queda solo el grande, con su
+// historial y los colores de siempre como primera paleta. Ahí no hay «fuera»
+// ni Escape que lo cierre: lo cierra el panel que lo contiene. Cada color que
+// se da por bueno (soltar la rueda, Enter en un campo, una casilla) va al
+// historial con onFin.
+function PanelColorLibre({ valor, recientes, onVivo, onListo, onCancela, onFin, alTocar, ancla, enHoja, incrustado, paleta, incluirTransparente }) {
   const { useState, useRef, useEffect, useLayoutEffect } = React;
   const C = window.OdiColor;
-  const deInicio = (C.hexARgb(valor || '') ? C.rgbAHex(C.hexARgb(valor)) : '#1A1A1A');
+  const deReserva = (paleta || []).find(c => C.hexARgb(c)) || '#1A1A1A';
+  const deInicio = C.rgbAHex(C.hexARgb(C.hexARgb(valor || '') ? valor : deReserva));
+  const esTransparente = valor === 'transparent' || valor === '';
   const antes = useRef(deInicio);
   // El color vive en HSV: es lo que dibujan la rueda (tono) y el cuadro
   // (saturación y brillo). Guardarlo en HEX perdería el tono de los grises:
@@ -229,7 +238,10 @@ function PanelColorLibre({ valor, recientes, onVivo, onListo, onCancela, ancla, 
     }
     pendiente.current = h;
   };
-  const ponHsv = (n) => { setHsv(n); manda(C.rgbAHex(C.hsvARgb(n))); };
+  // El último color puesto, al momento (hexRef espera a que se pinte).
+  const ultimo = useRef(deInicio);
+  const termina = (c) => { if (onFin && c) onFin(c); };
+  const ponHsv = (n) => { setHsv(n); ultimo.current = C.rgbAHex(C.hsvARgb(n)); manda(ultimo.current); };
   // Un color que llega hecho (campo, reciente, paleta, cuentagotas). Si es un
   // gris, el tono de la rueda se queda donde estaba.
   const ponHex = (h) => {
@@ -238,7 +250,8 @@ function PanelColorLibre({ valor, recientes, onVivo, onListo, onCancela, ancla, 
     const n = C.rgbAHsv(rgb);
     if (n.s < 0.5 || n.v < 0.5) n.h = hsv.h;
     setHsv(n);
-    manda(C.rgbAHex(rgb));
+    ultimo.current = C.rgbAHex(rgb);
+    manda(ultimo.current);
   };
 
   // ── Los campos ──
@@ -258,7 +271,7 @@ function PanelColorLibre({ valor, recientes, onVivo, onListo, onCancela, ancla, 
   const aplicaCampo = (clave) => {
     const leido = C.lee(campos[clave], clave);
     escribiendo.current = null;
-    if (leido) ponHex(C.rgbAHex(leido));
+    if (leido) { ponHex(C.rgbAHex(leido)); termina(C.rgbAHex(leido)); }
     else setCampos(C.textos(hexRef.current));
   };
   const copia = async (clave) => {
@@ -313,7 +326,11 @@ function PanelColorLibre({ valor, recientes, onVivo, onListo, onCancela, ancla, 
     desdePuntero(e, que);
   };
   const alMover = (e) => { if (arrastre.current) desdePuntero(e, arrastre.current); };
-  const alSoltar = () => { arrastre.current = null; };
+  const alSoltar = () => {
+    if (!arrastre.current) return;
+    arrastre.current = null;
+    termina(ultimo.current);
+  };
   // Con el teclado: flechas en la rueda (tono) y en el cuadro (saturación y brillo).
   const teclaRueda = (e, que) => {
     const paso = e.shiftKey ? 10 : 1;
@@ -339,7 +356,11 @@ function PanelColorLibre({ valor, recientes, onVivo, onListo, onCancela, ancla, 
     if (window.EyeDropper) {
       try {
         const r = await new window.EyeDropper().open();
-        if (r && r.sRGBHex) ponHex(r.sRGBHex.length === 7 ? r.sRGBHex : C.rgbAHex(C.lee(r.sRGBHex, 'rgb') || { r: 0, g: 0, b: 0 }));
+        if (r && r.sRGBHex) {
+          const h = r.sRGBHex.length === 7 ? r.sRGBHex : C.rgbAHex(C.lee(r.sRGBHex, 'rgb') || { r: 0, g: 0, b: 0 });
+          ponHex(h);
+          termina(C.rgbAHex(C.hexARgb(h)));
+        }
       } catch (e) { /* Escape: no se cogió nada */ }
       return;
     }
@@ -349,12 +370,13 @@ function PanelColorLibre({ valor, recientes, onVivo, onListo, onCancela, ancla, 
     setConGotero(false);
     if (r === 'nada') tostada('Ahí no hay ninguna imagen.', 'There is no image there.');
     else if (r === 'protegida') tostada('Esa imagen no deja leer sus colores.', 'That image does not let its colours be read.');
-    else if (r) ponHex(r);
+    else if (r) { ponHex(r); termina(r); }
   };
 
   // ── Las paletas ──
   const [paletas, setPaletas] = useState(leePaletas);
   const [renombrando, setRenombrando] = useState(null);
+  const nombreRef = useRef(null);
   const [borrando, setBorrando] = useState(null);
   useEffect(() => {
     const al = () => setPaletas(leePaletas());
@@ -398,7 +420,7 @@ function PanelColorLibre({ valor, recientes, onVivo, onListo, onCancela, ancla, 
   const panelRef = useRef(null);
   const [sitio, setSitio] = useState(null);
   useLayoutEffect(() => {
-    if (enHoja) return;
+    if (enHoja || incrustado) return;
     const coloca = () => {
       const el = panelRef.current;
       if (!el || !ancla) return;
@@ -416,7 +438,7 @@ function PanelColorLibre({ valor, recientes, onVivo, onListo, onCancela, ancla, 
     coloca();
     window.addEventListener('resize', coloca);
     return () => window.removeEventListener('resize', coloca);
-  }, [ancla, enHoja]);
+  }, [ancla, enHoja, incrustado]);
 
   // ── Cerrar ──
   const listoRef = useRef(onListo);
@@ -424,6 +446,7 @@ function PanelColorLibre({ valor, recientes, onVivo, onListo, onCancela, ancla, 
   const cancelaRef = useRef(onCancela);
   cancelaRef.current = onCancela;
   useEffect(() => {
+    if (incrustado) return;
     const tecla = (e) => {
       if (e.key !== 'Escape' || conGotero) return;
       // En un campo, Escape solo deshace lo escrito en él.
@@ -444,14 +467,20 @@ function PanelColorLibre({ valor, recientes, onVivo, onListo, onCancela, ancla, 
       document.removeEventListener('keydown', tecla, true);
       document.removeEventListener('pointerdown', fuera, true);
     };
-  }, [ancla, enHoja, conGotero]);
+  }, [ancla, enHoja, incrustado, conGotero]);
 
   // Que nada de lo que pasa aquí dentro llegue al lienzo: el panel se pinta en
   // el body, pero React pasa los eventos por el árbol de componentes, y el
   // lienzo entendería un clic aquí como un clic en el vacío (y soltaría el nodo).
   // Y que un clic en una casilla no le quite el foco al texto que se colorea.
   const aislado = {
-    onMouseDown: (e) => { e.stopPropagation(); if (!(e.target.closest && e.target.closest('input'))) e.preventDefault(); },
+    onMouseDown: (e) => {
+      e.stopPropagation();
+      // Antes de que un campo se quede el foco: quien colorea texto apunta aquí
+      // su selección para poder devolverla.
+      if (alTocar) alTocar();
+      if (!(e.target.closest && e.target.closest('input'))) e.preventDefault();
+    },
     onPointerDown: (e) => e.stopPropagation(),
     onClick: (e) => e.stopPropagation(),
     onDoubleClick: (e) => e.stopPropagation(),
@@ -468,7 +497,7 @@ function PanelColorLibre({ valor, recientes, onVivo, onListo, onCancela, ancla, 
       style={{ background: c }}
       title={(extra && extra.titulo) || c}
       aria-label={c}
-      onClick={() => ponHex(c)}
+      onClick={() => { ponHex(c); termina(c); }}
       onContextMenu={extra && extra.alQuitar ? (e) => { e.preventDefault(); extra.alQuitar(); } : undefined}
     />
   );
@@ -503,8 +532,8 @@ function PanelColorLibre({ valor, recientes, onVivo, onListo, onCancela, ancla, 
   const cuerpo = (
     <div
       ref={panelRef}
-      className={`panel-color ${enHoja ? 'en-hoja' : ''}`}
-      style={enHoja ? undefined : { left: sitio ? sitio.left : -9999, top: sitio ? sitio.top : 0, visibility: sitio ? 'visible' : 'hidden' }}
+      className={`panel-color ${enHoja ? 'en-hoja' : ''} ${incrustado ? 'incrustado' : ''}`}
+      style={(enHoja || incrustado) ? undefined : { left: sitio ? sitio.left : -9999, top: sitio ? sitio.top : 0, visibility: sitio ? 'visible' : 'hidden' }}
       role="dialog"
       aria-label={window.t('Elegir un color', 'Pick a colour')}
       {...aislado}
@@ -551,9 +580,7 @@ function PanelColorLibre({ valor, recientes, onVivo, onListo, onCancela, ancla, 
             aria-label={window.t('Cuentagotas', 'Eyedropper')}>
             <span className="material-symbols-rounded">colorize</span>
           </button>
-          <div className="panel-color-recientes" title={window.t('Los últimos que usaste', 'The last ones you used')}>
-            {(recientes || []).slice(0, 6).map(c => casilla(c.toUpperCase(), { clave: '-r' }))}
-          </div>
+          <span className="panel-color-gotero-texto">{window.t('Cuentagotas', 'Eyedropper')}</span>
         </div>
       </div>
 
@@ -567,7 +594,7 @@ function PanelColorLibre({ valor, recientes, onVivo, onListo, onCancela, ancla, 
           <span className="panel-color-ahora" style={{ background: hex }}>
             <span style={{ color: C.luminancia(hex) > 0.45 ? '#1A1A1A' : '#FFFFFF' }}>{window.t('Ahora', 'Now')}</span>
           </span>
-          <button type="button" className="panel-color-listo" onClick={() => onListo(hex)}>
+          <button type="button" className="panel-color-listo" onClick={() => onListo && onListo(ultimo.current)}>
             {window.t('Listo', 'Done')}
           </button>
         </div>
@@ -575,9 +602,36 @@ function PanelColorLibre({ valor, recientes, onVivo, onListo, onCancela, ancla, 
         {fila('rgb', 'RGB')}
         {fila('hsl', 'HSL')}
 
+        {/* El historial: los últimos que se usaron, en cualquier nodo. */}
+        <div className="panel-color-tit">{window.t('Historial', 'History')}</div>
+        <div className="panel-color-historial">
+          {(recientes || []).length
+            ? (recientes || []).slice(0, 10).map(c => casilla(c.toUpperCase(), { clave: '-r' }))
+            : <span className="panel-color-vacio">{window.t('Aquí salen los últimos que uses.', 'The last ones you use show up here.')}</span>}
+        </div>
+
         <div className="panel-color-tit">{window.t('Paletas', 'Palettes')}</div>
         <div className="panel-color-paletas">
-          {paletas.length === 0 && (
+          {/* Los de siempre de este sitio (los de fondo, los de texto…), y «sin
+              color» donde se puede quitar. No se borran ni se renombran. */}
+          {((paleta && paleta.length) || incluirTransparente) && (
+            <div className="panel-color-paleta fija">
+              <span className="panel-color-nombre" title={window.t('Los de siempre', 'The usual ones')}>{window.t('Básicos', 'Basics')}</span>
+              <div className="panel-color-paleta-casillas">
+                {incluirTransparente && (
+                  <button
+                    type="button"
+                    className={`panel-color-casilla sin-color ${esTransparente ? 'activa' : ''}`}
+                    title={window.t('Sin color', 'No colour')}
+                    aria-label={window.t('Sin color', 'No colour')}
+                    onClick={() => { onVivo('transparent'); termina('transparent'); }}
+                  />
+                )}
+                {(paleta || []).filter(c => C.hexARgb(c)).map(c => casilla(C.rgbAHex(C.hexARgb(c)), { clave: '-b' }))}
+              </div>
+            </div>
+          )}
+          {paletas.length === 0 && !incrustado && (
             <div className="panel-color-vacio">
               {window.t('Aún no hay paletas. «Nueva» guarda el color de ahora; «De imagen» saca los de una foto.',
                 'No palettes yet. "New" keeps the current colour; "From image" takes them from a photo.')}
@@ -586,17 +640,30 @@ function PanelColorLibre({ valor, recientes, onVivo, onListo, onCancela, ancla, 
           {paletas.map(p => (
             <div className="panel-color-paleta" key={p.id}>
               {renombrando === p.id ? (
-                <input
-                  className="panel-color-nombre-campo"
-                  autoFocus
-                  defaultValue={p.nombre}
-                  onFocus={(e) => e.target.select()}
-                  onBlur={(e) => renombra(p.id, e.target.value.trim() || p.nombre)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') { e.preventDefault(); e.target.blur(); }
-                    else if (e.key === 'Escape') { e.preventDefault(); setRenombrando(null); }
-                  }}
-                />
+                <span className="panel-color-nombre-caja">
+                  <input
+                    ref={nombreRef}
+                    className="panel-color-nombre-campo"
+                    autoFocus
+                    defaultValue={p.nombre}
+                    onFocus={(e) => e.target.select()}
+                    onBlur={(e) => renombra(p.id, e.target.value.trim() || p.nombre)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') { e.preventDefault(); e.target.blur(); }
+                      else if (e.key === 'Escape') { e.preventDefault(); setRenombrando(null); }
+                    }}
+                  />
+                  {/* Pedido por el usuario: con Enter o pulsando fuera ya se
+                      guardaba, pero no se veía cómo terminar. */}
+                  <button
+                    type="button"
+                    className="panel-color-ok"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => renombra(p.id, ((nombreRef.current && nombreRef.current.value) || '').trim() || p.nombre)}
+                  >
+                    OK
+                  </button>
+                </span>
               ) : (
                 <span className="panel-color-nombre" onDoubleClick={() => setRenombrando(p.id)}
                   title={window.t('Doble clic para cambiarle el nombre', 'Double-click to rename')}>{p.nombre}</span>
@@ -636,7 +703,7 @@ function PanelColorLibre({ valor, recientes, onVivo, onListo, onCancela, ancla, 
     </div>
   );
 
-  if (enHoja || !window.ReactDOM || !window.ReactDOM.createPortal) return cuerpo;
+  if (enHoja || incrustado || !window.ReactDOM || !window.ReactDOM.createPortal) return cuerpo;
   return window.ReactDOM.createPortal(cuerpo, document.body);
 }
 window.PanelColorLibre = PanelColorLibre;
@@ -650,6 +717,11 @@ window.SelectorColor = function SelectorColor({
   etiquetaLibre,
   // Todo en una fila en vez de en tres. Lo pide quien tiene ancho y no altura.
   compacto = false,
+  // El panel grande dentro del panel que lo contiene, sin los círculos de
+  // siempre ni el arcoíris (ver PanelColorLibre, «incrustado»). Para los
+  // paneles laterales, donde cabe; los sitios estrechos (la barra de una
+  // flecha, la fila de la ruleta) se quedan con el arcoíris.
+  entero = false,
   // El color del botón de aceptar. Verde en toda la aplicación; la ventana de
   // la corona lo pide dorado, porque allí el dorado es lo que se ha comprado.
   acento,
@@ -691,9 +763,18 @@ window.SelectorColor = function SelectorColor({
   const apuntaSeleccion = () => {
     try {
       const sel = window.getSelection();
-      if (sel && sel.rangeCount) rango.current = sel.getRangeAt(0).cloneRange();
+      if (!sel || !sel.rangeCount) return;
+      const r = sel.getRangeAt(0);
+      // La de un campo del propio panel no es la del texto que se colorea.
+      const n = r.commonAncestorContainer;
+      const el = n && (n.nodeType === 1 ? n : n.parentElement);
+      if (el && el.closest && el.closest('.panel-color')) return;
+      rango.current = r.cloneRange();
     } catch (e) {}
   };
+  // Con el panel ya abierto no hay un clic en el arcoíris que la apunte: se
+  // apunta al aparecer.
+  React.useEffect(() => { if (entero) apuntaSeleccion(); }, []);
 
   const devuelveSeleccion = () => {
     try {
@@ -952,6 +1033,31 @@ window.SelectorColor = function SelectorColor({
   // separación de verdad viene el historial con un reloj delante. El color
   // recién elegido aparece justo después del reloj, que es donde se está
   // mirando al soltar la rueda.
+  if (entero && !conDedo && window.PanelColorLibre) {
+    const Panel = window.PanelColorLibre;
+    return (
+      <div className="selector-color-caja entero">
+        <Panel
+          incrustado
+          valor={valor}
+          recientes={recientes}
+          paleta={paleta}
+          incluirTransparente={incluirTransparente}
+          alTocar={apuntaSeleccion}
+          onVivo={(c) => { devuelveSeleccion(); onCambio(c); }}
+          onFin={(c) => setRecientes(apuntaReciente(c))}
+          onListo={(c) => {
+            if (c && norm(c) !== actual) { devuelveSeleccion(); onCambio(c); }
+            if (c) setRecientes(apuntaReciente(c));
+            // El panel que lo contiene se cierra (lo escuchan las barras).
+            try { window.dispatchEvent(new CustomEvent('odi-color-listo')); } catch (e) {}
+          }}
+          onCancela={() => {}}
+        />
+      </div>
+    );
+  }
+
   if (compacto) {
     return (
       <div className="selector-color-caja" style={{ display: 'flex', flexDirection: 'column', gap: '7px' }}>
