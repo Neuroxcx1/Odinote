@@ -68,6 +68,7 @@ function defaultDims(type) {
     case 'carpeta':  return { w: 230, h: 240 };
     case 'ruleta':   return { w: 340, h: 340 };
     case 'galeria':  return { w: 420, h: 320 };
+    case 'progreso': return { w: 360, h: 136 };
     case 'code':     return { w: 420, h: 260 };
     case 'timer':    return { w: 260, h: 252 };
     case 'bigtitle': return { w: 300, h: 80 };
@@ -214,6 +215,10 @@ function makeNewItem(type, x, y, w, h, lang) {
       // Nace vacía y en rejilla: el hueco explica que se sueltan fotos encima
       // y trae el botón para elegirlas.
       return { ...base, type: 'galeria', ...defaultSize(420, 320), fotos: [], vista: 'rejilla' };
+    case 'progreso':
+      // Nace contando el proyecto entero; en su barra se cambia a "este
+      // tablero". No guarda el número: lo calcula al pintarse (Progreso.jsx).
+      return { ...base, type: 'progreso', ...defaultSize(360, 136), alcance: 'proyecto' };
     case 'timer':
       // Nace en cuenta atras de cinco minutos, que es para lo que la coge uno
       // sin pensarlo. El pomodoro y el cronometro estan a un clic en su menu.
@@ -4866,6 +4871,11 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
     openFile: (id) => setFileOpen({ id }),
     updateItem,
     getNestedItems,
+    // Lo que cuenta el nodo de progreso: el proyecto entero o este tablero
+    // con lo que tenga dentro (window.OdiProgreso).
+    cuentaProgreso: (alcance) => window.OdiProgreso
+      ? window.OdiProgreso.cuenta(canvases, alcance === 'tablero' ? currentId : projectId)
+      : { hechas: 0, total: 0, porcentaje: 0 },
     croppingId,
     setCroppingId,
     startEdit: (id) => setEditing(id),

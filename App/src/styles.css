@@ -2109,6 +2109,62 @@ body.odi-busy iframe { pointer-events: none !important; }
    No usa .item-card a propósito: esa clase deja el nodo sin eventos hasta que
    se selecciona, y entonces no se podían soltar fotos encima de una galería
    que no estuviera seleccionada. */
+/* ── El nodo de progreso ──
+   Crece como una imagen: la letra va en unidades del propio nodo (cqw/cqh),
+   así que al estirarlo crece todo junto, sin botón de tamaño (como la ruleta).
+   La barra se llena deslizándose con --muelle cuando cambia el número. */
+.progreso {
+  container-type: size;
+  position: relative; width: 100%; height: 100%; box-sizing: border-box;
+  display: flex; flex-direction: column; justify-content: center;
+  /* En % y no en cqw/cqh: en el propio contenedor esas unidades no miden el
+     nodo sino la ventana, y salían 77 px de margen a cada lado. */
+  padding: 4% 6%;
+  border: 1.5px solid var(--line); border-radius: 2px;
+  box-shadow: var(--pop);
+  color: var(--ink);
+  user-select: none;
+}
+.progreso-cabeza { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; min-width: 0; }
+.progreso-titulo {
+  display: flex; align-items: center; gap: 0.35em; min-width: 0;
+  font-family: var(--font-display); font-weight: 700;
+  font-size: clamp(10px, 4.6cqw, 44px);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.progreso-titulo .material-symbols-rounded { font-size: 1.25em; color: var(--olive); flex-shrink: 0; }
+.progreso-pct {
+  font-family: var(--font-display); font-weight: 800; line-height: 1;
+  font-size: clamp(16px, 9.5cqw, 96px);
+  font-variant-numeric: tabular-nums;
+}
+.progreso-pct small { font-size: 0.5em; margin-left: 0.05em; color: var(--ink-2); }
+.progreso-barra {
+  position: relative; height: clamp(8px, 15cqh, 64px);
+  margin: 6cqh 0 5cqh;
+  border: 1.5px solid var(--line); border-radius: 999px;
+  background: var(--paper-2);
+  overflow: hidden;
+}
+.progreso-relleno {
+  position: absolute; inset: 0 auto 0 0;
+  background-color: var(--olive);
+  background-image: repeating-linear-gradient(-45deg, rgba(255,255,255,0.20) 0 7px, transparent 7px 14px);
+  border-right: 1.5px solid var(--line);
+  transition: width 700ms var(--muelle);
+}
+.progreso-barra i {
+  position: absolute; top: 28%; bottom: 28%; width: 1.5px;
+  background: color-mix(in srgb, var(--ink) 16%, transparent);
+}
+.progreso-pie { font-size: clamp(9px, 3.5cqw, 30px); font-weight: 600; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.progreso.vacio .progreso-pie { white-space: normal; }
+.progreso.vacio .progreso-relleno { border-right: none; }
+/* Lleno: la barra entera y el número dan un saltito. */
+.progreso.lleno .progreso-relleno { border-right: none; }
+.progreso.lleno .progreso-pct { color: var(--olive); animation: progreso-lleno 620ms var(--muelle); }
+@keyframes progreso-lleno { 0% { transform: scale(1); } 40% { transform: scale(1.18); } 100% { transform: scale(1); } }
+
 .galeria {
   --galeria-curva: cubic-bezier(0.3, 1.22, 0.45, 1);
   position: relative; width: 100%; height: 100%;

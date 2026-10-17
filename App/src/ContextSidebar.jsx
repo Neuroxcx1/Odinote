@@ -339,6 +339,7 @@ function ContextSidebar({
   const isCarpeta = item.type === 'carpeta';
   const isRuleta = item.type === 'ruleta';
   const isGaleria = item.type === 'galeria';
+  const isProgreso = item.type === 'progreso';
   const isCode = item.type === 'code';
   const isTimer = item.type === 'timer';
   // Mientras se escribe código, la barra se queda en lo justo: volver, y
@@ -766,6 +767,21 @@ function ContextSidebar({
               <span>{window.t('Elementos', 'Items')}</span>
             </button>
           </>
+        )}
+
+        {/* El progreso: qué cuenta, el proyecto entero o este tablero con lo que
+            tenga dentro. Un solo botón que cambia de uno a otro. */}
+        {isProgreso && (
+          <button
+            className="ctx-btn"
+            onClick={() => { onUpdate({ alcance: item.alcance === 'tablero' ? 'proyecto' : 'tablero' }); window.playAudioTone && window.playAudioTone('click'); }}
+            title={item.alcance === 'tablero'
+              ? window.t('Cuenta este tablero: pulsa para contar el proyecto entero', 'Counts this board: click to count the whole project')
+              : window.t('Cuenta el proyecto entero: pulsa para contar solo este tablero', 'Counts the whole project: click to count only this board')}
+          >
+            <span className="material-symbols-rounded">{item.alcance === 'tablero' ? 'dashboard' : 'folder_special'}</span>
+            <span>{item.alcance === 'tablero' ? window.t('Tablero', 'Board') : window.t('Proyecto', 'Project')}</span>
+          </button>
         )}
 
         {/* El separador: el estilo de la línea y dónde va el título. */}

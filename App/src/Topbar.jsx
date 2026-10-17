@@ -57,6 +57,7 @@ const EXTRA_TOOLS = [
   { id: 'separator', icon: 'horizontal_rule', label: 'tool_separator', bg: '#E6544F', fg: 'white' },
   { id: 'calendar', icon: 'calendar_month',label: 'tool_calendar', bg: '#E6544F', fg: 'white' },
   { id: 'timer',    icon: 'timer',         label: 'tool_timer',    bg: '#E6544F', fg: 'white' },
+  { id: 'progreso', icon: 'donut_large',   label: 'tool_progreso', bg: '#E6544F', fg: 'white' },
   { id: 'ruleta',   icon: 'pie_chart',     label: 'tool_ruleta',   bg: '#E6544F', fg: 'white' },
 ];
 

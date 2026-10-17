@@ -423,3 +423,6 @@ function RuletaItem({ item, lang, onUpdate }) {
 }
 
 window.RuletaItem = RuletaItem;
+// El confeti de triangulitos, para quien más celebre algo (el nodo de
+// progreso al llegar al 100 %).
+window.odiConfeti = ruletaConfeti;
