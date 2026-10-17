@@ -3887,9 +3887,58 @@ function CodeItem({ item, lang, editing, onUpdate, callbacks }) {
       return;
     }
     if (e.key === 'Escape') { e.stopPropagation(); cb.endEdit && cb.endEdit(); }
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault();
+      e.stopPropagation();
+      if (ejecutable) ejecutar();
+      else if (window.showToast) window.showToast(window.t('Solo se puede ejecutar JavaScript.', 'Only JavaScript can be run.'));
+    }
   };
 
   const estaEditando = !!editing;
+
+  // ── La terminal ──
+  // Ejecuta el bloque (solo JavaScript: es lo que el navegador sabe correr sin
+  // descargar nada) en un worker aislado, sin red ni acceso a la aplicación
+  // (ejecuta-codigo.js), y enseña debajo lo que imprime. Lo que sale no se
+  // guarda en el proyecto: es del momento, como la consola de cualquier editor.
+  const adivinado = lenguaje.id === 'auto' ? adivinaLenguaje(codigo) : null;
+  const ejecutable = !!window.OdiEjecuta && (lenguaje.id === 'javascript' || adivinado === 'JavaScript');
+  const [terminal, setTerminal] = React.useState(null);
+  const enMarcha = React.useRef(null);
+  const salidaRef = React.useRef(null);
+  React.useEffect(() => () => { if (enMarcha.current) enMarcha.current.para(); }, []);
+  React.useEffect(() => {
+    const el = salidaRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [terminal]);
+  const ejecutar = () => {
+    if (!ejecutable) return;
+    if (enMarcha.current) enMarcha.current.para();
+    const lineas = [];
+    setTerminal({ lineas: [], estado: 'corriendo' });
+    const c = window.OdiEjecuta.ejecuta(codigo, (l) => {
+      if (l.tipo === 'limpia') lineas.length = 0;
+      else { lineas.push(l); if (lineas.length > 500) lineas.shift(); }
+      setTerminal(t => (t ? Object.assign({}, t, { lineas: lineas.slice() }) : t));
+    }, { palabraLinea: window.t('línea', 'line') });
+    enMarcha.current = c;
+    c.hecho.then(r => {
+      if (enMarcha.current !== c) return;
+      enMarcha.current = null;
+      const estado = r.motivo === 'fin' ? (r.fallo ? 'fallo' : 'hecho') : r.motivo;
+      setTerminal(t => (t ? { lineas: lineas.slice(), estado, ms: r.ms, resultado: r.hay ? r.resultado : null } : t));
+    });
+  };
+  const paraYa = () => { if (enMarcha.current) enMarcha.current.para(); };
+  const estadoTerminal = (t) => {
+    if (t.estado === 'corriendo') return window.t('ejecutando…', 'running…');
+    if (t.estado === 'hecho') return window.t('listo', 'done') + ' · ' + Math.round(t.ms) + ' ms';
+    if (t.estado === 'fallo') return window.t('con un error', 'with an error');
+    if (t.estado === 'tiempo') return window.t('parado: más de 5 s (¿un bucle sin fin?)', 'stopped: over 5 s (an endless loop?)');
+    return window.t('parado', 'stopped');
+  };
+  const sinArrastrar = (e) => e.stopPropagation();
 
   return (
     <div className="code-card" style={{ width: '100%', height: '100%' }}>
@@ -3925,9 +3974,24 @@ function CodeItem({ item, lang, editing, onUpdate, callbacks }) {
               si solo pusiera "Automático" no habría forma de saber si acertó. */}
           <span className="code-lang">
             {lenguaje.id === 'auto'
-              ? (adivinaLenguaje(codigo) ? `• ${adivinaLenguaje(codigo)}` : window.t('Automático', 'Auto'))
+              ? (adivinado ? `• ${adivinado}` : window.t('Automático', 'Auto'))
               : lenguaje.nombre}
           </span>
+          {ejecutable && (
+            <button
+              type="button"
+              className={`code-run ${terminal && terminal.estado === 'corriendo' ? 'corriendo' : ''}`}
+              onMouseDown={sinArrastrar}
+              onDoubleClick={sinArrastrar}
+              onClick={(e) => { e.stopPropagation(); if (terminal && terminal.estado === 'corriendo') paraYa(); else ejecutar(); }}
+              title={terminal && terminal.estado === 'corriendo'
+                ? window.t('Parar', 'Stop')
+                : window.t('Ejecutar (Ctrl+Enter al escribir)', 'Run (Ctrl+Enter while typing)')}
+              aria-label={window.t('Ejecutar', 'Run')}
+            >
+              <span className="material-symbols-rounded">{terminal && terminal.estado === 'corriendo' ? 'stop' : 'play_arrow'}</span>
+            </button>
+          )}
         </div>
 
         {/* El código */}
@@ -3962,6 +4026,35 @@ function CodeItem({ item, lang, editing, onUpdate, callbacks }) {
             />
           )}
         </div>
+
+        {terminal && (
+          <div className="code-terminal" onMouseDown={sinArrastrar} onDoubleClick={sinArrastrar} onClick={sinArrastrar}>
+            <div className="code-terminal-barra">
+              <span className="material-symbols-rounded code-terminal-icono">terminal</span>
+              <span className="code-terminal-tit">{window.t('Terminal', 'Terminal')}</span>
+              <span className={`code-terminal-estado ${terminal.estado}`}>{estadoTerminal(terminal)}</span>
+              <button type="button" className="code-terminal-btn" onClick={() => setTerminal(t => Object.assign({}, t, { lineas: [], resultado: null }))}
+                title={window.t('Limpiar', 'Clear')} aria-label={window.t('Limpiar', 'Clear')}>
+                <span className="material-symbols-rounded">block</span>
+              </button>
+              <button type="button" className="code-terminal-btn" onClick={() => { paraYa(); setTerminal(null); }}
+                title={window.t('Cerrar la terminal', 'Close the terminal')} aria-label={window.t('Cerrar la terminal', 'Close the terminal')}>
+                <span className="material-symbols-rounded">close</span>
+              </button>
+            </div>
+            <div className="code-terminal-salida" ref={salidaRef}>
+              {terminal.lineas.map((l, i) => (
+                <div key={i} className={`code-linea ${l.tipo}`}>{l.texto}</div>
+              ))}
+              {terminal.resultado != null && (
+                <div className="code-linea resultado">← {terminal.resultado}</div>
+              )}
+              {!terminal.lineas.length && terminal.resultado == null && terminal.estado !== 'corriendo' && (
+                <div className="code-linea vacia">{window.t('(sin salida: usa console.log para ver algo aquí)', '(no output: use console.log to see something here)')}</div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

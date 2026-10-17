@@ -7954,3 +7954,65 @@ body.odi-cuentagotas, body.odi-cuentagotas * { cursor: crosshair !important; }
 .ajuste-escala-rapido:hover { border-color: var(--line); }
 .ajuste-escala-rapido.activo { background: var(--olive); color: #FFFFFF; border-color: var(--olive); }
 .ajuste-escala-nota { margin: 0; font-size: 12px; line-height: 1.5; color: var(--text-soft, #595459); }
+
+
+/* ── La terminal del nodo de código (items.jsx, CodeItem; ejecuta-codigo.js) ── */
+.code-run {
+  flex: 0 0 auto; width: 22px; height: 22px; padding: 0; cursor: pointer;
+  display: grid; place-items: center;
+  background: var(--olive); color: #FFFFFF;
+  border: 1.5px solid rgba(0,0,0,0.35); border-radius: 50%;
+  transition: transform 160ms var(--muelle);
+}
+.code-run .material-symbols-rounded { font-size: 16px; }
+.code-run:hover { transform: scale(1.12); }
+.code-run:active { transform: scale(0.92); }
+.code-run.corriendo { background: var(--wine); }
+/* El ▶ y la terminal se pueden usar sin elegir antes el nodo (el resto de la
+   tarjeta no recibe clics hasta elegirlo, ver «Node-first editing»). */
+.item:not(.selected):not(.editing) .code-run,
+.item:not(.selected):not(.editing) .code-terminal,
+.item:not(.selected):not(.editing) .code-terminal * { pointer-events: auto; }
+
+.code-terminal {
+  flex: 0 1 auto; max-height: 48%; min-height: 64px;
+  display: flex; flex-direction: column;
+  background: #0A0F1A; color: #DDE6F5;
+  border-top: 1px solid rgba(255,255,255,0.12);
+  animation: code-terminal-entra 220ms var(--muelle) both;
+}
+@keyframes code-terminal-entra { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+.code-terminal-barra {
+  flex: 0 0 auto; display: flex; align-items: center; gap: 7px;
+  padding: 4px 6px 4px 10px;
+  border-bottom: 1px solid rgba(255,255,255,0.07);
+  font-size: 10.5px;
+}
+.code-terminal-icono { font-size: 15px; opacity: 0.7; }
+.code-terminal-tit { font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; opacity: 0.8; }
+.code-terminal-estado { margin-left: auto; font-family: var(--font-mono); opacity: 0.75; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.code-terminal-estado.corriendo { color: #F5C26B; opacity: 1; }
+.code-terminal-estado.hecho { color: #9AD27A; }
+.code-terminal-estado.fallo, .code-terminal-estado.tiempo { color: #FF8A80; opacity: 1; }
+.code-terminal-btn {
+  width: 22px; height: 22px; padding: 0; flex: 0 0 auto; cursor: pointer;
+  display: grid; place-items: center;
+  background: transparent; color: #DDE6F5; opacity: 0.7;
+  border: none; border-radius: 4px;
+}
+.code-terminal-btn .material-symbols-rounded { font-size: 15px; }
+.code-terminal-btn:hover { opacity: 1; background: rgba(255,255,255,0.10); }
+.code-terminal-salida {
+  flex: 1 1 auto; min-height: 0; overflow: auto;
+  padding: 6px 10px 8px;
+  font-family: var(--font-mono), 'JetBrains Mono', ui-monospace, monospace;
+  font-size: calc(11.5px * var(--node-scale, 1));
+  line-height: 1.45;
+  user-select: text; cursor: text;
+}
+.code-linea { white-space: pre-wrap; word-break: break-word; }
+.code-linea.info { color: #9CC4FF; }
+.code-linea.warn { color: #F5C26B; }
+.code-linea.error { color: #FF8A80; }
+.code-linea.resultado { color: #9AD27A; }
+.code-linea.vacia { opacity: 0.5; font-style: italic; }
