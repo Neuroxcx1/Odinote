@@ -47,7 +47,7 @@ try {
 
 // Marcador de build: si la consola no muestra esta versión, el navegador está
 // sirviendo JS cacheado (subir ?v= en index.html invalida la caché)
-window.ODINOTE_BUILD = '1.0.9-211';
+window.ODINOTE_BUILD = '1.2.0-212';
 console.log('[ODINOTE] Código cargado: ' + window.ODINOTE_BUILD);
 
 // Global shortcuts configuration
@@ -1193,7 +1193,10 @@ function App() {
   const acordadoNubeRef = React.useRef(null);
   const ultimaSubidaNubeRef = React.useRef(0);
 
-  const CURRENT_VERSION = '1.0.9'; // debe coincidir con package.json
+  // La versión vive solo en package.json: scripts/marca-build.js la copia a
+  // ODINOTE_BUILD ("1.2.0-212") en cada build. Escrita aquí a mano se
+  // descuadraba, y entonces la campana de actualización no se apagaba nunca.
+  const CURRENT_VERSION = String(window.ODINOTE_BUILD || '').split('-')[0];
 
   // Compara versiones semánticas "a.b.c": devuelve true si `latest` > `current`
   const isNewerVersion = (latest, current) => {
