@@ -123,6 +123,34 @@ function ruletaConfeti(caja) {
 }
 
 // Un punto de la circunferencia, con 0 grados ARRIBA y girando como el reloj.
+// La foto de una porción, encogida (360 px por el lado largo, WebP) y DENTRO
+// del elemento como data: URL, igual que la portada de un proyecto. Así no
+// pasa por los cinco sitios por donde viajan los medios de un nodo (bóveda,
+// Drive, reemplazos, caché y tablero a proyecto): ocho fotos así son unos
+// cientos de KB en el proyecto.
+function ruletaEncogeFoto(file) {
+  return new Promise((resolve) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      try {
+        const k = Math.min(1, 360 / Math.max(img.naturalWidth, img.naturalHeight));
+        const lienzo = document.createElement('canvas');
+        lienzo.width = Math.max(1, Math.round(img.naturalWidth * k));
+        lienzo.height = Math.max(1, Math.round(img.naturalHeight * k));
+        lienzo.getContext('2d').drawImage(img, 0, 0, lienzo.width, lienzo.height);
+        let src = lienzo.toDataURL('image/webp', 0.82);
+        if (!/^data:image\/webp/.test(src)) src = lienzo.toDataURL('image/jpeg', 0.85);
+        resolve(src);
+      } catch (e) { resolve(null); }
+      finally { URL.revokeObjectURL(url); }
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); resolve(null); };
+    img.src = url;
+  });
+}
+window.ruletaEncogeFoto = ruletaEncogeFoto;
+
 // A qué distancia del centro va el centro de cada nombre: a medio camino
 // entre el botón de girar (radio ~27) y el borde (96), igual en todas.
 const RULETA_RADIO_TEXTO = 61;
@@ -344,6 +372,7 @@ function RuletaItem({ item, lang, onUpdate }) {
       d: `M0 0 L${x0.toFixed(3)} ${y0.toFixed(3)} A96 96 0 ${grande} 1 ${x1.toFixed(3)} ${y1.toFixed(3)} Z` };
   });
   const maxLetras = m <= 4 ? 16 : m <= 8 ? 12 : 9;
+  const conFotos = lista.some(el => el.imagen && !el.hueco);
 
   return (
     <div className={`ruleta ${n === 1 ? 'uno' : ''} ${girando ? 'girando' : ''} ${elegido && !girando ? 'con-elegido' : ''}`}>
@@ -366,6 +395,24 @@ function RuletaItem({ item, lang, onUpdate }) {
                 <stop offset="100%" stopColor={p.color}/>
               </radialGradient>
             ))}
+            {/* Las fotos: cada una recortada a su porción, y un desvanecido
+                común que las deja enteras en el borde (lo más ancho, donde
+                más lucen) y las borra hacia el centro, donde va el nombre. */}
+            {conFotos && porciones.filter(p => p.el.imagen && !p.el.hueco).map(p => (
+              <clipPath key={'c' + p.el.id} id={`${idBase}-recorte-${p.i}`}><path d={p.d}/></clipPath>
+            ))}
+            {conFotos && (
+              <radialGradient id={`${idBase}-desvanece`} cx="0" cy="0" r="96" gradientUnits="userSpaceOnUse">
+                <stop offset="0%" stopColor="#FFFFFF" stopOpacity="0"/>
+                <stop offset="32%" stopColor="#FFFFFF" stopOpacity="0.08"/>
+                <stop offset="100%" stopColor="#FFFFFF" stopOpacity="1"/>
+              </radialGradient>
+            )}
+            {conFotos && (
+              <mask id={`${idBase}-mascara`} maskUnits="userSpaceOnUse" x="-100" y="-100" width="200" height="200">
+                <rect x="-100" y="-100" width="200" height="200" fill={`url(#${idBase}-desvanece)`}/>
+              </mask>
+            )}
           </defs>
           <circle r="99" className="ruleta-borde"/>
           {porciones.map(p => (
@@ -377,10 +424,32 @@ function RuletaItem({ item, lang, onUpdate }) {
               onAnimationEnd={p.el.id === recien ? () => setRecien(null) : undefined}
             />
           ))}
+          {/* Encima de su color: la foto, girada para que mire hacia fuera y
+              tapando su porción sin deformarse (como object-fit: cover). */}
+          {conFotos && (
+            <g mask={`url(#${idBase}-mascara)`} className="ruleta-fotos">
+              {porciones.filter(p => p.el.imagen && !p.el.hueco).map(p => {
+                const ancho = Math.min(192, 2 * 96 * Math.sin(Math.min(paso, 180) / 2 * Math.PI / 180)) + 4;
+                return (
+                  <g key={'f' + p.el.id} clipPath={`url(#${idBase}-recorte-${p.i})`}
+                    style={{ opacity: elegido && !girando && p.el.id !== elegido.id ? 0.45 : 1 }}>
+                    <image href={p.el.imagen} x={-ancho / 2} y={-98} width={ancho} height={98}
+                      preserveAspectRatio="xMidYMid slice" transform={`rotate(${p.medio})`}/>
+                  </g>
+                );
+              })}
+            </g>
+          )}
+          {/* Con fotos, una raya blanca entre porciones: si no, las fotos de al
+              lado se mezclan unas con otras. */}
+          {conFotos && n >= 2 && lista.map((el, i) => {
+            const [x, y] = ruletaPunto(i * paso, 96);
+            return <line key={'s' + el.id} x1="0" y1="0" x2={x} y2={y} className="ruleta-raya"/>;
+          })}
           {porciones.map(p => (
             <text
               key={'t' + p.el.id}
-              className={`ruleta-texto ${p.el.hueco ? 'fantasma' : ''}`}
+              className={`ruleta-texto ${p.el.hueco ? 'fantasma' : ''} ${p.el.imagen ? 'con-foto' : ''}`}
               fill={p.el.hueco ? undefined : p.tinta}
               textAnchor="middle"
               dominantBaseline="central"

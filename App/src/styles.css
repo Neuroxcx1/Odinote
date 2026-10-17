@@ -1986,6 +1986,20 @@ body.odi-busy iframe { pointer-events: none !important; }
    rueda, como el atributo transform de siempre. */
 .ruleta-texto { font-family: var(--font-display); font-weight: 800; font-size: 8.5px; letter-spacing: -0.01em; pointer-events: none; transform-box: view-box; transform-origin: 0 0; transition: opacity 300ms, transform 520ms var(--muelle); }
 .ruleta-texto.fantasma { fill: var(--ink-3); }
+/* Sobre una foto, el nombre negro lleva un halo claro para leerse. */
+.ruleta-texto.con-foto { paint-order: stroke; stroke: rgba(255,255,255,0.92); stroke-width: 2.4px; stroke-linejoin: round; }
+.ruleta-raya { stroke: #FFFFFF; stroke-width: 1.6; stroke-linecap: round; pointer-events: none; }
+.ruleta-fotos { pointer-events: none; }
+/* El botón de la foto en la lista de elementos: con foto, la enseña. */
+.ruleta-fila-foto {
+  width: 26px; height: 26px; flex-shrink: 0; display: grid; place-items: center;
+  border: 1.5px dashed var(--line-soft); border-radius: 6px;
+  color: var(--ink-3); cursor: pointer;
+  background-size: cover; background-position: center;
+}
+.ruleta-fila-foto:hover { border-color: var(--line); color: var(--ink); }
+.ruleta-fila-foto.con-foto { border-style: solid; border-color: var(--line); }
+.ruleta-fila-foto .material-symbols-rounded { font-size: 16px; }
 .ruleta-luz { fill: #FFF6D8; stroke: rgba(0,0,0,0.12); stroke-width: 0.4; }
 .ruleta.girando .ruleta-luz { animation: ruleta-luces 380ms steps(2, jump-none) infinite; }
 .ruleta.girando .ruleta-luz:nth-child(odd) { animation-delay: 190ms; }

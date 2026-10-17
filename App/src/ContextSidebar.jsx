@@ -1710,12 +1710,32 @@ function ContextSidebar({
                       onClick={() => setColorRuleta(colorRuleta === el.id ? null : el.id)}
                       title={window.t('Cambiar el color', 'Change the colour')}
                     />
+                    {/* Una foto para su porción: se encoge y va dentro del
+                        elemento (ver ruletaEncogeFoto en Ruleta.jsx). */}
+                    <label className={`ruleta-fila-foto ${el.imagen ? 'con-foto' : ''}`}
+                      title={el.imagen ? window.t('Cambiar la foto', 'Change the photo') : window.t('Poner una foto', 'Add a photo')}
+                      style={el.imagen ? { backgroundImage: `url(${el.imagen})` } : undefined}>
+                      {!el.imagen && <span className="material-symbols-rounded">add_photo_alternate</span>}
+                      <input type="file" accept="image/*" style={{ display: 'none' }}
+                        onChange={async (e) => {
+                          const f = e.target.files && e.target.files[0];
+                          e.target.value = '';
+                          if (!f || !window.ruletaEncogeFoto) return;
+                          const src = await window.ruletaEncogeFoto(f);
+                          if (src) { cambia(el.id, { imagen: src }); window.playAudioTone && window.playAudioTone('create'); }
+                        }}/>
+                    </label>
                     <input
                       className="ruleta-fila-texto"
                       value={el.texto}
                       onChange={(e) => cambia(el.id, { texto: e.target.value })}
                       onKeyDown={(e) => e.stopPropagation()}
                     />
+                    {el.imagen && (
+                      <button className="ruleta-fila-quitar" onClick={() => cambia(el.id, { imagen: null })} title={window.t('Quitar la foto', 'Remove the photo')}>
+                        <span className="material-symbols-rounded">hide_image</span>
+                      </button>
+                    )}
                     <button className="ruleta-fila-quitar" onClick={() => onUpdate({ ultimo: null, elementos: elementos.filter(e => e.id !== el.id) })} title={window.t('Quitar', 'Remove')}>
                       <span className="material-symbols-rounded">close</span>
                     </button>
