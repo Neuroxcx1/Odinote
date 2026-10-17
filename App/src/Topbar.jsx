@@ -87,6 +87,24 @@ function ConchaMas() {
 
 // Los nodos de More en sus tres grupos, por el color que ya tienen: lo que se
 // escribe, los medios y archivos, y la estructura.
+// Para la hoja «Añadir» del teléfono: TODOS los nodos (la barra y los de
+// más) en los cuatro grupos de color de la barra, en el mismo orden.
+function gruposDeTodos() {
+  const nombre = {
+    '#90B968': window.t('Escribir', 'Write'),
+    '#E1DFE3': window.t('Medios', 'Media'),
+    '#E6544F': window.t('Estructura', 'Structure'),
+    '#FFFFFF': window.t('Trazos', 'Strokes'),
+  };
+  const orden = ['#90B968', '#E1DFE3', '#E6544F', '#FFFFFF'];
+  return orden.map(bg => ({
+    bg,
+    nombre: nombre[bg],
+    // La carpeta solo existe en el escritorio (lee el disco con main.js).
+    tools: TOOLS.concat(EXTRA_TOOLS).filter(tool => tool.bg === bg && (tool.id !== 'carpeta' || !!(window.electronAPI && window.electronAPI.carpetaElegir))),
+  })).filter(g => g.tools.length);
+}
+
 function gruposDeMas() {
   const nombre = {
     '#90B968': window.t('Escribir', 'Write'),
@@ -100,6 +118,71 @@ function gruposDeMas() {
     else grupos.push({ bg: tool.bg, nombre: nombre[tool.bg] || '', tools: [tool] });
   });
   return grupos;
+}
+
+// La hoja «Añadir» del teléfono. El tirador de arriba la deja bajar con el
+// dedo: si se suelta pasada una distancia, se cierra; si no, vuelve.
+function HojaNodos({ t, activeTool, onCierra, onElige, onToca }) {
+  const [bajada, setBajada] = React.useState(0);
+  const inicio = React.useRef(null);
+  const pulsa = (e) => {
+    inicio.current = e.clientY;
+    try { e.currentTarget.setPointerCapture(e.pointerId); } catch (err) {}
+  };
+  const mueve = (e) => {
+    if (inicio.current == null) return;
+    setBajada(Math.max(0, e.clientY - inicio.current));
+  };
+  const suelta = () => {
+    if (inicio.current == null) return;
+    inicio.current = null;
+    if (bajada > 90) onCierra();
+    else setBajada(0);
+  };
+  return (
+    <div className="hoja-nodos-fondo" onClick={onCierra}>
+      <div
+        className="hoja-nodos"
+        role="dialog"
+        aria-label={window.t('Añadir al lienzo', 'Add to the canvas')}
+        style={bajada ? { transform: `translateY(${bajada}px)`, transition: 'none' } : undefined}
+        onClick={(e) => e.stopPropagation()}
+        onMouseDown={(e) => e.stopPropagation()}
+      >
+        <div className="hoja-tirador" onPointerDown={pulsa} onPointerMove={mueve} onPointerUp={suelta} onPointerCancel={suelta}>
+          <span/>
+        </div>
+        <div className="hoja-nodos-cabeza">
+          <b>{window.t('Añadir al lienzo', 'Add to the canvas')}</b>
+          <button className="hoja-cerrar" onClick={onCierra} aria-label={window.t('Cerrar', 'Close')}>
+            <span className="material-symbols-rounded">close</span>
+          </button>
+        </div>
+        <div className="hoja-nodos-cuerpo">
+          {gruposDeTodos().map(g => (
+            <div className="hoja-nodos-grupo" key={g.bg}>
+              <div className="hoja-nodos-nombre">{g.nombre}</div>
+              <div className="hoja-nodos-rejilla">
+                {g.tools.map(tool => (
+                  <button
+                    key={tool.id}
+                    className={`hoja-nodo press ${activeTool === tool.id ? 'active' : ''}`}
+                    onMouseDown={(e) => onElige(e, tool.id)}
+                    onClick={() => onToca(tool.id)}
+                  >
+                    <span className="hoja-nodo-icono" style={{ background: tool.bg, color: tool.fg || 'var(--ink)' }}>
+                      <span className="material-symbols-rounded">{tool.icon}</span>
+                    </span>
+                    <span className="hoja-nodo-nombre">{t[tool.label] || tool.id}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function Topbar({
@@ -356,6 +439,7 @@ function Topbar({
             {idx === 12 && <div className="tool-divider"/>}
             <button
               className={`tool press ${activeTool === tool.id ? 'active' : ''}`}
+              data-tool={tool.id}
               title={`${t[tool.label] || tool.id} · ${window.t('Arrastra al canvas o clic', 'Drag to canvas or click')}`}
               onMouseDown={(e)=>startToolDrag(e, tool.id)}
               onClick={() => window.playAudioTone && window.playAudioTone('click')}
@@ -489,61 +573,43 @@ function Topbar({
         document.body
       )}
 
-      {/* En el teléfono se queda la lista de siempre, pegada al raíl de
-          herramientas: una tira de once nodos no cabe de lado en una pantalla
-          de móvil. */}
+      {/* En el teléfono, «Más» abre una hoja desde abajo con TODOS los nodos
+          por grupos de color, a tamaño de dedo (como la de Freeform en el
+          iPhone). Se cierra tocando fuera, con la X o bajándola por el
+          tirador. Elegir uno es lo mismo que en la barra: luego se toca el
+          lienzo donde va. */}
       {extraOpen && esMovil() && ReactDOM.createPortal(
-        <>
-          <div
-            style={{ position: 'fixed', inset: 0, zIndex: 400 }}
-            onClick={() => setExtraOpen(false)}
-          />
-          <div
-            className="extra-tools-popout"
-            /* En movil el panel se ancla al rail vertical desde la hoja de
-               estilos (right/bottom). Poner left/top aqui la pisaba y el panel
-               se iba fuera de la pantalla, asi que ahi se deja en auto y manda
-               el CSS. */
-            style={esMovil()
-              ? { position: 'fixed', left: 'auto', top: 'auto', margin: 0 }
-              : { position: 'fixed', left: extraPos.left, top: extraPos.top, margin: 0 }}
-            onMouseDown={(e)=>e.stopPropagation()}
-          >
-            <div className="extra-tools-title">
-              {window.t('EXTRAS', 'EXTRAS')}
-            </div>
-            {EXTRA_TOOLS.map(tool => (
-              <button
-                key={tool.id}
-                className="extra-tools-btn"
-                onMouseDown={(e) => {
-                  setExtraOpen(false);
-                  startToolDrag(e, tool.id);
-                }}
-                onClick={() => {
-                  setExtraOpen(false);
-                  window.playAudioTone && window.playAudioTone('click');
-                  setActiveTool(tool.id);
-                }}
-              >
-                <div
-                  className="extra-tools-icon"
-                  style={{
-                    background: activeTool === tool.id ? 'var(--olive)' : tool.bg,
-                    color: activeTool === tool.id ? 'white' : (tool.fg || 'var(--ink)'),
-                  }}
-                >
-                  <span className="material-symbols-rounded" style={{ fontSize: '16px' }}>{tool.icon}</span>
-                </div>
-                <span className="extra-tools-label">
-                  {t[tool.label] || tool.id}
-                </span>
-              </button>
-            ))}
-          </div>
-        </>,
+        <HojaNodos
+          t={t}
+          activeTool={activeTool}
+          onCierra={() => setExtraOpen(false)}
+          onElige={(e, toolId) => { setExtraOpen(false); startToolDrag(e, toolId); }}
+          onToca={(toolId) => { setExtraOpen(false); window.playAudioTone && window.playAudioTone('click'); setActiveTool(toolId); }}
+        />,
         document.body
       )}
+
+      {/* Deshacer y rehacer, a la vista en el teléfono (en el escritorio están
+          con las demás acciones). Antes vivían dentro del panel ⋯: dos toques
+          para lo que más se usa. */}
+      <button
+        className="solo-movil movil-deshacer"
+        onClick={() => { onUndo && onUndo(); window.playAudioTone && window.playAudioTone('click'); }}
+        disabled={!canUndo}
+        aria-label={window.t('Deshacer', 'Undo')}
+        title={window.t('Deshacer', 'Undo')}
+      >
+        <span className="material-symbols-rounded">undo</span>
+      </button>
+      <button
+        className="solo-movil movil-rehacer"
+        onClick={() => { onRedo && onRedo(); window.playAudioTone && window.playAudioTone('click'); }}
+        disabled={!canRedo}
+        aria-label={window.t('Rehacer', 'Redo')}
+        title={window.t('Rehacer', 'Redo')}
+      >
+        <span className="material-symbols-rounded">redo</span>
+      </button>
 
       {/* Botón "⋯": en móvil despliega todo lo que sigue como panel; en
           escritorio está oculto y .topbar-tail usa display:contents, así que la

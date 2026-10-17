@@ -1027,4 +1027,8 @@ window.ODI_IDIOMAS.de = {
   1022: "Wo die Leiste mit den Knoten zum Erstellen sitzt: oben wie immer, links, rechts oder unten. Die Änderung gilt sofort.",
   1023: "Oben",
   1024: "Unten",
+  1025: "Ganze Leinwand zeigen",
+  1026: "Zurück auf 100 %",
+  1027: "Striche",
+  1028: "Zur Leinwand hinzufügen",
 };

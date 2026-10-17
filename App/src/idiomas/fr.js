@@ -1027,4 +1027,8 @@ window.ODI_IDIOMAS.fr = {
   1022: "Où va la barre des nœuds à créer : en haut, comme toujours, à gauche, à droite ou en bas. Le changement est immédiat.",
   1023: "En haut",
   1024: "En bas",
+  1025: "Voir tout le canevas",
+  1026: "Revenir à 100 %",
+  1027: "Traits",
+  1028: "Ajouter au canevas",
 };

@@ -6244,6 +6244,8 @@ html[data-mobile="1"] .topbar {
   padding-right: max(6px, env(safe-area-inset-right));
   flex-wrap: nowrap;
 }
+/* Lo que solo existe en el teléfono (deshacer y rehacer arriba, Topbar.jsx). */
+.solo-movil { display: none; }
 html[data-mobile="1"] .topbar .brand { flex: 0 0 auto; }
 html[data-mobile="1"] .topbar .brand-mark { width: 26px; height: 26px; }
 html[data-mobile="1"] .topbar > .topbar-spacer { display: none; }
@@ -8232,3 +8234,160 @@ html:not([data-mobile="1"])[data-barra="bottom"] .mas-serpiente { transform-orig
 .barra-sitio-dibujo.izquierda::after { top: 4px; bottom: 4px; left: 4px; width: 5px; }
 .barra-sitio-dibujo.derecha::after { top: 4px; bottom: 4px; right: 4px; width: 5px; }
 .barra-sitio-dibujo.abajo::after { left: 14px; right: 14px; bottom: 4px; height: 5px; }
+
+/* ══ El teléfono, rehecho (17/10, la propuesta A) ══
+   Lo pidió el usuario: la versión de teléfono se le hacía incómoda. Se miró
+   cómo lo hacen Freeform y Notas en el iPhone y Samsung Notes, y se eligió:
+   · las herramientas ABAJO, donde llega el pulgar: Nota, Tareas, Imagen,
+     Lápiz y «Más», que abre una hoja con todos los nodos (Topbar.jsx,
+     HojaNodos). Fuera el raíl de la derecha y su botón flotante;
+   · con un nodo elegido, esa misma fila es la barra del nodo (con :has, sin
+     tocar el JS de cada barra);
+   · deshacer y rehacer arriba, a la vista;
+   · nada que se toque por debajo de 44 px. */
+html[data-mobile="1"] .solo-movil {
+  display: grid; place-items: center; flex: 0 0 auto;
+  width: 44px; height: 44px; padding: 0;
+  border: none; background: none; color: var(--ink);
+}
+html[data-mobile="1"] .solo-movil:disabled { opacity: 0.35; }
+html[data-mobile="1"] .solo-movil .material-symbols-rounded { font-size: 24px; }
+html[data-mobile="1"] .crumb-back,
+html[data-mobile="1"] .topbar-more { width: 44px; height: 44px; }
+html[data-mobile="1"] .crumb-pill { min-height: 44px; }
+
+/* La barra de abajo. */
+html[data-mobile="1"] .tools,
+html[data-mobile="1"] .tools.rail-closed {
+  display: flex;
+  position: fixed;
+  top: auto; left: 0; right: 0; bottom: 0;
+  max-height: none;
+  flex-direction: row;
+  justify-content: space-around;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 8px max(6px, env(safe-area-inset-right)) calc(10px + env(safe-area-inset-bottom)) max(6px, env(safe-area-inset-left));
+  border: none;
+  border-top: 1.5px solid var(--line);
+  border-radius: 0;
+  background: var(--paper);
+  box-shadow: 0 -4px 14px rgba(0, 0, 0, 0.06);
+  overflow: visible;
+  z-index: 110;
+}
+html[data-mobile="1"] .tools > .tool:not([data-tool="note"]):not([data-tool="todo"]):not([data-tool="image"]):not([data-tool="draw"]):not(.mas-boton),
+html[data-mobile="1"] .tools > .tool-divider { display: none; }
+html[data-mobile="1"] .tools .tool { flex: 1 1 0; max-width: 84px; min-height: 44px; padding: 2px 0; gap: 4px; }
+html[data-mobile="1"] .tools .tool .tool-icon { width: 48px; height: 48px; border-radius: 12px; }
+html[data-mobile="1"] .tools .tool .material-symbols-rounded { font-size: 24px; }
+html[data-mobile="1"] .tools .tool .tool-label { display: block; font-size: 11.5px; }
+/* «Más», oscuro: es la puerta a todo lo demás, no un nodo. */
+html[data-mobile="1"] .tools .mas-boton .tool-icon { background: #1A1A1A !important; color: #FFFFFF !important; }
+html[data-mobile="1"] .tools-fab { display: none !important; }
+/* Con un nodo elegido, su barra ocupa este sitio. */
+html[data-mobile="1"] body:has(.ctx-side) .tools { display: none; }
+
+/* La barra del nodo elegido: la fila de abajo, de lado a lado. --teclado lo
+   pone touch.js: con el teclado abierto, la barra se queda encima de él
+   (formato encima del teclado, como en Notas). */
+html[data-mobile="1"] .ctx-side,
+html[data-mobile="1"] .ctx-side.text-format,
+html[data-mobile="1"] .ctx-side.ctx-side-day,
+html[data-mobile="1"][data-orient="landscape"] .ctx-side,
+html[data-mobile="1"][data-orient="landscape"] .ctx-side.text-format,
+html[data-mobile="1"][data-orient="landscape"] .ctx-side.ctx-side-day {
+  left: 0; right: 0;
+  bottom: var(--teclado, 0px);
+  padding: 8px max(8px, env(safe-area-inset-right)) calc(8px + env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left));
+  border: none;
+  border-top: 1.5px solid var(--line);
+  border-radius: 0;
+  box-shadow: 0 -4px 14px rgba(0, 0, 0, 0.06);
+  gap: 6px;
+}
+html[data-mobile="1"] .ctx-side .ctx-btn { min-width: 56px; min-height: 52px; }
+html[data-mobile="1"] .ctx-side .ctx-close { width: 44px; height: 44px; }
+html[data-mobile="1"][data-orient="portrait"] .ctx-popout {
+  left: max(8px, env(safe-area-inset-left));
+  right: max(8px, env(safe-area-inset-right));
+  bottom: calc(84px + var(--teclado, 0px) + env(safe-area-inset-bottom));
+}
+/* Mientras se dibuja, la barra se aparta (como la de Marcación de Apple). */
+html[data-mobile="1"].pintando .ctx-side { opacity: 0.15; pointer-events: none; transition: opacity 160ms; }
+
+/* La fila de encima: zoom a la izquierda, fondo y plantillas detrás, y las
+   conexiones a la derecha. El resto de la barra de estado (guardado, cuántos
+   nodos) no cabe en un teléfono y no se echa de menos. */
+html[data-mobile="1"] .zoom-ctrls { bottom: calc(96px + env(safe-area-inset-bottom)); }
+html[data-mobile="1"] .canvas-bg-selector { left: 68px !important; bottom: calc(99px + env(safe-area-inset-bottom)) !important; }
+html[data-mobile="1"] .plantillas-esquina { left: 108px !important; bottom: calc(96px + env(safe-area-inset-bottom)) !important; }
+html[data-mobile="1"] .plantillas-panel { bottom: calc(148px + env(safe-area-inset-bottom)); }
+html[data-mobile="1"] .status-bar {
+  left: auto;
+  right: max(8px, env(safe-area-inset-right));
+  bottom: calc(96px + env(safe-area-inset-bottom));
+}
+html[data-mobile="1"] .status-bar > *:not(.odi-graph-btn) { display: none; }
+html[data-mobile="1"] .status-bar .odi-graph-btn { pointer-events: auto; min-height: 36px; }
+html[data-mobile="1"] .place-hint { bottom: calc(150px + env(safe-area-inset-bottom)); right: 8px; }
+
+/* En horizontal falta alto: la barra de abajo sin nombres y más baja. */
+html[data-mobile="1"][data-orient="landscape"] .tools .tool .tool-label { display: none; }
+html[data-mobile="1"][data-orient="landscape"] .tools { top: auto; bottom: 0; padding-top: 6px; padding-bottom: calc(6px + env(safe-area-inset-bottom)); }
+html[data-mobile="1"][data-orient="landscape"] .tools .tool .tool-icon { width: 44px; height: 44px; }
+html[data-mobile="1"][data-orient="landscape"] .zoom-ctrls,
+html[data-mobile="1"][data-orient="landscape"] .status-bar { bottom: calc(66px + env(safe-area-inset-bottom)); }
+html[data-mobile="1"][data-orient="landscape"] .canvas-bg-selector { left: 68px !important; bottom: calc(69px + env(safe-area-inset-bottom)) !important; }
+html[data-mobile="1"][data-orient="landscape"] .status-bar { right: max(8px, env(safe-area-inset-right)); }
+html[data-mobile="1"][data-orient="landscape"] .plantillas-esquina { bottom: calc(66px + env(safe-area-inset-bottom)) !important; }
+
+/* La hoja «Añadir» (Topbar.jsx, HojaNodos). */
+.hoja-nodos-fondo {
+  position: fixed; inset: 0; z-index: 500;
+  display: flex; align-items: flex-end;
+  background: rgba(20, 18, 26, 0.38);
+  animation: hoja-fondo 180ms ease-out;
+}
+.hoja-nodos {
+  width: 100%; max-height: 82dvh;
+  display: flex; flex-direction: column;
+  background: var(--paper);
+  border-top: 1.5px solid var(--line);
+  border-radius: 18px 18px 0 0;
+  box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.2);
+  padding-bottom: env(safe-area-inset-bottom);
+  animation: hoja-sube 280ms var(--muelle, cubic-bezier(0.34, 1.4, 0.64, 1));
+  transition: transform 200ms var(--e-out);
+}
+.hoja-tirador { display: flex; justify-content: center; padding: 10px 0 6px; touch-action: none; cursor: grab; }
+.hoja-tirador span { width: 40px; height: 5px; border-radius: 3px; background: var(--line-soft); }
+.hoja-nodos-cabeza { display: flex; align-items: center; gap: 10px; padding: 0 14px 8px 18px; }
+.hoja-nodos-cabeza b { flex: 1; font-family: var(--font-display); font-weight: 800; font-size: 19px; }
+.hoja-cerrar {
+  width: 44px; height: 44px; flex: 0 0 auto; display: grid; place-items: center;
+  border: 1.5px solid var(--line); border-radius: 22px; background: var(--paper); color: var(--ink);
+}
+.hoja-cerrar .material-symbols-rounded { font-size: 22px; }
+.hoja-nodos-cuerpo { overflow-y: auto; overscroll-behavior: contain; padding: 4px 14px 18px; display: flex; flex-direction: column; gap: 16px; }
+.hoja-nodos-nombre { margin: 0 0 8px 4px; font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-3); }
+.hoja-nodos-rejilla { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px 6px; }
+.hoja-nodo {
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  min-height: 78px; padding: 4px 0;
+  border: none; background: none; color: var(--ink);
+}
+.hoja-nodo-icono {
+  width: 52px; height: 52px; display: grid; place-items: center;
+  border: 1.5px solid var(--line); border-radius: 14px; box-shadow: var(--pop-sm);
+}
+.hoja-nodo-icono .material-symbols-rounded { font-size: 25px; }
+.hoja-nodo-nombre { font-size: 12px; font-weight: 700; text-align: center; line-height: 1.15; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.hoja-nodo.active .hoja-nodo-icono { outline: 2.5px solid var(--olive); outline-offset: 2px; }
+[data-theme="dark"] .hoja-nodos { background: #2F2D2F; }
+[data-theme="dark"] .hoja-cerrar { background: #3A383A; }
+@keyframes hoja-sube { from { transform: translateY(100%); } to { transform: none; } }
+@keyframes hoja-fondo { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  .hoja-nodos, .hoja-nodos-fondo { animation: none; }
+}

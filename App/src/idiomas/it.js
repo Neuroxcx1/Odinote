@@ -1027,4 +1027,8 @@ window.ODI_IDIOMAS.it = {
   1022: "Dove va la barra con i nodi da creare: in alto, come sempre, a sinistra, a destra o in basso. Cambia subito.",
   1023: "In alto",
   1024: "In basso",
+  1025: "Mostra tutta la tela",
+  1026: "Torna al 100 %",
+  1027: "Tratti",
+  1028: "Aggiungi alla tela",
 };

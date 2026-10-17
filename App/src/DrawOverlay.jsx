@@ -213,6 +213,9 @@ function DrawOverlay({
   const onPointerDown = (e) => {
     if (e.button != null && e.button !== 0) return;
     pointersRef.current.add(e.pointerId);
+    // Mientras se pinta, la barra del dibujo se aparta (styles.css, .pintando;
+    // solo en el teléfono, donde tapa media pantalla).
+    document.documentElement.classList.add('pintando');
     // Dos dedos = pellizco para hacer zoom, que resuelve Canvas. Lo que
     // hubiera empezado a dibujarse se descarta.
     if (pointersRef.current.size > 1) {
@@ -308,6 +311,7 @@ function DrawOverlay({
 
   const endPointer = (e) => {
     pointersRef.current.delete(e.pointerId);
+    if (!pointersRef.current.size) document.documentElement.classList.remove('pintando');
     const drag = dragRef.current;
     // Al salirse de la capa el círculo de la goma no tiene dónde estar.
     if (e.type === 'pointerleave') paintRing(null);
@@ -330,6 +334,7 @@ function DrawOverlay({
 
   const onPointerCancel = (e) => {
     pointersRef.current.delete(e.pointerId);
+    if (!pointersRef.current.size) document.documentElement.classList.remove('pintando');
     drawingRef.current = null;
     dragRef.current = null;
     clearLive();
@@ -369,6 +374,8 @@ function DrawOverlay({
 
   // Al cambiar de herramienta, el círculo de la goma no se queda pintado.
   React.useEffect(() => { if (tool !== 'eraser') clearLive(); }, [tool]);
+  // Al salir del modo dibujo con el dedo aún puesto, que la barra no se quede apartada.
+  React.useEffect(() => () => document.documentElement.classList.remove('pintando'), []);
 
   return (
     <div

@@ -53,6 +53,14 @@
     // 100vh en móvil incluye la barra de URL, que aparece y desaparece: usamos
     // la altura real para que el lienzo no quede cortado por debajo.
     html.style.setProperty('--app-h', window.innerHeight + 'px');
+    // Lo que tapa el teclado por abajo. En el iPhone la ventana no encoge al
+    // abrirlo (la vista visible sí); en Android depende del navegador. La
+    // barra del nodo se pone encima (styles.css, --teclado): el formato queda
+    // pegado al teclado, como en Notas. Por debajo de 80 px es la barra de la
+    // dirección que aparece y desaparece, no el teclado.
+    const vv = window.visualViewport;
+    const teclado = vv ? Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop)) : 0;
+    html.style.setProperty('--teclado', (teclado > 80 ? teclado : 0) + 'px');
   }
 
   applyEnvFlags();

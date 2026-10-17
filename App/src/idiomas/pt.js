@@ -1027,4 +1027,8 @@ window.ODI_IDIOMAS.pt = {
   1022: "Onde fica a barra com os nós para criar: em cima, como sempre, à esquerda, à direita ou embaixo. Muda na hora.",
   1023: "Em cima",
   1024: "Embaixo",
+  1025: "Ver a tela inteira",
+  1026: "Voltar para 100 %",
+  1027: "Traços",
+  1028: "Adicionar à tela",
 };

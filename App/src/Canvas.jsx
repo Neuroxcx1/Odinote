@@ -1270,6 +1270,52 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
     applySnapshot(historyIdxRef.current + 1);
   };
 
+  // ───── En el teléfono: dos dedos deshacen, tres rehacen ─────
+  // Un toque corto con dos dedos que no se mueven es «deshacer»; con tres,
+  // «rehacer», como en Procreate y las apps de dibujo del iPad. Si los dedos
+  // se mueven es un pellizco o un arrastre y no cuenta. Deshacer sigue arriba
+  // para quien no conozca el gesto.
+  const gestosRef = useRefCanvas({});
+  gestosRef.current = { undo, redo };
+  useEffectCanvas(() => {
+    const el = surfaceRef.current;
+    if (!el) return;
+    let toque = null;
+    const empieza = (e) => {
+      if (e.touches.length < 2) { toque = null; return; }
+      const pts = [...e.touches].map(t => ({ id: t.identifier, x: t.clientX, y: t.clientY }));
+      if (!toque) toque = { t0: Date.now(), dedos: e.touches.length, pts, movido: false };
+      else { toque.dedos = Math.max(toque.dedos, e.touches.length); toque.pts = toque.pts.concat(pts.filter(p => !toque.pts.some(q => q.id === p.id))); }
+    };
+    const mueve = (e) => {
+      if (!toque) return;
+      for (const t of e.touches) {
+        const p = toque.pts.find(q => q.id === t.identifier);
+        if (p && Math.hypot(p.x - t.clientX, p.y - t.clientY) > 14) toque.movido = true;
+      }
+    };
+    const acaba = (e) => {
+      if (!toque || e.touches.length > 0) return;
+      const corto = Date.now() - toque.t0 < 320;
+      if (corto && !toque.movido) {
+        if (toque.dedos === 2) gestosRef.current.undo();
+        else if (toque.dedos >= 3) gestosRef.current.redo();
+        if (navigator.vibrate) { try { navigator.vibrate(8); } catch (err) {} }
+      }
+      toque = null;
+    };
+    el.addEventListener('touchstart', empieza, { passive: true });
+    el.addEventListener('touchmove', mueve, { passive: true });
+    el.addEventListener('touchend', acaba, { passive: true });
+    el.addEventListener('touchcancel', acaba, { passive: true });
+    return () => {
+      el.removeEventListener('touchstart', empieza);
+      el.removeEventListener('touchmove', mueve);
+      el.removeEventListener('touchend', acaba);
+      el.removeEventListener('touchcancel', acaba);
+    };
+  }, []);
+
   // ───── Reset state on canvas change ─────
   useEffectCanvas(() => {
     setSelected(null);
@@ -6565,7 +6611,27 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
           <button title={window.t('Alejar', 'Zoom out')} onClick={()=>setScale(s => Math.max(0.2, s - 0.1))}>
             <span className="material-symbols-rounded" style={{fontSize:15}}>remove</span>
           </button>
-          <button className="zoom-level" onClick={()=>{ setScale(1); setPan({x:40, y:20}); }}>
+          <button
+            className="zoom-level"
+            title={(window.odiIsMobile && window.odiIsMobile()) ? window.t('Ver todo el lienzo', 'Show the whole canvas') : window.t('Volver al 100 %', 'Back to 100 %')}
+            onClick={()=>{
+              // En el teléfono, encuadrar todo lo que hay (como «ajustar al
+              // contenido» de Freeform): alejarse a pellizcos para buscar un
+              // nodo perdido es lo más pesado de un lienzo grande en el móvil.
+              // En el escritorio, volver al 100 % como siempre.
+              if (!(window.odiIsMobile && window.odiIsMobile())) { setScale(1); setPan({x:40, y:20}); return; }
+              const its = (current && current.items) || [];
+              const r = surfaceRef.current ? surfaceRef.current.getBoundingClientRect() : { width: window.innerWidth, height: window.innerHeight };
+              if (!its.length) { setScale(1); setPan({x:40, y:20}); return; }
+              const x0 = Math.min(...its.map(i => i.x)), y0 = Math.min(...its.map(i => i.y));
+              const x1 = Math.max(...its.map(i => i.x + (i.w || 0))), y1 = Math.max(...its.map(i => i.y + (i.h || 0)));
+              // Lo de abajo (la barra y la fila del zoom) tapa unos 150 px.
+              const libreAlto = Math.max(120, r.height - 150);
+              const s = Math.max(0.2, Math.min(1.25, Math.min((r.width - 48) / Math.max(1, x1 - x0), (libreAlto - 48) / Math.max(1, y1 - y0))));
+              setScale(s);
+              setPan({ x: Math.round(r.width / 2 - ((x0 + x1) / 2) * s), y: Math.round(libreAlto / 2 - ((y0 + y1) / 2) * s) });
+            }}
+          >
             {Math.round(scale * 100)}%
           </button>
           <button title={window.t('Acercar', 'Zoom in')} onClick={()=>setScale(s => Math.min(2.5, s + 0.1))}>
