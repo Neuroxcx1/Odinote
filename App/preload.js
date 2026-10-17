@@ -63,6 +63,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
       return () => ipcRenderer.removeListener('ventana:estado', f);
     },
     arrastra: (que) => ipcRenderer.send('ventana:arrastra', que),
+    // La escala de toda la aplicación (Ajustes). guardar=false mientras se
+    // arrastra la barra; true al soltarla.
+    escala: (f, guardar) => ipcRenderer.invoke('ventana:escala', f, !!guardar),
+    leeEscala: () => ipcRenderer.invoke('ventana:escala-lee'),
   },
   onGoogleSigninCompleted: (callback) => {
     const listener = (event, profile) => callback(profile);

@@ -7931,3 +7931,26 @@ body.odi-cuentagotas, body.odi-cuentagotas * { cursor: crosshair !important; }
 .panel-color.en-hoja .panel-color-paletas { max-height: none; }
 .panel-color.en-hoja .panel-color-mas { width: 28px; height: 28px; }
 .panel-color.en-hoja .panel-color-borra { opacity: 1; width: 28px; height: 28px; }
+
+
+/* ── Ajustes: el tamaño de toda la aplicación (Ventana.jsx, AjusteEscala) ── */
+.ajuste-escala { display: flex; flex-direction: column; gap: 8px; }
+.ajuste-escala-fila { display: flex; align-items: center; gap: 10px; }
+.ajuste-escala-barra { flex: 1; accent-color: var(--olive); cursor: pointer; }
+.ajuste-escala-icono { color: var(--ink-2); flex-shrink: 0; }
+.ajuste-escala-icono.pequena { font-size: 15px; }
+.ajuste-escala-icono.grande { font-size: 24px; }
+.ajuste-escala-valor {
+  min-width: 54px; text-align: right;
+  font-family: var(--font-mono, ui-monospace, monospace); font-size: 13px; font-weight: 700;
+  color: var(--ink);
+}
+.ajuste-escala-rapidos { display: flex; gap: 6px; flex-wrap: wrap; }
+.ajuste-escala-rapido {
+  padding: 5px 10px; cursor: pointer;
+  background: #FFFFFF; color: #1A1A1A; font-size: 12px; font-weight: 700;
+  border: 1.5px solid var(--line-soft); border-radius: 6px;
+}
+.ajuste-escala-rapido:hover { border-color: var(--line); }
+.ajuste-escala-rapido.activo { background: var(--olive); color: #FFFFFF; border-color: var(--olive); }
+.ajuste-escala-nota { margin: 0; font-size: 12px; line-height: 1.5; color: var(--text-soft, #595459); }

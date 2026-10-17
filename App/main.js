@@ -31,7 +31,8 @@ function appWC() {
 function colocaVistas() {
   if (!mainWindow || !vistaApp) return;
   const [w, h] = mainWindow.getContentSize();
-  const arriba = (ventanaFijada || mainWindow.isFullScreen()) ? 0 : ALTO_BARRA;
+  // La barra de título crece con la escala de la aplicación (ver aplicaEscala).
+  const arriba = (ventanaFijada || mainWindow.isFullScreen()) ? 0 : Math.round(ALTO_BARRA * escalaApp);
   vistaApp.setBounds({ x: 0, y: arriba, width: w, height: Math.max(0, h - arriba) });
 }
 
@@ -163,6 +164,11 @@ function createWindow() {
   });
   vistaApp.setBackgroundColor(fondoVentana);
   mainWindow.setBrowserView(vistaApp);
+  // La escala guardada, en cuanto cargue cada página (Chromium la olvida al
+  // navegar).
+  escalaApp = leeEscalaGuardada();
+  vistaApp.webContents.on('did-finish-load', aplicaEscala);
+  mainWindow.webContents.on('did-finish-load', aplicaEscala);
   colocaVistas();
   mainWindow.loadFile(path.join(__dirname, 'barra-titulo.html'), { query: { tema: savedTheme === 'dark' ? 'dark' : 'light' } });
 
@@ -1428,6 +1434,47 @@ ipcMain.handle('ventana:opacidad', (event, valor) => {
   mainWindow.setOpacity(ventanaFijada ? v : 1);
   return mainWindow.getOpacity();
 });
+
+// ── La escala de la aplicación (Ajustes → Tamaño de la interfaz) ──
+// Para quien tiene una pantalla 4K y ve los botones diminutos, o una de 720 y
+// quiere que quepa más. Es el zoom de la página de Chromium y no un cambio de
+// tamaños en el CSS: así crece todo por igual y las cuentas del lienzo (dónde
+// cae el ratón, el zoom del lienzo) siguen cuadrando solas. Se aplica también a
+// la barra de título, que es otra página, y la vista baja con ella.
+// Se guarda en config.json: el localStorage no vale, porque la escala hace
+// falta antes de que cargue la página (si no, se vería un salto al arrancar).
+let escalaApp = 1;
+const ESCALA_MIN = 0.5, ESCALA_MAX = 2;
+function leeEscalaGuardada() {
+  try {
+    const c = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+    const f = Number(c.escala);
+    return f >= ESCALA_MIN && f <= ESCALA_MAX ? f : 1;
+  } catch (e) { return 1; }
+}
+function aplicaEscala() {
+  try { if (vistaApp && !vistaApp.webContents.isDestroyed()) vistaApp.webContents.setZoomFactor(escalaApp); } catch (e) {}
+  try { if (mainWindow && !mainWindow.webContents.isDestroyed()) mainWindow.webContents.setZoomFactor(escalaApp); } catch (e) {}
+  colocaVistas();
+}
+ipcMain.handle('ventana:escala', (event, valor, guardar) => {
+  const f = Math.round(Math.max(ESCALA_MIN, Math.min(ESCALA_MAX, Number(valor) || 1)) * 100) / 100;
+  escalaApp = f;
+  aplicaEscala();
+  if (guardar) {
+    try {
+      let config = {};
+      if (fs.existsSync(configPath)) { try { config = JSON.parse(fs.readFileSync(configPath, 'utf-8')); } catch (e) {} }
+      config.escala = f;
+      fs.writeFileSync(configPath, JSON.stringify(config, null, 2), 'utf-8');
+      logToFile('escala de la aplicación: ' + Math.round(f * 100) + ' %');
+    } catch (err) {
+      logToFile('escala: no se pudo guardar: ' + err.message);
+    }
+  }
+  return escalaApp;
+});
+ipcMain.handle('ventana:escala-lee', () => escalaApp);
 
 // Mover la ventana fijada: sin barra de título no hay de dónde agarrarla, así
 // que la aplicación avisa cuando se pulsa en una zona vacía de su barra de

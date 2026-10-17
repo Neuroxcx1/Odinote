@@ -135,5 +135,132 @@ function BotonFijar({ className }) {
   }, true);
 })();
 
+// ── El tamaño de toda la aplicación (Ajustes) ──
+//
+// Pedido así: en una pantalla 4K los botones de arriba salen diminutos, y en
+// una de 720 se querría ver más cosas a la vez. Una barra del 50 % al 200 %,
+// y la aplicación de detrás cambia mientras se arrastra, para ver lo que se
+// está haciendo. La ventana de Ajustes no cambia con ella (la compensa quien
+// la pinta, con onCambia): si creciera bajo el ratón, la barra se escaparía
+// del puntero en cada paso.
+//
+// Por arriba, el tope es lo que cabe: por debajo de 860 px de ancho la
+// aplicación pasa a la disposición del teléfono (touch.js), así que una
+// pantalla de 1366 px no puede ir más allá del 150 %.
+//
+// Es el zoom de Chromium (main.js, ventana:escala). En la web no hay forma de
+// tocarlo desde la página: allí se explica el del navegador.
+const ESCALA_ANCHO_MINIMO = 900;
+const ESCALAS_RAPIDAS = [0.75, 1, 1.25, 1.5];
+
+function AjusteEscala({ onCambia, onArrastra }) {
+  const { useState, useEffect, useRef } = React;
+  const api = window.electronAPI && window.electronAPI.ventana && window.electronAPI.ventana.escala ? window.electronAPI.ventana : null;
+  const [escala, setEscala] = useState(1);
+  const pendiente = useRef(null);
+  const barraRef = useRef(null);
+
+  // El tope sale del ancho de la VENTANA en píxeles de verdad (lo que mide en
+  // CSS por la escala que ya tiene), no del de la pantalla: con la ventana a
+  // 1280 en un monitor de 1920, el 200 % la dejaba en 640 y la aplicación se
+  // ponía como en el teléfono. Se mide una vez al abrir: mientras se arrastra,
+  // el ancho en CSS cambia con la escala y el tope bailaría.
+  const [anchoReal, setAnchoReal] = useState(window.innerWidth);
+  const maximo = Math.max(1, Math.min(2, Math.floor(anchoReal / ESCALA_ANCHO_MINIMO * 20) / 20));
+
+  useEffect(() => {
+    if (!api || !api.leeEscala) return;
+    api.leeEscala().then(f => {
+      if (!f) return;
+      setEscala(f);
+      setAnchoReal(window.innerWidth * f);
+      onCambia && onCambia(f);
+    }).catch(() => {});
+  }, []);
+
+  // Soltar la barra: el «change» de verdad. El onChange de React salta en
+  // cada movimiento, como onInput, y guardaría config.json a cada paso.
+  const ponRef = useRef(null);
+  useEffect(() => {
+    const b = barraRef.current;
+    if (!b) return;
+    const alSoltar = () => { ponRef.current && ponRef.current(Number(b.value) / 100, true); onArrastra && onArrastra(false); };
+    b.addEventListener('change', alSoltar);
+    return () => b.removeEventListener('change', alSoltar);
+  }, [api]);
+
+  if (!api) {
+    return (
+      <p className="ajuste-escala-nota">
+        {window.t(
+          'En el navegador, el tamaño lo pone el propio navegador: Ctrl + y Ctrl − (o ⌘ + y ⌘ − en Mac), y Ctrl 0 para volver.',
+          'In the browser, size is set by the browser itself: Ctrl + and Ctrl − (or ⌘ + and ⌘ − on Mac), and Ctrl 0 to reset.')}
+      </p>
+    );
+  }
+
+  // Mientras se arrastra se manda una vez por cuadro y sin guardar; al soltar
+  // se guarda. Así no se escribe config.json cuarenta veces por segundo.
+  const pon = (f, guardar) => {
+    const v = Math.max(0.5, Math.min(maximo, Math.round(f * 100) / 100));
+    setEscala(v);
+    onCambia && onCambia(v);
+    if (guardar) { pendiente.current = null; api.escala(v, true); return; }
+    if (pendiente.current == null) {
+      requestAnimationFrame(() => {
+        const x = pendiente.current;
+        pendiente.current = null;
+        if (x != null) api.escala(x, false);
+      });
+    }
+    pendiente.current = v;
+  };
+
+  ponRef.current = pon;
+  const pct = Math.round(escala * 100);
+  return (
+    <div className="ajuste-escala">
+      <div className="ajuste-escala-fila">
+        <span className="material-symbols-rounded ajuste-escala-icono pequena" aria-hidden="true">text_fields</span>
+        <input
+          ref={barraRef}
+          type="range"
+          className="ajuste-escala-barra"
+          min={50}
+          max={Math.round(maximo * 100)}
+          step={5}
+          value={pct}
+          aria-label={window.t('Tamaño de la interfaz', 'Interface size')}
+          onPointerDown={() => onArrastra && onArrastra(true)}
+          onPointerUp={() => onArrastra && onArrastra(false)}
+          onChange={(e) => pon(Number(e.target.value) / 100, false)}
+        />
+        <span className="material-symbols-rounded ajuste-escala-icono grande" aria-hidden="true">text_fields</span>
+        <span className="ajuste-escala-valor">{pct} %</span>
+      </div>
+      <div className="ajuste-escala-rapidos">
+        {ESCALAS_RAPIDAS.filter(f => f <= maximo + 0.001).map(f => (
+          <button
+            key={f}
+            type="button"
+            className={`ajuste-escala-rapido ${Math.abs(f - escala) < 0.001 ? 'activo' : ''}`}
+            onClick={() => pon(f, true)}
+          >
+            {Math.round(f * 100)} %{f === 1 ? window.t(' (normal)', ' (normal)') : ''}
+          </button>
+        ))}
+      </div>
+      {maximo < 2 && (
+        <p className="ajuste-escala-nota">
+          {window.t(
+            `En esta pantalla llega hasta el ${Math.round(maximo * 100)} %: más grande, la aplicación ya no cabría y se pondría como en el teléfono.`,
+            `On this screen it goes up to ${Math.round(maximo * 100)} %: any bigger and the app would no longer fit and would switch to the phone layout.`)}
+        </p>
+      )}
+    </div>
+  );
+}
+
 window.BotonFijar = BotonFijar;
 window.useVentana = useVentana;
+window.AjusteEscala = AjusteEscala;

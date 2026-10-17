@@ -300,6 +300,14 @@ function App() {
   const [updateProgress, setUpdateProgress] = useStateApp(0);
   const [contextMenu, setContextMenu] = useStateApp(null);
   const [settingsOpen, setSettingsOpen] = useStateApp(false);
+  // La escala de toda la aplicación (Ajustes → Tamaño de la interfaz). Aquí
+  // para que la ventana de Ajustes se pinte compensada desde el primer cuadro.
+  const [escalaUI, setEscalaUI] = useStateApp(1);
+  const [arrastrandoEscala, setArrastrandoEscala] = useStateApp(false);
+  React.useEffect(() => {
+    const v = window.electronAPI && window.electronAPI.ventana;
+    if (v && v.leeEscala) v.leeEscala().then(f => { if (f) setEscalaUI(f); }).catch(() => {});
+  }, []);
   const [showTouchDiag, setShowTouchDiag] = useStateApp(false);
   // Explicación del atajo señalado. Va en un elemento aparte con posición fija
   // porque la lista de atajos está dentro de un contenedor con scroll, y ahí
@@ -3257,12 +3265,13 @@ function App() {
       )}
 
       {settingsOpen && (
-        <div className="doc-modal-overlay" style={{ zIndex: 10000, display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.45)' }} onClick={() => setSettingsOpen(false)}>
+        <div className="doc-modal-overlay" style={{ zIndex: 10000, display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: arrastrandoEscala ? 'rgba(0,0,0,0.06)' : 'rgba(0,0,0,0.45)', transition: 'background 200ms' }} onClick={() => setSettingsOpen(false)}>
           <div 
             className="doc-modal-window" 
             style={{ 
               width: '680px', 
-              maxHeight: '90vh', 
+              // 90vh de una página ya ampliada se quedan cortos: se compensa como el zoom.
+              maxHeight: (90 * (escalaUI || 1)) + 'vh', 
               padding: '24px', 
               borderRadius: '16px', 
               background: 'var(--bg-card, #FFFFFF)', 
@@ -3270,7 +3279,11 @@ function App() {
               boxShadow: '0 8px 30px rgba(0,0,0,0.12)',
               display: 'flex',
               flexDirection: 'column',
-              gap: '16px'
+              gap: '16px',
+              // La ventana de Ajustes no crece ni encoge con la escala: se
+              // compensa, para que el fondo cambie y la barra no se escape del
+              // ratón mientras se arrastra (ver AjusteEscala en Ventana.jsx).
+              zoom: escalaUI && escalaUI !== 1 ? 1 / escalaUI : undefined,
             }} 
             onClick={(e) => e.stopPropagation()}
           >
@@ -3329,6 +3342,24 @@ function App() {
             )}
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', overflowY: 'auto' }}>
+              {/* Tamaño de la interfaz: lo primero, porque quien lo necesita
+                  (una pantalla 4K) lo busca nada más abrir los ajustes. */}
+              {window.AjusteEscala && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <div style={{ fontWeight: '600', fontSize: '14px', color: 'var(--wine, #7B2D26)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span className="material-symbols-rounded" style={{ fontSize: '18px' }}>zoom_in</span>
+                    <span>{window.t('Tamaño de la interfaz', 'Interface size')}</span>
+                  </div>
+                  <p style={{ fontSize: '12.5px', color: 'var(--text-soft, #595459)', margin: 0, lineHeight: '1.5' }}>
+                    {window.t(
+                      'Agranda o encoge toda la aplicación: botones, letra y lienzo. Más grande en una pantalla 4K; más pequeño para que quepa más en una pantalla pequeña. Mira el fondo mientras mueves la barra.',
+                      'Make the whole app bigger or smaller: buttons, text and canvas. Bigger on a 4K screen; smaller to fit more on a small screen. Watch the background while you move the slider.'
+                    )}
+                  </p>
+                  <window.AjusteEscala onCambia={setEscalaUI} onArrastra={setArrastrandoEscala} />
+                </div>
+              )}
+
               {/* Sección Corrector Ortográfico */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 <div style={{ fontWeight: '600', fontSize: '14px', color: 'var(--wine, #7B2D26)', display: 'flex', alignItems: 'center', gap: '6px' }}>
