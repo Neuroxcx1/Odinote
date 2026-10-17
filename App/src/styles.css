@@ -8088,3 +8088,7 @@ body.odi-cuentagotas, body.odi-cuentagotas * { cursor: crosshair !important; }
   border: 1.5px solid var(--line); border-radius: 4px;
 }
 .panel-color-gotero-texto { font-size: 11.5px; font-weight: 700; color: var(--ink-2); }
+
+/* El ▶ de un bloque que no es JavaScript: gris, y al pulsarlo la terminal
+   explica cómo ejecutarlo. */
+.code-run.otro-lenguaje { background: #5A6475; }

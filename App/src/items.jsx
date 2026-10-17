@@ -3890,8 +3890,7 @@ function CodeItem({ item, lang, editing, onUpdate, callbacks }) {
     if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
       e.preventDefault();
       e.stopPropagation();
-      if (ejecutable) ejecutar();
-      else if (window.showToast) window.showToast(window.t('Solo se puede ejecutar JavaScript.', 'Only JavaScript can be run.'));
+      ejecutar();
     }
   };
 
@@ -3913,7 +3912,15 @@ function CodeItem({ item, lang, editing, onUpdate, callbacks }) {
     if (el) el.scrollTop = el.scrollHeight;
   }, [terminal]);
   const ejecutar = () => {
-    if (!ejecutable) return;
+    // Con otro lenguaje no se ejecuta, pero se dice por qué y cómo cambiarlo:
+    // un ▶ que no hace nada, o que no sale, parece que la terminal no existe.
+    if (!ejecutable) {
+      const nombre = lenguaje.id === 'auto' ? (adivinado || window.t('un lenguaje que no se reconoce', 'an unrecognised language')) : lenguaje.nombre;
+      setTerminal({ lineas: [{ tipo: 'info', texto: window.t(
+        `Esta terminal ejecuta JavaScript, y este bloque está en ${nombre}. Para ejecutarlo, elige «JavaScript» en el botón del lenguaje de la barra del nodo (el de < >).`,
+        `This terminal runs JavaScript, and this block is in ${nombre}. To run it, pick «JavaScript» with the language button in the node bar (the < > one).`) }], estado: 'nojs' });
+      return;
+    }
     if (enMarcha.current) enMarcha.current.para();
     const lineas = [];
     setTerminal({ lineas: [], estado: 'corriendo' });
@@ -3936,6 +3943,7 @@ function CodeItem({ item, lang, editing, onUpdate, callbacks }) {
     if (t.estado === 'hecho') return window.t('listo', 'done') + ' · ' + Math.round(t.ms) + ' ms';
     if (t.estado === 'fallo') return window.t('con un error', 'with an error');
     if (t.estado === 'tiempo') return window.t('parado: más de 5 s (¿un bucle sin fin?)', 'stopped: over 5 s (an endless loop?)');
+    if (t.estado === 'nojs') return window.t('solo JavaScript', 'JavaScript only');
     return window.t('parado', 'stopped');
   };
   const sinArrastrar = (e) => e.stopPropagation();
@@ -3977,10 +3985,10 @@ function CodeItem({ item, lang, editing, onUpdate, callbacks }) {
               ? (adivinado ? `• ${adivinado}` : window.t('Automático', 'Auto'))
               : lenguaje.nombre}
           </span>
-          {ejecutable && (
+          {window.OdiEjecuta && (
             <button
               type="button"
-              className={`code-run ${terminal && terminal.estado === 'corriendo' ? 'corriendo' : ''}`}
+              className={`code-run ${terminal && terminal.estado === 'corriendo' ? 'corriendo' : ''} ${ejecutable ? '' : 'otro-lenguaje'}`}
               onMouseDown={sinArrastrar}
               onDoubleClick={sinArrastrar}
               onClick={(e) => { e.stopPropagation(); if (terminal && terminal.estado === 'corriendo') paraYa(); else ejecutar(); }}
