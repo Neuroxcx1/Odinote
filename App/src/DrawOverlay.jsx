@@ -17,7 +17,7 @@ function DrawOverlay({
   strokes, tool, color, width, pressureMode,
   scale, pan, bounds, theme,
   selectedStrokeId,
-  onCommitStroke, onEraseStroke, onMoveStroke, onSelectStroke,
+  onCommitStroke, onEraseStroke, onEraseArea, onMoveStroke, onSelectStroke,
 }) {
   const D = window.OdiDraw;
   const layerRef = React.useRef(null);
@@ -117,6 +117,45 @@ function DrawOverlay({
     }
   };
 
+  // ── La goma ──
+  // Su tamaño sale del grosor elegido (así se cambia con el mismo botón), con
+  // un mínimo en pantalla para que al alejarse no se quede en un punto.
+  const radioGoma = () => Math.max(8 / viewRef.current.scale, (toolRef.current.width || 4) * 2.5);
+
+  // El círculo de la goma sigue al puntero: sin verlo no se sabe qué se va a
+  // borrar. Se pinta en el mismo lienzo del trazo en curso.
+  const paintRing = (e) => {
+    const cv = liveRef.current;
+    const layer = layerRef.current;
+    if (!cv || !layer) return;
+    sizeLive();
+    const ctx = cv.getContext('2d');
+    const dpr = window.devicePixelRatio || 1;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, cv.width / dpr, cv.height / dpr);
+    if (!e) return;
+    const rect = layer.getBoundingClientRect();
+    const r = radioGoma() * viewRef.current.scale;
+    ctx.beginPath();
+    ctx.arc(e.clientX - rect.left, e.clientY - rect.top, r, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(255,255,255,0.35)';
+    ctx.fill();
+    ctx.lineWidth = 1.5;
+    ctx.strokeStyle = 'rgba(26,26,26,0.75)';
+    ctx.stroke();
+  };
+
+  // Entre dos movimientos del ratón la mano puede haber recorrido mucho: se
+  // borra también lo de en medio, cada medio radio, o quedarían islas sin
+  // borrar en una pasada rápida.
+  const pasoDeGoma = (a, b, r) => {
+    const d = Math.hypot(b.x - a.x, b.y - a.y);
+    const n = Math.max(1, Math.ceil(d / (r / 2)));
+    const out = [];
+    for (let k = 1; k <= n; k++) out.push({ x: a.x + (b.x - a.x) * k / n, y: a.y + (b.y - a.y) * k / n });
+    return out;
+  };
+
   // ── Puntero ──
   const addSample = (e, isLast) => {
     const cur = drawingRef.current;
@@ -162,9 +201,14 @@ function DrawOverlay({
     const tol = 6 / viewRef.current.scale;
 
     if (t.tool === 'eraser') {
-      const id = D.hitTest(strokesRef.current, p.x, p.y, tol);
-      if (id) onEraseStroke(id);
-      dragRef.current = { kind: 'erase' };
+      if (onEraseArea) {
+        onEraseArea([p], radioGoma(), 'inicio');
+      } else {
+        const id = D.hitTest(strokesRef.current, p.x, p.y, tol);
+        if (id) onEraseStroke(id);
+      }
+      dragRef.current = { kind: 'erase', last: p };
+      paintRing(e);
       return;
     }
 
@@ -196,11 +240,18 @@ function DrawOverlay({
 
   const onPointerMove = (e) => {
     const drag = dragRef.current;
+    if (toolRef.current.tool === 'eraser' && !drawingRef.current) paintRing(e);
     if (drag) {
       const p = toCanvas(e);
       if (drag.kind === 'erase') {
-        const id = D.hitTest(strokesRef.current, p.x, p.y, 6 / viewRef.current.scale);
-        if (id) onEraseStroke(id);
+        if (onEraseArea) {
+          const r = radioGoma();
+          onEraseArea(pasoDeGoma(drag.last || p, p, r), r);
+          drag.last = p;
+        } else {
+          const id = D.hitTest(strokesRef.current, p.x, p.y, 6 / viewRef.current.scale);
+          if (id) onEraseStroke(id);
+        }
       } else if (drag.kind === 'move') {
         const dx = p.x - drag.lastX;
         const dy = p.y - drag.lastY;
@@ -226,11 +277,14 @@ function DrawOverlay({
   const endPointer = (e) => {
     pointersRef.current.delete(e.pointerId);
     const drag = dragRef.current;
+    // Al salirse de la capa el círculo de la goma no tiene dónde estar.
+    if (e.type === 'pointerleave') paintRing(null);
     if (drag) {
       dragRef.current = null;
       // El movimiento se ha ido aplicando en vivo; aquí solo se cierra para
       // que quede UNA entrada de deshacer, no una por píxel.
       if (drag.kind === 'move' && drag.moved) onMoveStroke(drag.id, 0, 0, true);
+      if (drag.kind === 'erase' && onEraseArea) onEraseArea(null, 0, 'fin');
       return;
     }
     const cur = drawingRef.current;
@@ -278,7 +332,11 @@ function DrawOverlay({
     );
   };
 
-  const cursor = tool === 'eraser' ? 'cell' : tool === 'move' ? 'default' : 'crosshair';
+  // Con la goma el cursor es su círculo (paintRing): la flecha encima estorba.
+  const cursor = tool === 'eraser' ? 'none' : tool === 'move' ? 'default' : 'crosshair';
+
+  // Al cambiar de herramienta, el círculo de la goma no se queda pintado.
+  React.useEffect(() => { if (tool !== 'eraser') clearLive(); }, [tool]);
 
   return (
     <div

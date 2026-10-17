@@ -1963,6 +1963,15 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
       const items = cdata?.items;
       const types = cdata ? Array.from(cdata.types || []) : [];
 
+      // Pegar dibujando (una imagen de referencia para calcarla, sobre todo):
+      // lo pegado entra en el lienzo pero NO se selecciona. Antes se
+      // seleccionaba, la barra lateral cambiaba a la de la imagen y el modo
+      // dibujo se quedaba abierto sin sus botones, sin manera de guardar. Y al
+      // no tocarlo queda por debajo del dibujo (el orden de apilado sigue a lo
+      // último seleccionado), que es donde tiene que estar para pintar encima.
+      const enDibujo = !!drawingId;
+      const seleccionaPegado = (id) => { if (!enDibujo) setSelected(id); };
+
       // Paste structured items and connectors
       const pasteData = (data) => {
         if (!data || !data.items || !data.items.length) return;
@@ -2036,7 +2045,9 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
           return next;
         });
 
-        if (pastedItems.length === 1) {
+        if (enDibujo) {
+          // Ver seleccionaPegado: dibujando, la selección es del dibujo.
+        } else if (pastedItems.length === 1) {
           setSelected(pastedItems[0].id);
           setSelectedIds([]);
         } else if (pastedItems.length > 1) {
@@ -2065,7 +2076,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
               const c = prev[currentId];
               return { ...prev, [currentId]: { ...c, items: [...c.items, newItem] } };
             });
-            setSelected(newItem.id);
+            seleccionaPegado(newItem.id);
           }
         };
 
@@ -2222,7 +2233,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
           const c = prev[currentId];
           return { ...prev, [currentId]: { ...c, items: [...c.items, newItem] } };
         });
-        setSelected(newItem.id);
+        seleccionaPegado(newItem.id);
         window.playAudioTone && window.playAudioTone('drop');
         return;
       }
@@ -2480,6 +2491,25 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
     return list.filter(s => s.id !== id);
   });
 
+  // La goma: borra un círculo de los trazos por cada punto por donde pasa
+  // (ver OdiDraw.eraseArea). Una pasada entera, de pulsar a soltar, es UN
+  // paso de deshacer; si no, cada movimiento del ratón sería uno.
+  const drawErasingRef = useRefCanvas(false);
+  const eraseArea = (puntos, r, fase) => {
+    if (fase === 'fin') { drawErasingRef.current = false; return; }
+    if (fase === 'inicio') drawErasingRef.current = false;
+    const D = window.OdiDraw;
+    const corta = (lista) => puntos.reduce((l, p) => D.eraseArea(l, p.x, p.y, r), lista);
+    setDrawSession(s => {
+      if (!s) return s;
+      const next = corta(s.strokes);
+      if (next === s.strokes) return s;
+      if (drawErasingRef.current) return { ...s, strokes: next };
+      drawErasingRef.current = true;
+      return { strokes: next, past: [...s.past, s.strokes].slice(-60), future: [] };
+    });
+  };
+
   const moveStroke = (id, dx, dy, isEnd) => {
     if (isEnd) { drawMovingRef.current = false; return; }
     const D = window.OdiDraw;
@@ -2497,7 +2527,14 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
 
   const recolorStroke = (hex) => {
     setDrawColor(hex);
-    if (!selectedStrokeId) return;
+    // Elegir un color es querer pintar con él: si estabas con Mover o con la
+    // goma, se vuelve al lápiz. Si no, el trazo siguiente no salía y parecía
+    // que el color no había cambiado («le daba a cambiar de color y no
+    // pasaba nada»). Con un trazo elegido no: ahí el color es para ese trazo.
+    if (!selectedStrokeId) {
+      if (drawTool !== 'pen') setDrawTool('pen');
+      return;
+    }
     applyDrawChange(list => list.map(s => s.id === selectedStrokeId ? { ...s, color: hex } : s));
   };
 
@@ -5923,6 +5960,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
             selectedStrokeId={selectedStrokeId}
             onCommitStroke={commitStroke}
             onEraseStroke={eraseStroke}
+            onEraseArea={eraseArea}
             onMoveStroke={moveStroke}
             onSelectStroke={setSelectedStrokeId}
           />

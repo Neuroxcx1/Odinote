@@ -188,5 +188,33 @@ const check = (nombre, ok, extra) => {
     OdiDraw.hitStroke({ id: 'x', width: 30, pts: [[0, 0, 1], [100, 0, 1]] }, 50, 12, 0));
 }
 
+// ── La goma de verdad ──
+// Una raya recta guardada con solo dos puntos: la goma en medio tiene que
+// partirla en dos, aunque ahí no haya ningún punto guardado.
+{
+  const raya = [{ id: 'r', color: '#000', width: 4, pts: [[0, 0, 1], [200, 0, 1]] }];
+  const partida = OdiDraw.eraseArea(raya, 100, 0, 10);
+  check('la goma en medio parte la raya en dos', partida.length === 2, String(partida.length));
+  const izq = partida[0], der = partida[1];
+  const finIzq = izq && izq.pts[izq.pts.length - 1][0];
+  const iniDer = der && der.pts[0][0];
+  check('el hueco queda donde pasó la goma', finIzq > 80 && finIzq < 92 && iniDer > 108 && iniDer < 120, `${finIzq} … ${iniDer}`);
+  check('los trozos conservan color y grosor', izq.color === '#000' && der.width === 4);
+  check('cada trozo es un trazo nuevo, con su id', izq.id !== der.id && izq.id !== 'r');
+  check('los trozos salen simplificados (una raya sigue siendo pocos puntos)', izq.pts.length <= 3 && der.pts.length <= 3,
+    `${izq.pts.length} y ${der.pts.length}`);
+  check('lejos de todo no cambia nada (y es la misma lista)', OdiDraw.eraseArea(raya, 100, 80, 10) === raya);
+  check('en una punta solo recorta, no parte', OdiDraw.eraseArea(raya, 0, 0, 10).length === 1);
+  check('una goma que lo cubre todo lo borra entero', OdiDraw.eraseArea(raya, 100, 0, 150).length === 0);
+  // El borde de la línea cuenta: una línea gorda se toca antes que su centro.
+  const gorda = [{ id: 'g', width: 30, pts: [[0, 0, 1], [200, 0, 1]] }];
+  check('una línea gorda se borra al rozar su borde', OdiDraw.eraseArea(gorda, 100, 20, 8).length === 2);
+  // El grosor que variaba por el camino se mantiene en los trozos.
+  const variable = [{ id: 'v', width: 6, pts: [[0, 0, 0.5], [200, 0, 1.1]] }];
+  const v = OdiDraw.eraseArea(variable, 100, 0, 5);
+  const fv = v[1] && v[1].pts[0][2];
+  check('el grosor variable se reparte en el corte', fv > 0.75 && fv < 0.9, String(fv));
+}
+
 console.log(fallos === 0 ? '\nTodo correcto.' : `\n${fallos} prueba(s) fallidas.`);
 process.exit(fallos === 0 ? 0 : 1);

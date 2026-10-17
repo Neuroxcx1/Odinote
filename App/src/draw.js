@@ -323,6 +323,66 @@
     return (strokes || []).reduce((n, s) => n + (s.pts || []).length, 0);
   }
 
+  // ── La goma de verdad ──
+  //
+  // El borrador quitaba el trazo ENTERO que tocaba; quien probó el modo
+  // dibujo esperaba una goma: que borre solo por donde pasa y el trazo se
+  // parta en dos. Los trazos se guardan simplificados (una raya recta son
+  // dos puntos), así que primero se rellenan de puntos intermedios, para que
+  // el corte caiga donde pasa la goma y no en el siguiente punto guardado.
+  function densify(pts, paso) {
+    if (!pts || pts.length < 2) return (pts || []).slice();
+    const out = [pts[0]];
+    for (let i = 1; i < pts.length; i++) {
+      const a = pts[i - 1], b = pts[i];
+      const d = Math.hypot(b[0] - a[0], b[1] - a[1]);
+      const n = Math.max(1, Math.ceil(d / paso));
+      for (let k = 1; k <= n; k++) {
+        const t = k / n;
+        const fa = a[2] == null ? 1 : a[2], fb = b[2] == null ? 1 : b[2];
+        out.push([a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, fa + (fb - fa) * t]);
+      }
+    }
+    return out;
+  }
+
+  // Borra el círculo (x, y, r) de todos los trazos: lo de dentro se va y lo
+  // de fuera se queda partido en trozos, cada uno un trazo con su propio id.
+  // Devuelve la MISMA lista si no tocó nada, para no apuntar un deshacer
+  // vacío por cada movimiento del ratón que pasa por un hueco.
+  function eraseArea(strokes, x, y, r) {
+    const lista = strokes || [];
+    let cambio = false;
+    const out = [];
+    lista.forEach(s => {
+      const pts = s.pts || [];
+      const half = (s.width || 4) / 2;
+      // Lo que toca la goma es el borde de la línea, no solo su centro.
+      const alcance = r + half;
+      const dentro = (p) => Math.hypot(p[0] - x, p[1] - y) <= alcance;
+      // Lejos del todo: ni se mira punto a punto.
+      const toca = pts.length === 1 ? dentro(pts[0])
+        : pts.some((p, i) => i < pts.length - 1 && perpDistance([x, y], p, pts[i + 1]) <= alcance);
+      if (!toca) { out.push(s); return; }
+      cambio = true;
+      const finos = densify(pts, Math.max(0.5, r / 3));
+      const trozos = [];
+      let actual = [];
+      finos.forEach(p => {
+        if (dentro(p)) { if (actual.length) trozos.push(actual); actual = []; }
+        else actual.push(p);
+      });
+      if (actual.length) trozos.push(actual);
+      trozos.forEach((t, k) => {
+        // Un punto suelto que queda al borde no es un trazo: es la mota que
+        // deja la goma, y molesta más que ayuda.
+        if (t.length < 2) return;
+        out.push({ ...s, id: `${s.id}-${k}-${Math.floor(Math.random() * 9999)}`, pts: roundPts(simplify(t, 0.6), 1) });
+      });
+    });
+    return cambio ? out : lista;
+  }
+
   const OdiDraw = {
     MIN_F, MAX_F,
     factorFromPressure, factorFromSpeed, factorFor, smoothFactor, stabilize, CHASE,
@@ -331,6 +391,7 @@
     smoothPath, ribbonPath, strokeGeometry, isUniform,
     strokesBounds, translateStrokes,
     hitStroke, hitTest, totalPoints,
+    densify, eraseArea,
   };
   if (typeof window !== 'undefined') window.OdiDraw = OdiDraw;
   if (typeof module !== 'undefined' && module.exports) module.exports = OdiDraw;
