@@ -3201,6 +3201,73 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
     'Está bloqueado: quítale el candado para moverlo o borrarlo.',
     'It is locked: unlock it to move or delete it.'));
 
+  // ── Las plantillas (window.OdiPlantillas) ──
+  // Se ponen en el centro de lo que se está viendo, de una vez (un solo paso de
+  // deshacer) y quedan elegidas, para poder moverlas juntas a otro sitio.
+  const [plantillasAbiertas, setPlantillasAbiertas] = useStateCanvas(false);
+  // Como cualquier menú: Escape o un clic fuera lo cierran. Sin esto se quedaba
+  // abierto tapando el lienzo hasta volver a pulsar el botón.
+  useEffectCanvas(() => {
+    if (!plantillasAbiertas) return;
+    const tecla = (e) => { if (e.key === 'Escape') { e.stopPropagation(); setPlantillasAbiertas(false); } };
+    const fuera = (e) => { if (!e.target.closest || !e.target.closest('.plantillas-esquina')) setPlantillasAbiertas(false); };
+    document.addEventListener('keydown', tecla, true);
+    document.addEventListener('pointerdown', fuera, true);
+    return () => {
+      document.removeEventListener('keydown', tecla, true);
+      document.removeEventListener('pointerdown', fuera, true);
+    };
+  }, [plantillasAbiertas]);
+  const ponPlantilla = (id) => {
+    const P = window.OdiPlantillas;
+    const pl = P && P.PLANTILLAS.find(x => x.id === id);
+    if (!pl) return;
+    const { w, h } = P.caja(pl);
+    const rect = surfaceRef.current ? surfaceRef.current.getBoundingClientRect() : { width: window.innerWidth, height: window.innerHeight };
+    const ox = Math.round((rect.width / 2 - pan.x) / scale - w / 2);
+    const oy = Math.round((rect.height / 2 - pan.y) / scale - h / 2);
+    const sello = Date.now();
+    const porRef = {};
+    // Sin «const { a, ...resto } = n»: el Babel del navegador lo convierte en
+    // una variable global _excluded, y otro archivo ya tiene la suya; al
+    // cargarlos juntos la página se quedaba en blanco.
+    const sinCampos = (o, fuera) => { const r = {}; Object.keys(o).forEach(k => { if (fuera.indexOf(k) === -1) r[k] = o[k]; }); return r; };
+    const nuevos = pl.nodos.map((n, k) => {
+      const { ref, tipo, x, y, w: nw, h: nh, hijos } = n;
+      const resto = sinCampos(n, ['ref', 'tipo', 'x', 'y', 'w', 'h', 'hijos']);
+      const it = makeNewItem(tipo, ox + x, oy + y, nw, nh, lang);
+      // makeNewItem pone el id con la hora en milisegundos: doce nodos en el
+      // mismo milisegundo podrían repetirlo.
+      it.id = `it-${sello}-pl${k}-${Math.floor(Math.random() * 99999)}`;
+      Object.assign(it, JSON.parse(JSON.stringify(resto)));
+      if (hijos) {
+        it.children = hijos.map((hj, j) => {
+          const tipoHijo = hj.tipo;
+          const restoHijo = sinCampos(hj, ['tipo']);
+          const hijo = makeNewItem(tipoHijo, 0, 0, undefined, hj.h, lang);
+          return { ...hijo, ...JSON.parse(JSON.stringify(restoHijo)), id: `${it.id}-h${j}` };
+        });
+      }
+      porRef[ref] = it.id;
+      return it;
+    });
+    const flechas = (pl.flechas || []).map(([a, b], k) => ({
+      id: `cn-${sello}-pl${k}-${Math.floor(Math.random() * 9999)}`,
+      fromEnd: { itemId: porRef[a] }, toEnd: { itemId: porRef[b] },
+      bend: { x: 0, y: 0 }, isColorExplicit: false,
+    }));
+    setCanvases(prev => {
+      const c = prev[currentId];
+      return { ...prev, [currentId]: { ...c, items: [...c.items, ...nuevos], connectors: [...(c.connectors || []), ...flechas] } };
+    });
+    setSelected(null);
+    setSelectedIds(nuevos.map(n => n.id));
+    window.playAudioTone && window.playAudioTone('create');
+    window.showToast && window.showToast(window.t(
+      `Plantilla puesta: ${pl.nombre.es}. Está elegida entera: arrástrala para moverla.`,
+      `Template added: ${pl.nombre.en}. It is all selected: drag it to move it.`));
+  };
+
   const startDragItem = (e, itemId) => {
     if (panearSiEspacio(e)) return;
     if (e.target.closest('input, textarea, button, .todo-check, .swatch-btn, .anchor, .todo-add, .cal-mb-input, .cal-mb-cell, .cal-mb-nav')) return;
@@ -6390,6 +6457,36 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
             </div>
           )}
         </div>
+
+        {/* Las plantillas: abajo a la derecha, donde las pidió el usuario, a la
+            izquierda de la cámara (o en su sitio, en la web, que no la tiene). */}
+        {window.OdiPlantillas && !drawingId && (
+          <div className="plantillas-esquina" style={{ right: (window.electronAPI && window.electronAPI.capturarLienzo) ? 250 : 205 }}
+            onMouseDown={(e) => e.stopPropagation()}>
+            {plantillasAbiertas && (
+              <div className="plantillas-panel">
+                <div className="plantillas-tit">{window.t('Empezar con una plantilla', 'Start from a template')}</div>
+                {window.OdiPlantillas.PLANTILLAS.map(pl => (
+                  <button key={pl.id} className="plantilla" onClick={() => { ponPlantilla(pl.id); setPlantillasAbiertas(false); }}>
+                    <span className="material-symbols-rounded plantilla-icono">{pl.icono}</span>
+                    <span className="plantilla-textos">
+                      <b>{window.t(pl.nombre.es, pl.nombre.en)}</b>
+                      <small>{window.t(pl.descripcion.es, pl.descripcion.en)}</small>
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+            <button
+              className={`icon-btn lift plantillas-boton ${plantillasAbiertas ? 'abierto' : ''}`}
+              onClick={() => { setPlantillasAbiertas(v => !v); window.playAudioTone && window.playAudioTone('click'); }}
+              title={window.t('Plantillas de tablero', 'Board templates')}
+            >
+              <span className="material-symbols-rounded">dashboard_customize</span>
+              <span>{window.t('Plantillas', 'Templates')}</span>
+            </button>
+          </div>
+        )}
 
         {/* Zoom controls */}
         <div className="zoom-ctrls">
