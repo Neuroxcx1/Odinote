@@ -1479,6 +1479,42 @@ function ContextSidebar({
                 <span>{window.t('Sin recorte', 'Uncrop')}</span>
               </button>
             )}
+            {/* Sacar la paleta de la imagen: se guarda entre las paletas del
+                selector de color (para usarla en cualquier proyecto) y se deja
+                al lado un nodo de paleta, para tenerla a la vista en el tablero. */}
+            {window.odiPaletaDeImagen && item.src && (
+              <button
+                className="ctx-btn"
+                onClick={async () => {
+                  try {
+                    const src = window.resolveMediaSrc ? window.resolveMediaSrc(item.src) : item.src;
+                    const colores = await window.odiPaletaDeImagen(src, 6);
+                    if (!colores.length) {
+                      window.showToast && window.showToast(window.t('En esta imagen no hay colores que sacar.', 'There are no colours to take from this image.'));
+                      return;
+                    }
+                    window.odiGuardaPaleta(window.t('De la imagen', 'From the image'), colores);
+                    if (callbacks && callbacks.ponNodoAlLado) {
+                      callbacks.ponNodoAlLado(item.id, {
+                        type: 'swatch', w: 320, h: 112,
+                        title: { es: 'Paleta', en: 'Palette' },
+                        colors: colores.map(hex => ({ hex })),
+                      });
+                    }
+                    window.playAudioTone && window.playAudioTone('create');
+                    window.showToast && window.showToast(window.t(
+                      'Paleta sacada: está al lado de la imagen y entre las paletas del selector de color.',
+                      'Palette taken: it is next to the image and among the colour picker palettes.'));
+                  } catch (e) {
+                    window.showToast && window.showToast(window.t('No se pudieron leer los colores de esta imagen.', 'Could not read the colours of this image.'));
+                  }
+                }}
+                title={window.t('Sacar los colores de esta imagen', 'Take the colours of this image')}
+              >
+                <span className="material-symbols-rounded">palette</span>
+                <span>{window.t('Paleta', 'Palette')}</span>
+              </button>
+            )}
             <button
               className={`ctx-btn ${item.flipH ? 'active' : ''}`}
               onClick={() => {
@@ -2111,21 +2147,15 @@ function ContextSidebar({
         <div className="ctx-popout">
           <div className="ctx-pop-section">
             <div className="ctx-pop-title">{window.t('Color', 'Color')}</div>
-            <div className="ctx-colorhex">
-              <input
-                type="color"
-                value={/^#[0-9a-fA-F]{6}$/.test(item.hex||'') ? item.hex : '#56B3A7'}
-                onChange={(e)=>onUpdate({ hex: e.target.value.toUpperCase() })}
+            {/* El selector de toda la aplicación: su arcoíris abre el panel
+                con la rueda, los códigos HEX/RGB/HSL y el cuentagotas. Antes
+                aquí había la ventana de colores de Windows y un campo suelto. */}
+            {window.SelectorColor && (
+              <window.SelectorColor
+                valor={/^#[0-9a-fA-F]{6}$/.test(item.hex || '') ? item.hex : '#56B3A7'}
+                onCambio={(c) => { if (/^#[0-9a-fA-F]{6}$/.test(c || '')) onUpdate({ hex: c.toUpperCase() }); }}
               />
-              <input
-                type="text"
-                className="ctx-hex-input"
-                value={item.hex || '#56B3A7'}
-                onChange={(e)=>{ let v = e.target.value.trim().toUpperCase(); if (v && !v.startsWith('#')) v = '#' + v; onUpdate({ hex: v }); }}
-                onClick={(e)=>e.stopPropagation()}
-                onMouseDown={(e)=>e.stopPropagation()}
-              />
-            </div>
+            )}
           </div>
         </div>
       )}

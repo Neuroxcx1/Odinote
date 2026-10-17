@@ -598,6 +598,8 @@ function CalendarItem({ item, lang, onUpdate, editing }) {
   React.useEffect(() => {
     if (selector == null && verMas == null && !menuVista) return;
     const fuera = (e) => {
+      // El panel de color va aparte, en el body: un clic en él no es «fuera».
+      if (e.target.closest && e.target.closest('.panel-color')) return;
       if (selector != null && selectorRef.current && !selectorRef.current.contains(e.target)) setSelector(null);
       if (menuVista && vistaRef.current && !vistaRef.current.contains(e.target)) setMenuVista(false);
       if (verMas != null && listaRef.current && !listaRef.current.contains(e.target)) setVerMas(null);

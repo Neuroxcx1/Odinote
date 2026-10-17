@@ -5191,6 +5191,24 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
     openDoc: (id, colId) => setDocOpen({ id, colId }),
     openFile: (id) => setFileOpen({ id }),
     updateItem,
+    // Un nodo nuevo a la derecha de otro, a su misma altura (la paleta que se
+    // saca de una imagen). El que estaba elegido sigue elegido.
+    ponNodoAlLado: (itemId, nodo) => {
+      const c = canvases[currentId];
+      const junto = c && c.items.find(x => x.id === itemId);
+      if (!junto) return;
+      const d = defaultDims(junto.type);
+      const nuevo = Object.assign({
+        id: `it-${Date.now()}-${Math.floor(Math.random() * 99999)}`,
+        x: Math.round((junto.x || 0) + (junto.w || d.w) + 30),
+        y: Math.round(junto.y || 0),
+        _new: true,
+      }, nodo);
+      setCanvases(prev => {
+        const cv = prev[currentId];
+        return { ...prev, [currentId]: { ...cv, items: [...cv.items, nuevo] } };
+      });
+    },
     getNestedItems,
     // Lo que cuenta el nodo de progreso: el proyecto entero o este tablero
     // con lo que tenga dentro (window.OdiProgreso).

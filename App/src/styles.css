@@ -4419,15 +4419,18 @@ html[data-mobile="1"] .connector-hit { stroke-width: 40; }
 .doc-status-sep { opacity: 0.5; }
 /* Elementos nuevos dentro del documento */
 .doc-color-libre { display: flex; align-items: center; gap: 6px; margin-top: 9px; padding-top: 9px; border-top: 1px solid var(--line-soft); }
-.doc-color-libre input[type="color"] {
-  width: 30px; height: 26px; padding: 0; border: 1.5px solid var(--line);
-  border-radius: 3px; background: none; cursor: pointer; flex: 0 0 auto;
+/* La bolita de arcoíris del botón que abre el panel de color. */
+.doc-color-arco {
+  width: 14px; height: 14px; border-radius: 50%; flex: 0 0 auto;
+  border: 1.5px solid var(--line);
+  background: conic-gradient(#E6544F, #DDAF2C, #90B968, #3CA59E, #3D5A80, #955BA5, #E6544F);
 }
 .doc-color-ok {
+  display: flex; align-items: center; justify-content: center; gap: 6px;
   flex: 1; height: 26px; border-radius: 3px; font-size: 11.5px; font-weight: 700;
   background: var(--bg); color: var(--ink-2); border: 1.5px solid var(--line-soft);
 }
-.doc-color-ok:hover { background: var(--olive); color: #fff; border-color: var(--olive); }
+.doc-color-ok:hover, .doc-color-ok.abierto { background: var(--olive); color: #fff; border-color: var(--olive); }
 .doc-modal-content h3 { font-family: var(--font-display); font-size: 17px; font-weight: 700; margin: 16px 0 8px; }
 /* Bloque de código. Antes no tenía estilo propio: el <pre> se quedaba con el
    ajuste por defecto (sin partir líneas), así que una línea larga sacaba una
@@ -7781,3 +7784,150 @@ body.arrastrando-proyecto .ms-sacar-card { border-color: var(--wine) !important;
 /* En el teléfono la fila de abajo no tiene sitio para el texto. */
 html[data-mobile="1"] .plantillas-boton span:not(.material-symbols-rounded) { display: none; }
 html[data-mobile="1"] .plantillas-panel { width: min(320px, calc(100vw - 24px)); }
+
+
+/* ── El panel de color propio (ColorPicker.jsx, PanelColorLibre) ──
+   La propuesta C: la rueda y el cuadro a la izquierda, códigos y paletas a la
+   derecha. Va en el body con posición fija, pegado al panel del arcoíris. */
+.panel-color {
+  position: fixed; z-index: 960;
+  width: 440px; max-width: calc(100vw - 16px);
+  display: flex; gap: 14px; padding: 12px;
+  background: var(--paper); color: var(--ink);
+  border: 1.5px solid var(--line); border-radius: 10px;
+  box-shadow: var(--pop);
+  font-size: 12px;
+  transform-origin: left center;
+  animation: panel-color-entra 240ms var(--muelle) both;
+}
+@keyframes panel-color-entra { from { opacity: 0; transform: translateX(-6px) scale(0.96); } to { opacity: 1; transform: none; } }
+.panel-color-izq { display: flex; flex-direction: column; align-items: center; gap: 10px; flex-shrink: 0; }
+.panel-color-der { display: flex; flex-direction: column; gap: 7px; flex: 1; min-width: 0; }
+
+.panel-color-rueda { position: relative; touch-action: none; cursor: crosshair; flex-shrink: 0; }
+.panel-color-aro {
+  position: absolute; inset: 0; border-radius: 50%;
+  background: conic-gradient(#F00, #FF0, #0F0, #0FF, #00F, #F0F, #F00);
+}
+/* Los dos bordes del aro, el de fuera y el de dentro, con la tinta de la app. */
+.panel-color-rueda::before {
+  content: ""; position: absolute; inset: 0; border-radius: 50%;
+  border: 1.5px solid var(--line); pointer-events: none; z-index: 1;
+}
+.panel-color-aro-borde { position: absolute; border-radius: 50%; border: 1.5px solid var(--line); pointer-events: none; }
+.panel-color-cuadro {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  border: 1.5px solid var(--line); border-radius: 4px; outline: none;
+}
+.panel-color-cuadro:focus-visible, .panel-color-mira.aro:focus-visible { box-shadow: 0 0 0 3px var(--olive-2); }
+.panel-color-mira {
+  position: absolute; width: 14px; height: 14px; margin: -7px 0 0 -7px;
+  border: 2.5px solid #FFFFFF; border-radius: 50%;
+  box-shadow: 0 0 0 1.5px #1A1A1A, inset 0 0 0 1px rgba(0,0,0,0.25);
+  pointer-events: none; z-index: 2;
+}
+.panel-color-mira.aro { width: 16px; height: 16px; margin: -8px 0 0 -8px; outline: none; }
+
+.panel-color-bajo-rueda { display: flex; align-items: center; gap: 6px; align-self: stretch; }
+.panel-color-recientes { display: flex; gap: 4px; flex-wrap: wrap; }
+
+.panel-color-casilla {
+  width: 18px; height: 18px; padding: 0; flex-shrink: 0; cursor: pointer;
+  border: 1.5px solid var(--line); border-radius: 4px;
+  transition: transform 160ms var(--muelle);
+}
+.panel-color-casilla:hover { transform: translateY(-1px) scale(1.12); }
+.panel-color-casilla.activa { box-shadow: 0 0 0 2px var(--paper), 0 0 0 3.5px var(--ink); }
+
+.panel-color-icono {
+  width: 28px; height: 28px; flex-shrink: 0; padding: 0; cursor: pointer;
+  display: grid; place-items: center;
+  background: #FFFFFF; color: #1A1A1A;
+  border: 1.5px solid var(--line); border-radius: 5px;
+}
+.panel-color-icono .material-symbols-rounded { font-size: 16px; }
+.panel-color-icono:hover { background: #F3F2EE; }
+.panel-color-icono.activo { background: var(--olive); color: #FFFFFF; }
+
+.panel-color-arriba { display: flex; align-items: stretch; height: 30px; }
+.panel-color-antes, .panel-color-ahora {
+  flex: 1; display: grid; place-items: center;
+  border: 1.5px solid var(--line); font-size: 11px; font-weight: 700; padding: 0;
+}
+.panel-color-antes { border-radius: 5px 0 0 5px; border-right: none; cursor: pointer; }
+.panel-color-ahora { border-radius: 0 5px 5px 0; }
+.panel-color-listo {
+  margin-left: 8px; padding: 0 12px; cursor: pointer;
+  background: var(--olive); color: #FFFFFF; font-weight: 700; font-size: 12px;
+  border: 1.5px solid var(--line); border-radius: 5px;
+}
+
+.panel-color-fila { display: flex; align-items: center; gap: 6px; }
+.panel-color-etiqueta { width: 30px; flex-shrink: 0; font-size: 10.5px; font-weight: 700; letter-spacing: 0.04em; color: var(--ink-2); }
+.panel-color-campo {
+  flex: 1; min-width: 0; height: 28px; padding: 0 8px;
+  font-family: var(--font-mono, ui-monospace, monospace); font-size: 12px;
+  background: var(--paper-2); color: var(--ink);
+  border: 1.5px solid var(--line); border-radius: 5px; outline: none;
+}
+.panel-color-campo:focus { border-color: var(--olive); box-shadow: 0 0 0 2px var(--olive-l); }
+
+.panel-color-tit { margin-top: 4px; font-size: 10.5px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-3); }
+.panel-color-paletas { display: flex; flex-direction: column; gap: 6px; max-height: 128px; overflow-y: auto; padding-right: 2px; }
+.panel-color-vacio { font-size: 11.5px; color: var(--ink-2); line-height: 1.4; }
+.panel-color-paleta { display: flex; align-items: center; gap: 6px; }
+.panel-color-nombre {
+  width: 64px; flex-shrink: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: 11.5px; color: var(--ink-2); cursor: text;
+}
+.panel-color-nombre-campo {
+  width: 64px; flex-shrink: 0; height: 22px; padding: 0 4px; font-size: 11.5px;
+  background: var(--paper-2); color: var(--ink); border: 1.5px solid var(--olive); border-radius: 4px; outline: none;
+}
+.panel-color-paleta-casillas { display: flex; gap: 4px; flex-wrap: wrap; flex: 1; min-width: 0; }
+.panel-color-mas, .panel-color-borra {
+  width: 18px; height: 18px; padding: 0; flex-shrink: 0; cursor: pointer;
+  display: grid; place-items: center;
+  background: transparent; color: var(--ink-3);
+  border: 1.5px dashed var(--line-soft); border-radius: 4px;
+}
+.panel-color-mas .material-symbols-rounded, .panel-color-borra .material-symbols-rounded { font-size: 14px; }
+.panel-color-mas:hover { color: var(--ink); border-color: var(--line); }
+.panel-color-borra { border: none; opacity: 0; transition: opacity 120ms; }
+.panel-color-paleta:hover .panel-color-borra, .panel-color-borra:focus-visible { opacity: 1; }
+.panel-color-borra:hover { color: var(--wine); }
+.panel-color-borra.seguro { opacity: 1; color: #FFFFFF; background: var(--wine); border-radius: 4px; }
+
+.panel-color-botones { display: flex; gap: 6px; margin-top: 2px; }
+.panel-color-boton {
+  flex: 1; height: 30px; padding: 0 8px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; gap: 5px;
+  background: #FFFFFF; color: #1A1A1A; font-size: 12px; font-weight: 700; white-space: nowrap;
+  border: 1.5px solid var(--line); border-radius: 5px;
+}
+.panel-color-boton .material-symbols-rounded { font-size: 16px; }
+.panel-color-boton.verde { background: var(--olive); color: #FFFFFF; }
+.panel-color-boton:hover { filter: brightness(0.96); }
+
+/* El arcoíris con su panel abierto. */
+.selector-color-libre.abierto { box-shadow: 0 0 0 2px var(--paper), 0 0 0 3.5px var(--olive); }
+
+/* El cuentagotas sin EyeDropper: se toca una imagen del lienzo. */
+body.odi-cuentagotas, body.odi-cuentagotas * { cursor: crosshair !important; }
+
+/* En la ventana estrecha, apilado: la rueda arriba. */
+@media (max-width: 520px) {
+  .panel-color:not(.en-hoja) { flex-direction: column; align-items: stretch; width: auto; }
+}
+/* En el teléfono va dentro de la hoja de abajo, que ya tiene su fondo y su borde. */
+.panel-color.en-hoja {
+  position: static; width: auto; max-width: none;
+  flex-direction: column; align-items: stretch;
+  padding: 0; border: none; box-shadow: none; background: transparent; animation: none;
+}
+.panel-color.en-hoja .panel-color-casilla { width: 28px; height: 28px; }
+.panel-color.en-hoja .panel-color-icono { width: 36px; height: 36px; }
+.panel-color.en-hoja .panel-color-campo { height: 36px; }
+.panel-color.en-hoja .panel-color-paletas { max-height: none; }
+.panel-color.en-hoja .panel-color-mas { width: 28px; height: 28px; }
+.panel-color.en-hoja .panel-color-borra { opacity: 1; width: 28px; height: 28px; }

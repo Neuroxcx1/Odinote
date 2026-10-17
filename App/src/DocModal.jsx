@@ -403,7 +403,9 @@ function DocModal({ docItem, lang, onClose, onUpdate }) {
   const savedRangeRef = React.useRef(null);             // selection captured when the link menu opened
   const linkInputRef = React.useRef(null);
   const popRangeRef = React.useRef(null);               // selección al abrir un desplegable de la barra
-  const colorLibreRef = React.useRef(null);             // color elegido en el selector del sistema
+  const colorLibreRef = React.useRef(null);             // color elegido en el panel de color
+  const arcoDocRef = React.useRef(null);
+  const [panelDocAbierto, setPanelDocAbierto] = React.useState(false);
 
   // Último color usado de cada tipo. Se recuerda entre sesiones porque casi
   // nadie cambia de color a cada frase: se elige uno y se repite.
@@ -1608,19 +1610,36 @@ function DocModal({ docItem, lang, onClose, onUpdate }) {
                   ))}
                 </div>
                 {/* Cualquier color, no solo los de la paleta. Los de arriba son
-                    los que se usan a diario; esto es para el resto. Se aplica al
-                    soltar el selector, no mientras se arrastra, para no llenar
-                    el historial de deshacer con un color por cada píxel movido. */}
+                    los que se usan a diario; esto es para el resto: el panel de
+                    color de toda la aplicación (ColorPicker.jsx). Aquí se aplica
+                    al pulsar «Listo» y no mientras se arrastra, para no llenar el
+                    historial de deshacer del documento con un color por cada
+                    píxel movido. */}
                 <div className="doc-color-libre">
-                  <input
-                    type="color"
-                    defaultValue={pop.kind === 'text' ? '#1A1A1A' : '#FFF3A3'}
-                    title={window.t('Elegir cualquier color', 'Pick any colour')}
-                    onChange={(e)=>{ colorLibreRef.current = e.target.value; }}
-                  />
-                  <button className="doc-color-ok" onClick={aplicaColorLibre}>
-                    {window.t('Usar este color', 'Use this colour')}
+                  <button
+                    ref={arcoDocRef}
+                    className={`doc-color-ok ${panelDocAbierto ? 'abierto' : ''}`}
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => setPanelDocAbierto(v => !v)}
+                  >
+                    <span className="doc-color-arco" aria-hidden="true" />
+                    {window.t('Cualquier color…', 'Any colour…')}
                   </button>
+                  {panelDocAbierto && window.PanelColorLibre && (
+                    <window.PanelColorLibre
+                      valor={pop.kind === 'text' ? '#1A1A1A' : '#FFF3A3'}
+                      recientes={window.odiLeeRecientes ? window.odiLeeRecientes() : []}
+                      ancla={arcoDocRef.current}
+                      onVivo={(c) => { colorLibreRef.current = c; }}
+                      onListo={(c) => {
+                        colorLibreRef.current = c;
+                        setPanelDocAbierto(false);
+                        window.odiApuntaReciente && window.odiApuntaReciente(c);
+                        aplicaColorLibre();
+                      }}
+                      onCancela={() => { colorLibreRef.current = null; setPanelDocAbierto(false); }}
+                    />
+                  )}
                 </div>
               </>
             )}

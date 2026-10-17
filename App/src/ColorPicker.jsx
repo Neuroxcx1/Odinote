@@ -14,16 +14,11 @@
 // La única excepción es el fondo del lienzo, que se queda con sus temas: ahí el
 // color no es una decisión de quien escribe, es la piel del programa.
 //
-// ── El orden de las cosas, que no es casual ──
-//
-// De arriba abajo: los últimos que se usaron, el botón de aceptar, los colores
-// de siempre, y ABAJO DEL TODO el arcoíris.
-//
-// El arcoíris va el último porque abre una ventana del sistema operativo, y esa
-// ventana se coloca junto a lo que la abrió y tapa lo que tenga debajo. Con el
-// arcoíris arriba, esa ventana caía encima del resto del panel y el botón de
-// aceptar quedaba escondido detrás de ella. Con el arcoíris abajo, la ventana
-// cae fuera del panel y todo lo demás se sigue viendo y se puede pulsar.
+// Y desde el 17 de octubre de 2026, «el resto» ya no es la ventana de colores
+// de Windows: es un panel propio (PanelColorLibre, más abajo), el mismo en el
+// ordenador, la web y el teléfono. La ventana del sistema tapaba este panel, se
+// llevaba la selección del texto, no dejaba escribir un código y en Android ni
+// funcionaba.
 // =====================================================
 
 // Los cuatro de trazo: tinta, vino, oliva y azul. Son los de la propia
@@ -82,37 +77,569 @@ function apuntaReciente(color) {
   try { localStorage.setItem(CLAVE_RECIENTES, JSON.stringify(lista)); } catch (e) {}
   return lista;
 }
+// Para quien usa el panel sin pasar por SelectorColor (el documento).
+window.odiLeeRecientes = leeRecientes;
+window.odiApuntaReciente = apuntaReciente;
 
-// ── La rueda de dentro, para el dedo ──
+// =====================================================
+// El panel de color propio (la propuesta C, elegida el 17 de octubre)
 //
-// En el teléfono el arcoíris abría el selector de color de ANDROID, y ahí se
-// perdía todo: elegías un color, pulsabas "Establecer" y no pasaba nada. Ese
-// diálogo es una ventana del sistema, fuera de la página, y lo que devuelve no
-// siempre llega a una aplicación metida en un APK. Comprobado desde el propio
-// teléfono: aplicando el color a mano sí se pinta y sí se guarda, así que lo
-// que fallaba era el diálogo, no la aplicación.
+// Sustituye a la ventana de colores de Windows, que tapaba el panel, se llevaba
+// la selección del texto, no admitía códigos y en el teléfono ni existía. Aquí:
+// una rueda de tono con el cuadro de saturación y brillo dentro, el
+// cuentagotas, los recientes, los tres códigos (HEX, RGB y HSL) con su botón
+// de copiar, y las paletas con nombre. Las cuentas viven en color-logica.js
+// (window.OdiColor), sin React, con su prueba.
 //
-// Aquí no se abre nada de fuera: trece tonos arriba, seis claridades de ese
-// tono abajo, y una fila de grises —que de un tono no sale un gris por mucho
-// que se le quite color, y el blanco y el negro son de los más usados.
-//
-// En el escritorio se queda el selector del sistema: allí funciona, es el que
-// la gente conoce y trae cuentagotas.
-const TONOS_DEDO = [0, 18, 36, 52, 90, 130, 165, 190, 210, 235, 262, 290, 325];
-const CLARIDADES_DEDO = [
-  { s: 72, l: 88 }, { s: 76, l: 76 }, { s: 78, l: 64 },
-  { s: 80, l: 52 }, { s: 70, l: 40 }, { s: 58, l: 28 },
-];
-const GRISES_DEDO = ['#FFFFFF', '#D4D2D6', '#9E9BA1', '#6B686E', '#3A383C', '#1A1A1A'];
+// Lo que se mueve en la rueda se va aplicando (es la única forma de acertar un
+// tono) y se da por bueno al cerrar: con «Listo», pulsando fuera o volviendo a
+// pulsar el arcoíris. Escape y «Antes» devuelven el color con el que se abrió.
+// =====================================================
 
-function hslAHex(h, s, l) {
-  s /= 100; l /= 100;
-  const k = (n) => (n + h / 30) % 12;
-  const a = s * Math.min(l, 1 - l);
-  const f = (n) => l - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1)));
-  const dos = (x) => Math.round(x * 255).toString(16).padStart(2, '0');
-  return '#' + dos(f(0)) + dos(f(8)) + dos(f(4));
+// ── Las paletas con nombre ──
+// En el equipo, como los recientes: son una costumbre de quien trabaja y le
+// sirven en cualquier proyecto. Para dejar una a la vista dentro de un tablero
+// está el nodo de paleta (botón «Paleta» de la barra de una imagen).
+const CLAVE_PALETAS = 'odinote.paletas';
+const MAX_PALETAS = 40;
+const MAX_COLORES_PALETA = 16;
+
+function leePaletas() {
+  try {
+    const lista = JSON.parse(localStorage.getItem(CLAVE_PALETAS) || '[]');
+    if (!Array.isArray(lista)) return [];
+    return lista.filter(p => p && typeof p.id === 'string' && Array.isArray(p.colores))
+      .map(p => ({ id: p.id, nombre: String(p.nombre || ''), colores: p.colores.filter(c => /^#[0-9a-f]{6}$/i.test(c)).slice(0, MAX_COLORES_PALETA) }));
+  } catch (e) {
+    return [];
+  }
 }
+
+function guardaPaletas(lista) {
+  try { localStorage.setItem(CLAVE_PALETAS, JSON.stringify(lista.slice(0, MAX_PALETAS))); } catch (e) {}
+  // Los paneles abiertos se enteran (puede haber más de uno: el de la barra y
+  // el de un calendario, por ejemplo).
+  try { window.dispatchEvent(new Event('odi-paletas')); } catch (e) {}
+}
+
+// Una paleta nueva, la primera de la lista. La usan el panel y el botón
+// «Paleta» de las imágenes.
+window.odiGuardaPaleta = function (nombre, colores) {
+  const p = {
+    id: 'pal-' + Date.now().toString(36) + '-' + Math.floor(Math.random() * 1e5).toString(36),
+    nombre: String(nombre || '').slice(0, 60),
+    colores: (colores || []).map(c => String(c).toUpperCase()).filter(c => /^#[0-9A-F]{6}$/.test(c)).slice(0, MAX_COLORES_PALETA),
+  };
+  guardaPaletas([p, ...leePaletas()]);
+  return p;
+};
+
+// Los colores de una imagen, de una dirección que el navegador sepa pintar
+// (media/…, blob:, data:). Se encoge a 64 px antes de mirarla: para saber qué
+// colores pesan no hacen falta todos los píxeles, y una foto de 4.000 px
+// tardaría un segundo entero.
+window.odiPaletaDeImagen = async function (src, cuantos) {
+  const img = new Image();
+  img.crossOrigin = 'anonymous';
+  img.src = src;
+  await img.decode();
+  const k = Math.min(1, 64 / Math.max(img.naturalWidth || 1, img.naturalHeight || 1));
+  const w = Math.max(1, Math.round((img.naturalWidth || 1) * k));
+  const h = Math.max(1, Math.round((img.naturalHeight || 1) * k));
+  const lienzo = document.createElement('canvas');
+  lienzo.width = w; lienzo.height = h;
+  const cx = lienzo.getContext('2d', { willReadFrequently: true });
+  cx.drawImage(img, 0, 0, w, h);
+  return window.OdiColor.paletaDeImagen(cx.getImageData(0, 0, w, h).data, cuantos || 6);
+};
+
+// ── El cuentagotas cuando el navegador no trae uno ──
+// Chromium (la aplicación y Chrome) tiene window.EyeDropper, que coge un color
+// de cualquier punto de la pantalla. Firefox, Safari y el teléfono no: allí se
+// toca una imagen del lienzo y se lee el píxel que hay debajo del dedo.
+function cuentagotasDeLienzo() {
+  return new Promise((resolve) => {
+    document.body.classList.add('odi-cuentagotas');
+    const acaba = (valor) => {
+      document.removeEventListener('pointerdown', toca, true);
+      document.removeEventListener('keydown', tecla, true);
+      document.body.classList.remove('odi-cuentagotas');
+      resolve(valor);
+    };
+    const tecla = (e) => { if (e.key === 'Escape') { e.stopPropagation(); acaba(null); } };
+    const toca = (e) => {
+      if (e.target.closest && e.target.closest('.panel-color')) return;
+      e.preventDefault();
+      e.stopPropagation();
+      // El clic que sigue a este toque tampoco es para el lienzo.
+      const tragaClic = (ev) => { ev.stopPropagation(); ev.preventDefault(); };
+      document.addEventListener('click', tragaClic, { capture: true, once: true });
+      setTimeout(() => document.removeEventListener('click', tragaClic, true), 600);
+      let img = e.target.tagName === 'IMG' ? e.target : null;
+      if (!img && e.target.closest) {
+        const nodo = e.target.closest('.item, .col-child-wrap');
+        img = nodo ? nodo.querySelector('img') : null;
+      }
+      if (!img || !img.naturalWidth) { acaba('nada'); return; }
+      try {
+        const r = img.getBoundingClientRect();
+        const x = Math.min(img.naturalWidth - 1, Math.max(0, Math.floor((e.clientX - r.left) / r.width * img.naturalWidth)));
+        const y = Math.min(img.naturalHeight - 1, Math.max(0, Math.floor((e.clientY - r.top) / r.height * img.naturalHeight)));
+        const lienzo = document.createElement('canvas');
+        lienzo.width = 1; lienzo.height = 1;
+        const cx = lienzo.getContext('2d', { willReadFrequently: true });
+        cx.drawImage(img, x, y, 1, 1, 0, 0, 1, 1);
+        const d = cx.getImageData(0, 0, 1, 1).data;
+        acaba(window.OdiColor.rgbAHex({ r: d[0], g: d[1], b: d[2] }));
+      } catch (err) {
+        // Una imagen de otra web sin permiso para leerla «mancha» el lienzo.
+        acaba('protegida');
+      }
+    };
+    document.addEventListener('pointerdown', toca, true);
+    document.addEventListener('keydown', tecla, true);
+  });
+}
+
+const tostada = (es, en) => { if (window.showToast) window.showToast(window.t(es, en)); };
+
+function PanelColorLibre({ valor, recientes, onVivo, onListo, onCancela, ancla, enHoja }) {
+  const { useState, useRef, useEffect, useLayoutEffect } = React;
+  const C = window.OdiColor;
+  const deInicio = (C.hexARgb(valor || '') ? C.rgbAHex(C.hexARgb(valor)) : '#1A1A1A');
+  const antes = useRef(deInicio);
+  // El color vive en HSV: es lo que dibujan la rueda (tono) y el cuadro
+  // (saturación y brillo). Guardarlo en HEX perdería el tono de los grises:
+  // al bajar el brillo a cero la rueda saltaría al rojo.
+  const [hsv, setHsv] = useState(() => C.rgbAHsv(C.hexARgb(deInicio)));
+  const hex = C.rgbAHex(C.hsvARgb(hsv));
+  const hexRef = useRef(hex);
+  hexRef.current = hex;
+
+  // Lo que se arrastra se manda una vez por cuadro, no en cada movimiento del
+  // ratón: así un paseo por la rueda no inunda el nodo de cambios.
+  const pendiente = useRef(null);
+  const manda = (h) => {
+    if (pendiente.current == null) {
+      requestAnimationFrame(() => {
+        const c = pendiente.current;
+        pendiente.current = null;
+        if (c) onVivo(c);
+      });
+    }
+    pendiente.current = h;
+  };
+  const ponHsv = (n) => { setHsv(n); manda(C.rgbAHex(C.hsvARgb(n))); };
+  // Un color que llega hecho (campo, reciente, paleta, cuentagotas). Si es un
+  // gris, el tono de la rueda se queda donde estaba.
+  const ponHex = (h) => {
+    const rgb = C.hexARgb(h);
+    if (!rgb) return;
+    const n = C.rgbAHsv(rgb);
+    if (n.s < 0.5 || n.v < 0.5) n.h = hsv.h;
+    setHsv(n);
+    manda(C.rgbAHex(rgb));
+  };
+
+  // ── Los campos ──
+  // Se escriben a gusto y se aplican con Enter o al salir; Escape devuelve lo
+  // que había. Mientras se escribe en uno, los otros siguen al color.
+  const [campos, setCampos] = useState(() => C.textos(deInicio));
+  const escribiendo = useRef(null);
+  useEffect(() => {
+    const t = C.textos(hex);
+    setCampos(prev => {
+      if (!escribiendo.current) return t;
+      const n = { hex: t.hex, rgb: t.rgb, hsl: t.hsl, copia: t.copia };
+      n[escribiendo.current] = prev[escribiendo.current];
+      return n;
+    });
+  }, [hex]);
+  const aplicaCampo = (clave) => {
+    const leido = C.lee(campos[clave], clave);
+    escribiendo.current = null;
+    if (leido) ponHex(C.rgbAHex(leido));
+    else setCampos(C.textos(hexRef.current));
+  };
+  const copia = async (clave) => {
+    const texto = C.textos(hex).copia[clave];
+    try {
+      await navigator.clipboard.writeText(texto);
+      tostada('Copiado: ' + texto, 'Copied: ' + texto);
+    } catch (e) {
+      tostada('No se pudo copiar: ' + texto, 'Could not copy: ' + texto);
+    }
+  };
+
+  // ── La rueda y el cuadro ──
+  // Un solo elemento recibe el puntero y decide al pulsar qué se arrastra: el
+  // aro (tono) o el cuadro (saturación y brillo). Medidas en px del panel.
+  const RUEDA = enHoja ? 220 : 180;
+  const GROSOR = enHoja ? 22 : 18;
+  const CUADRO = Math.round((RUEDA - 2 * GROSOR - 10) / Math.SQRT2);
+  const ruedaRef = useRef(null);
+  const arrastre = useRef(null);
+  const desdePuntero = (e, que) => {
+    const r = ruedaRef.current.getBoundingClientRect();
+    const x = e.clientX - r.left - r.width / 2, y = e.clientY - r.top - r.height / 2;
+    if (que === 'tono') {
+      let h = Math.atan2(x, -y) * 180 / Math.PI;
+      if (h < 0) h += 360;
+      ponHsv({ h, s: hsvRef.current.s, v: hsvRef.current.v });
+      return;
+    }
+    const lado = CUADRO * (r.width / RUEDA);
+    const s = Math.min(100, Math.max(0, (x + lado / 2) / lado * 100));
+    const v = Math.min(100, Math.max(0, 100 - (y + lado / 2) / lado * 100));
+    ponHsv({ h: hsvRef.current.h, s, v });
+  };
+  // ponHsv lee hsv del render en curso: durante un arrastre hay que leer el
+  // último, o el tono y el cuadro se pisarían uno a otro.
+  const hsvRef = useRef(hsv);
+  hsvRef.current = hsv;
+  const alPulsar = (e) => {
+    e.preventDefault();
+    const r = ruedaRef.current.getBoundingClientRect();
+    const k = r.width / RUEDA;
+    const x = e.clientX - r.left - r.width / 2, y = e.clientY - r.top - r.height / 2;
+    const d = Math.hypot(x, y);
+    const medio = CUADRO * k / 2;
+    let que = null;
+    if (Math.abs(x) <= medio + 4 && Math.abs(y) <= medio + 4) que = 'cuadro';
+    else if (d >= (RUEDA / 2 - GROSOR - 6) * k && d <= (RUEDA / 2 + 4) * k) que = 'tono';
+    if (!que) return;
+    arrastre.current = que;
+    try { ruedaRef.current.setPointerCapture(e.pointerId); } catch (err) {}
+    desdePuntero(e, que);
+  };
+  const alMover = (e) => { if (arrastre.current) desdePuntero(e, arrastre.current); };
+  const alSoltar = () => { arrastre.current = null; };
+  // Con el teclado: flechas en la rueda (tono) y en el cuadro (saturación y brillo).
+  const teclaRueda = (e, que) => {
+    const paso = e.shiftKey ? 10 : 1;
+    const n = { h: hsv.h, s: hsv.s, v: hsv.v };
+    if (que === 'tono') {
+      if (e.key === 'ArrowRight' || e.key === 'ArrowUp') n.h = (n.h + paso) % 360;
+      else if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') n.h = (n.h - paso + 360) % 360;
+      else return;
+    } else {
+      if (e.key === 'ArrowRight') n.s = Math.min(100, n.s + paso);
+      else if (e.key === 'ArrowLeft') n.s = Math.max(0, n.s - paso);
+      else if (e.key === 'ArrowUp') n.v = Math.min(100, n.v + paso);
+      else if (e.key === 'ArrowDown') n.v = Math.max(0, n.v - paso);
+      else return;
+    }
+    e.preventDefault();
+    ponHsv(n);
+  };
+
+  // ── El cuentagotas ──
+  const [conGotero, setConGotero] = useState(false);
+  const cuentagotas = async () => {
+    if (window.EyeDropper) {
+      try {
+        const r = await new window.EyeDropper().open();
+        if (r && r.sRGBHex) ponHex(r.sRGBHex.length === 7 ? r.sRGBHex : C.rgbAHex(C.lee(r.sRGBHex, 'rgb') || { r: 0, g: 0, b: 0 }));
+      } catch (e) { /* Escape: no se cogió nada */ }
+      return;
+    }
+    setConGotero(true);
+    tostada('Toca una imagen del lienzo para coger su color (Escape para dejarlo).', 'Tap an image on the canvas to pick its colour (Escape to stop).');
+    const r = await cuentagotasDeLienzo();
+    setConGotero(false);
+    if (r === 'nada') tostada('Ahí no hay ninguna imagen.', 'There is no image there.');
+    else if (r === 'protegida') tostada('Esa imagen no deja leer sus colores.', 'That image does not let its colours be read.');
+    else if (r) ponHex(r);
+  };
+
+  // ── Las paletas ──
+  const [paletas, setPaletas] = useState(leePaletas);
+  const [renombrando, setRenombrando] = useState(null);
+  const [borrando, setBorrando] = useState(null);
+  useEffect(() => {
+    const al = () => setPaletas(leePaletas());
+    window.addEventListener('odi-paletas', al);
+    return () => window.removeEventListener('odi-paletas', al);
+  }, []);
+  const cambiaPaletas = (f) => { const n = f(leePaletas()); guardaPaletas(n); setPaletas(n); };
+  const nuevaPaleta = () => {
+    const p = window.odiGuardaPaleta(window.t('Paleta ', 'Palette ') + (paletas.length + 1), [hex]);
+    setPaletas(leePaletas());
+    setRenombrando(p.id);
+  };
+  const anadeA = (id) => cambiaPaletas(l => l.map(p => (p.id !== id || p.colores.includes(hex) || p.colores.length >= MAX_COLORES_PALETA) ? p : { id: p.id, nombre: p.nombre, colores: [...p.colores, hex] }));
+  const quitaDe = (id, c) => cambiaPaletas(l => l.map(p => p.id !== id ? p : { id: p.id, nombre: p.nombre, colores: p.colores.filter(x => x !== c) }));
+  const renombra = (id, nombre) => { cambiaPaletas(l => l.map(p => p.id !== id ? p : { id: p.id, nombre: nombre.slice(0, 60), colores: p.colores })); setRenombrando(null); };
+  const borra = (id) => { cambiaPaletas(l => l.filter(p => p.id !== id)); setBorrando(null); };
+
+  const archivoRef = useRef(null);
+  const deImagen = async (archivo) => {
+    if (!archivo) return;
+    const url = URL.createObjectURL(archivo);
+    try {
+      const colores = await window.odiPaletaDeImagen(url, 6);
+      if (!colores.length) { tostada('En esa imagen no hay colores que sacar.', 'There are no colours to take from that image.'); return; }
+      const nombre = String(archivo.name || '').replace(/\.[^.]+$/, '') || window.t('imagen', 'image');
+      window.odiGuardaPaleta(window.t('De ', 'From ') + nombre, colores);
+      setPaletas(leePaletas());
+      tostada('Paleta sacada de la imagen.', 'Palette taken from the image.');
+    } catch (e) {
+      tostada('No se pudo leer esa imagen.', 'Could not read that image.');
+    } finally {
+      URL.revokeObjectURL(url);
+    }
+  };
+
+  // ── Dónde va ──
+  // En el ordenador, pegado al lado del panel donde está el arcoíris (el de la
+  // barra del nodo, el del texto…), a la derecha si cabe y si no a la
+  // izquierda, y sin salirse de la ventana. En el teléfono va dentro de la
+  // hoja de abajo, y de colocarlo se encarga ella.
+  const panelRef = useRef(null);
+  const [sitio, setSitio] = useState(null);
+  useLayoutEffect(() => {
+    if (enHoja) return;
+    const coloca = () => {
+      const el = panelRef.current;
+      if (!el || !ancla) return;
+      const caja = (ancla.closest && ancla.closest('.ctx-popout, .ctx-sidebar, .text-sidebar, .tfs-panel, .cal-color-pop, .modal, [role="dialog"]')) || ancla;
+      const rc = caja.getBoundingClientRect(), rb = ancla.getBoundingClientRect();
+      const w = el.offsetWidth, h = el.offsetHeight;
+      const W = window.innerWidth, H = window.innerHeight;
+      let left = rc.right + 10;
+      if (left + w > W - 8) left = rc.left - w - 10;
+      if (left < 8) left = Math.max(8, Math.min(W - w - 8, rb.left));
+      let top = rb.top - 60;
+      top = Math.max(8, Math.min(top, H - h - 8));
+      setSitio({ left, top });
+    };
+    coloca();
+    window.addEventListener('resize', coloca);
+    return () => window.removeEventListener('resize', coloca);
+  }, [ancla, enHoja]);
+
+  // ── Cerrar ──
+  const listoRef = useRef(onListo);
+  listoRef.current = onListo;
+  const cancelaRef = useRef(onCancela);
+  cancelaRef.current = onCancela;
+  useEffect(() => {
+    const tecla = (e) => {
+      if (e.key !== 'Escape' || conGotero) return;
+      // En un campo, Escape solo deshace lo escrito en él.
+      if (e.target && e.target.closest && e.target.closest('.panel-color input')) return;
+      e.stopPropagation();
+      cancelaRef.current();
+    };
+    document.addEventListener('keydown', tecla, true);
+    if (enHoja) return () => document.removeEventListener('keydown', tecla, true);
+    const fuera = (e) => {
+      if (conGotero) return;
+      if (panelRef.current && panelRef.current.contains(e.target)) return;
+      if (ancla && ancla.contains(e.target)) return;
+      listoRef.current(hexRef.current);
+    };
+    document.addEventListener('pointerdown', fuera, true);
+    return () => {
+      document.removeEventListener('keydown', tecla, true);
+      document.removeEventListener('pointerdown', fuera, true);
+    };
+  }, [ancla, enHoja, conGotero]);
+
+  // Que nada de lo que pasa aquí dentro llegue al lienzo: el panel se pinta en
+  // el body, pero React pasa los eventos por el árbol de componentes, y el
+  // lienzo entendería un clic aquí como un clic en el vacío (y soltaría el nodo).
+  // Y que un clic en una casilla no le quite el foco al texto que se colorea.
+  const aislado = {
+    onMouseDown: (e) => { e.stopPropagation(); if (!(e.target.closest && e.target.closest('input'))) e.preventDefault(); },
+    onPointerDown: (e) => e.stopPropagation(),
+    onClick: (e) => e.stopPropagation(),
+    onDoubleClick: (e) => e.stopPropagation(),
+    onKeyDown: (e) => e.stopPropagation(),
+    onWheel: (e) => e.stopPropagation(),
+    onContextMenu: (e) => e.stopPropagation(),
+  };
+
+  const casilla = (c, extra) => (
+    <button
+      key={c + (extra && extra.clave ? extra.clave : '')}
+      type="button"
+      className={`panel-color-casilla ${c === hex ? 'activa' : ''}`}
+      style={{ background: c }}
+      title={(extra && extra.titulo) || c}
+      aria-label={c}
+      onClick={() => ponHex(c)}
+      onContextMenu={extra && extra.alQuitar ? (e) => { e.preventDefault(); extra.alQuitar(); } : undefined}
+    />
+  );
+
+  const fila = (clave, etiqueta) => (
+    <div className="panel-color-fila" key={clave}>
+      <span className="panel-color-etiqueta">{etiqueta}</span>
+      <input
+        className="panel-color-campo"
+        value={campos[clave]}
+        spellCheck={false}
+        aria-label={etiqueta}
+        onFocus={(e) => { escribiendo.current = clave; e.target.select(); }}
+        onChange={(e) => { const v = e.target.value; setCampos(prev => { const n = { hex: prev.hex, rgb: prev.rgb, hsl: prev.hsl, copia: prev.copia }; n[clave] = v; return n; }); }}
+        onBlur={() => aplicaCampo(clave)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') { e.preventDefault(); e.target.blur(); }
+          else if (e.key === 'Escape') { escribiendo.current = null; setCampos(C.textos(hexRef.current)); e.target.blur(); }
+        }}
+      />
+      <button type="button" className="panel-color-icono" onClick={() => copia(clave)}
+        title={window.t('Copiar ', 'Copy ') + C.textos(hex).copia[clave]} aria-label={window.t('Copiar ', 'Copy ') + etiqueta}>
+        <span className="material-symbols-rounded">content_copy</span>
+      </button>
+    </div>
+  );
+
+  const tonoPuro = C.rgbAHex(C.hsvARgb({ h: hsv.h, s: 100, v: 100 }));
+  const angulo = hsv.h * Math.PI / 180;
+  const radioAro = RUEDA / 2 - GROSOR / 2;
+
+  const cuerpo = (
+    <div
+      ref={panelRef}
+      className={`panel-color ${enHoja ? 'en-hoja' : ''}`}
+      style={enHoja ? undefined : { left: sitio ? sitio.left : -9999, top: sitio ? sitio.top : 0, visibility: sitio ? 'visible' : 'hidden' }}
+      role="dialog"
+      aria-label={window.t('Elegir un color', 'Pick a colour')}
+      {...aislado}
+    >
+      <div className="panel-color-izq">
+        <div
+          ref={ruedaRef}
+          className="panel-color-rueda"
+          style={{ width: RUEDA, height: RUEDA }}
+          onPointerDown={alPulsar}
+          onPointerMove={alMover}
+          onPointerUp={alSoltar}
+          onPointerCancel={alSoltar}
+        >
+          <div className="panel-color-aro" style={{ WebkitMask: `radial-gradient(circle, transparent ${RUEDA / 2 - GROSOR - 1}px, #000 ${RUEDA / 2 - GROSOR}px)`, mask: `radial-gradient(circle, transparent ${RUEDA / 2 - GROSOR - 1}px, #000 ${RUEDA / 2 - GROSOR}px)` }} />
+          <div className="panel-color-aro-borde" style={{ inset: GROSOR }} />
+          <div
+            className="panel-color-cuadro"
+            tabIndex={0}
+            role="slider"
+            aria-label={window.t('Saturación y brillo', 'Saturation and brightness')}
+            aria-valuetext={`${Math.round(hsv.s)}%, ${Math.round(hsv.v)}%`}
+            onKeyDown={(e) => teclaRueda(e, 'cuadro')}
+            style={{
+              width: CUADRO, height: CUADRO,
+              background: `linear-gradient(to top, #000, rgba(0,0,0,0)), linear-gradient(to right, #fff, ${tonoPuro})`,
+            }}
+          >
+            <i className="panel-color-mira" style={{ left: hsv.s + '%', top: (100 - hsv.v) + '%', background: hex }} />
+          </div>
+          <i
+            className="panel-color-mira aro"
+            tabIndex={0}
+            role="slider"
+            aria-label={window.t('Tono', 'Hue')}
+            aria-valuenow={Math.round(hsv.h)}
+            onKeyDown={(e) => teclaRueda(e, 'tono')}
+            style={{ left: RUEDA / 2 + Math.sin(angulo) * radioAro, top: RUEDA / 2 - Math.cos(angulo) * radioAro, background: tonoPuro }}
+          />
+        </div>
+        <div className="panel-color-bajo-rueda">
+          <button type="button" className={`panel-color-icono gotero ${conGotero ? 'activo' : ''}`} onClick={cuentagotas}
+            title={window.t('Cuentagotas: coger un color de la pantalla', 'Eyedropper: pick a colour from the screen')}
+            aria-label={window.t('Cuentagotas', 'Eyedropper')}>
+            <span className="material-symbols-rounded">colorize</span>
+          </button>
+          <div className="panel-color-recientes" title={window.t('Los últimos que usaste', 'The last ones you used')}>
+            {(recientes || []).slice(0, 6).map(c => casilla(c.toUpperCase(), { clave: '-r' }))}
+          </div>
+        </div>
+      </div>
+
+      <div className="panel-color-der">
+        <div className="panel-color-arriba">
+          <button type="button" className="panel-color-antes" style={{ background: antes.current }}
+            onClick={() => ponHex(antes.current)}
+            title={window.t('Antes: ', 'Before: ') + antes.current + window.t(' (pulsa para volver a él)', ' (click to go back to it)')}>
+            <span style={{ color: C.luminancia(antes.current) > 0.45 ? '#1A1A1A' : '#FFFFFF' }}>{window.t('Antes', 'Before')}</span>
+          </button>
+          <span className="panel-color-ahora" style={{ background: hex }}>
+            <span style={{ color: C.luminancia(hex) > 0.45 ? '#1A1A1A' : '#FFFFFF' }}>{window.t('Ahora', 'Now')}</span>
+          </span>
+          <button type="button" className="panel-color-listo" onClick={() => onListo(hex)}>
+            {window.t('Listo', 'Done')}
+          </button>
+        </div>
+        {fila('hex', 'HEX')}
+        {fila('rgb', 'RGB')}
+        {fila('hsl', 'HSL')}
+
+        <div className="panel-color-tit">{window.t('Paletas', 'Palettes')}</div>
+        <div className="panel-color-paletas">
+          {paletas.length === 0 && (
+            <div className="panel-color-vacio">
+              {window.t('Aún no hay paletas. «Nueva» guarda el color de ahora; «De imagen» saca los de una foto.',
+                'No palettes yet. "New" keeps the current colour; "From image" takes them from a photo.')}
+            </div>
+          )}
+          {paletas.map(p => (
+            <div className="panel-color-paleta" key={p.id}>
+              {renombrando === p.id ? (
+                <input
+                  className="panel-color-nombre-campo"
+                  autoFocus
+                  defaultValue={p.nombre}
+                  onFocus={(e) => e.target.select()}
+                  onBlur={(e) => renombra(p.id, e.target.value.trim() || p.nombre)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') { e.preventDefault(); e.target.blur(); }
+                    else if (e.key === 'Escape') { e.preventDefault(); setRenombrando(null); }
+                  }}
+                />
+              ) : (
+                <span className="panel-color-nombre" onDoubleClick={() => setRenombrando(p.id)}
+                  title={window.t('Doble clic para cambiarle el nombre', 'Double-click to rename')}>{p.nombre}</span>
+              )}
+              <div className="panel-color-paleta-casillas">
+                {p.colores.map(c => casilla(c, {
+                  clave: '-' + p.id,
+                  titulo: c + window.t(' · clic derecho para quitarlo', ' · right-click to remove it'),
+                  alQuitar: () => quitaDe(p.id, c),
+                }))}
+                <button type="button" className="panel-color-mas" onClick={() => anadeA(p.id)}
+                  title={window.t('Añadir el color de ahora', 'Add the current colour')} aria-label={window.t('Añadir el color de ahora', 'Add the current colour')}>
+                  <span className="material-symbols-rounded">add</span>
+                </button>
+              </div>
+              <button type="button" className={`panel-color-borra ${borrando === p.id ? 'seguro' : ''}`}
+                onClick={() => (borrando === p.id ? borra(p.id) : setBorrando(p.id))}
+                onMouseLeave={() => setBorrando(b => (b === p.id ? null : b))}
+                title={borrando === p.id ? window.t('Pulsa otra vez para borrarla', 'Click again to delete it') : window.t('Borrar la paleta', 'Delete the palette')}
+                aria-label={window.t('Borrar la paleta', 'Delete the palette')}>
+                <span className="material-symbols-rounded">{borrando === p.id ? 'delete_forever' : 'delete'}</span>
+              </button>
+            </div>
+          ))}
+        </div>
+        <div className="panel-color-botones">
+          <button type="button" className="panel-color-boton verde" onClick={nuevaPaleta}>
+            <span className="material-symbols-rounded">add</span>{window.t('Nueva', 'New')}
+          </button>
+          <button type="button" className="panel-color-boton" onClick={() => archivoRef.current && archivoRef.current.click()}>
+            <span className="material-symbols-rounded">image</span>{window.t('De imagen', 'From image')}
+          </button>
+          <input ref={archivoRef} type="file" accept="image/*" style={{ display: 'none' }}
+            onChange={(e) => { const f = e.target.files && e.target.files[0]; e.target.value = ''; deImagen(f); }} />
+        </div>
+      </div>
+    </div>
+  );
+
+  if (enHoja || !window.ReactDOM || !window.ReactDOM.createPortal) return cuerpo;
+  return window.ReactDOM.createPortal(cuerpo, document.body);
+}
+window.PanelColorLibre = PanelColorLibre;
 
 window.SelectorColor = function SelectorColor({
   valor,
@@ -129,20 +656,20 @@ window.SelectorColor = function SelectorColor({
   acentoTexto,
 }) {
   const { useRef, useState } = React;
-  const entrada = useRef(null);
+  // El arcoíris: el panel se coloca a su lado y no se cierra al pulsarlo.
+  const libreRef = useRef(null);
   const paleta = colores || window.COLORES_ODINOTE;
 
-  // Si esto se maneja con el dedo, el arcoíris abre la rueda de aquí dentro en
-  // vez del diálogo del sistema (ver arriba).
+  // Con el dedo el panel va en una hoja abajo, a todo lo ancho (ver más abajo).
   const conDedo = typeof window !== 'undefined' && !!(window.odiIsMobile && window.odiIsMobile());
   const [ruedaAbierta, setRuedaAbierta] = useState(false);
-  const [tonoElegido, setTonoElegido] = useState(210);
+  const [libreAbierto, setLibreAbierto] = useState(false);
 
   const [recientes, setRecientes] = useState(leeRecientes);
 
-  // Mientras se mueve la rueda del sistema el color se va aplicando —es la única
-  // forma de acertar un tono— pero NO se da por bueno. De eso se encarga
-  // Aceptar, y por eso hay que recordar de dónde se venía.
+  // Mientras se mueve el panel el color se va aplicando —es la única forma de
+  // acertar un tono— pero NO se da por bueno hasta cerrarlo, y por eso hay que
+  // recordar de dónde se venía.
   //
   // Que la rueda no dé nada por bueno arregla además el historial. Los
   // navegadores avisan del cambio en cada movimiento del ratón, así que
@@ -154,10 +681,9 @@ window.SelectorColor = function SelectorColor({
   // ── Que no se pierda lo que hay seleccionado ──
   //
   // Dos cosas se lo llevan por delante. Pulsar una casilla le quita el foco al
-  // texto, y eso se evita cancelando el mousedown. Pero la rueda del sistema es
-  // una ventana aparte: al abrirse se lleva la selección entera y no hay forma
-  // de impedirlo, así que hay que apuntarla antes y devolverla justo antes de
-  // aplicar el color.
+  // texto, y eso se evita cancelando el mousedown. Pero escribir un código en el
+  // panel pone el foco en su campo y la selección se va con él, así que hay que
+  // apuntarla antes y devolverla justo antes de aplicar el color.
   //
   // Sin esto, elegir un color y escribir después salía del color de antes.
   const rango = useRef(null);
@@ -256,88 +782,21 @@ window.SelectorColor = function SelectorColor({
     />
   );
 
-  // El arcoíris: siempre arcoíris, tenga o no un color libre puesto. Si mostrara
-  // el color elegido se confundiría con una casilla más de la paleta y dejaría
-  // de leerse como "aquí hay más". Que esté elegido se ve por el aro, igual que
-  // en las demás.
-  const casillaLibre = () => (
-    <button
-      key="libre"
-      type="button"
-      className="selector-color-libre"
-      style={{
-        ...redondo,
-        position: 'relative',
-        border: marco(!enPaleta),
-        background: 'conic-gradient(#E6544F, #DDAF2C, #90B968, #3CA59E, #3D5A80, #955BA5, #E6544F)',
-      }}
-      onMouseDown={sinRobarFoco}
-      onClick={() => {
-        if (conDedo) { setRuedaAbierta(v => !v); return; }
-        if (entrada.current) entrada.current.click();
-      }}
-      title={etiquetaLibre || window.t('Elegir otro color', 'Pick another colour')}
-      aria-label={etiquetaLibre || window.t('Elegir otro color', 'Pick another colour')}
-    >
-      {/* Se escuchan los dos avisos que da el navegador. Cuál de ellos llega,
-          y cuántas veces, cambia de un navegador a otro; lo único seguro es
-          que con los dos no se pierde ningún movimiento de la rueda. Ninguno
-          da el color por bueno: de eso se encarga Aceptar.
-
-          Con el dedo este campo NO se pinta: cubre el botón entero, así que el
-          toque caería sobre él y abriría igualmente el diálogo del sistema —
-          justo el que no funciona. */}
-      {!conDedo && (
-        <input
-          ref={entrada}
-          type="color"
-          value={/^#[0-9a-f]{6}$/i.test(valor || '') ? valor : '#1A1A1A'}
-          onInput={(e) => { enCurso(e.target.value); devuelveSeleccion(); onCambio(e.target.value); }}
-          onChange={(e) => { enCurso(e.target.value); devuelveSeleccion(); onCambio(e.target.value); }}
-          style={{
-            position: 'absolute', inset: 0, width: '100%', height: '100%',
-            opacity: 0, border: 'none', padding: 0, cursor: 'pointer',
-          }}
-          tabIndex={-1}
-          aria-hidden="true"
-        />
-      )}
-    </button>
-  );
-
-  // Elegir un tono no cambia el color todavía: solo cambia la fila de abajo. El
-  // color se aplica al tocar una claridad —se ve al momento, como con la rueda
-  // del sistema— y Aceptar es quien lo da por bueno.
-
-  // ── La hoja de colores, abajo y a todo lo ancho ──
-  //
-  // Primero la puse dentro del propio panel, y en el de un nodo se veía bien.
-  // Pero el panel de una LÍNEA mide ochenta y pico píxeles: ahí no caben ni dos
-  // tonos seguidos, así que salía una columna de veinticinco bolas más alta que
-  // la pantalla, se desbordaba el panel y ya no había manera ni de cerrarlo.
-  //
-  // Ensancharla dentro de ese panel no se puede. Así que no vive dentro: se
-  // dibuja aparte, pegada abajo y ocupando el ancho de la pantalla, que es donde
-  // los dedos llegan bien y donde caben seis o siete tonos por fila. Va por un
-  // portal al body a propósito: dentro del panel, cualquier antepasado con una
-  // transformación la habría vuelto a encerrar.
-  //
-  // Y se cierra de tres maneras —Aceptar, la X, o tocando fuera—, porque el
-  // fallo que más molestó no fue verla mal: fue no poder quitarla.
-  const enRejillaAncha = {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fill, minmax(38px, 1fr))',
-    gap: '8px',
-  };
-
-  const cierraHoja = (aceptando) => {
+  // Lo que se mueve en el panel se aplica al momento y NO se da por bueno: eso
+  // lo hace cerrarlo (Listo, pulsar fuera o volver al arcoíris). Así un paseo
+  // entero por la rueda deja una sola entrada en los recientes.
+  const vivo = (c) => { enCurso(c); devuelveSeleccion(); onCambio(c); };
+  const cierraLibre = (aceptando, c) => {
+    setLibreAbierto(false);
     setRuedaAbierta(false);
     if (aceptando) {
-      if (eligiendo) elige(eligiendo.actual || valor);
+      const final = c || (eligiendo && eligiendo.actual);
+      if (final && (eligiendo || norm(final) !== actual)) elige(final);
+      else setEligiendo(null);
       return;
     }
-    // Sin aceptar se deshace, igual que el botón Deshacer de arriba: quien
-    // cierra sin más no quiere quedarse con lo que estaba probando.
+    // Sin aceptar (Escape, la X de la hoja, tocar fuera de la hoja) se
+    // deshace: quien cierra así no quiere quedarse con lo que probaba.
     if (eligiendo) {
       const previo = eligiendo.previo;
       setEligiendo(null);
@@ -346,29 +805,67 @@ window.SelectorColor = function SelectorColor({
     }
   };
 
-  const casillaHoja = (hex, alto) => (
+  // El arcoíris: siempre arcoíris, tenga o no un color libre puesto. Si mostrara
+  // el color elegido se confundiría con una casilla más de la paleta y dejaría
+  // de leerse como "aquí hay más". Que esté elegido se ve por el aro, igual que
+  // en las demás.
+  const casillaLibre = () => (
     <button
-      key={hex}
+      key="libre"
+      ref={libreRef}
       type="button"
+      className={`selector-color-libre ${(libreAbierto || ruedaAbierta) ? 'abierto' : ''}`}
       style={{
-        height: alto + 'px', borderRadius: '9px', padding: 0, cursor: 'pointer',
-        background: hex,
-        border: norm(hex) === actual ? '3px solid var(--wine)' : '1.5px solid var(--line-soft)',
+        ...redondo,
+        position: 'relative',
+        border: marco(!enPaleta || libreAbierto),
+        background: 'conic-gradient(#E6544F, #DDAF2C, #90B968, #3CA59E, #3D5A80, #955BA5, #E6544F)',
       }}
       onMouseDown={sinRobarFoco}
-      onClick={() => { enCurso(hex); devuelveSeleccion(); onCambio(hex); }}
-      aria-label={hex}
+      onClick={() => {
+        if (conDedo) { setRuedaAbierta(true); return; }
+        if (libreAbierto) cierraLibre(true);
+        else setLibreAbierto(true);
+      }}
+      title={etiquetaLibre || window.t('Elegir otro color', 'Pick another colour')}
+      aria-label={etiquetaLibre || window.t('Elegir otro color', 'Pick another colour')}
+      aria-expanded={libreAbierto || ruedaAbierta}
     />
   );
 
-  const ruedaDeDentro = () => {
-    if (!conDedo || !ruedaAbierta) return null;
-    if (!window.ReactDOM || !window.ReactDOM.createPortal) return null;
+  // ── En el teléfono: el panel en una hoja abajo y a todo lo ancho ──
+  //
+  // Primero la rueda del dedo vivía dentro del propio panel, y en el de un nodo
+  // se veía bien. Pero el panel de una LÍNEA mide ochenta y pico píxeles: ahí no
+  // cabía nada, se desbordaba el panel y ya no había manera ni de cerrarlo. Así
+  // que va aparte, pegada abajo, que es donde los dedos llegan bien. Por un
+  // portal al body a propósito: dentro del panel, cualquier antepasado con una
+  // transformación la habría vuelto a encerrar.
+  //
+  // Y se cierra de tres maneras —Aceptar, la X, o tocando fuera—, porque el
+  // fallo que más molestó no fue verla mal: fue no poder quitarla.
+  const panelLibre = () => {
+    if (!window.PanelColorLibre) return null;
+    const Panel = window.PanelColorLibre;
+    if (!conDedo) {
+      if (!libreAbierto) return null;
+      return (
+        <Panel
+          valor={valor}
+          recientes={recientes}
+          ancla={libreRef.current}
+          onVivo={vivo}
+          onListo={(c) => cierraLibre(true, c)}
+          onCancela={() => cierraLibre(false)}
+        />
+      );
+    }
+    if (!ruedaAbierta || !window.ReactDOM || !window.ReactDOM.createPortal) return null;
     return window.ReactDOM.createPortal(
       <div
         className="odi-hoja-color-fondo"
         style={{ position: 'fixed', inset: 0, zIndex: 900, background: 'rgba(20,18,26,0.42)' }}
-        onMouseDown={(e) => { if (e.target === e.currentTarget) { sinRobarFoco(e); cierraHoja(false); } }}
+        onMouseDown={(e) => { if (e.target === e.currentTarget) { sinRobarFoco(e); cierraLibre(false); } }}
       >
         <div
           className="odi-hoja-color"
@@ -379,6 +876,7 @@ window.SelectorColor = function SelectorColor({
             borderRadius: '16px 16px 0 0',
             padding: ' 14px 14px calc(14px + env(safe-area-inset-bottom)) 14px',
             display: 'flex', flexDirection: 'column', gap: '10px',
+            maxHeight: '88vh',
             boxShadow: '0 -8px 30px rgba(0,0,0,0.18)',
           }}
           onMouseDown={(e) => e.stopPropagation()}
@@ -395,7 +893,7 @@ window.SelectorColor = function SelectorColor({
                 color: 'var(--ink-3, #595459)', fontSize: '18px', cursor: 'pointer',
               }}
               onMouseDown={sinRobarFoco}
-              onClick={() => cierraHoja(false)}
+              onClick={() => cierraLibre(false)}
               title={window.t('Cerrar', 'Close')}
               aria-label={window.t('Cerrar', 'Close')}
             >
@@ -403,29 +901,15 @@ window.SelectorColor = function SelectorColor({
             </button>
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '46vh', overflowY: 'auto', overscrollBehavior: 'contain' }}>
-            <div className="selector-color-rueda-tonos" style={enRejillaAncha}>
-              {TONOS_DEDO.map(h => (
-                <button
-                  key={h}
-                  type="button"
-                  style={{
-                    height: '34px', borderRadius: '50%', padding: 0, cursor: 'pointer',
-                    background: hslAHex(h, 85, 52),
-                    border: h === tonoElegido ? '3px solid var(--wine)' : '1.5px solid var(--line-soft)',
-                  }}
-                  onMouseDown={sinRobarFoco}
-                  onClick={() => setTonoElegido(h)}
-                  aria-label={window.t('Tono ', 'Hue ') + h}
-                />
-              ))}
-            </div>
-            <div className="selector-color-rueda-claridades" style={enRejillaAncha}>
-              {CLARIDADES_DEDO.map(({ s, l }) => casillaHoja(hslAHex(tonoElegido, s, l), 38))}
-            </div>
-            <div className="selector-color-rueda-grises" style={enRejillaAncha}>
-              {GRISES_DEDO.map(hex => casillaHoja(hex, 34))}
-            </div>
+          <div style={{ overflowY: 'auto', overscrollBehavior: 'contain', minHeight: 0 }}>
+            <Panel
+              enHoja
+              valor={valor}
+              recientes={recientes}
+              onVivo={vivo}
+              onListo={(c) => cierraLibre(true, c)}
+              onCancela={() => cierraLibre(false)}
+            />
           </div>
 
           <button
@@ -436,7 +920,7 @@ window.SelectorColor = function SelectorColor({
               fontWeight: 700, fontSize: '13.5px', cursor: 'pointer',
             }}
             onMouseDown={sinRobarFoco}
-            onClick={() => cierraHoja(true)}
+            onClick={() => cierraLibre(true)}
           >
             {window.t('Aceptar', 'Accept')}
           </button>
@@ -446,63 +930,6 @@ window.SelectorColor = function SelectorColor({
     );
   };
 
-
-  // Aceptar y Deshacer. Van ARRIBA del todo y no al final: la ventana del
-  // sistema se abre junto al arcoíris, que está abajo, así que este botón se
-  // queda fuera de su sombra y se puede pulsar sin cerrar nada antes. El color
-  // ya se está viendo aplicado; esto lo da por bueno y lo guarda.
-  //
-  // `reservado` pinta la misma fila pero invisible y sin poder tocarse. Es para
-  // que el sitio esté guardado antes de hacer falta: cuando aparecía y
-  // desaparecía de verdad, todo lo que tenía debajo —los colores, la zona de
-  // prueba, los botones— pegaba un salto de treinta píxeles cada vez que se
-  // tocaba la rueda, y volvía a saltar al aceptar. Con la ventana quieta, el
-  // ojo puede seguir el color en lugar de perseguir los botones.
-  const confirmacion = (reservado) => (!eligiendo && !reservado ? null : (
-    <div
-      style={{
-        display: 'flex', gap: '6px', flexWrap: 'wrap',
-        visibility: eligiendo ? 'visible' : 'hidden',
-        pointerEvents: eligiendo ? 'auto' : 'none',
-      }}
-      aria-hidden={!eligiendo}
-    >
-      <button
-        type="button"
-        className="btn"
-        tabIndex={eligiendo ? 0 : -1}
-        style={{
-          flex: '1 1 auto', padding: '7px 10px', borderRadius: '6px', border: 'none',
-          background: acento || 'var(--olive, #6A8546)', color: acentoTexto || '#FFF',
-          fontWeight: 700, fontSize: '11.5px', cursor: 'pointer',
-        }}
-        onMouseDown={sinRobarFoco}
-        onClick={() => eligiendo && elige(eligiendo.actual || valor)}
-      >
-        {window.t('Aceptar', 'Accept')}
-      </button>
-      <button
-        type="button"
-        className="btn"
-        style={{
-          flex: '0 0 auto', padding: '7px 9px', borderRadius: '6px', fontSize: '11.5px', cursor: 'pointer',
-          border: '1.5px solid var(--line-soft)', background: 'transparent',
-          color: 'var(--ink-3, #595459)',
-        }}
-        tabIndex={eligiendo ? 0 : -1}
-        onMouseDown={sinRobarFoco}
-        onClick={() => {
-          if (!eligiendo) return;
-          const previo = eligiendo.previo;
-          setEligiendo(null);
-          devuelveSeleccion();
-          onCambio(previo);
-        }}
-      >
-        {window.t('Deshacer', 'Undo')}
-      </button>
-    </div>
-  ));
 
   // ── Todo seguido, en una sola fila ──
   //
@@ -528,7 +955,6 @@ window.SelectorColor = function SelectorColor({
   if (compacto) {
     return (
       <div className="selector-color-caja" style={{ display: 'flex', flexDirection: 'column', gap: '7px' }}>
-        {confirmacion(true)}
         <div className="selector-color" style={enFila}>
           {incluirTransparente && casillaNinguno()}
           {paleta.map(casillaPaleta)}
@@ -552,7 +978,7 @@ window.SelectorColor = function SelectorColor({
           )}
           {recientes.map(casillaReciente)}
         </div>
-        {ruedaDeDentro()}
+        {panelLibre()}
       </div>
     );
   }
@@ -572,20 +998,17 @@ window.SelectorColor = function SelectorColor({
         </div>
       )}
 
-      {/* ── 2. Aceptar ── */}
-      {confirmacion()}
-
-      {/* ── 3. Los de siempre ── */}
+      {/* ── 2. Los de siempre ── */}
       <div className="selector-color" style={enFila}>
         {incluirTransparente && casillaNinguno()}
         {paleta.map(casillaPaleta)}
       </div>
 
-      {/* ── 4. El arcoíris, abajo del todo ── */}
+      {/* ── 3. El arcoíris ── */}
       <div style={enFila}>
         {casillaLibre()}
       </div>
-      {ruedaDeDentro()}
+      {panelLibre()}
     </div>
   );
 };
