@@ -93,7 +93,7 @@
         display: flex; flex-direction: column; align-items: center; justify-content: center;
         background: #F4F3EF;
         transition: opacity 550ms ease;
-        overflow: hidden; font-family: 'Bricolage Grotesque', system-ui, sans-serif;
+        overflow: hidden; font-family: 'Aileron', system-ui, sans-serif;
       }
       #odi-splash.odi-dark { background: #232123; }
       #odi-splash .odi-aura {
@@ -189,6 +189,9 @@
 
     <script src="./lib/react.production.min.js"></script>
     <script src="./lib/react-dom.production.min.js"></script>
+    <!-- Los iconos: tiene que ir justo detrás de React y antes de cualquier .jsx,
+         porque cambia React.createElement para pintar cada icono con su dibujo. -->
+    <script src="./src/iconos/iconos.js?v=217"></script>
     <script src="./lib/babel.min.js"></script>
     <script src="./lib/highlight.min.js"></script>
     <script src="./lib/mammoth.browser.min.js"></script>

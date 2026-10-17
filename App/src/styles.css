@@ -66,8 +66,8 @@
   --e-std: cubic-bezier(0.4, 0, 0.2, 1);
   --e-in:  cubic-bezier(0.55, 0.06, 0.68, 0.19);
 
-  --font-display: 'Bricolage Grotesque', system-ui, sans-serif;
-  --font-body:    'Geist', 'DM Sans', system-ui, sans-serif;
+  --font-display: 'Aileron', system-ui, sans-serif;
+  --font-body:    'Vegur', system-ui, sans-serif;
   --font-mono:    'JetBrains Mono', ui-monospace, monospace;
 
   --tool-bg: var(--paper);
@@ -575,6 +575,20 @@ body[data-patrocinador="1"] .board-preview-item {
 
 
 .material-symbols-rounded { font-variation-settings: 'FILL' 0, 'wght' 500, 'GRAD' 0, 'opsz' 24; user-select: none; }
+/* Los iconos propios (src/iconos/iconos.js): un dibujo en vez de la letra de
+   Material. Mide 1em, como la letra a la que sustituye, y el trazo crece con
+   el tamaño igual que crecía el grosor de la letra. No se toca el display del
+   icono: hay reglas que lo esconden con display:none y tienen que seguir
+   ganando. */
+.odi-icono > svg { width: 1em; height: 1em; display: block; margin: 0 auto; overflow: visible; stroke-width: 1.5px; }
+/* El nombre escondido del icono: hay reglas como «.barra span { display: flex }»
+   que le ganarían al hidden del navegador. */
+.odi-icono > span[hidden] { display: none !important; }
+/* «Lleno»: lo que Material pintaba con FILL 1. Solo se rellena lo marcado con r. */
+.odi-icono.icono-lleno > svg .r,
+.boton-fijar.fijada .odi-icono > svg .r,
+.ms-folder-card.con-color .ms-folder-icono > svg .r,
+.nodo-candado .odi-icono > svg .r { fill: currentColor; }
 
 /* ─── motion ─── */
 .lift { transition: transform 140ms var(--e-out), box-shadow 140ms var(--e-out); }
@@ -4981,7 +4995,7 @@ html[data-mobile="1"] .connector-hit { stroke-width: 40; }
 /* Los números en cifras de ancho fijo: sin eso el reloj “baila” a cada
    segundo, porque el 1 es más estrecho que el 8. */
 .timer-reloj {
-  font-family: var(--font-display), 'Bricolage Grotesque', system-ui, sans-serif;
+  font-family: var(--font-display), system-ui, sans-serif;
   font-variant-numeric: tabular-nums;
   font-weight: 800; letter-spacing: -0.02em; line-height: 1;
   font-size: calc(40px * var(--node-scale, 1));

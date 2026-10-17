@@ -1,0 +1,15 @@
+3dicons — iconos 3D de código abierto
+Vijay Verma (@realvjy)
+
+  https://3dicons.co
+  https://github.com/realvjy/3dicons
+
+Licencia: CC0 1.0 Universal (dominio público). No exige atribución; esta nota
+está aquí para saber SIEMPRE de dónde salió cada archivo, que es la única forma
+de no acabar dentro de dos años con un icono de origen desconocido.
+
+Descargados el 2026-08-28 del CDN oficial del proyecto, ángulo "dynamic", en
+dos estilos: "color" y "gradient". El archivo LICENSE.txt de al lado es el
+texto completo tal cual está en su repositorio.
+
+Si añades más, cógelos de la misma fuente y apúntalo aquí.

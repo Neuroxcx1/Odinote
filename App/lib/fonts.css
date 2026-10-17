@@ -26,83 +26,44 @@
   direction: ltr;
 }
 
-/* 2. Bricolage Grotesque */
+/* 2. Aileron (títulos) y 3. Vegur (texto): las dos de dotcolon, en dominio
+   público (CC0). Sustituyen a Bricolage Grotesque y Geist desde la 1.2.0: lo
+   eligió el mantenedor, mirando las dos en la app. Vegur no tiene seminegrita:
+   el 500 y el 600 caen en la normal, como en la prueba que se le enseñó. */
 @font-face {
-  font-family: 'Bricolage Grotesque';
+  font-family: 'Aileron';
   font-style: normal;
-  font-weight: 400;
-  font-stretch: normal;
+  font-weight: 400 699;
   font-display: swap;
-  src: url('./bricolage-400.ttf') format('truetype');
+  src: url('./aileron-700.otf') format('opentype');
 }
 @font-face {
-  font-family: 'Bricolage Grotesque';
+  font-family: 'Aileron';
   font-style: normal;
-  font-weight: 500;
-  font-stretch: normal;
+  font-weight: 700 900;
   font-display: swap;
-  src: url('./bricolage-500.ttf') format('truetype');
+  src: url('./aileron-900.otf') format('opentype');
 }
 @font-face {
-  font-family: 'Bricolage Grotesque';
+  font-family: 'Vegur';
   font-style: normal;
-  font-weight: 600;
-  font-stretch: normal;
+  font-weight: 100 399;
   font-display: swap;
-  src: url('./bricolage-600.ttf') format('truetype');
+  src: url('./vegur-300.otf') format('opentype');
 }
 @font-face {
-  font-family: 'Bricolage Grotesque';
+  font-family: 'Vegur';
   font-style: normal;
-  font-weight: 700;
-  font-stretch: normal;
+  font-weight: 400 600;
   font-display: swap;
-  src: url('./bricolage-700.ttf') format('truetype');
+  src: url('./vegur-400.otf') format('opentype');
 }
 @font-face {
-  font-family: 'Bricolage Grotesque';
+  font-family: 'Vegur';
   font-style: normal;
-  font-weight: 800;
-  font-stretch: normal;
+  font-weight: 601 900;
   font-display: swap;
-  src: url('./bricolage-800.ttf') format('truetype');
-}
-
-/* 3. Geist */
-@font-face {
-  font-family: 'Geist';
-  font-style: normal;
-  font-weight: 400;
-  font-display: swap;
-  src: url('./geist-400.ttf') format('truetype');
-}
-@font-face {
-  font-family: 'Geist';
-  font-style: normal;
-  font-weight: 500;
-  font-display: swap;
-  src: url('./geist-500.ttf') format('truetype');
-}
-@font-face {
-  font-family: 'Geist';
-  font-style: normal;
-  font-weight: 600;
-  font-display: swap;
-  src: url('./geist-600.ttf') format('truetype');
-}
-@font-face {
-  font-family: 'Geist';
-  font-style: normal;
-  font-weight: 700;
-  font-display: swap;
-  src: url('./geist-700.ttf') format('truetype');
-}
-@font-face {
-  font-family: 'Geist';
-  font-style: normal;
-  font-weight: 800;
-  font-display: swap;
-  src: url('./geist-800.ttf') format('truetype');
+  src: url('./vegur-700.otf') format('opentype');
 }
 
 /* 4. JetBrains Mono */
