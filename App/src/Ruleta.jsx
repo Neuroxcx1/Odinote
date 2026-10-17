@@ -123,6 +123,10 @@ function ruletaConfeti(caja) {
 }
 
 // Un punto de la circunferencia, con 0 grados ARRIBA y girando como el reloj.
+// A qué distancia del centro va el centro de cada nombre: a medio camino
+// entre el botón de girar (radio ~27) y el borde (96), igual en todas.
+const RULETA_RADIO_TEXTO = 61;
+
 function ruletaPunto(grados, radio) {
   const r = (grados - 90) * Math.PI / 180;
   return [Math.cos(r) * radio, Math.sin(r) * radio];
@@ -140,6 +144,14 @@ function RuletaItem({ item, lang, onUpdate }) {
   const n = elementos.length;
   const [giro, setGiro] = React.useState(item.giro || 0);
   const [girando, setGirando] = React.useState(false);
+  // Qué nombres van cabeza abajo se decide con el giro EN REPOSO: el de antes
+  // de una tirada mientras dura, y el nuevo cuando para. Antes se decidía sin
+  // contar el giro, y después de una tirada los de un lado acababan en el
+  // otro, al revés. Mientras gira no se tocan (se verían voltearse a saltos).
+  // Aquí arriba y no junto a la rueda: más abajo hay un return temprano (la
+  // ruleta vacía) y un hook después de él rompía el nodo al añadir elementos.
+  const reposoRef = React.useRef(giro);
+  if (!girando) reposoRef.current = giro;
   const [ganador, setGanador] = React.useState(null);
   const [escribiendo, setEscribiendo] = React.useState(false);
   const [texto, setTexto] = React.useState('');
@@ -317,11 +329,17 @@ function RuletaItem({ item, lang, onUpdate }) {
     const grande = a1 - a0 > 180 ? 1 : 0;
     const medio = (a0 + a1) / 2;
     const color = el.hueco ? null : (el.color || RULETA_COLORES[i % RULETA_COLORES.length]);
-    // El texto sale del centro hacia fuera; en la mitad izquierda se da la
-    // vuelta para no leerse cabeza abajo.
+    // El nombre va a lo largo del radio, CENTRADO en su porción y a la misma
+    // distancia del centro en todas (RULETA_RADIO_TEXTO). Antes empezaba junto
+    // al centro en una mitad y junto al borde en la otra, y unos parecían
+    // pegados al botón y otros al borde. En la mitad que queda a la izquierda
+    // en pantalla se da la vuelta para no leerse cabeza abajo.
     const giroTexto = medio - 90;
-    const volteado = giroTexto > 90 && giroTexto < 270;
-    const tinta = color && typeof tintaLegible === 'function' ? tintaLegible(color) : '#1A1A1A';
+    const enPantalla = (((giroTexto + reposoRef.current) % 360) + 360) % 360;
+    const volteado = enPantalla > 90 && enPantalla < 270;
+    // Siempre negro, lo pidió así: elegirlo según lo oscuro de cada porción
+    // hacía que unos salieran blancos y otros negros, y parecía al azar.
+    const tinta = '#1A1A1A';
     return { el, i, color, medio, tinta, volteado, giroTexto,
       d: `M0 0 L${x0.toFixed(3)} ${y0.toFixed(3)} A96 96 0 ${grande} 1 ${x1.toFixed(3)} ${y1.toFixed(3)} Z` };
   });
@@ -364,10 +382,15 @@ function RuletaItem({ item, lang, onUpdate }) {
               key={'t' + p.el.id}
               className={`ruleta-texto ${p.el.hueco ? 'fantasma' : ''}`}
               fill={p.el.hueco ? undefined : p.tinta}
-              transform={`rotate(${p.giroTexto}) translate(${p.volteado ? 86 : 30} 0)${p.volteado ? ' rotate(180)' : ''}`}
-              textAnchor="start"
+              textAnchor="middle"
               dominantBaseline="central"
-              style={{ opacity: elegido && !girando && p.el.id !== elegido.id ? 0.45 : 1 }}
+              style={{
+                opacity: elegido && !girando && p.el.id !== elegido.id ? 0.45 : 1,
+                // Con transform de CSS y no el atributo, para que al parar los
+                // que quedan cabeza abajo se den la vuelta girando en su sitio
+                // (y al añadir una porción, los demás se deslicen a la suya).
+                transform: `rotate(${p.giroTexto}deg) translateX(${RULETA_RADIO_TEXTO}px) rotate(${p.volteado ? 180 : 0}deg)`,
+              }}
             >
               {p.el.texto.length > maxLetras ? p.el.texto.slice(0, maxLetras - 1) + '…' : p.el.texto}
             </text>

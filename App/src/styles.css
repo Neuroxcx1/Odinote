@@ -1959,7 +1959,10 @@ body.odi-busy iframe { pointer-events: none !important; }
 /* El hueco del segundo elemento cuando solo hay uno: sin color, con borde de
    puntos, y con lo que se va escribiendo dentro según se teclea. */
 .ruleta-porcion.fantasma { fill: var(--paper-2); stroke: var(--ink-3); stroke-width: 0.9; stroke-dasharray: 3 2.4; }
-.ruleta-texto { font-family: var(--font-display); font-weight: 800; font-size: 8.5px; letter-spacing: -0.01em; pointer-events: none; transition: opacity 300ms; }
+/* Su transform va en CSS (ver Ruleta.jsx) para que la vuelta de los que quedan
+   cabeza abajo al parar se vea girar en su sitio. El origen, el centro de la
+   rueda, como el atributo transform de siempre. */
+.ruleta-texto { font-family: var(--font-display); font-weight: 800; font-size: 8.5px; letter-spacing: -0.01em; pointer-events: none; transform-box: view-box; transform-origin: 0 0; transition: opacity 300ms, transform 520ms var(--muelle); }
 .ruleta-texto.fantasma { fill: var(--ink-3); }
 .ruleta-luz { fill: #FFF6D8; stroke: rgba(0,0,0,0.12); stroke-width: 0.4; }
 .ruleta.girando .ruleta-luz { animation: ruleta-luces 380ms steps(2, jump-none) infinite; }
