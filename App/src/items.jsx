@@ -171,7 +171,12 @@ function colorClass(c) {
 function pickLang(v, lang) {
   if (v == null) return '';
   if (typeof v === 'string') return v;
-  return v[lang] || v.es || v.en || '';
+  // En los otros nueve idiomas, el inglés antes que el español: a quien usa la
+  // app en francés le sirve más. Lo que escribe la gente se guarda igual en
+  // las dos, así que esto solo cambia lo que trae la app (plantillas, títulos
+  // por defecto).
+  if (lang !== 'es') return v[lang] || v.en || v.es || '';
+  return v.es || v.en || '';
 }
 // Se cuelga de window a proposito. Antes funcionaba solo porque Babel deja las
 // funciones sueltas en el ambito global, que es un accidente y no un contrato.
@@ -1533,7 +1538,7 @@ function TodoItem({ item, lang, onUpdate, editing, callbacks }) {
                       callbacks.startDragTaskRow(e, item.id, idx);
                     }
                   }}
-                  title={lang === 'es' ? 'Arrastrar tarea fuera o reordenar' : 'Drag task out or reorder'}
+                  title={window.t('Arrastrar tarea fuera o reordenar', 'Drag task out or reorder')}
                 >
                   <span className="material-symbols-rounded">drag_indicator</span>
                 </div>
@@ -1880,7 +1885,7 @@ function ColumnItem({ item, lang, onUpdate, editing, callbacks }) {
                   <div className="anchors">
                     <div
                       className="connect-handle"
-                      title={lang==='es'?'Arrastra para conectar':'Drag to connect'}
+                      title={window.t('Arrastra para conectar', 'Drag to connect')}
                       onMouseDown={(e)=>callbacks.startAnchorDrag(e, child.id, 'center')}
                     >
                       <span className="material-symbols-rounded">trip_origin</span>

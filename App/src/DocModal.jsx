@@ -1021,7 +1021,7 @@ function DocModal({ docItem, lang, onClose, onUpdate }) {
     const pre = document.createElement('pre');
     pre.setAttribute('data-lang', 'auto');
     const code = document.createElement('code');
-    code.textContent = texto || (lang === 'es' ? '// código' : '// code');
+    code.textContent = texto || (window.t('// código', '// code'));
     pre.appendChild(code);
 
     // El bloque que contiene la selección; si no hay ninguno, el propio editor.
@@ -1265,7 +1265,7 @@ function DocModal({ docItem, lang, onClose, onUpdate }) {
             <textarea
               ref={titleRef}
               className="doc-title-input"
-              placeholder={lang==='es'?'Sin título':'Untitled'}
+              placeholder={window.t('Sin título', 'Untitled')}
               onChange={(e) => {
                 commitTitle();
                 e.target.style.height = 'auto';
@@ -1292,7 +1292,7 @@ function DocModal({ docItem, lang, onClose, onUpdate }) {
             <button
               className="icon-btn lift"
               onClick={() => titleRef.current?.select()}
-              title={lang==='es' ? 'Editar título' : 'Edit title'}
+              title={window.t('Editar título', 'Edit title')}
               style={{
                 padding: '6px',
                 minWidth: 'auto',
@@ -1307,7 +1307,7 @@ function DocModal({ docItem, lang, onClose, onUpdate }) {
           </div>
           <button className="btn btn-ghost" onClick={onClose}>
             <span className="material-symbols-rounded">close</span>
-            {lang==='es'?'Cerrar':'Close'}
+            {window.t('Cerrar', 'Close')}
           </button>
         </div>
         {/* Barra de herramientas en horizontal y agrupada por categoría. Antes
@@ -1315,34 +1315,34 @@ function DocModal({ docItem, lang, onClose, onUpdate }) {
             a uno para dar con el que se buscaba. */}
         <div className="doc-ribbon" onMouseDown={(e)=>e.preventDefault()}>
           <DocGrupo nombre={window.t('Deshacer', 'Undo')}>
-            <button onClick={deshacer} title={lang==='es'?'Deshacer (Ctrl+Z)':'Undo (Ctrl+Z)'}>
+            <button onClick={deshacer} title={window.t('Deshacer (Ctrl+Z)', 'Undo (Ctrl+Z)')}>
               <span className="material-symbols-rounded">undo</span>
             </button>
-            <button onClick={rehacer} title={lang==='es'?'Rehacer (Ctrl+Y)':'Redo (Ctrl+Y)'}>
+            <button onClick={rehacer} title={window.t('Rehacer (Ctrl+Y)', 'Redo (Ctrl+Y)')}>
               <span className="material-symbols-rounded">redo</span>
             </button>
           </DocGrupo>
 
           <DocGrupo nombre={window.t('Texto', 'Text')}>
-            <button onClick={()=>exec('bold')} className={active.bold ? 'active' : ''} title={lang==='es'?'Negrita (Ctrl+B)':'Bold (Ctrl+B)'}>
+            <button onClick={()=>exec('bold')} className={active.bold ? 'active' : ''} title={window.t('Negrita (Ctrl+B)', 'Bold (Ctrl+B)')}>
               <span className="doc-tool-label">B</span>
             </button>
-            <button onClick={()=>exec('italic')} className={active.italic ? 'active' : ''} title={lang==='es'?'Cursiva (Ctrl+I)':'Italic (Ctrl+I)'}>
+            <button onClick={()=>exec('italic')} className={active.italic ? 'active' : ''} title={window.t('Cursiva (Ctrl+I)', 'Italic (Ctrl+I)')}>
               <i>I</i>
             </button>
-            <button onClick={()=>exec('underline')} className={active.underline ? 'active' : ''} title={lang==='es'?'Subrayado (Ctrl+U)':'Underline (Ctrl+U)'}>
+            <button onClick={()=>exec('underline')} className={active.underline ? 'active' : ''} title={window.t('Subrayado (Ctrl+U)', 'Underline (Ctrl+U)')}>
               <span style={{textDecoration:'underline', fontWeight: 700}}>U</span>
             </button>
-            <button onClick={()=>exec('strikeThrough')} className={active.strike ? 'active' : ''} title={lang==='es'?'Tachado':'Strikethrough'}>
+            <button onClick={()=>exec('strikeThrough')} className={active.strike ? 'active' : ''} title={window.t('Tachado', 'Strikethrough')}>
               <span style={{textDecoration:'line-through', fontWeight: 700}}>S</span>
             </button>
-            <button onClick={()=>exec('superscript')} className={active.sup ? 'active' : ''} title={lang==='es'?'Superíndice':'Superscript'}>
+            <button onClick={()=>exec('superscript')} className={active.sup ? 'active' : ''} title={window.t('Superíndice', 'Superscript')}>
               <span className="material-symbols-rounded">superscript</span>
             </button>
-            <button onClick={()=>exec('subscript')} className={active.sub ? 'active' : ''} title={lang==='es'?'Subíndice':'Subscript'}>
+            <button onClick={()=>exec('subscript')} className={active.sub ? 'active' : ''} title={window.t('Subíndice', 'Subscript')}>
               <span className="material-symbols-rounded">subscript</span>
             </button>
-            <button onClick={()=>exec('removeFormat')} title={lang==='es'?'Limpiar formato':'Clear formatting'}>
+            <button onClick={()=>exec('removeFormat')} title={window.t('Limpiar formato', 'Clear formatting')}>
               <span className="material-symbols-rounded">format_clear</span>
             </button>
           </DocGrupo>
@@ -1351,23 +1351,23 @@ function DocModal({ docItem, lang, onClose, onUpdate }) {
             <button
               className={`doc-font-btn ${pop && pop.kind === 'font' ? 'active' : ''}`}
               onClick={(e)=>abrePop('font', e)}
-              title={lang==='es'?'Tipo de letra':'Typeface'}
+              title={window.t('Tipo de letra', 'Typeface')}
             >
               <span className="material-symbols-rounded">font_download</span>
               <span className="material-symbols-rounded doc-caret">expand_more</span>
             </button>
             <div className="doc-size-ctrl">
-              <button onClick={()=>stepFontSize(-1)} title={lang==='es'?'Reducir el tamaño de la letra':'Decrease font size'}>
+              <button onClick={()=>stepFontSize(-1)} title={window.t('Reducir el tamaño de la letra', 'Decrease font size')}>
                 <span className="material-symbols-rounded">text_decrease</span>
               </button>
               <button
                 className={`doc-size-num ${pop && pop.kind === 'size' ? 'active' : ''}`}
                 onClick={(e)=>abrePop('size', e)}
-                title={lang==='es'?'Elegir el tamaño de la letra':'Choose font size'}
+                title={window.t('Elegir el tamaño de la letra', 'Choose font size')}
               >
                 {active.size || '—'}
               </button>
-              <button onClick={()=>stepFontSize(1)} title={lang==='es'?'Aumentar el tamaño de la letra':'Increase font size'}>
+              <button onClick={()=>stepFontSize(1)} title={window.t('Aumentar el tamaño de la letra', 'Increase font size')}>
                 <span className="material-symbols-rounded">text_increase</span>
               </button>
             </div>
@@ -1379,7 +1379,7 @@ function DocModal({ docItem, lang, onClose, onUpdate }) {
             <button
               className={`doc-color-btn ${pop && pop.kind === 'text' ? 'active' : ''}`}
               onClick={(e)=>abrePop('text', e)}
-              title={lang==='es'?'Color del texto':'Text colour'}
+              title={window.t('Color del texto', 'Text colour')}
             >
               <span className="material-symbols-rounded">format_color_text</span>
               <i className="doc-color-bar" style={{ background: ultimoColor.text }}/>
@@ -1387,7 +1387,7 @@ function DocModal({ docItem, lang, onClose, onUpdate }) {
             <button
               className={`doc-color-btn ${pop && pop.kind === 'mark' ? 'active' : ''}`}
               onClick={(e)=>abrePop('mark', e)}
-              title={lang==='es'?'Resaltar':'Highlight'}
+              title={window.t('Resaltar', 'Highlight')}
             >
               <span className="material-symbols-rounded">format_ink_highlighter</span>
               <i
@@ -1400,59 +1400,59 @@ function DocModal({ docItem, lang, onClose, onUpdate }) {
           </DocGrupo>
 
           <DocGrupo nombre={window.t('Estilo', 'Style')}>
-            <button onClick={()=>exec('formatBlock', '<h1>')} className={active.h1 ? 'active' : ''} title={lang==='es'?'Título 1':'Heading 1'}>
+            <button onClick={()=>exec('formatBlock', '<h1>')} className={active.h1 ? 'active' : ''} title={window.t('Título 1', 'Heading 1')}>
               <span style={{fontFamily:'var(--font-display)', fontWeight: 800, fontSize: 14}}>H1</span>
             </button>
-            <button onClick={()=>exec('formatBlock', '<h2>')} className={active.h2 ? 'active' : ''} title={lang==='es'?'Título 2':'Heading 2'}>
+            <button onClick={()=>exec('formatBlock', '<h2>')} className={active.h2 ? 'active' : ''} title={window.t('Título 2', 'Heading 2')}>
               <span style={{fontFamily:'var(--font-display)', fontWeight: 700, fontSize: 12.5}}>H2</span>
             </button>
-            <button onClick={()=>exec('formatBlock', '<h3>')} className={active.h3 ? 'active' : ''} title={lang==='es'?'Título 3':'Heading 3'}>
+            <button onClick={()=>exec('formatBlock', '<h3>')} className={active.h3 ? 'active' : ''} title={window.t('Título 3', 'Heading 3')}>
               <span style={{fontFamily:'var(--font-display)', fontWeight: 700, fontSize: 11.5}}>H3</span>
             </button>
-            <button onClick={()=>exec('formatBlock', '<p>')} className={active.p ? 'active' : ''} title={lang==='es'?'Texto normal':'Paragraph'}>
+            <button onClick={()=>exec('formatBlock', '<p>')} className={active.p ? 'active' : ''} title={window.t('Texto normal', 'Paragraph')}>
               <span className="material-symbols-rounded">notes</span>
             </button>
-            <button onClick={toggleQuote} className={active.quote ? 'active' : ''} title={lang==='es'?'Cita':'Quote'}>
+            <button onClick={toggleQuote} className={active.quote ? 'active' : ''} title={window.t('Cita', 'Quote')}>
               <span className="material-symbols-rounded">format_quote</span>
             </button>
           </DocGrupo>
 
           <DocGrupo nombre={window.t('Párrafo', 'Paragraph')}>
-            <button onClick={()=>exec('insertUnorderedList')} className={active.ul ? 'active' : ''} title={lang==='es'?'Lista con viñetas':'Bulleted list'}>
+            <button onClick={()=>exec('insertUnorderedList')} className={active.ul ? 'active' : ''} title={window.t('Lista con viñetas', 'Bulleted list')}>
               <span className="material-symbols-rounded">format_list_bulleted</span>
             </button>
-            <button onClick={()=>exec('insertOrderedList')} className={active.ol ? 'active' : ''} title={lang==='es'?'Lista numerada':'Numbered list'}>
+            <button onClick={()=>exec('insertOrderedList')} className={active.ol ? 'active' : ''} title={window.t('Lista numerada', 'Numbered list')}>
               <span className="material-symbols-rounded">format_list_numbered</span>
             </button>
-            <button onClick={()=>exec('justifyLeft')} className={!active.alignC && !active.alignR && !active.alignJ ? 'active' : ''} title={lang==='es'?'Alinear a la izquierda':'Align left'}>
+            <button onClick={()=>exec('justifyLeft')} className={!active.alignC && !active.alignR && !active.alignJ ? 'active' : ''} title={window.t('Alinear a la izquierda', 'Align left')}>
               <span className="material-symbols-rounded">format_align_left</span>
             </button>
-            <button onClick={()=>exec('justifyCenter')} className={active.alignC ? 'active' : ''} title={lang==='es'?'Centrar':'Align centre'}>
+            <button onClick={()=>exec('justifyCenter')} className={active.alignC ? 'active' : ''} title={window.t('Centrar', 'Align centre')}>
               <span className="material-symbols-rounded">format_align_center</span>
             </button>
-            <button onClick={()=>exec('justifyRight')} className={active.alignR ? 'active' : ''} title={lang==='es'?'Alinear a la derecha':'Align right'}>
+            <button onClick={()=>exec('justifyRight')} className={active.alignR ? 'active' : ''} title={window.t('Alinear a la derecha', 'Align right')}>
               <span className="material-symbols-rounded">format_align_right</span>
             </button>
-            <button onClick={()=>exec('justifyFull')} className={active.alignJ ? 'active' : ''} title={lang==='es'?'Justificar':'Justify'}>
+            <button onClick={()=>exec('justifyFull')} className={active.alignJ ? 'active' : ''} title={window.t('Justificar', 'Justify')}>
               <span className="material-symbols-rounded">format_align_justify</span>
             </button>
-            <button onClick={()=>stepIndent(1)} title={lang==='es'?'Aumentar sangría':'Increase indent'}>
+            <button onClick={()=>stepIndent(1)} title={window.t('Aumentar sangría', 'Increase indent')}>
               <span className="material-symbols-rounded">format_indent_increase</span>
             </button>
-            <button onClick={()=>stepIndent(-1)} title={lang==='es'?'Reducir sangría':'Decrease indent'}>
+            <button onClick={()=>stepIndent(-1)} title={window.t('Reducir sangría', 'Decrease indent')}>
               <span className="material-symbols-rounded">format_indent_decrease</span>
             </button>
             <button
               onClick={(e)=>abrePop('lh', e)}
               className={pop && pop.kind === 'lh' ? 'active' : ''}
-              title={lang==='es'?'Interlineado':'Line spacing'}
+              title={window.t('Interlineado', 'Line spacing')}
             >
               <span className="material-symbols-rounded">format_line_spacing</span>
             </button>
           </DocGrupo>
 
           <DocGrupo nombre={window.t('Insertar', 'Insert')}>
-            <button onClick={insertCode} title={lang==='es'?'Código':'Code'}>
+            <button onClick={insertCode} title={window.t('Código', 'Code')}>
               <span className="material-symbols-rounded">code</span>
             </button>
             {/* Elegir el lenguaje del bloque donde está el cursor. Solo se puede
@@ -1462,19 +1462,19 @@ function DocModal({ docItem, lang, onClose, onUpdate }) {
               disabled={!active.enCodigo}
               className={pop && pop.kind === 'lang' ? 'active' : ''}
               title={active.enCodigo
-                ? (lang==='es'?'Lenguaje del bloque de código':'Code block language')
-                : (lang==='es'?'Pon el cursor dentro de un bloque de código':'Put the caret inside a code block')}
+                ? (window.t('Lenguaje del bloque de código', 'Code block language'))
+                : (window.t('Pon el cursor dentro de un bloque de código', 'Put the caret inside a code block'))}
             >
               <span className="material-symbols-rounded">manage_search</span>
             </button>
-            <button onClick={()=>exec('insertHorizontalRule')} title={lang==='es'?'Línea separadora':'Horizontal rule'}>
+            <button onClick={()=>exec('insertHorizontalRule')} title={window.t('Línea separadora', 'Horizontal rule')}>
               <span className="material-symbols-rounded">horizontal_rule</span>
             </button>
             <button
               onClick={openLinkMenu}
               disabled={!active.hasSel}
               className={linkMenu ? 'active' : ''}
-              title={active.hasSel ? (lang==='es'?'Enlace a una dirección de internet':'Link to a web address') : (lang==='es'?'Selecciona texto primero':'Select text first')}
+              title={active.hasSel ? (window.t('Enlace a una dirección de internet', 'Link to a web address')) : (window.t('Selecciona texto primero', 'Select text first'))}
             >
               <span className="material-symbols-rounded">link</span>
             </button>
@@ -1485,8 +1485,8 @@ function DocModal({ docItem, lang, onClose, onUpdate }) {
               onClick={linkToNode}
               disabled={!active.hasSel}
               title={active.hasSel
-                ? (lang==='es'?'Enlazar la selección con otro nodo':'Link selection to another node')
-                : (lang==='es'?'Selecciona texto primero':'Select text first')}
+                ? (window.t('Enlazar la selección con otro nodo', 'Link selection to another node'))
+                : (window.t('Selecciona texto primero', 'Select text first'))}
             >
               <span className="material-symbols-rounded">add_link</span>
             </button>
@@ -1557,7 +1557,7 @@ function DocModal({ docItem, lang, onClose, onUpdate }) {
                     style={{ fontFamily: f.v || 'var(--font-body, inherit)' }}
                     onClick={()=>{ applyFontFamily(f.v); setPop(null); }}
                   >
-                    {f.v ? f.n : (lang==='es' ? 'Del programa' : 'App default')}
+                    {f.v ? f.n : (window.t('Del programa', 'App default'))}
                   </button>
                 ))}
               </div>
@@ -1585,8 +1585,8 @@ function DocModal({ docItem, lang, onClose, onUpdate }) {
               <>
                 <div className="doc-pop-title">
                   {pop.kind === 'text'
-                    ? (lang==='es'?'Color del texto':'Text color')
-                    : (lang==='es'?'Resaltar':'Highlight')}
+                    ? (window.t('Color del texto', 'Text color'))
+                    : (window.t('Resaltar', 'Highlight'))}
                 </div>
                 <div className="doc-color-grid">
                   {(pop.kind === 'text' ? DOC_TEXT_COLORS : DOC_MARK_COLORS).map(c => (
@@ -1597,7 +1597,7 @@ function DocModal({ docItem, lang, onClose, onUpdate }) {
                         background: c === 'transparent' ? 'var(--paper)' : c,
                         borderColor: c === '#FFFFFF' || c === 'transparent' ? 'var(--line-soft)' : 'var(--line)',
                       }}
-                      title={c === 'transparent' ? (lang==='es'?'Sin resaltado':'No highlight') : c}
+                      title={c === 'transparent' ? (window.t('Sin resaltado', 'No highlight')) : c}
                       onClick={()=>{
                         applyColor(pop.kind === 'text' ? 'foreColor' : 'hiliteColor', c);
                         setPop(null);
@@ -1661,7 +1661,7 @@ function DocModal({ docItem, lang, onClose, onUpdate }) {
             <input
               ref={linkInputRef}
               className="doc-link-input"
-              placeholder={lang==='es'?'Pega o escribe el enlace…':'Paste or type the link…'}
+              placeholder={window.t('Pega o escribe el enlace…', 'Paste or type the link…')}
               value={linkMenu.value}
               onChange={(e)=>setLinkMenu(m => ({ ...m, value: e.target.value }))}
               onKeyDown={(e)=>{
@@ -1670,11 +1670,11 @@ function DocModal({ docItem, lang, onClose, onUpdate }) {
               }}
             />
             {linkMenu.value && (
-              <button className="doc-link-rm" title={lang==='es'?'Quitar enlace':'Remove link'} onClick={removeLink}>
+              <button className="doc-link-rm" title={window.t('Quitar enlace', 'Remove link')} onClick={removeLink}>
                 <span className="material-symbols-rounded" style={{fontSize:17}}>link_off</span>
               </button>
             )}
-            <button className="doc-link-ok" onClick={applyLink}>{lang==='es'?'Aplicar':'Apply'}</button>
+            <button className="doc-link-ok" onClick={applyLink}>{window.t('Aplicar', 'Apply')}</button>
           </div>
         </>,
         document.body

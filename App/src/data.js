@@ -49,6 +49,12 @@ const TRANSLATIONS = {
     new_canvas: 'New canvas',
   },
   fr: {
+    tool_frame: "Cadre",
+    tool_bigtitle: "Titre",
+    tool_map: "Carte",
+    tool_shape: "Forme",
+    tool_code: "Code",
+    tool_timer: "Minuteur",
     home_hero: 'Votre esprit,\nordonné en\ncanevas.',
     home_sub: 'Oddinote est un canevas infini avec des tableaux imbriqués. Conçu pour les développeurs de jeux, écrivains et créatifs.',
     new_project: 'Nouveau projet',
@@ -67,6 +73,12 @@ const TRANSLATIONS = {
     new_canvas: 'Nouveau canevas',
   },
   de: {
+    tool_frame: "Rahmen",
+    tool_bigtitle: "Titel",
+    tool_map: "Karte",
+    tool_shape: "Form",
+    tool_code: "Code",
+    tool_timer: "Timer",
     home_hero: 'Ihr Geist,\ngeordnet in\nLeinwänden.',
     home_sub: 'Oddinote ist eine unendliche Leinwand mit verschachtelten Boards. Entwickelt für Game-Devs, Autoren und Kreative.',
     new_project: 'Neues Projekt',
@@ -85,6 +97,12 @@ const TRANSLATIONS = {
     new_canvas: 'Neue Leinwand',
   },
   it: {
+    tool_frame: "Cornice",
+    tool_bigtitle: "Titolo",
+    tool_map: "Mappa",
+    tool_shape: "Forma",
+    tool_code: "Codice",
+    tool_timer: "Timer",
     home_hero: 'La tua mente,\nordinata in\ntavole.',
     home_sub: 'Oddinote è una tela infinita con tavole annidate. Pensata per game dev, scrittori e creativi che non entrano in un solo schermo.',
     new_project: 'Nuovo progetto',
@@ -103,6 +121,12 @@ const TRANSLATIONS = {
     new_canvas: 'Nuova tela',
   },
   pt: {
+    tool_frame: "Moldura",
+    tool_bigtitle: "Título",
+    tool_map: "Mapa",
+    tool_shape: "Forma",
+    tool_code: "Código",
+    tool_timer: "Tempo",
     home_hero: 'Sua mente,\norganizada em\ntelas.',
     home_sub: 'Oddinote é uma tela infinita com quadros aninhados. Projetado para game devs, escritores e criativos que não cabem em uma só tela.',
     new_project: 'Novo projeto',
@@ -121,6 +145,12 @@ const TRANSLATIONS = {
     new_canvas: 'Nova tela',
   },
   zh: {
+    tool_frame: "框架",
+    tool_bigtitle: "标题",
+    tool_map: "地图",
+    tool_shape: "形状",
+    tool_code: "代码",
+    tool_timer: "计时",
     home_hero: '理清思绪，\n尽在无限\n画布。',
     home_sub: 'Oddinote 是一个具有嵌套看板的无限画布。专为游戏开发者、作家和创意人员设计。',
     new_project: '新建项目',
@@ -139,6 +169,12 @@ const TRANSLATIONS = {
     new_canvas: '新画布',
   },
   ja: {
+    tool_frame: "フレーム",
+    tool_bigtitle: "タイトル",
+    tool_map: "地図",
+    tool_shape: "図形",
+    tool_code: "コード",
+    tool_timer: "タイマー",
     home_hero: '無限のキャンバスで\n思考を整理する。',
     home_sub: 'Oddinoteは、ネストされたボードを備えた無限のキャンバスです。ゲーム開発者、作家、クリエイター向けに設計されています。',
     new_project: '新規プロジェクト',
@@ -157,6 +193,12 @@ const TRANSLATIONS = {
     new_canvas: '新規キャンバス',
   },
   ko: {
+    tool_frame: "프레임",
+    tool_bigtitle: "제목",
+    tool_map: "지도",
+    tool_shape: "도형",
+    tool_code: "코드",
+    tool_timer: "타이머",
     home_hero: '무한한 캔버스에\n당신의 생각을\n정리하세요.',
     home_sub: 'Oddinote는 중첩된 보드가 있는 무한 캔버스입니다. 게임 개발자, 작가, 크리에이터를 위해 설계되었습니다.',
     new_project: '새 프로젝트',
@@ -175,6 +217,12 @@ const TRANSLATIONS = {
     new_canvas: '새 캔버스',
   },
   ar: {
+    tool_frame: "إطار",
+    tool_bigtitle: "عنوان",
+    tool_map: "خريطة",
+    tool_shape: "شكل",
+    tool_code: "شيفرة",
+    tool_timer: "مؤقت",
     home_hero: 'رتب أفكارك\nفي لوحات\nمترابطة.',
     home_sub: 'أودينوت هي مساحة لا نهائية تحتوي على لوحات متداخلة. صُممت لمطوري الألعاب والكتاب والمبدعين.',
     new_project: 'مشروع جديد',
@@ -193,6 +241,12 @@ const TRANSLATIONS = {
     new_canvas: 'لوحة جديدة',
   },
   ru: {
+    tool_frame: "Рамка",
+    tool_bigtitle: "Заголовок",
+    tool_map: "Карта",
+    tool_shape: "Фигура",
+    tool_code: "Код",
+    tool_timer: "Таймер",
     home_hero: 'Ваш разум,\nорганизованный в\nхолсты.',
     home_sub: 'Oddinote — это бесконечный холст с вложенными досками. Создан для разработчиков игр, писателей и творцов, которым мало одного экрана.',
     new_project: 'Новый проект',
@@ -1890,6 +1944,14 @@ window.t = function(es, en, fr, de, it, pt, zh, ja, ko, ar, ru) {
     const indexMap = { es: 0, en: 1, fr: 2, de: 3, it: 4, pt: 5, zh: 6, ja: 7, ko: 8, ar: 9, ru: 10 };
     const idx = indexMap[currentLang];
     return arguments[idx] || en || es;
+  }
+
+  // Los otros nueve idiomas (src/idiomas/): antes que UI_WORDS, que es más
+  // corto y a veces traduce una palabra suelta con otro sentido. Si la frase
+  // aún no está traducida, sigue como siempre (UI_WORDS y luego el inglés).
+  if (currentLang !== 'es' && currentLang !== 'en' && typeof es === 'string' && window.odiTraduce) {
+    const traducida = window.odiTraduce(currentLang, es, en);
+    if (traducida) return traducida;
   }
 
   // Otherwise, use the global UI_WORDS lookup dictionary

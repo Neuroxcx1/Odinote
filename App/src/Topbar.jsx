@@ -632,7 +632,7 @@ function Topbar({
         <div className="volume-ctrl" style={{ marginRight: 6 }}>
           <button
             className="icon-btn-mute"
-            title={volume === 0 ? (lang === 'es' ? 'Activar sonido' : 'Unmute') : (lang === 'es' ? 'Silenciar' : 'Mute')}
+            title={volume === 0 ? (window.t('Activar sonido', 'Unmute')) : (window.t('Silenciar', 'Mute'))}
             onClick={() => {
               let nextVol = 0.5;
               if (volume > 0) {

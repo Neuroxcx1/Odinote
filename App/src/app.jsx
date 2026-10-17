@@ -3181,7 +3181,7 @@ function App() {
               <>
                 <div className="ctx-menu-header">
                   <span className="material-symbols-rounded" style={{ fontSize: '14px', color: 'var(--wine)' }}>spellcheck</span>
-                  <span>{lang === 'es' ? 'Ortografía' : 'Spelling'}</span>
+                  <span>{window.t('Ortografía', 'Spelling')}</span>
                 </div>
                 <div className="ctx-menu-suggestions">
                   {contextMenu.dictionarySuggestions && contextMenu.dictionarySuggestions.length > 0 ? (
@@ -3197,7 +3197,7 @@ function App() {
                     ))
                   ) : (
                     <div className="ctx-menu-no-suggestions">
-                      <i>{lang === 'es' ? 'Sin sugerencias' : 'No suggestions'}</i>
+                      <i>{window.t('Sin sugerencias', 'No suggestions')}</i>
                     </div>
                   )}
                 </div>
@@ -3207,7 +3207,7 @@ function App() {
                   onClick={handleAddToDictionary}
                 >
                   <span className="material-symbols-rounded">add_to_photos</span>
-                  <span>{lang === 'es' ? 'Añadir al diccionario' : 'Add to dictionary'}</span>
+                  <span>{window.t('Añadir al diccionario', 'Add to dictionary')}</span>
                 </button>
                 {(contextMenu.isEditable || (contextMenu.selectionText && contextMenu.selectionText.trim() !== '')) && <div className="ctx-menu-divider" />}
               </>
@@ -3217,15 +3217,15 @@ function App() {
               <>
                 <button className="ctx-menu-item" onMouseDown={(e) => e.preventDefault()} onClick={handleCut}>
                   <span className="material-symbols-rounded">content_cut</span>
-                  <span>{lang === 'es' ? 'Cortar' : 'Cut'}</span>
+                  <span>{window.t('Cortar', 'Cut')}</span>
                 </button>
                 <button className="ctx-menu-item" onMouseDown={(e) => e.preventDefault()} onClick={handleCopy}>
                   <span className="material-symbols-rounded">content_copy</span>
-                  <span>{lang === 'es' ? 'Copiar' : 'Copy'}</span>
+                  <span>{window.t('Copiar', 'Copy')}</span>
                 </button>
                 <button className="ctx-menu-item" onMouseDown={(e) => e.preventDefault()} onClick={handlePaste}>
                   <span className="material-symbols-rounded">content_paste</span>
-                  <span>{lang === 'es' ? 'Pegar' : 'Paste'}</span>
+                  <span>{window.t('Pegar', 'Paste')}</span>
                 </button>
                 {/* Enlazar el texto seleccionado con otro nodo. Es el mismo
                     enlace que se hace escribiendo "[[", pero a partir de algo
@@ -3247,7 +3247,7 @@ function App() {
                       }}
                     >
                       <span className="material-symbols-rounded">add_link</span>
-                      <span>{lang === 'es' ? 'Enlazar con un nodo…' : 'Link to a node…'}</span>
+                      <span>{window.t('Enlazar con un nodo…', 'Link to a node…')}</span>
                     </button>
                   </>
                 )}
@@ -3257,7 +3257,7 @@ function App() {
             {!contextMenu.isEditable && contextMenu.selectionText && contextMenu.selectionText.trim() !== '' && (
               <button className="ctx-menu-item" onMouseDown={(e) => e.preventDefault()} onClick={handleCopy}>
                 <span className="material-symbols-rounded">content_copy</span>
-                <span>{lang === 'es' ? 'Copiar' : 'Copy'}</span>
+                <span>{window.t('Copiar', 'Copy')}</span>
               </button>
             )}
           </div>

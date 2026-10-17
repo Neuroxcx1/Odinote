@@ -22,6 +22,34 @@ const { useState: useStateHome, useMemo: useMemoHome, useRef: useRefHome, useEff
 // llenado, no información que merezca viajar.
 const CARPETAS_VACIAS_KEY = 'odinote.carpetas_vacias';
 
+// El titular de la pantalla de inicio: [antes del salto, antes del resaltado,
+// lo resaltado, después].
+const HERO_INICIO = {
+  es: ['Tu mente, ordenada', 'en ', 'canvases anidados', '.'],
+  en: ['Your mind, organized', 'as ', 'nested canvases', '.'],
+  fr: ['Votre esprit, organisé', 'en ', 'canevas imbriqués', '.'],
+  de: ['Dein Kopf, geordnet', 'in ', 'verschachtelten Leinwänden', '.'],
+  it: ['La tua mente, ordinata', 'in ', 'tele annidate', '.'],
+  pt: ['Sua mente, organizada', 'em ', 'telas aninhadas', '.'],
+  zh: ['你的想法，', '整理成', '层层嵌套的画布', '。'],
+  ja: ['頭の中を、', '', '入れ子のキャンバス', 'で整理。'],
+  ko: ['생각을', '', '중첩 캔버스', '로 정리하세요.'],
+  ar: ['أفكارك، مرتّبة', 'في ', 'لوحات متداخلة', '.'],
+  ru: ['Ваши мысли — по полочкам', 'на ', 'вложенных холстах', '.'],
+};
+
+// «Hace cuánto» de una tarjeta: viene guardado en el propio proyecto como
+// {es, en}. Los dos que pone la app pasan por window.t para salir en los
+// otros nueve idiomas; lo demás, como siempre.
+function textoActualizado(u, lang) {
+  if (!u) return '';
+  if (lang !== 'es' && lang !== 'en' && typeof u === 'object') {
+    if (u.es === 'ahora') return window.t('ahora', 'just now');
+    if (u.es === 'Sincronizado') return window.t('Sincronizado', 'Synced');
+  }
+  return window.pickLang(u, lang);
+}
+
 function leeCarpetasVacias() {
   try {
     const crudo = JSON.parse(localStorage.getItem(CARPETAS_VACIAS_KEY) || '[]');
@@ -864,11 +892,13 @@ function Home({ lang, setLang, theme, setTheme, onOpenProject, projects, onCreat
                   {window.t('Open source · gratis para siempre', 'Open source · free forever')}
                 </div>
                 <h1 className="ms-hero-title">
-                  {lang==='es' ? (
-                    <>Tu mente, ordenada<br/>en <span className="hero-mark">canvases anidados</span>.</>
-                  ) : (
-                    <>Your mind, organized<br/>as <span className="hero-mark">nested canvases</span>.</>
-                  )}
+                  {(() => {
+                    // Cada idioma con su frase entera y su trozo resaltado: no se
+                    // puede montar con trozos sueltos traducidos, porque en
+                    // japonés o coreano el orden de las palabras es otro.
+                    const h = HERO_INICIO[lang] || HERO_INICIO.en;
+                    return <>{h[0]}<br/>{h[1]}<span className="hero-mark">{h[2]}</span>{h[3]}</>;
+                  })()}
                 </h1>
                 <p className="ms-hero-sub">{window.t('Pensado para game devs, escritores y creativos que no caben en una sola pantalla. Notas, imágenes, vínculos, tableros — todo en un canvas infinito.', "Built for game devs, writers and creatives who don't fit on one screen. Notes, images, links, boards — all on an infinite canvas.")}</p>
               </div>
@@ -1120,7 +1150,7 @@ function RecentCard({ project, lang, t, onOpen, onDelete, onRenameClick, onToggl
         <div className="ms-recent-meta">
           <span>{project.items} {t.items_count}</span>
           <span className="dot"/>
-          <span>{window.pickLang(project.updated, lang) || (window.t('recién', 'recent'))}</span>
+          <span>{textoActualizado(project.updated, lang) || (window.t('recién', 'recent'))}</span>
         </div>
       </div>
     </div>
@@ -1225,7 +1255,7 @@ function ProjectCard({ project, lang, t, onOpen, onDelete, onRenameClick, onRest
         <div className="ms-project-meta">
           <span>{project.items} {t.items_count}</span>
           <span className="dot"/>
-          <span>{window.pickLang(project.updated, lang) || (window.t('recién', 'recent'))}</span>
+          <span>{textoActualizado(project.updated, lang) || (window.t('recién', 'recent'))}</span>
           {/* Buscando y en Favoritos las tarjetas salen fuera de su carpeta;
               sin esto no había forma de saber dónde vive cada una. Dentro de
               esa misma carpeta no se enseña: ahí lo dicen ya las migas de

@@ -192,14 +192,14 @@ function TextFormatSidebar({ item, lang, onUpdate, onClose, variant }) {
   return (
     <>
     <div className="ctx-side text-format" onMouseDown={(e)=>e.preventDefault()}>
-      <button className="ctx-close" onClick={onClose} title={lang==='es'?'Cerrar':'Close'}>
+      <button className="ctx-close" onClick={onClose} title={window.t('Cerrar', 'Close')}>
         <span className="material-symbols-rounded">arrow_back</span>
       </button>
 
       <button
         className={`ctx-btn ${colorOpen ? 'active' : ''}`}
         onClick={()=>setColorOpen(o=>!o)}
-        title={lang==='es'?'Color del texto':'Text color'}
+        title={window.t('Color del texto', 'Text color')}
       >
         <div className="ctx-letter" style={{
           fontWeight: 800,
@@ -215,7 +215,7 @@ function TextFormatSidebar({ item, lang, onUpdate, onClose, variant }) {
         }}>
           {isCustomPropType && (usaTextColor ? item.textColor : item.titleColor) && (usaTextColor ? item.textColor : item.titleColor) !== 'inherit' ? <span style={{color: usaTextColor ? item.textColor : item.titleColor}}>A</span> : 'A'}
         </div>
-        <span>{lang==='es'?'Color':'Color'}</span>
+        <span>{window.t('Color', 'Color')}</span>
       </button>
 
       {/* Bloques (titulos, listas, cita, codigo): no en una tarea ni en una
@@ -226,15 +226,15 @@ function TextFormatSidebar({ item, lang, onUpdate, onClose, variant }) {
         <>
           <button className="ctx-btn" onClick={()=>exec('formatBlock', '<h1>')}>
             <div className="ctx-letter" style={{fontWeight: 800, fontSize: 14}}>H1</div>
-            <span>{lang==='es'?'Título':'Heading'}</span>
+            <span>{window.t('Título', 'Heading')}</span>
           </button>
           <button className="ctx-btn" onClick={()=>exec('formatBlock', '<h2>')}>
             <div className="ctx-letter" style={{fontWeight: 700, fontSize: 12}}>H2</div>
-            <span>{lang==='es'?'Subtítulo':'Subheading'}</span>
+            <span>{window.t('Subtítulo', 'Subheading')}</span>
           </button>
           <button className="ctx-btn" onClick={()=>exec('formatBlock', '<p>')}>
             <span className="material-symbols-rounded">notes</span>
-            <span>{lang==='es'?'Texto normal':'Paragraph'}</span>
+            <span>{window.t('Texto normal', 'Paragraph')}</span>
           </button>
         </>
       )}
@@ -245,22 +245,22 @@ function TextFormatSidebar({ item, lang, onUpdate, onClose, variant }) {
               (texto plano); en las notas usan execCommand por selección. */}
           <button className={`ctx-btn ${shown.bold ? 'active' : ''}`} onClick={()=> (isBigTitle || isBoard || isCode || isTimer || isCarpeta) ? onUpdate({ bold: item.bold === false }) : exec('bold')}>
             <div className="ctx-letter" style={{fontWeight: 800}}>B</div>
-            <span>{lang==='es'?'Negrita':'Bold'}</span>
+            <span>{window.t('Negrita', 'Bold')}</span>
           </button>
 
           <button className={`ctx-btn ${shown.italic ? 'active' : ''}`} onClick={()=> (isBigTitle || isBoard || isCode || isTimer || isCarpeta) ? onUpdate({ italic: !item.italic }) : exec('italic')}>
             <div className="ctx-letter" style={{fontStyle: 'italic', fontWeight: 700}}>I</div>
-            <span>{lang==='es'?'Cursiva':'Italic'}</span>
+            <span>{window.t('Cursiva', 'Italic')}</span>
           </button>
 
           <button className={`ctx-btn ${shown.strike ? 'active' : ''}`} onClick={()=> (isBigTitle || isBoard || isCode || isTimer || isCarpeta) ? onUpdate({ strike: !item.strike }) : exec('strikeThrough')}>
             <div className="ctx-letter" style={{textDecoration: 'line-through', fontWeight: 700}}>S</div>
-            <span>{lang==='es'?'Tachado':'Strike'}</span>
+            <span>{window.t('Tachado', 'Strike')}</span>
           </button>
 
           <button className={`ctx-btn ${shown.underline ? 'active' : ''}`} onClick={()=> (isBigTitle || isBoard || isCode || isTimer || isCarpeta) ? onUpdate({ underline: !item.underline }) : exec('underline')}>
             <div className="ctx-letter" style={{textDecoration: 'underline', fontWeight: 700}}>U</div>
-            <span>{lang==='es'?'Subrayado':'Underline'}</span>
+            <span>{window.t('Subrayado', 'Underline')}</span>
           </button>
         </>
       )}
@@ -281,10 +281,10 @@ function TextFormatSidebar({ item, lang, onUpdate, onClose, variant }) {
                 exec('justifyLeft');
               }
             }}
-            title={lang==='es'?'Alinear a la izquierda':'Align left'}
+            title={window.t('Alinear a la izquierda', 'Align left')}
           >
             <span className="material-symbols-rounded">format_align_left</span>
-            <span>{lang==='es'?'Izquierda':'Left'}</span>
+            <span>{window.t('Izquierda', 'Left')}</span>
           </button>
 
           <button
@@ -298,10 +298,10 @@ function TextFormatSidebar({ item, lang, onUpdate, onClose, variant }) {
                 exec('justifyCenter');
               }
             }}
-            title={lang==='es'?'Centrar':'Align center'}
+            title={window.t('Centrar', 'Align center')}
           >
             <span className="material-symbols-rounded">format_align_center</span>
-            <span>{lang==='es'?'Centrar':'Center'}</span>
+            <span>{window.t('Centrar', 'Center')}</span>
           </button>
 
           <button
@@ -315,10 +315,10 @@ function TextFormatSidebar({ item, lang, onUpdate, onClose, variant }) {
                 exec('justifyRight');
               }
             }}
-            title={lang==='es'?'Alinear a la derecha':'Align right'}
+            title={window.t('Alinear a la derecha', 'Align right')}
           >
             <span className="material-symbols-rounded">format_align_right</span>
-            <span>{lang==='es'?'Derecha':'Right'}</span>
+            <span>{window.t('Derecha', 'Right')}</span>
           </button>
 
           <button
@@ -332,10 +332,10 @@ function TextFormatSidebar({ item, lang, onUpdate, onClose, variant }) {
                 exec('justifyFull');
               }
             }}
-            title={lang==='es'?'Justificar':'Justify'}
+            title={window.t('Justificar', 'Justify')}
           >
             <span className="material-symbols-rounded">format_align_justify</span>
-            <span>{lang==='es'?'Justificar':'Justify'}</span>
+            <span>{window.t('Justificar', 'Justify')}</span>
           </button>
         </>
       )}
@@ -346,12 +346,12 @@ function TextFormatSidebar({ item, lang, onUpdate, onClose, variant }) {
 
           <button className={`ctx-btn ${shown.ul ? 'active' : ''}`} onClick={()=>exec('insertUnorderedList')}>
             <span className="material-symbols-rounded">format_list_bulleted</span>
-            <span>{lang==='es'?'Lista':'Bullets'}</span>
+            <span>{window.t('Lista', 'Bullets')}</span>
           </button>
 
           <button className={`ctx-btn ${shown.ol ? 'active' : ''}`} onClick={()=>exec('insertOrderedList')}>
             <span className="material-symbols-rounded">format_list_numbered</span>
-            <span>{lang==='es'?'Numerada':'Numbered'}</span>
+            <span>{window.t('Numerada', 'Numbered')}</span>
           </button>
 
           {/* Aquí estaban Cita y Código. El código no funcionaba —envolvía la
@@ -383,17 +383,17 @@ function TextFormatSidebar({ item, lang, onUpdate, onClose, variant }) {
           }
           window.odiStartLinkFromSelection && window.odiStartLinkFromSelection(sel.getRangeAt(0).cloneRange());
         }}
-        title={lang==='es'?'Enlazar la selección con otro nodo':'Link selection to another node'}
+        title={window.t('Enlazar la selección con otro nodo', 'Link selection to another node')}
       >
         <span className="material-symbols-rounded">add_link</span>
-        <span>{lang==='es'?'Enlazar':'Link'}</span>
+        <span>{window.t('Enlazar', 'Link')}</span>
       </button>}
     </div>
 
     {colorOpen && (
       <div className="ctx-popout text-color-pop" onMouseDown={(e)=>e.preventDefault()}>
         <div className="ctx-pop-section">
-          <div className="ctx-pop-title">{lang==='es'?'Color del texto':'Text color'}</div>
+          <div className="ctx-pop-title">{window.t('Color del texto', 'Text color')}</div>
           {/* Sin `text-color-grid`: esa clase es una rejilla de siete columnas
               de cuando aquí había siete casillas sueltas. Metiendo dentro el
               selector entero, lo encajaba en una columna de treinta píxeles y
@@ -439,7 +439,7 @@ function TextFormatSidebar({ item, lang, onUpdate, onClose, variant }) {
             }}
           >
             <span className="material-symbols-rounded" style={{fontSize:14}}>format_clear</span>
-            {lang==='es'?'Limpiar formato':'Clear formatting'}
+            {window.t('Limpiar formato', 'Clear formatting')}
           </button>
         </div>
       </div>

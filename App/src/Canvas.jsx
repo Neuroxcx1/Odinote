@@ -6154,7 +6154,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
                         <div
                           key={pos}
                           className={`connect-handle ${pos === 'right' ? '' : `pos-${pos}`}`}
-                          title={lang==='es'?'Arrastra para conectar':'Drag to connect'}
+                          title={window.t('Arrastra para conectar', 'Drag to connect')}
                           onMouseDown={(e)=>startAnchorDrag(e, item.id, 'center')}
                         >
                           <span className="material-symbols-rounded">trip_origin</span>
