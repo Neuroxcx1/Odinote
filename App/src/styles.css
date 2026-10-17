@@ -8149,3 +8149,86 @@ html[data-mobile="1"] .code-run .material-symbols-rounded { font-size: max(16px,
 /* El ▶ de un bloque que no es JavaScript: gris, y al pulsarlo la terminal
    explica cómo ejecutarlo. */
 .code-run.otro-lenguaje { background: #5A6475; }
+
+/* ══ La barra de nodos a un lado o abajo (Ajustes → Barra de nodos) ══
+   Lo pidió el usuario: arriba (lo de siempre), a la izquierda, a la derecha o
+   abajo. La posición vive en <html data-barra>, la pone index.html antes de
+   pintar nada (sin destello) y la cambia Ajustes. Solo en el escritorio: en el
+   teléfono la barra tiene su propio sitio.
+   La barra (.tools-wrap) sigue dentro de .topbar, pero en estos modos se saca
+   con position: fixed; --alto-topbar lo mide Topbar.jsx. A los lados acaba
+   encima de la fila de abajo (estado, zoom, plantillas) para no taparla, y
+   abajo se queda en el hueco del medio de esa fila. */
+html:not([data-mobile="1"])[data-barra="left"] .topbar .tools-wrap,
+html:not([data-mobile="1"])[data-barra="right"] .topbar .tools-wrap {
+  position: fixed;
+  top: calc(var(--alto-topbar, 62px) + 12px);
+  bottom: 66px;
+  z-index: 60;
+  max-height: none;
+}
+html:not([data-mobile="1"])[data-barra="left"] .topbar .tools-wrap { left: 12px; }
+html:not([data-mobile="1"])[data-barra="right"] .topbar .tools-wrap { right: 12px; }
+html:not([data-mobile="1"])[data-barra="left"] .topbar .tools,
+html:not([data-mobile="1"])[data-barra="right"] .topbar .tools {
+  flex-direction: column;
+  align-items: stretch;
+  overflow-x: hidden;
+  overflow-y: auto;
+  min-height: 0;
+  flex: 0 1 auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-soft) transparent;
+}
+html:not([data-mobile="1"])[data-barra="left"] .topbar .tool-divider,
+html:not([data-mobile="1"])[data-barra="right"] .topbar .tool-divider {
+  width: auto; height: 1.5px; margin: 3px 4px;
+}
+/* El deslizador es para desplazarse a lo ancho: de lado sobra (rueda o barra). */
+html:not([data-mobile="1"])[data-barra="left"] .topbar .tools-slider,
+html:not([data-mobile="1"])[data-barra="right"] .topbar .tools-slider { display: none; }
+
+html:not([data-mobile="1"])[data-barra="bottom"] .topbar .tools-wrap {
+  position: fixed;
+  left: 50%;
+  bottom: 12px;
+  transform: translateX(-50%);
+  z-index: 60;
+  /* El hueco entre la barra de estado (izquierda) y el zoom y las plantillas
+     (derecha). Si no caben todos los nodos, se desplaza como arriba. */
+  max-width: calc(100vw - 720px);
+  min-width: 260px;
+}
+
+/* Lo que estaba en ese lado se aparta. */
+html:not([data-mobile="1"])[data-barra="left"] .ctx-side,
+html:not([data-mobile="1"])[data-barra="left"] .ctx-side.text-format,
+html:not([data-mobile="1"])[data-barra="left"] .ctx-side.ctx-side-day { left: 100px; }
+html:not([data-mobile="1"])[data-barra="right"] .fijar-lienzo { right: 100px; }
+
+/* La tira del caracol sale hacia donde hay sitio (Topbar.jsx la coloca); el
+   pico que la une a la concha solo cuadra con la barra arriba. */
+html:not([data-mobile="1"])[data-barra="left"] .mas-serpiente::before,
+html:not([data-mobile="1"])[data-barra="right"] .mas-serpiente::before,
+html:not([data-mobile="1"])[data-barra="bottom"] .mas-serpiente::before { display: none; }
+html:not([data-mobile="1"])[data-barra="left"] .mas-serpiente { transform-origin: 0 0; }
+html:not([data-mobile="1"])[data-barra="bottom"] .mas-serpiente { transform-origin: calc(100% - var(--pico)) 100%; }
+
+/* El dibujito de cada sitio en Ajustes. */
+.barra-sitios { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.barra-sitio {
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  padding: 10px 6px 8px; border: 1.5px solid var(--line); border-radius: 8px;
+  background: var(--paper); box-shadow: var(--pop-sm); cursor: pointer;
+  font-size: 12px; font-weight: 700; color: var(--ink);
+}
+.barra-sitio.activo { background: var(--olive); color: #FFFFFF; }
+.barra-sitio-dibujo {
+  position: relative; width: 58px; height: 40px; box-sizing: border-box;
+  border: 1.5px solid currentColor; border-radius: 4px; opacity: 0.9;
+}
+.barra-sitio-dibujo::after { content: ''; position: absolute; background: currentColor; border-radius: 1px; }
+.barra-sitio-dibujo.arriba::after { left: 4px; right: 4px; top: 4px; height: 5px; }
+.barra-sitio-dibujo.izquierda::after { top: 4px; bottom: 4px; left: 4px; width: 5px; }
+.barra-sitio-dibujo.derecha::after { top: 4px; bottom: 4px; right: 4px; width: 5px; }
+.barra-sitio-dibujo.abajo::after { left: 14px; right: 14px; bottom: 4px; height: 5px; }

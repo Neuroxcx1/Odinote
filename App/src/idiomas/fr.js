@@ -1023,4 +1023,8 @@ window.ODI_IDIOMAS.fr = {
   1018: "Compter les nombres",
   1019: "Minimum",
   1020: "Maximum",
+  1021: "Barre des nœuds",
+  1022: "Où va la barre des nœuds à créer : en haut, comme toujours, à gauche, à droite ou en bas. Le changement est immédiat.",
+  1023: "En haut",
+  1024: "En bas",
 };

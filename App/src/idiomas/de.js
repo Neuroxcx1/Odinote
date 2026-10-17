@@ -1023,4 +1023,8 @@ window.ODI_IDIOMAS.de = {
   1018: "Zahlen zählen",
   1019: "Minimum",
   1020: "Maximum",
+  1021: "Knotenleiste",
+  1022: "Wo die Leiste mit den Knoten zum Erstellen sitzt: oben wie immer, links, rechts oder unten. Die Änderung gilt sofort.",
+  1023: "Oben",
+  1024: "Unten",
 };

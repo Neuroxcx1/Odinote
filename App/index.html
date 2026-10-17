@@ -2,6 +2,18 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <!-- Dónde va la barra de nodos (Ajustes): antes de pintar nada, para que no
+         salga un instante arriba y luego salte a su sitio. Ver styles.css. -->
+    <script>
+      // Dentro de una función: un var suelto aquí sería global, y un const del
+      // mismo nombre en cualquier .jsx dejaría la app en blanco.
+      (function () {
+        try {
+          var sitio = localStorage.getItem('odinote.barra_nodos');
+          if (sitio === 'left' || sitio === 'right' || sitio === 'bottom') document.documentElement.setAttribute('data-barra', sitio);
+        } catch (e) {}
+      })();
+    </script>
     <!-- NO poner maximum-scale ni user-scalable=no: el navegador móvil sigue
          acercándose por su cuenta al enfocar un texto pequeño, pero entonces
          el usuario ya no puede alejarse y se queda atrapado. El zoom de

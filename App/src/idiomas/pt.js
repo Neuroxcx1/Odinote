@@ -1023,4 +1023,8 @@ window.ODI_IDIOMAS.pt = {
   1018: "Contar números",
   1019: "Mínimo",
   1020: "Máximo",
+  1021: "Barra de nós",
+  1022: "Onde fica a barra com os nós para criar: em cima, como sempre, à esquerda, à direita ou embaixo. Muda na hora.",
+  1023: "Em cima",
+  1024: "Embaixo",
 };

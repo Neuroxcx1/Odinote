@@ -141,6 +141,21 @@ function Topbar({
   const [extraPos, setExtraPos] = React.useState({ left: 0, top: 0 });
   const extraBtnRef = React.useRef(null);
 
+  // El alto de esta barra, para la barra de nodos puesta a un lado (Ajustes →
+  // Barra de nodos): empieza justo debajo, y el alto cambia con la escala de
+  // la interfaz y con la ventana fijada (ver styles.css, --alto-topbar).
+  const topbarRef = React.useRef(null);
+  React.useLayoutEffect(() => {
+    const el = topbarRef.current;
+    if (!el) return;
+    const mide = () => document.documentElement.style.setProperty('--alto-topbar', Math.round(el.getBoundingClientRect().height) + 'px');
+    mide();
+    if (typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(mide);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
   // El panel se coloca cuando ya esta en el DOM, con un efecto de disposicion:
   // se ejecuta despues de que React monte y antes de pintar, sin depender del
   // bucle de fotogramas. Ademas se encaja en la ventana, para que no se salga
@@ -152,6 +167,22 @@ function Topbar({
       const el = extraBtnRef.current;
       if (!el) return;
       const r = el.getBoundingClientRect();
+      // Con la barra de nodos a un lado o abajo (Ajustes), la tira sale hacia
+      // donde hay sitio: a la derecha de la barra de la izquierda, a la
+      // izquierda de la de la derecha, encima de la de abajo.
+      const sitio = (!(window.odiIsMobile && window.odiIsMobile()) && document.documentElement.getAttribute('data-barra')) || 'top';
+      if (sitio === 'left') {
+        setExtraPos({ left: r.right + 10, top: Math.max(8, Math.min(r.top - 6, window.innerHeight - 260)), anchoMax: Math.max(220, window.innerWidth - r.right - 20), pico: 20, sitio });
+        return;
+      }
+      if (sitio === 'right') {
+        setExtraPos({ right: Math.max(8, window.innerWidth - r.left + 10), top: Math.max(8, Math.min(r.top - 6, window.innerHeight - 260)), anchoMax: Math.max(220, r.left - 20), pico: 20, sitio });
+        return;
+      }
+      if (sitio === 'bottom') {
+        setExtraPos({ right: Math.max(8, window.innerWidth - r.right), bottom: window.innerHeight - r.top + 10, anchoMax: Math.max(220, r.right - 8), pico: r.width / 2, sitio });
+        return;
+      }
       setExtraPos({
         left: Math.max(8, Math.min(r.left, window.innerWidth - ANCHO - 8)),
         top: r.bottom + 8,
@@ -231,7 +262,7 @@ function Topbar({
   return (
     // data-mueve-ventana: con la ventana fijada (sin barra de título), las
     // zonas vacías de esta barra la mueven. Ver Ventana.jsx.
-    <div className="topbar" data-mueve-ventana="">
+    <div className="topbar" data-mueve-ventana="" ref={topbarRef}>
       <button className="brand press" onClick={onHome} title={t.home}>
         <div className="brand-mark"><window.BrandMark/></div>
       </button>
@@ -405,7 +436,7 @@ function Topbar({
               pequeño vaivén, como el cuerpo de una serpiente al estirarse. */}
           <div
             className={`mas-serpiente ${extraCerrando ? 'cierra' : ''}`}
-            style={{ position: 'fixed', right: extraPos.right, top: extraPos.top, maxWidth: extraPos.anchoMax, '--pico': (extraPos.pico || 20) + 'px' }}
+            style={{ position: 'fixed', ...(extraPos.sitio === 'left' ? { left: extraPos.left, top: extraPos.top } : extraPos.sitio === 'bottom' ? { right: extraPos.right, bottom: extraPos.bottom } : { right: extraPos.right, top: extraPos.top }), maxWidth: extraPos.anchoMax, '--pico': (extraPos.pico || 20) + 'px' }}
             onMouseDown={(e) => e.stopPropagation()}
           >
             {(() => {

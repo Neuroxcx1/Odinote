@@ -1023,4 +1023,8 @@ window.ODI_IDIOMAS.it = {
   1018: "Conta i numeri",
   1019: "Minimo",
   1020: "Massimo",
+  1021: "Barra dei nodi",
+  1022: "Dove va la barra con i nodi da creare: in alto, come sempre, a sinistra, a destra o in basso. Cambia subito.",
+  1023: "In alto",
+  1024: "In basso",
 };

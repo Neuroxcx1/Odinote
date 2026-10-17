@@ -308,6 +308,19 @@ function App() {
   const [updateProgress, setUpdateProgress] = useStateApp(0);
   const [contextMenu, setContextMenu] = useStateApp(null);
   const [settingsOpen, setSettingsOpen] = useStateApp(false);
+  // Dónde va la barra de nodos (Ajustes → Barra de nodos). Se guarda en este
+  // equipo, no en los proyectos: es cosa de la pantalla de cada uno. La
+  // aplica ya index.html antes de pintar; aquí solo se cambia.
+  const [barraNodos, setBarraNodosEstado] = useStateApp(() => {
+    try { const v = localStorage.getItem('odinote.barra_nodos'); return ['left', 'right', 'bottom'].includes(v) ? v : 'top'; } catch (e) { return 'top'; }
+  });
+  const ponBarraNodos = (sitio) => {
+    setBarraNodosEstado(sitio);
+    try { localStorage.setItem('odinote.barra_nodos', sitio); } catch (e) {}
+    if (sitio === 'top') document.documentElement.removeAttribute('data-barra');
+    else document.documentElement.setAttribute('data-barra', sitio);
+    window.playAudioTone && window.playAudioTone('click');
+  };
   // La escala de toda la aplicación (Ajustes → Tamaño de la interfaz). Aquí
   // para que la ventana de Ajustes se pinte compensada desde el primer cuadro.
   const [escalaUI, setEscalaUI] = useStateApp(1);
@@ -3456,6 +3469,43 @@ function App() {
                     )}
                   </p>
                   <window.AjusteEscala onCambia={setEscalaUI} onArrastra={setArrastrandoEscala} />
+                </div>
+              )}
+
+              {/* La barra de nodos, arriba, a un lado o abajo. En el teléfono no:
+                  allí la barra tiene su propio sitio. */}
+              {!(window.odiIsMobile && window.odiIsMobile()) && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <div style={{ fontWeight: '600', fontSize: '14px', color: 'var(--wine, #7B2D26)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span className="material-symbols-rounded" style={{ fontSize: '18px' }}>space_dashboard</span>
+                    <span>{window.t('Barra de nodos', 'Node bar')}</span>
+                  </div>
+                  <p style={{ fontSize: '12.5px', color: 'var(--text-soft, #595459)', margin: 0, lineHeight: '1.5' }}>
+                    {window.t(
+                      'Dónde va la barra con los nodos para crear: arriba, como siempre, a la izquierda, a la derecha o abajo. Se cambia al momento.',
+                      'Where the bar with the nodes to create goes: at the top, as always, on the left, on the right or at the bottom. It changes right away.'
+                    )}
+                  </p>
+                  <div className="barra-sitios" role="radiogroup" aria-label={window.t('Barra de nodos', 'Node bar')}>
+                    {[
+                      ['top', window.t('Arriba', 'Top'), 'arriba'],
+                      ['left', window.t('Izquierda', 'Left'), 'izquierda'],
+                      ['right', window.t('Derecha', 'Right'), 'derecha'],
+                      ['bottom', window.t('Abajo', 'Bottom'), 'abajo'],
+                    ].map(([sitio, nombre, dibujo]) => (
+                      <button
+                        key={sitio}
+                        type="button"
+                        role="radio"
+                        aria-checked={barraNodos === sitio}
+                        className={'barra-sitio' + (barraNodos === sitio ? ' activo' : '')}
+                        onClick={() => ponBarraNodos(sitio)}
+                      >
+                        <span className={'barra-sitio-dibujo ' + dibujo} aria-hidden="true"/>
+                        <span>{nombre}</span>
+                      </button>
+                    ))}
+                  </div>
                 </div>
               )}
 

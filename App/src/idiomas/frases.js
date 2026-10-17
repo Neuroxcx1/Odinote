@@ -1023,4 +1023,8 @@ window.ODI_FRASES = [
   /* 1018 */ ["Contar números","Count numbers"],
   /* 1019 */ ["Mínimo","Minimum"],
   /* 1020 */ ["Máximo","Maximum"],
+  /* 1021 */ ["Barra de nodos","Node bar"],
+  /* 1022 */ ["Dónde va la barra con los nodos para crear: arriba, como siempre, a la izquierda, a la derecha o abajo. Se cambia al momento.","Where the bar with the nodes to create goes: at the top, as always, on the left, on the right or at the bottom. It changes right away."],
+  /* 1023 */ ["Arriba","Top"],
+  /* 1024 */ ["Abajo","Bottom"],
 ];
