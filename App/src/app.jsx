@@ -1657,6 +1657,11 @@ function App() {
     document.body.setAttribute('data-lang', lang);
     // Para el corrector, la voz del sistema y los buscadores: decía siempre en.
     document.documentElement.lang = lang;
+    // El árabe se lee de derecha a izquierda: la interfaz entera se pone en
+    // espejo (las barras, los menús y el orden de los botones). El lienzo no:
+    // sus nodos van donde los dejas. Y el texto de cada nodo sigue su propia
+    // dirección (ver unicode-bidi en styles.css).
+    document.documentElement.dir = lang === 'ar' ? 'rtl' : 'ltr';
     window.currentLang = lang;
     // Persistir el tema para que el splash del próximo arranque combine sin destello
     try { localStorage.setItem('odinote.theme', theme); } catch (e) {}

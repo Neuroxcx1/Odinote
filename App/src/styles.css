@@ -584,6 +584,25 @@ body[data-patrocinador="1"] .board-preview-item {
 /* El nombre escondido del icono: hay reglas como «.barra span { display: flex }»
    que le ganarían al hidden del navegador. */
 .odi-icono > span[hidden] { display: none !important; }
+/* De derecha a izquierda (árabe), las flechas que dicen «atrás», «adelante» o
+   «siguiente» miran al otro lado; las demás (deshacer, girar…) se quedan. */
+[dir="rtl"] .odi-icono:is([data-icono="arrow_back"], [data-icono="chevron_left"], [data-icono="chevron_right"], [data-icono="arrow_outward"], [data-icono="near_me"]) > svg { transform: scaleX(-1); }
+/* El lienzo no se pone en espejo: los nodos van donde los dejas. */
+[dir="rtl"] .canvas-wrap { direction: ltr; }
+/* La barra del nodo y sus paneles, a la derecha (con la barra de nodos a un
+   lado se quedan donde estaban, para no montarse con ella). */
+html[dir="rtl"]:not([data-mobile="1"]):not([data-barra="left"]):not([data-barra="right"]) .ctx-side { left: auto; right: 14px; }
+html[dir="rtl"]:not([data-mobile="1"]):not([data-barra="left"]):not([data-barra="right"]) .ctx-popout { left: auto; right: 100px; transform-origin: right top; }
+[dir="rtl"] .ctx-side, [dir="rtl"] .ctx-popout { direction: rtl; }
+/* Los códigos (colores, atajos, rutas, código) se leen siempre de izquierda a
+   derecha: en espejo salía «FFFFFF#» y «255 ,255 ,255». */
+[dir="rtl"] .panel-color input, [dir="rtl"] kbd, [dir="rtl"] code, [dir="rtl"] .code-area, [dir="rtl"] .ms-vault-path { direction: ltr; unicode-bidi: isolate; }
+/* El texto que escribe la gente sigue SU dirección, en cualquier idioma de la
+   interfaz: una nota en árabe se alinea a la derecha y una en español a la
+   izquierda, cada párrafo según lo que lleve. Antes todo iba a la izquierda. */
+.canvas-surface [contenteditable], .canvas-surface textarea, .canvas-surface input[type="text"],
+.canvas-surface .rich, .canvas-surface .rich > *, .canvas-surface .rich li,
+.doc-modal-window [contenteditable] { unicode-bidi: plaintext; text-align: start; }
 /* «Lleno»: lo que Material pintaba con FILL 1. Solo se rellena lo marcado con r. */
 .odi-icono.icono-lleno > svg .r,
 .boton-fijar.fijada .odi-icono > svg .r,
