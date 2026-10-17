@@ -1065,29 +1065,146 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
   const canvasesLiveRef = useRefCanvas(canvases);
   canvasesLiveRef.current = canvases;
 
-  const pushHistory = useCallbackCanvas((snap) => {
+  // ── El deshacer ──
+  //
+  // Quien probó la 1.2.0 lo dijo claro: Ctrl+Z deshacía «lo más mínimo», y a
+  // veces parecía no hacer nada. Dos causas:
+  //
+  //  · Pasos invisibles. La instantánea llevaba los campos del momento
+  //    (_new, _dragging…) y los ajustes automáticos (la altura que se pone sola
+  //    una nota al escribir) entraban como pasos propios: el primer Ctrl+Z
+  //    deshacía eso, que no se ve, y parecía que no funcionaba. Ahora la
+  //    instantánea va sin los campos del momento (sinMomento), y lo que toca
+  //    los mismos nodos va al mismo paso (abajo).
+  //  · Pasos diminutos. Cada pausa de medio segundo era un paso: una frase eran
+  //    seis Ctrl+Z. Ahora los cambios a LOS MISMOS NODOS sin una pausa de más de
+  //    1,5 s se juntan en un paso: lo que escribes de corrido se deshace de una
+  //    vez. Tocar otro nodo siempre empieza un paso nuevo.
+  const sinMomento = (k, v) => (k && k.charCodeAt(0) === 95 /* _ */ ? undefined : v);
+  const instantanea = (obj) => JSON.stringify(obj, sinMomento);
+  // Qué nodos (o flechas, o lienzos) cambiaron entre dos estados. Los nodos que
+  // no se tocan conservan su objeto, así que basta con comparar referencias.
+  // Las altas y bajas (nodos que aparecen o desaparecen) se marcan aparte: un
+  // paso que crea o borra nunca se junta con otro (crear una nota y escribir
+  // en ella son dos Ctrl+Z, no uno que se la lleve entera).
+  const queCambio = (antes, ahora) => {
+    const ids = new Set();
+    ids.altas = false;
+    if (!antes || !ahora) return ids;
+    for (const cid of new Set([...Object.keys(antes), ...Object.keys(ahora)])) {
+      const a = antes[cid], b = ahora[cid];
+      if (a === b) continue;
+      if (!a || !b) { ids.add('lienzo:' + cid); ids.altas = true; continue; }
+      if (a.connectors !== b.connectors) ids.add('flechas:' + cid);
+      const previos = new Map((a.items || []).map(i => [i.id, i]));
+      for (const it of (b.items || [])) {
+        if (!previos.has(it.id)) ids.altas = true;
+        if (previos.get(it.id) !== it) ids.add(it.id);
+        previos.delete(it.id);
+      }
+      for (const id of previos.keys()) { ids.add(id); ids.altas = true; }
+    }
+    return ids;
+  };
+  const JUNTAR_MS = 1500;
+  // El estado del último paso guardado (para saber qué cambió desde él) y de
+  // qué trataba y cuándo cambió por última vez (para saber si juntar).
+  const ultimoObjRef = useRefCanvas(null);
+  const ultimoPasoRef = useRefCanvas(null);   // { ids, ultimoCambio } o null
+  const primerCambioRef = useRefCanvas(0);
+  const ultimoCambioRef = useRefCanvas(0);
+  const pendienteRef = useRefCanvas(null);    // lo que espera su pausa: { snap, obj }
+  // Los ajustes que la app hace sola justo después de deshacer, rehacer o abrir
+  // el lienzo (una nota que vuelve a medir su altura) NO son pasos: antes
+  // entraban como uno nuevo y además borraban el rehacer, así que Ctrl+Y no
+  // devolvía lo deshecho y el siguiente Ctrl+Z solo deshacía esa altura. Si no
+  // ha habido ni tecla ni clic desde entonces, se meten en el paso actual.
+  const restauradoEnRef = useRefCanvas(Date.now());
+  const ultimaEntradaRef = useRefCanvas(0);
+  useEffectCanvas(() => {
+    const apunta = () => { ultimaEntradaRef.current = Date.now(); };
+    document.addEventListener('pointerdown', apunta, true);
+    document.addEventListener('keydown', apunta, true);
+    return () => {
+      document.removeEventListener('pointerdown', apunta, true);
+      document.removeEventListener('keydown', apunta, true);
+    };
+  }, []);
+
+  const pushHistory = useCallbackCanvas((snap, obj) => {
     if (lastSnapRef.current === snap) return; // sin cambios reales
+    const cambio = obj ? queCambio(ultimoObjRef.current, obj) : new Set();
+    const ids = [...cambio].sort().join('|');
+    const soloModifica = !cambio.altas;
+    const paso = ultimoPasoRef.current;
+    const juntar = !!(paso && ids && paso.ids === ids && paso.soloModifica && soloModifica &&
+      primerCambioRef.current - paso.ultimoCambio < JUNTAR_MS &&
+      historyIdxRef.current >= 1 && historyIdxRef.current === historyRef.current.length - 1);
     lastSnapRef.current = snap;
-    const cut = historyRef.current.slice(0, historyIdxRef.current + 1);
-    cut.push(snap);
-    if (cut.length > 50) cut.shift();
+    if (obj) ultimoObjRef.current = obj;
+    let cut;
+    if (juntar) {
+      // El mismo paso, con lo último: Ctrl+Z vuelve a como estaba antes de
+      // empezar, no a medio escribir.
+      cut = historyRef.current.slice();
+      cut[cut.length - 1] = snap;
+    } else {
+      cut = historyRef.current.slice(0, historyIdxRef.current + 1);
+      cut.push(snap);
+      if (cut.length > 50) cut.shift();
+    }
+    // El primer estado (el de partida) nunca se junta con nada.
+    ultimoPasoRef.current = cut.length > 1 ? { ids, soloModifica, ultimoCambio: ultimoCambioRef.current || Date.now() } : null;
+    primerCambioRef.current = 0;
     historyRef.current = cut;
     historyIdxRef.current = cut.length - 1;
     setHistory(cut);
     setHistoryIdx(cut.length - 1);
   }, []);
 
-  // Se agrupan los cambios rápidos (escribir letra por letra, arrastrar) en una
-  // sola entrada tras una pausa, para que cada Ctrl+Z deshaga algo perceptible.
+  // Los cambios se apuntan tras una pausa de medio segundo (y luego, si tocan
+  // lo mismo que el paso anterior sin pausa larga, se juntan con él).
   useEffectCanvas(() => {
     if (skipHistory.current) { skipHistory.current = false; return; }
-    const snap = JSON.stringify(canvases);
+    const snap = instantanea(canvases);
+    const obj = canvases;
     // La primera instantánea se guarda de inmediato (estado base del lienzo)
-    if (lastSnapRef.current === null) { pushHistory(snap); return; }
+    if (lastSnapRef.current === null) { pushHistory(snap, obj); return; }
+    if (snap === lastSnapRef.current) return; // solo cambió algo del momento
+    const ahora = Date.now();
+    // Un ajuste solo de la app tras deshacer/rehacer/abrir: al paso actual.
+    if (ahora - restauradoEnRef.current < 1500 && ultimaEntradaRef.current < restauradoEnRef.current &&
+        historyIdxRef.current >= 0 && !historyTimerRef.current) {
+      const cut = historyRef.current.slice();
+      cut[historyIdxRef.current] = snap;
+      historyRef.current = cut;
+      lastSnapRef.current = snap;
+      ultimoObjRef.current = obj;
+      setHistory(cut);
+      return;
+    }
+    // Crear o borrar nodos se apunta YA, como paso propio: con la pausa, una
+    // nota recién puesta y lo primero que se escribe en ella acababan en el
+    // mismo paso, y Ctrl+Z se llevaba la nota entera.
+    if (queCambio(ultimoObjRef.current, obj).altas) {
+      if (historyTimerRef.current) { clearTimeout(historyTimerRef.current); historyTimerRef.current = null; }
+      // Lo que estaba esperando su pausa va antes, en su propio paso.
+      const pend = pendienteRef.current;
+      pendienteRef.current = null;
+      if (pend && pend.snap !== lastSnapRef.current) pushHistory(pend.snap, pend.obj);
+      if (!primerCambioRef.current) primerCambioRef.current = ahora;
+      ultimoCambioRef.current = ahora;
+      pushHistory(snap, obj);
+      return;
+    }
+    if (!primerCambioRef.current) primerCambioRef.current = ahora;
+    ultimoCambioRef.current = ahora;
     if (historyTimerRef.current) clearTimeout(historyTimerRef.current);
+    pendienteRef.current = { snap, obj };
     historyTimerRef.current = setTimeout(() => {
       historyTimerRef.current = null;
-      pushHistory(snap);
+      pendienteRef.current = null;
+      pushHistory(snap, obj);
     }, 450);
   // eslint-disable-next-line
   }, [canvases]);
@@ -1099,20 +1216,36 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
     lastSnapRef.current = snapStr;
     historyIdxRef.current = idx;
     setHistoryIdx(idx);
-    _setCanvases(JSON.parse(snapStr));
+    const obj = JSON.parse(snapStr);
+    // Tras deshacer o rehacer no se junta nada con ese paso: lo siguiente que
+    // se haga es un paso nuevo.
+    ultimoObjRef.current = obj;
+    ultimoPasoRef.current = null;
+    primerCambioRef.current = 0;
+    restauradoEnRef.current = Date.now();
+    _setCanvases(obj);
   };
 
   const undo = () => {
     if (historyTimerRef.current) { clearTimeout(historyTimerRef.current); historyTimerRef.current = null; }
+    pendienteRef.current = null;
     // Volcar los cambios aún no registrados (p. ej. lo que se acaba de escribir)
-    // para que este Ctrl+Z los pueda deshacer en lugar de perderse.
-    const live = JSON.stringify(canvasesLiveRef.current);
-    if (live !== lastSnapRef.current) pushHistory(live);
+    // para que este Ctrl+Z los pueda deshacer en lugar de perderse. También los
+    // que llegaron en silencio (una altura automática): sin esto, el Ctrl+Z
+    // gastaba su pulsación en deshacerlos, que no se ven.
+    const vivo = canvasesLiveRef.current;
+    const live = instantanea(vivo);
+    if (live !== lastSnapRef.current) {
+      if (!primerCambioRef.current) primerCambioRef.current = Date.now();
+      ultimoCambioRef.current = Date.now();
+      pushHistory(live, vivo);
+    }
     if (historyIdxRef.current <= 0) return;
     applySnapshot(historyIdxRef.current - 1);
   };
   const redo = () => {
     if (historyTimerRef.current) { clearTimeout(historyTimerRef.current); historyTimerRef.current = null; }
+    pendienteRef.current = null;
     if (historyIdxRef.current >= historyRef.current.length - 1) return;
     applySnapshot(historyIdxRef.current + 1);
   };
@@ -1499,7 +1632,10 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
           const isUndo = matchShortcut(window.shortcuts.undo);
           try { e.target.blur(); } catch (err) {}
           setEditing(null);
-          setTimeout(() => { isUndo ? undo() : redo(); }, 0);
+          // Dos cuadros y no un setTimeout(0): al desenfocar, el nodo guarda lo
+          // que quedaba y React lo pinta después; deshacer antes de eso no
+          // veía lo último escrito.
+          requestAnimationFrame(() => requestAnimationFrame(() => { isUndo ? undo() : redo(); }));
         }
         return;
       }
@@ -4841,6 +4977,9 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
     historyRef.current = [];
     historyIdxRef.current = -1;
     lastSnapRef.current = null;
+    ultimoObjRef.current = null;
+    ultimoPasoRef.current = null;
+    primerCambioRef.current = 0;
     setHistory([]);
     setHistoryIdx(-1);
   };
