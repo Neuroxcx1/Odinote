@@ -536,11 +536,12 @@
   // Lo que se queda aunque no lo nombre nadie:
   //   · lo tocado hace menos de una hora (una imagen recién pegada cuyo nodo
   //     aún no se ha guardado);
-  //   · lo que lleva en el nombre el id de un nodo vivo, salvo que sea copia
-  //     exacta de otro que sí se usa. Es la copia de este equipo de una imagen
-  //     que está en Drive y cuyo nodo la olvidó: la app la vuelve a enlazar al
-  //     abrir el proyecto (download-media-to-vault reconoce el contenido), y
-  //     entonces la que sobre ya sí es una copia.
+  //   · lo que lleva en el nombre el id de un nodo vivo y puede ser lo único
+  //     bueno que tiene en este equipo (salvo que sea copia exacta de otro que
+  //     sí se usa). Ver loQueGuarda, abajo: el ORIGINAL de una imagen que
+  //     pegó la persona (media_…) se queda mientras su nodo solo tenga la
+  //     versión que sirve Drive, que viene recomprimida (en la bóveda del
+  //     usuario, un original de 19,8 MB contra 2,2 MB de la de Drive).
   var SIN_USAR = 'Archivos sin usar';
 
   function archivosDeMedia(io, dir) {
@@ -588,12 +589,15 @@
     try { return io.fs.readFileSync(a.ruta).equals(io.fs.readFileSync(b.ruta)); } catch (err) { return false; }
   }
 
-  // Los ids de todos los nodos (también hijos de columna y fotos de galería).
-  function idsDeNodos(canvases) {
+  // De cada nodo (también hijos de columna y fotos de galería), el nombre del
+  // archivo de este equipo que usa: el de srcLocal, el de su src si es local,
+  // o '' si su medio está solo en internet.
+  function copiasDeNodos(canvases) {
     var ids = {};
+    var nombreDe = function (s) { var m = typeof s === 'string' && s.match(/media\/([^/]+)$/i); return m ? m[1] : ''; };
     var mira = function (n) {
       if (!n || typeof n !== 'object') return;
-      if (n.id != null) ids[String(n.id)] = true;
+      if (n.id != null && (n.src || n.srcLocal)) ids[String(n.id)] = nombreDe(n.srcLocal) || nombreDe(n.src);
       (Array.isArray(n.children) ? n.children : []).forEach(mira);
       (Array.isArray(n.fotos) ? n.fotos : []).forEach(mira);
     };
@@ -604,13 +608,27 @@
     return ids;
   }
 
-  // 'cloud_it-123-45_0123456789abcdef.png' → ¿es de un nodo que existe?
-  // Los nombres que pone la app son <cloud|media|galeria>_<id>[_<id>]_<huella>.
-  function esDeNodoVivo(nombre, ids) {
-    var m = String(nombre).match(/^(?:cloud|media|galeria)_(.+)_[0-9a-f]{16}\.[a-z0-9]+$/i);
+  // ¿Hay que guardar este archivo que nadie nombra porque es de un nodo vivo?
+  // Los nombres que pone la app son <cloud|media|galeria>_<id>[_<id>]_<huella>:
+  // cloud_ es lo bajado de la nube, media_ y galeria_ lo que guardó la app al
+  // pegarlo o soltarlo (el original).
+  //   · El nodo no tiene copia en este equipo: se guarda (es la suya, olvidada).
+  //   · Es un cloud_ y el nodo ya tiene su copia: una bajada vieja, sobra.
+  //   · Es un original y el nodo solo tiene un cloud_: se guarda, es mejor.
+  //   · Es un original y el nodo ya tiene su original: una versión vieja.
+  function loQueGuarda(nombre, copias) {
+    var m = String(nombre).match(/^(cloud|media|galeria)_(.+)_[0-9a-f]{16}\.[a-z0-9]+$/i);
     if (!m) return false;
-    var partes = [m[1]].concat(m[1].split('_'));
-    return partes.some(function (p) { return p && ids[p]; });
+    var partes = [m[2]].concat(m[2].split('_'));
+    for (var i = 0; i < partes.length; i++) {
+      var p = partes[i];
+      if (!p || !Object.prototype.hasOwnProperty.call(copias, p)) continue;
+      var suya = copias[p];
+      if (!suya) return true;
+      if (m[1].toLowerCase() === 'cloud') continue;
+      if (/^cloud_/i.test(suya)) return true;
+    }
+    return false;
   }
 
   // opciones: { ahora, edadMinimaMs } (por defecto, una hora).
@@ -639,7 +657,7 @@
     var nombresCarpeta = Object.keys(textoDe);
     var todo = nombresCarpeta.map(function (c) { return textoDe[c]; })
       .concat(textosDeJson(io, folderPath), [JSON.stringify(datos)]).join('\n');
-    var ids = idsDeNodos(canvases);
+    var copias = copiasDeNodos(canvases);
     var monton = io.path.join(folderPath, 'media');
 
     // 1. Del montón a la carpeta de su proyecto.
@@ -669,7 +687,7 @@
     sobran.forEach(function (f) {
       if (ahora - f.mtimeMs < edadMinima) return;
       var copia = usados.some(function (u) { return mismoContenido(io, u, f); });
-      if (!copia && esDeNodoVivo(f.nombre, ids)) return;
+      if (!copia && loQueGuarda(f.nombre, copias)) return;
       try {
         var destino = io.path.join(lote, io.path.relative(folderPath, f.ruta));
         io.fs.mkdirSync(io.path.dirname(destino), { recursive: true });

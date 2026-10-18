@@ -1157,6 +1157,20 @@ ipcMain.handle('download-media-to-vault', async (event, { folderPath, url, fileN
         logToFile(`IPC download-media-to-vault: ya estaba como media/${gemela}`);
         return `media/${gemela}`;
       }
+      // Y si la gemela está en el montón común, se muda al proyecto (con su
+      // nombre): mismo archivo, una sola copia, y en la carpeta que toca.
+      if (carpetaValida) {
+        const enMonton = igualEn(path.join(folderPath, 'media'));
+        if (enMonton) {
+          try {
+            fs.renameSync(path.join(folderPath, 'media', enMonton), path.join(mediaDir, enMonton));
+            logToFile(`IPC download-media-to-vault: media/${enMonton} se muda a "${carpeta}"`);
+            return `media/${enMonton}`;
+          } catch (e) {
+            logToFile(`IPC download-media-to-vault: no se pudo mudar ${enMonton} (${e.message})`);
+          }
+        }
+      }
     }
     
     if (!fs.existsSync(destPath)) {

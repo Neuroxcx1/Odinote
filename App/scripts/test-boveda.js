@@ -373,6 +373,12 @@ const check = (nombre, ok, extra) => {
       { id: 'it-3', type: 'image', src: 'media/compartida.png' },
       // Una de Drive que olvidó su copia: el archivo lleva su id.
       { id: 'it-4', type: 'image', src: 'https://lh3.googleusercontent.com/d/x4' },
+      // Una cambiada: tiene su copia, y la versión vieja lleva su id.
+      { id: 'it-7', type: 'image', src: 'https://lh3.googleusercontent.com/d/x7', srcLocal: 'media/cloud_it-7_' + h16('7') + '.png' },
+      // Una que solo tiene la versión de Drive, con su original aparte.
+      { id: 'it-8', type: 'image', src: 'https://lh3.googleusercontent.com/d/x8', srcLocal: 'media/cloud_it-8_' + h16('8') + '.png' },
+      // Una con su original, y otro original viejo de antes de cambiarla.
+      { id: 'it-9', type: 'image', src: 'media/media_it-9_' + h16('9') + '.png' },
       // Una de las de antes, con la ruta entera y un espacio en el nombre.
       { id: 'it-5', type: 'image', src: 'file:///D:/Odinote/media/con%20espacio.png' },
     ] },
@@ -387,6 +393,12 @@ const check = (nombre, ok, extra) => {
   pon('media/cloud_it-4_' + h16('d') + '.png', 'FOTO-4', 2 * DIA);
   pon('media/con espacio.png', 'FOTO-5', 2 * DIA);
   pon('media/de_un_nodo_borrado.mp4', 'VIDEO-VIEJO', 2 * DIA);
+  pon('Cliclone/media/cloud_it-7_' + h16('7') + '.png', 'FOTO-7-NUEVA', 2 * DIA);
+  pon('media/cloud_it-7_' + h16('8') + '.png', 'FOTO-7-VIEJA', 2 * DIA);
+  pon('Cliclone/media/cloud_it-8_' + h16('8') + '.png', 'FOTO-8-DE-DRIVE', 2 * DIA);
+  pon('Cliclone/media/media_it-8_' + h16('f') + '.png', 'FOTO-8-ORIGINAL-GRANDE', 2 * DIA);
+  pon('Cliclone/media/media_it-9_' + h16('9') + '.png', 'FOTO-9', 2 * DIA);
+  pon('Cliclone/media/media_it-9_' + h16('0') + '.png', 'FOTO-9-VIEJA', 2 * DIA);
   pon('Cliclone/media/cloud_it-99_' + h16('e') + '.png', 'NODO-BORRADO', 2 * DIA);
   pon('media/recien_pegada.png', 'NUEVA', 60 * 1000);
   pon('Mis cosas/media/ajeno.png', 'NO-ES-NUESTRO', 2 * DIA);
@@ -398,13 +410,19 @@ const check = (nombre, ok, extra) => {
   check('y su gemela olvidada (mismo contenido) se aparta', !esta('Cliclone/media/media_it-1_' + h16('c') + '.png'));
   check('la imagen de siempre no se toca', esta('Cliclone/media/media_it-2_' + h16('b') + '.png'));
   check('la que usan dos proyectos se queda en el montón', esta('media/compartida.png'));
-  check('la de Drive que olvidó su copia NO se aparta (lleva el id de un nodo vivo)', esta('media/cloud_it-4_' + h16('d') + '.png'));
+  check('la de Drive que olvidó su copia NO se aparta (su nodo no tiene otra)', esta('media/cloud_it-4_' + h16('d') + '.png'));
   check('una ruta entera con el nombre codificado cuenta como usada',
     esta('Cliclone/media/con espacio.png') || esta('media/con espacio.png'));
   check('lo de un nodo borrado se aparta', !esta('media/de_un_nodo_borrado.mp4') && !esta('Cliclone/media/cloud_it-99_' + h16('e') + '.png'));
+  check('la versión vieja de una imagen cambiada se aparta, la nueva no',
+    !esta('media/cloud_it-7_' + h16('8') + '.png') && esta('Cliclone/media/cloud_it-7_' + h16('7') + '.png'));
+  check('el ORIGINAL de una imagen que solo tiene la versión de Drive se queda',
+    esta('Cliclone/media/media_it-8_' + h16('f') + '.png'));
+  check('un original viejo de una imagen que ya tiene su original se aparta',
+    !esta('Cliclone/media/media_it-9_' + h16('0') + '.png') && esta('Cliclone/media/media_it-9_' + h16('9') + '.png'));
   check('lo recién pegado se queda aunque nadie lo nombre todavía', esta('media/recien_pegada.png'));
   check('lo de una carpeta ajena no se toca', esta('Mis cosas/media/ajeno.png'));
-  check('cuenta lo que hizo', hecho.movidos >= 1 && hecho.apartados === 3 && hecho.repetidos === 1 && hecho.bytes > 0, JSON.stringify(hecho));
+  check('cuenta lo que hizo', hecho.movidos >= 1 && hecho.apartados === 5 && hecho.repetidos === 1 && hecho.bytes > 0, JSON.stringify(hecho));
   const lotes = fs.readdirSync(path.join(raiz, B.RETIRADOS)).filter(n => n.indexOf(B.SIN_USAR) === 0);
   check('lo apartado va a .retirados, en un lote con su LEEME', lotes.length === 1 && esta(path.join(B.RETIRADOS, lotes[0], 'LEEME.txt')));
   check('y conserva dónde estaba', esta(path.join(B.RETIRADOS, lotes[0], 'media', 'de_un_nodo_borrado.mp4')));
