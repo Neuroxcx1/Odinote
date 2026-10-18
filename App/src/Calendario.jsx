@@ -251,10 +251,13 @@ function CalEditor({ item, lang, onUpdate, editor, setEditor, onCerrar }) {
           </div>
         </div>
 
+        {/* Un título { es, en } se enseña en el idioma de la aplicación, y al
+            escribir se guarda como cadena, que es lo que guarda el calendario:
+            tocar solo un idioma dejaría el otro con el título viejo. */}
         <input
           className="cal-editor-titulo"
           autoFocus
-          value={ev.text || ''}
+          value={CalL.textoEvento(ev, lang)}
           placeholder={window.t('Añade un título', 'Add title')}
           onChange={(e) => cambia({ text: e.target.value })}
           onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); onCerrar(); } }}
@@ -531,7 +534,7 @@ function CalendarItem({ item, lang, onUpdate, editing }) {
     if (!yaBorrado && editor && editor.nuevo) {
       const lista = itemRef.current.events && itemRef.current.events[editor.origen];
       const ev = Array.isArray(lista) && lista.find(e => e.id === editor.id);
-      if (ev && !String(ev.text || '').trim()) {
+      if (ev && !CalL.textoEvento(ev, lang).trim()) {
         const next = { ...itemRef.current.events };
         next[editor.origen] = lista.filter(e => e.id !== editor.id);
         if (!next[editor.origen].length) delete next[editor.origen];
@@ -877,6 +880,7 @@ function CalendarItem({ item, lang, onUpdate, editing }) {
     const empieza = CalL.claveDe(o.inicio) === CalL.claveDe(dia);
     const acaba = CalL.claveDe(o.fin) === CalL.claveDe(dia);
     const moviendose = arrastre && arrastre.id === o.ev.id && arrastre.clave === o.clave;
+    const titulo = CalL.textoEvento(o.ev, lang);
     return (
       <div
         key={o.ev.id + '|' + o.clave}
@@ -886,7 +890,7 @@ function CalendarItem({ item, lang, onUpdate, editing }) {
         onMouseDown={quieto}
         onClick={quieto}
         onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); borraRapido(o); }}
-        title={(entero ? '' : CalL.textoHora(o.ev.hora, en24) + ' ') + (o.ev.text || '') + (o.ev.lugar ? ' · ' + o.ev.lugar : '')}
+        title={(entero ? '' : CalL.textoHora(o.ev.hora, en24) + ' ') + titulo + (o.ev.lugar ? ' · ' + o.ev.lugar : '')}
       >
         {o.ev.tarea && (
           <span className="cal-mb-tarea" onPointerDown={quieto} onClick={(e) => { e.stopPropagation(); alternaHecha(o); }}>
@@ -895,7 +899,7 @@ function CalendarItem({ item, lang, onUpdate, editing }) {
         )}
         {!entero && !o.ev.tarea && <span className="cal-mb-punto"/>}
         {!entero && <span className="cal-mb-hora">{CalL.textoHora(o.ev.hora, en24)}</span>}
-        <span className="cal-mb-texto">{o.ev.text || window.t('(sin título)', '(no title)')}</span>
+        <span className="cal-mb-texto">{titulo || window.t('(sin título)', '(no title)')}</span>
       </div>
     );
   };
@@ -1064,7 +1068,7 @@ function CalendarItem({ item, lang, onUpdate, editing }) {
                             <span className="material-symbols-rounded">{calHecha(o.ev, o.clave) ? 'check_circle' : 'radio_button_unchecked'}</span>
                           </span>
                         )}
-                        {o.ev.text || window.t('(sin título)', '(no title)')}
+                        {CalL.textoEvento(o.ev, lang) || window.t('(sin título)', '(no title)')}
                       </div>
                       <div className="cal-horas-evento-hora">
                         {CalL.textoHora(CalL.horaDe(desde), en24)} – {CalL.textoHora(CalL.horaDe(Math.min(1439, hasta)), en24)}
@@ -1152,7 +1156,7 @@ function CalendarItem({ item, lang, onUpdate, editing }) {
                       {CalL.esDeDiaEntero(o.ev) ? window.t('Todo el día', 'All day')
                         : CalL.textoHora(o.ev.hora, en24) + (o.ev.horaFin && !o.ev.tarea ? ' – ' + CalL.textoHora(o.ev.horaFin, en24) : '')}
                     </span>
-                    <span className="cal-agenda-texto">{o.ev.text || window.t('(sin título)', '(no title)')}</span>
+                    <span className="cal-agenda-texto">{CalL.textoEvento(o.ev, lang) || window.t('(sin título)', '(no title)')}</span>
                     {o.ev.lugar && <span className="cal-agenda-lugar">{o.ev.lugar}</span>}
                   </div>
                 ))}

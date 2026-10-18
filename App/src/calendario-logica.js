@@ -11,7 +11,8 @@
 // mes EMPEZANDO EN 0 (septiembre es 8). No se cambian: los eventos de todos los
 // calendarios que ya existen están guardados con ellas.
 //
-// Un evento es { id, text, color } como siempre, y ahora además, si hacen falta:
+// Un evento es { id, text, color } como siempre (text puede venir como { es, en }:
+// se lee con textoEvento), y ahora además, si hacen falta:
 //   hora, horaFin      "09:00" / "10:30"; sin hora, es de día entero
 //   fin                clave del último día, si dura varios
 //   repite             { cada, unidad: 'dia'|'semana'|'mes'|'anio', dias?, modo?, hasta?, veces? }
@@ -53,6 +54,28 @@
     const h12 = hh % 12 === 0 ? 12 : hh % 12;
     return h12 + (mm ? ':' + String(mm).padStart(2, '0') : '') + (hh < 12 ? ' am' : ' pm');
   };
+
+  // ── El título de un evento, SIEMPRE como cadena ──
+  // El calendario guarda `text` como cadena desde siempre, pero el proyecto de
+  // ejemplo (odinote-showcase-demo.json) y algún proyecto viejo lo traen como
+  // { es, en }, igual que el resto de textos de la aplicación. React no sabe
+  // pintar un objeto: lanzaba el error 31 y el nodo entero se quedaba en «Error
+  // al mostrar este nodo» en cuanto uno de esos eventos caía en un día a la
+  // vista. Y fuera de React salía «[object Object]» (el aviso, el .ics). Todo lo
+  // que lee el título pasa por aquí. El orden es el de pickLang (items.jsx): el
+  // idioma de la aplicación, luego el inglés, luego el español.
+  function textoEvento(ev, lang) {
+    const t = ev && ev.text;
+    if (t == null) return '';
+    if (typeof t === 'string') return t;
+    if (typeof t !== 'object') return String(t);
+    const l = lang || (typeof window !== 'undefined' && window.currentLang) || null;
+    for (const k of [l, 'en', 'es']) {
+      if (k && typeof t[k] === 'string' && t[k]) return t[k];
+    }
+    // Solo en otro idioma ({ fr: '…' }): mejor ese que un evento sin título.
+    return Object.values(t).find(v => typeof v === 'string' && v) || '';
+  }
 
   const esDeDiaEntero = (ev) => !ev || minutosDe(ev.hora) == null;
   // Cuántos días DE MÁS dura (0 = cabe en su día).
@@ -278,7 +301,9 @@
   };
   const DIAS_ICS = ['MO', 'TU', 'WE', 'TH', 'FR', 'SA', 'SU'];
 
-  function aICS(eventos, nombre) {
+  // `lang` elige el idioma de los títulos guardados como { es, en }: un .ics
+  // solo tiene un SUMMARY por evento.
+  function aICS(eventos, nombre, lang) {
     const l = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Oddinote//Calendario//ES', 'CALSCALE:GREGORIAN'];
     if (nombre) l.push('X-WR-CALNAME:' + ics.escapa(nombre));
     const sello = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d+/, '');
@@ -290,7 +315,8 @@
         l.push('BEGIN:' + (ev.tarea ? 'VTODO' : 'VEVENT'));
         l.push('UID:' + ev.id + '@oddinote');
         l.push('DTSTAMP:' + sello);
-        l.push('SUMMARY:' + ics.escapa(ev.text));
+        const titulo = textoEvento(ev, lang);
+        l.push('SUMMARY:' + ics.escapa(titulo));
         if (esDeDiaEntero(ev)) {
           l.push('DTSTART;VALUE=DATE:' + ics.fecha(ini));
           // En los .ics el final de un evento de día entero es el día SIGUIENTE.
@@ -317,7 +343,7 @@
         if (ev.notas) l.push('DESCRIPTION:' + ics.escapa(ev.notas));
         if (ev.tarea) l.push('STATUS:' + (ev.hecho ? 'COMPLETED' : 'NEEDS-ACTION'));
         for (const a of ev.avisos || []) {
-          l.push('BEGIN:VALARM', 'ACTION:DISPLAY', 'DESCRIPTION:' + ics.escapa(ev.text), 'TRIGGER:-PT' + Number(a) + 'M', 'END:VALARM');
+          l.push('BEGIN:VALARM', 'ACTION:DISPLAY', 'DESCRIPTION:' + ics.escapa(titulo), 'TRIGGER:-PT' + Number(a) + 'M', 'END:VALARM');
         }
         l.push('END:' + (ev.tarea ? 'VTODO' : 'VEVENT'));
       }
@@ -423,7 +449,7 @@
 
   const API = {
     clave, deClave, claveDe, sumaDias, diasEntre, diaSemana,
-    minutosDe, horaDe, textoHora, esDeDiaEntero, diasDeMas,
+    minutosDe, horaDe, textoHora, textoEvento, esDeDiaEntero, diasDeMas,
     ocurrencias, eventosEnRango, delDia, reparteColumnas, semanaISO, inicioSemana,
     avisosPendientes, aICS, deICS,
   };

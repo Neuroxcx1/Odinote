@@ -46,6 +46,18 @@
         else parts.push(pick(cell));
       });
     }
+    // Eventos de un calendario: { "año-mes-día": [{ text, lugar, notas }] }. No
+    // se buscaban, y un evento solo se encontraba con el buscador del lienzo.
+    // Su `text` puede ser cadena o { es, en } (el proyecto de ejemplo los trae
+    // así): `pick` ya sabe de las dos formas, así que aquí no puede romperse.
+    if (item.events && typeof item.events === 'object') {
+      Object.values(item.events).forEach(lista => {
+        if (!Array.isArray(lista)) return;
+        lista.forEach(ev => {
+          if (ev && typeof ev === 'object') parts.push(pick(ev.text), pick(ev.lugar), pick(ev.notas));
+        });
+      });
+    }
     // Tarjetas dentro de una columna
     if (Array.isArray(item.children)) {
       item.children.forEach(ch => parts.push(nodeText(ch, lang, forDisplay)));

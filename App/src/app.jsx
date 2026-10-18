@@ -443,7 +443,8 @@ function App() {
         if (dados[a.id]) continue;
         dados[a.id] = ahora.getTime();
         cambio = true;
-        const titulo = a.ev.text || window.t('Evento', 'Event');
+        // Con un título { es, en } salía «⏰ [object Object]»: ver textoEvento.
+        const titulo = window.CalLogica.textoEvento(a.ev, window.currentLang) || window.t('Evento', 'Event');
         const cuando = window.CalLogica.esDeDiaEntero(a.ev)
           ? window.t('Hoy', 'Today')
           : a.empieza.getHours() + ':' + String(a.empieza.getMinutes()).padStart(2, '0');

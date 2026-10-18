@@ -60,7 +60,7 @@ check('los nombres de días y meses los da el navegador en el idioma de la aplic
   /new Intl\.DateTimeFormat\(lang, opciones\)/.test(cal) && /calFormato\(lang, \{ weekday: forma \|\| 'short' \}\)/.test(cal) &&
   /calFormato\(lang, \{ month: forma \|\| 'long' \}\)/.test(cal));
 check('el editor guarda según se escribe, sin botón de guardar', /onChange=\{\(e\) => cambia\(\{ text: e\.target\.value \}\)\}/.test(cal));
-check('uno nuevo que se cierra sin título no se queda', /if \(ev && !String\(ev\.text \|\| ''\)\.trim\(\)\)/.test(cal));
+check('uno nuevo que se cierra sin título no se queda', /if \(ev && !CalL\.textoEvento\(ev, lang\)\.trim\(\)\)/.test(cal));
 check('borrar uno que se repite pregunta: solo este, los siguientes o todos',
   /quita\('este'\)/.test(cal) && /quita\('siguientes'\)/.test(cal) && /quita\('todos'\)/.test(cal));
 check('arrastrar uno que se repite mueve solo esa vez',
@@ -124,6 +124,16 @@ check('los dos colores de números se pueden devolver al de siempre',
 // ── Los avisos ──
 check('la aplicación mira los avisos cada medio minuto', /CalLogica\.avisosPendientes\(lienzosParaAvisosRef\.current/.test(app) && /setInterval\(mira, 30000\)/.test(app));
 check('y apunta los ya avisados para no repetirlos', /'odinote\.avisos_dados'/.test(app));
+
+// ── El título de un evento ──
+// Un título { es, en } (el del proyecto de ejemplo) pintado tal cual tumbaba el
+// nodo con el error 31 de React. Todo lo que lo lee pasa por textoEvento; leer
+// `ev.text` a pelo en cualquier vista lo volvería a romper.
+check('el calendario no lee el título del evento a pelo', !/\bev\.text\b/.test(cal),
+  (cal.match(/.*\bev\.text\b.*/g) || []).map(l => l.trim()).join(' | '));
+check('lo lee con textoEvento, en el idioma del nodo', (cal.match(/CalL\.textoEvento\([^)]*, lang\)/g) || []).length >= 5);
+check('el aviso de la aplicación tampoco', /CalLogica\.textoEvento\(a\.ev, window\.currentLang\)/.test(app) && !/a\.ev\.text/.test(app));
+check('y el .ics sale en el idioma de la aplicación', /CalLogica\.aICS\(.*, lang\);/.test(ctx));
 
 console.log(fallos ? `\n${fallos} FALLOS` : '\nTodo en orden.');
 process.exit(fallos ? 1 : 0);

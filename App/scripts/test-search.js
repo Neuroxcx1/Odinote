@@ -126,5 +126,33 @@ try {
 } catch (e) { reventó2 = e.message; }
 check('un lienzo sin lista de nodos no rompe nada', reventó2 === null, reventó2 || '');
 
+// 14. Eventos de calendario. El proyecto de ejemplo guarda su título como
+// { es, en } y el calendario como cadena: los dos se tienen que encontrar, y
+// una forma rara de `events` no puede tumbar el buscador.
+const conCalendario = {
+  p1: { title: 'Raíz', items: [
+    { id: 'cal1', type: 'calendar', events: {
+      '2026-7-6': [{ id: 'e1', text: { es: 'Prueba de juego', en: 'Playtest #4' } }],
+      '2026-7-9': [{ id: 'e2', text: 'Rodaje día 1', lugar: 'Plató norte' }],
+    } },
+    { id: 'cal2', type: 'calendar', events: { '2026-7-1': null, '2026-7-2': 'no soy una lista', '2026-7-3': [null, 7] } },
+    { id: 'cal3', type: 'calendar', events: 'tampoco' },
+  ] },
+};
+let reventó3 = null;
+try {
+  const playtest = S.searchAll({ projects: soloP1, canvases: conCalendario, query: 'playtest', lang: 'es' });
+  check('encuentra un evento con el título { es, en }, en el otro idioma', playtest.length === 1 && playtest[0].itemId === 'cal1');
+  check('y el extracto es texto, no un objeto',
+    typeof playtest[0].snippet === 'string' && !/object/i.test(playtest[0].snippet), playtest[0].snippet);
+  const enIngles = S.searchAll({ projects: soloP1, canvases: conCalendario, query: 'playtest', lang: 'en' });
+  check('con la app en inglés, el extracto enseña el título inglés', /Playtest #4/.test(enIngles[0] && enIngles[0].snippet), enIngles[0] && enIngles[0].snippet);
+  check('encuentra un evento con el título como cadena',
+    S.searchAll({ projects: soloP1, canvases: conCalendario, query: 'rodaje', lang: 'es' }).length === 1);
+  check('y por su lugar',
+    S.searchAll({ projects: soloP1, canvases: conCalendario, query: 'plató norte', lang: 'es' }).length === 1);
+} catch (e) { reventó3 = e.message; }
+check('eventos con forma rara no rompen el buscador', reventó3 === null, reventó3 || '');
+
 console.log(fallos ? `\n${fallos} FALLOS` : '\nTodo correcto');
 process.exit(fallos ? 1 : 0);

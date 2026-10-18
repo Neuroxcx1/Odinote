@@ -2081,7 +2081,7 @@ function ContextSidebar({
           </button>
         );
         const exporta = () => {
-          const texto = window.CalLogica.aICS(item.events || {}, window.t('Calendario de Oddinote', 'Oddinote calendar'));
+          const texto = window.CalLogica.aICS(item.events || {}, window.t('Calendario de Oddinote', 'Oddinote calendar'), lang);
           const url = URL.createObjectURL(new Blob([texto], { type: 'text/calendar;charset=utf-8' }));
           const a = document.createElement('a');
           a.href = url; a.download = 'calendario.ics';

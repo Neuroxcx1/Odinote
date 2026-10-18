@@ -116,5 +116,45 @@ const reu = (g[K(2026, 10, 15)] || [])[0] || {};
 check('de Google: la hora con zona, tal cual', reu.hora === '09:30' && reu.horaFin === '10:30', reu.hora);
 check('de Google: "el tercer jueves de cada mes"', reu.repite && reu.repite.unidad === 'mes' && reu.repite.modo === 'diaSemana');
 
+// ── El título de un evento ──
+// El proyecto de ejemplo (odinote-showcase-demo.json) guarda los títulos como
+// { es, en }. Pintar el objeto tal cual tumbaba el nodo entero (error 31 de
+// React) en cuanto uno caía en un día a la vista.
+const T = L.textoEvento;
+check('una cadena sale tal cual', T({ text: 'Dentista' }, 'fr') === 'Dentista');
+check('sin título, cadena vacía (y no "undefined")', T({ id: 'a' }, 'es') === '' && T(null, 'es') === '' && T({ text: null }, 'es') === '');
+const bilingue = { id: 'e-demo0018', text: { es: 'Prueba de juego', en: 'Playtest #4' } };
+check('{ es, en } en español: el español', T(bilingue, 'es') === 'Prueba de juego');
+check('{ es, en } en inglés: el inglés', T(bilingue, 'en') === 'Playtest #4');
+check('en otro idioma sin su texto: el inglés antes que el español', T(bilingue, 'fr') === 'Playtest #4');
+check('si el inglés está vacío, el español', T({ text: { es: 'Rodaje', en: '' } }, 'de') === 'Rodaje');
+check('el idioma de la app si lo tiene', T({ text: { es: 'Rodaje', en: 'Shoot', fr: 'Tournage' } }, 'fr') === 'Tournage');
+check('solo en otro idioma: ese, mejor que nada', T({ text: { ja: '撮影' } }, 'es') === '撮影');
+check('un objeto vacío o raro da cadena vacía', T({ text: {} }, 'es') === '' && T({ text: { es: 3 } }, 'es') === '');
+check('un número se vuelve texto', T({ text: 42 }, 'es') === '42');
+// Sin idioma, como lo llama alguien que no lo sabe: no puede romper.
+check('sin idioma: el inglés', T(bilingue) === 'Playtest #4');
+check('siempre devuelve una cadena', [bilingue, { text: {} }, {}, null, { text: 5 }].every(ev => typeof T(ev, 'es') === 'string'));
+
+// Los eventos del proyecto de ejemplo, con sus claves de verdad (mes desde 0:
+// "2026-7-6" es el 6 de AGOSTO). Se ven en agosto y se ordenan sin tropezar.
+const demo = {
+  '2026-7-6': [{ id: 'e-demo0018', text: { es: 'Playtest #4', en: 'Playtest #4' } }],
+  '2026-7-9': [{ id: 'e-demo0019', text: { es: 'Shoot day 1', en: 'Shoot day 1' } }],
+  '2026-7-28': [{ id: 'e-demo0023', text: { es: 'Trailer lock', en: 'Trailer lock' } }],
+};
+const agosto = L.eventosEnRango(demo, F(2026, 8, 1), F(2026, 8, 31));
+check('los del ejemplo salen en agosto de 2026', agosto.length === 3, agosto.length);
+const titulosAgosto = agosto.map(o => T(o.ev, 'es')).join(', ');
+check('y sus títulos se leen como texto', titulosAgosto === 'Playtest #4, Shoot day 1, Trailer lock', titulosAgosto);
+
+// El .ics con títulos { es, en }: antes escribía "SUMMARY:[object Object]".
+const icsDemo = L.aICS({ [K(2026, 8, 6)]: [{ id: 'b1', text: { es: 'Revisión', en: 'Review' }, hora: '10:00', avisos: [10] }] }, 'Demo', 'en');
+check('el .ics no escribe "[object Object]"', !/object Object/.test(icsDemo));
+check('el .ics lleva el título en el idioma pedido', /SUMMARY:Review\r\n/.test(icsDemo));
+check('y el aviso, el mismo título', /DESCRIPTION:Review\r\n/.test(icsDemo));
+check('y de vuelta llega como cadena', (L.deICS(icsDemo)[K(2026, 8, 6)] || [])[0].text === 'Review');
+check('en español, el título español', /SUMMARY:Revisi/.test(L.aICS({ [K(2026, 8, 6)]: [{ id: 'b1', text: { es: 'Revisión', en: 'Review' } }] }, '', 'es')));
+
 console.log(fallos ? `\n${fallos} FALLOS` : '\nTodo en orden.');
 process.exit(fallos ? 1 : 0);
