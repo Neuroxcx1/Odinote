@@ -74,6 +74,62 @@ function nombreColorPaleta(p) {
   return nombres[p.key] || p.label || p.key;
 }
 
+// ── Dónde está en el disco el archivo de un nodo ──
+//
+// Para «Abrir la carpeta» (la barra del nodo y el clic derecho). Sirve para
+// todo lo que viene de fuera: imagen, audio, vídeo y archivo, una tarjeta de
+// columna, y la galería (la primera de sus fotos que esté en el disco).
+//
+// Hay tres sitios donde puede estar, y el proceso principal prueba los que
+// se le den (ver mostrar-en-carpeta en main.js):
+//   · la ruta de donde salió (rutaOrigen, si se apuntó al añadirlo);
+//   · la copia de la bóveda (src = 'media/…' o 'file:///…');
+//   · la copia local de lo que está en Google Drive (srcLocal): ahí src es la
+//     dirección de Drive. Antes solo se miraba src y, en una bóveda con Drive,
+//     el botón no salía en casi ninguna imagen (193 de 209 en la del usuario).
+// Un data: es el archivo metido dentro de la nota, y una dirección de internet
+// no está en ninguna carpeta: esos no cuentan.
+function odiArchivoDe(it) {
+  if (!it) return null;
+  if (Array.isArray(it.fotos)) {
+    for (const f of it.fotos) { const r = odiArchivoDe(f); if (r) return r; }
+    return null;
+  }
+  const enDisco = (s) => typeof s === 'string' && !!s.trim() && !s.startsWith('data:') && !/^(https?|blob):/i.test(s);
+  const src = enDisco(it.srcLocal) ? it.srcLocal : (enDisco(it.src) ? it.src : null);
+  if (!src && !it.rutaOrigen) return null;
+  return { ruta: it.rutaOrigen || null, src: src || null };
+}
+function odiPuedeAbrirUbicacion(it) {
+  return !!(window.electronAPI && window.electronAPI.mostrarEnCarpeta && odiArchivoDe(it));
+}
+function odiAbreUbicacion(it) {
+  const archivo = odiArchivoDe(it);
+  if (!archivo || !window.electronAPI || !window.electronAPI.mostrarEnCarpeta) return;
+  window.playAudioTone && window.playAudioTone('click');
+  window.electronAPI.mostrarEnCarpeta({
+    ruta: archivo.ruta,
+    src: archivo.src,
+    carpeta: window.odiCarpetaProyecto || null,
+  }).then((r) => {
+    if (r && r.ok) return;
+    const motivo = r && r.motivo;
+    window.showToast && window.showToast(
+      motivo === 'no-esta'
+        ? window.t('El archivo ya no está en esa carpeta. Lo que ves aquí sigue guardado en la nota.',
+                   'The file is not in that folder any more. What you see here is still saved in the note.')
+        : motivo === 'sin-ruta'
+        ? window.t('Este archivo vive dentro de la nota, no en una carpeta. Con una bóveda abierta, los que añadas se guardan también como archivos.',
+                   'This file lives inside the note, not in a folder. With a vault open, the ones you add are also saved as files.')
+        : window.t('No se pudo abrir la carpeta.', 'The folder could not be opened.'),
+      'error'
+    );
+  });
+}
+window.odiArchivoDe = odiArchivoDe;
+window.odiPuedeAbrirUbicacion = odiPuedeAbrirUbicacion;
+window.odiAbreUbicacion = odiAbreUbicacion;
+
 function resolveStickyColor(key) {
   const found = STICKY_PALETTE.find(p => p.key === key);
   if (found) return found.hex;
@@ -375,34 +431,10 @@ function ContextSidebar({
   // carpeta `media`. El proceso principal prueba las dos y abre la primera que
   // exista, así que aquí basta con saber que hay algo que probar.
   //
-  // Un `src` que empieza por `data:` no cuenta: eso es el archivo metido dentro
-  // de la nota, que no existe en ninguna carpeta. Uno de internet tampoco.
-  const srcLocal = typeof item.src === 'string' && item.src.trim() &&
-    !item.src.startsWith('data:') && !/^https?:/.test(item.src);
-  const puedeAbrirCarpeta = !!((item.rutaOrigen || srcLocal) &&
-    window.electronAPI && window.electronAPI.mostrarEnCarpeta);
-
-  const abreLaCarpeta = () => {
-    window.playAudioTone && window.playAudioTone('click');
-    window.electronAPI.mostrarEnCarpeta({
-      ruta: item.rutaOrigen,
-      src: item.src,
-      carpeta: window.odiCarpetaProyecto || null,
-    }).then((r) => {
-      if (r && r.ok) return;
-      const motivo = r && r.motivo;
-      window.showToast && window.showToast(
-        motivo === 'no-esta'
-          ? window.t('El archivo ya no está en esa carpeta. Lo que ves aquí sigue guardado en la nota.',
-                     'The file is not in that folder any more. What you see here is still saved in the note.')
-          : motivo === 'sin-ruta'
-          ? window.t('Este archivo vive dentro de la nota, no en una carpeta. Con una bóveda abierta, los que añadas se guardan también como archivos.',
-                     'This file lives inside the note, not in a folder. With a vault open, the ones you add are also saved as files.')
-          : window.t('No se pudo abrir la carpeta.', 'The folder could not be opened.'),
-        'error'
-      );
-    });
-  };
+  // Con la imagen en Google Drive también vale la copia de este equipo
+  // (srcLocal): ver odiArchivoDe, arriba del todo.
+  const puedeAbrirCarpeta = odiPuedeAbrirUbicacion(item);
+  const abreLaCarpeta = () => odiAbreUbicacion(item);
   const isDraw = item.type === 'draw';
   const isCurrentlyCropping = isImage && callbacks?.croppingId === item.id;
   // Dibujando: la barra se convierte en la caja de herramientas del lápiz y

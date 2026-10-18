@@ -7100,6 +7100,14 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
                   {window.t('Abrir tablero', 'Open board')}
                 </button>
               )}
+              {/* La carpeta donde está el archivo (imagen, audio, vídeo, archivo,
+                  galería): lo mismo que el botón de la barra del nodo. */}
+              {window.odiPuedeAbrirUbicacion && window.odiPuedeAbrirUbicacion(it) && (
+                <button onClick={()=>{ window.odiAbreUbicacion(it); setContextMenu(null); }}>
+                  <span className="material-symbols-rounded">folder_open</span>
+                  {window.t('Abrir la carpeta del archivo', 'Open the file\'s folder')}
+                </button>
+              )}
               <button onClick={()=>{ duplicateItem(it.id); setContextMenu(null); }}>
                 <span className="material-symbols-rounded">content_copy</span>
                 {window.t('Duplicar', 'Duplicate')} <span style={{marginLeft:'auto', fontFamily:'var(--font-mono)', fontSize:10, color:'var(--ink-3)'}}>⌘D</span>
