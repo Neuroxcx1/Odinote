@@ -6714,7 +6714,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
             title={window.t('Buscar en todos los proyectos (Ctrl+K)', 'Search every project (Ctrl+K)')}
           >
             <span className="material-symbols-rounded" style={{ fontSize: 16 }}>travel_explore</span>
-            <span className="mini-search-kbd">Ctrl K</span>
+            <span className="mini-search-kbd">{window.odiTecla ? window.odiTecla('Ctrl') : 'Ctrl'} K</span>
           </button>
           {search && (
             <button onClick={()=>setSearch('')}>

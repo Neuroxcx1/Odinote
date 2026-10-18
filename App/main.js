@@ -27,6 +27,11 @@ ipcMain.handle('listo-para-cerrar', () => {
   return true;
 });
 
+// En un Mac la ventana lleva los botones de semáforo de siempre (a la
+// izquierda, dibujados por el sistema) en vez de los de Windows que pinta
+// barra-titulo.html. No se ha podido probar en un Mac de verdad.
+const ES_MAC = process.platform === 'darwin';
+
 function appWC() {
   if (vistaApp && !vistaApp.webContents.isDestroyed()) return vistaApp.webContents;
   return mainWindow ? mainWindow.webContents : null;
@@ -117,6 +122,13 @@ function createWindow() {
       ]
     }
   ];
+  // En Mac el primer menú es el de la aplicación (Oddinote › Acerca de, Salir…)
+  // y hace falta el de Ventana; sin el de Edición, Cmd+C y Cmd+V no hacen nada
+  // en los campos de texto.
+  if (ES_MAC) {
+    template.unshift({ role: 'appMenu' });
+    template.push({ role: 'windowMenu' });
+  }
   const menu = Menu.buildFromTemplate(template);
   Menu.setApplicationMenu(menu);
   
@@ -148,7 +160,9 @@ function createWindow() {
     icon: path.join(__dirname, 'Icon/Icon.ico'),
     title: 'Oddinote',
     show: false,
-    frame: false,
+    // En Mac, la barra del sistema escondida pero con sus semáforos encima de
+    // la nuestra (que les deja sitio a la izquierda); en Windows, sin marco.
+    ...(ES_MAC ? { titleBarStyle: 'hiddenInset', trafficLightPosition: { x: 12, y: 9 } } : { frame: false }),
     backgroundColor: fondoVentana,
     webPreferences: {
       nodeIntegration: false,
@@ -179,7 +193,7 @@ function createWindow() {
   vistaApp.webContents.on('did-finish-load', aplicaEscala);
   mainWindow.webContents.on('did-finish-load', aplicaEscala);
   colocaVistas();
-  mainWindow.loadFile(path.join(__dirname, 'barra-titulo.html'), { query: { tema: savedTheme === 'dark' ? 'dark' : 'light' } });
+  mainWindow.loadFile(path.join(__dirname, 'barra-titulo.html'), { query: { tema: savedTheme === 'dark' ? 'dark' : 'light', mac: ES_MAC ? '1' : '' } });
 
   ['resize', 'maximize', 'unmaximize', 'restore', 'enter-full-screen', 'leave-full-screen', 'show'].forEach(ev => {
     mainWindow.on(ev, () => { colocaVistas(); mandaEstadoVentana(); });
@@ -1489,6 +1503,9 @@ ipcMain.handle('ventana:fija', (event, si) => {
   if (!mainWindow) return {};
   ventanaFijada = !!si;
   mainWindow.setAlwaysOnTop(ventanaFijada, 'floating');
+  // Fijada no hay barra de título: en Mac, fuera también los semáforos (si no,
+  // quedarían flotando encima de la aplicación).
+  if (ES_MAC && mainWindow.setWindowButtonVisibility) mainWindow.setWindowButtonVisibility(!ventanaFijada);
   if (ventanaFijada) {
     mainWindow.setMinimumSize(360, 240);
   } else {
@@ -1740,7 +1757,8 @@ app.on('window-all-closed', () => {
   if (serverInstance) {
     serverInstance.close();
   }
-  if (process.platform !== 'darwin') {
-    app.quit();
-  }
+  // También en Mac: Oddinote es una sola ventana con su servidor local, y
+  // volver a crearla al pulsar el Dock duplicaría todo lo que se prepara al
+  // abrir. Cerrar la ventana es salir, como en Windows.
+  app.quit();
 });

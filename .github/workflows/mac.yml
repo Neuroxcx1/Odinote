@@ -1,0 +1,91 @@
+# Oddinote para Mac, compilado en un Mac de GitHub.
+#
+# No hay un Mac a mano y la licencia de Apple no deja usar macOS fuera de sus
+# ordenadores, así que la versión de Mac la compila GitHub en uno de los
+# suyos cada vez que se publica una versión, y sube los .zip a esa misma
+# publicación junto al de Windows y el APK. También se puede lanzar a mano
+# (pestaña Actions → Mac → Run workflow) y deja los .zip para descargar.
+#
+# Sale SIN FIRMAR: al abrirla, el Mac avisa de que es de un desarrollador no
+# identificado y se abre con clic derecho → Abrir. Firmarla pide la cuenta de
+# Apple Developer, que es del mantenedor.
+#
+# Para que entrar con Google funcione en esa versión, hace falta el secreto
+# GOOGLE_OAUTH_JSON del repositorio (Settings → Secrets → Actions) con el
+# contenido de App/google-oauth.json. Sin él compila igual, pero sin Google.
+name: Mac
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  mac:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Dependencias
+        working-directory: App
+        run: npm ci
+
+      - name: Credenciales de Google (si están)
+        working-directory: App
+        env:
+          GOOGLE_OAUTH_JSON: ${{ secrets.GOOGLE_OAUTH_JSON }}
+        run: |
+          if [ -n "$GOOGLE_OAUTH_JSON" ]; then
+            printf '%s' "$GOOGLE_OAUTH_JSON" > google-oauth.json
+            echo "google-oauth.json puesto"
+          else
+            echo "Sin GOOGLE_OAUTH_JSON: la versión de Mac saldrá sin entrar con Google"
+          fi
+
+      - name: Icono de Mac (.icns) a partir del de siempre
+        working-directory: App
+        run: |
+          mkdir -p Icon/Oddinote.iconset
+          for s in 16 32 128 256 512; do
+            sips -z $s $s Icon/Icon.png --out Icon/Oddinote.iconset/icon_${s}x${s}.png
+            d=$((s * 2))
+            sips -z $d $d Icon/Icon.png --out Icon/Oddinote.iconset/icon_${s}x${s}@2x.png
+          done
+          iconutil -c icns Icon/Oddinote.iconset -o Icon/Icon.icns
+
+      - name: Compilar (Apple y Intel)
+        working-directory: App
+        run: npx electron-packager . Oddinote --platform=darwin --arch=arm64,x64 --out=dist/mac --overwrite --icon=Icon/Icon.icns --ignore="^/dist($|/)"
+
+      - name: Comprimir
+        working-directory: App/dist/mac
+        env:
+          ETIQUETA: ${{ github.event.release.tag_name || 'prueba' }}
+        run: |
+          for d in Oddinote-darwin-*; do
+            arq="${d#Oddinote-darwin-}"
+            nombre="Oddinote-${ETIQUETA#v}-mac-${arq}.zip"
+            ditto -c -k --keepParent "$d/Oddinote.app" "$nombre"
+            echo "$nombre"
+          done
+
+      - name: Subir a la publicación
+        if: github.event_name == 'release'
+        working-directory: App/dist/mac
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload "${{ github.event.release.tag_name }}" Oddinote-*-mac-*.zip --clobber
+
+      - name: Dejarlos para descargar (si se lanzó a mano)
+        if: github.event_name != 'release'
+        uses: actions/upload-artifact@v4
+        with:
+          name: oddinote-mac
+          path: App/dist/mac/Oddinote-*-mac-*.zip

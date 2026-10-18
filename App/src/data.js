@@ -2106,3 +2106,17 @@ window.playAudioTone = function(type) {
     // Fail silently if browser audio context blocked
   }
 };
+
+// En un Mac los atajos van con Cmd (la aplicación acepta Ctrl y Cmd en todos):
+// los textos que dicen «Ctrl» dicen «⌘». odiTecla hace lo mismo con una tecla
+// suelta (las de Ajustes → Atajos y el chip del buscador).
+window.odiEsMac = /Mac/.test(navigator.platform || '') && !/iPhone|iPad|Android/.test(navigator.userAgent || '');
+window.odiTecla = function (k) { return (window.odiEsMac && k === 'Ctrl') ? '⌘' : k; };
+(function () {
+  if (!window.odiEsMac) return;
+  const base = window.t;
+  window.t = function () {
+    const r = base.apply(this, arguments);
+    return typeof r === 'string' ? r.replace(/\bCtrl\b/g, '⌘') : r;
+  };
+})();

@@ -69,6 +69,12 @@ Breadcrumbs always show where you are, so you never lose context and never run o
 
 Download the latest installer or portable ZIP from the [**Releases page**](https://github.com/Neuroxcx1/Odinote/releases/latest), run it, and you're done.
 
+### Mac
+
+Each release also carries a Mac ZIP (Apple silicon and Intel), built on GitHub by
+`.github/workflows/mac.yml`. It is not signed: the first time, open it with right click → Open.
+It has not been tested on a real Mac yet.
+
 ### Web
 
 No installation, nothing to sign up for: **[odinote-web.vercel.app](https://odinote-web.vercel.app/#try-web)**
@@ -83,7 +89,7 @@ npm start
 ```
 
 Build a Windows executable with `npm run build:exe` (it also writes the release ZIP), or an
-installer with `npm run build:installer`. `npm test` runs the test suite — 510 checks, no
+installer with `npm run build:installer`. `npm test` runs the test suite — over 900 checks, no
 framework, plain Node.
 
 ## Tech

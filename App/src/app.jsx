@@ -1306,7 +1306,7 @@ function App() {
       const alt = e.altKey;
       
       const parts = [];
-      if (ctrl) parts.push('Ctrl');
+      if (ctrl) parts.push(window.odiTecla ? window.odiTecla('Ctrl') : 'Ctrl');
       if (shift) parts.push('Shift');
       if (alt) parts.push('Alt');
       parts.push(e.key.toUpperCase());
@@ -1400,7 +1400,9 @@ function App() {
       if (isNewerVersion(cleanLatest, CURRENT_VERSION)) {
         // Buscar el instalador .exe entre los archivos del release para poder
         // auto-descargarlo; si no hay, se ofrecerá abrir la página del release.
-        const asset = (latestRelease.assets || []).find(a => /\.exe$/i.test(a.name));
+        // En un Mac no hay instalador que valga (el .exe es de Windows): se abre
+        // la página de la versión, donde están los .zip de Mac.
+        const asset = window.odiEsMac ? null : (latestRelease.assets || []).find(a => /\.exe$/i.test(a.name));
         setUpdateAvailable(true);
         setUpdateModal({
           state: 'available',
@@ -3904,7 +3906,7 @@ function App() {
                               boxShadow: '1px 1px 0 var(--line, #595459)',
                               fontFamily: 'var(--font-mono, monospace)',
                               margin: 0
-                            }}>{k}</kbd>
+                            }}>{window.odiTecla ? window.odiTecla(k) : k}</kbd>
                           ))}
                         </div>
                       </div>

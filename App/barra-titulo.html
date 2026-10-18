@@ -55,6 +55,11 @@
   /* Cerrar se pone rojo, como en Windows. */
   .boton.cerrar:hover { background: #C42B1C; color: #FFFFFF; }
   .boton.cerrar:active { background: #B82A1D; color: #FFFFFF; }
+  /* En Mac los botones son los semáforos del sistema, a la izquierda: los
+     nuestros no se pintan y el icono deja sitio a los semáforos. */
+  :root.mac .boton { display: none; }
+  :root.mac .icono { margin-left: 80px; }
+  :root.mac html, :root.mac body { font-family: -apple-system, BlinkMacSystemFont, system-ui, sans-serif; }
   /* Con la ventana en segundo plano, apagada como la de Windows. */
   body.fuera .titulo, body.fuera .icono, body.fuera .boton:not(:hover) { opacity: 0.5; }
 </style>
@@ -71,6 +76,7 @@
     (function () {
       var raiz = document.documentElement;
       var tema = new URLSearchParams(location.search).get('tema');
+      if (new URLSearchParams(location.search).get('mac') === '1') raiz.classList.add('mac');
       raiz.setAttribute('data-tema', tema === 'dark' ? 'dark' : 'light');
       if (!window.barra) return;
       var max = document.getElementById('maximizar');
