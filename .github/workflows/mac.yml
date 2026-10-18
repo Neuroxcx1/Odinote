@@ -44,9 +44,11 @@ jobs:
         with:
           node-version: 20
 
+      # npm install y no npm ci: el package-lock.json no va en el repositorio
+      # (está en .gitignore), y npm ci sin él no arranca.
       - name: Dependencias
         working-directory: App
-        run: npm ci
+        run: npm install --no-audit --no-fund
 
       - name: Credenciales de Google (si están)
         working-directory: App
