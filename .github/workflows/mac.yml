@@ -18,7 +18,16 @@ name: Mac
 on:
   release:
     types: [published]
+  # A mano (Actions → Mac → Run workflow): con una etiqueta, sube los .zip a
+  # esa publicación (sirve si la publicación se creó antes de que este flujo
+  # estuviera en main, como pasó con la v1.2.0); sin etiqueta, los deja para
+  # descargar.
   workflow_dispatch:
+    inputs:
+      etiqueta:
+        description: "Etiqueta de la publicación (p. ej. v1.2.0); vacío = solo compilar"
+        required: false
+        default: ""
 
 permissions:
   contents: write
@@ -28,6 +37,8 @@ jobs:
     runs-on: macos-14
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name || inputs.etiqueta || github.ref }}
 
       - uses: actions/setup-node@v4
         with:
@@ -67,7 +78,7 @@ jobs:
       - name: Comprimir
         working-directory: App/dist/mac
         env:
-          ETIQUETA: ${{ github.event.release.tag_name || 'prueba' }}
+          ETIQUETA: ${{ github.event.release.tag_name || inputs.etiqueta || 'prueba' }}
         run: |
           for d in Oddinote-darwin-*; do
             arq="${d#Oddinote-darwin-}"
@@ -77,14 +88,14 @@ jobs:
           done
 
       - name: Subir a la publicación
-        if: github.event_name == 'release'
+        if: github.event_name == 'release' || inputs.etiqueta != ''
         working-directory: App/dist/mac
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release upload "${{ github.event.release.tag_name }}" Oddinote-*-mac-*.zip --clobber
+        run: gh release upload "${{ github.event.release.tag_name || inputs.etiqueta }}" Oddinote-*-mac-*.zip --clobber --repo "${{ github.repository }}"
 
-      - name: Dejarlos para descargar (si se lanzó a mano)
-        if: github.event_name != 'release'
+      - name: Dejarlos para descargar (si se lanzó a mano sin etiqueta)
+        if: github.event_name != 'release' && inputs.etiqueta == ''
         uses: actions/upload-artifact@v4
         with:
           name: oddinote-mac
