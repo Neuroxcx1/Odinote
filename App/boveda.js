@@ -508,6 +508,237 @@
     return hecho;
   }
 
+  // ══════════════════════════════════════════════════════════
+  // Ordenar los medios: lo repetido y lo que no usa nadie
+  // ══════════════════════════════════════════════════════════
+  //
+  // Hasta la 1.2.0, cada imagen que se subía a Google Drive acababa DOS veces
+  // en el disco: la de la carpeta del proyecto, que el nodo olvidaba al pasar
+  // a la dirección de Drive, y otra que la app bajaba de Drive al 'media'
+  // común. En la bóveda del usuario (el 18/10): 845 archivos, 1 GB, y 598 de
+  // ellos (864 MB) sin que ninguna nota los nombrara. Esto lo ordena:
+  //
+  //   1. Lo del montón común que usa UN solo proyecto se muda a la carpeta de
+  //      ese proyecto, con el mismo nombre: el nodo no cambia, y «Abrir la
+  //      carpeta del archivo» lleva a la del proyecto y no a la de Oddinote.
+  //      Lo que usan varios se queda en el montón: mudarlo a uno haría que los
+  //      demás se trajeran su copia al guardar (reparaMedios).
+  //   2. Lo que no nombra ninguna nota se aparta a .retirados, como las
+  //      carpetas de los proyectos borrados: a los 30 días se borra solo.
+  //
+  // «Lo nombra una nota» se mira en el TEXTO: los datos de la app y además
+  // cada json que haya en la bóveda (odinote.json, cada project.json, el
+  // reparto viejo y lo retirado). Así cuenta cualquier campo, también los que
+  // se añadan mañana, y unos datos a medias de la app no bastan para apartar
+  // nada. Y si algo apartado se vuelve a pedir, el servidor lo devuelve a su
+  // sitio (rescataRetirado): equivocarse aquí no rompe ninguna imagen.
+  //
+  // Lo que se queda aunque no lo nombre nadie:
+  //   · lo tocado hace menos de una hora (una imagen recién pegada cuyo nodo
+  //     aún no se ha guardado);
+  //   · lo que lleva en el nombre el id de un nodo vivo, salvo que sea copia
+  //     exacta de otro que sí se usa. Es la copia de este equipo de una imagen
+  //     que está en Drive y cuyo nodo la olvidó: la app la vuelve a enlazar al
+  //     abrir el proyecto (download-media-to-vault reconoce el contenido), y
+  //     entonces la que sobre ya sí es una copia.
+  var SIN_USAR = 'Archivos sin usar';
+
+  function archivosDeMedia(io, dir) {
+    var fuera = [];
+    var entradas;
+    try { entradas = io.fs.readdirSync(dir, { withFileTypes: true }); } catch (err) { return fuera; }
+    entradas.forEach(function (e) {
+      if (!e.isFile()) return;
+      try {
+        var ruta = io.path.join(dir, e.name);
+        var st = io.fs.statSync(ruta);
+        fuera.push({ nombre: e.name, ruta: ruta, size: st.size, mtimeMs: st.mtimeMs });
+      } catch (err) {}
+    });
+    return fuera;
+  }
+
+  // El texto de los json que hay en la bóveda.
+  function textosDeJson(io, folderPath) {
+    var fuera = [];
+    var lee = function (ruta) { try { fuera.push(io.fs.readFileSync(ruta, 'utf-8')); } catch (err) {} };
+    lee(io.path.join(folderPath, 'odinote.json'));
+    [folderPath, io.path.join(folderPath, 'projects'), io.path.join(folderPath, RETIRADOS)].forEach(function (dir) {
+      var entradas;
+      try { entradas = io.fs.readdirSync(dir, { withFileTypes: true }); } catch (err) { return; }
+      entradas.forEach(function (e) {
+        if (e.isDirectory()) lee(io.path.join(dir, e.name, 'project.json'));
+      });
+    });
+    return fuera;
+  }
+
+  // ¿Sale este nombre de archivo en el texto? Tal cual o codificado como en
+  // una dirección (los espacios y los acentos de un file:/// de los de antes).
+  function nombra(texto, nombre) {
+    if (texto.indexOf(nombre) !== -1) return true;
+    var a = encodeURI(nombre);
+    if (a !== nombre && texto.indexOf(a) !== -1) return true;
+    var b = encodeURIComponent(nombre);
+    return b !== a && b !== nombre && texto.indexOf(b) !== -1;
+  }
+
+  function mismoContenido(io, a, b) {
+    if (a.size !== b.size || a.ruta === b.ruta) return false;
+    try { return io.fs.readFileSync(a.ruta).equals(io.fs.readFileSync(b.ruta)); } catch (err) { return false; }
+  }
+
+  // Los ids de todos los nodos (también hijos de columna y fotos de galería).
+  function idsDeNodos(canvases) {
+    var ids = {};
+    var mira = function (n) {
+      if (!n || typeof n !== 'object') return;
+      if (n.id != null) ids[String(n.id)] = true;
+      (Array.isArray(n.children) ? n.children : []).forEach(mira);
+      (Array.isArray(n.fotos) ? n.fotos : []).forEach(mira);
+    };
+    Object.keys(canvases || {}).forEach(function (cid) {
+      var c = canvases[cid];
+      (c && Array.isArray(c.items) ? c.items : []).forEach(mira);
+    });
+    return ids;
+  }
+
+  // 'cloud_it-123-45_0123456789abcdef.png' → ¿es de un nodo que existe?
+  // Los nombres que pone la app son <cloud|media|galeria>_<id>[_<id>]_<huella>.
+  function esDeNodoVivo(nombre, ids) {
+    var m = String(nombre).match(/^(?:cloud|media|galeria)_(.+)_[0-9a-f]{16}\.[a-z0-9]+$/i);
+    if (!m) return false;
+    var partes = [m[1]].concat(m[1].split('_'));
+    return partes.some(function (p) { return p && ids[p]; });
+  }
+
+  // opciones: { ahora, edadMinimaMs } (por defecto, una hora).
+  function ordenaMedios(io, folderPath, data, mapa, opciones) {
+    var op = opciones || {};
+    var ahora = op.ahora || Date.now();
+    var edadMinima = op.edadMinimaMs == null ? 3600 * 1000 : op.edadMinimaMs;
+    var hecho = { movidos: 0, apartados: 0, bytes: 0, repetidos: 0 };
+    var datos = data || {};
+    var proyectos = datos.projects || [];
+    var canvases = datos.canvases || {};
+    // Sin proyectos o sin lienzos no se toca nada: es mucho más probable una
+    // lectura fallida que una bóveda en la que sobre todo.
+    if (!proyectos.length || !Object.keys(canvases).length) return hecho;
+    var carpetas = mapa || carpetasDeProyectos(proyectos);
+
+    // El texto de cada proyecto: sus lienzos en la app y su project.json.
+    var textoDe = {};
+    proyectos.forEach(function (p) {
+      var c = p && p.id && carpetas[p.id];
+      if (!c) return;
+      var t = JSON.stringify(p) + JSON.stringify(canvasesDeProyecto(canvases, p.id));
+      try { t += io.fs.readFileSync(io.path.join(folderPath, c, 'project.json'), 'utf-8'); } catch (err) {}
+      textoDe[c] = (textoDe[c] || '') + t;
+    });
+    var nombresCarpeta = Object.keys(textoDe);
+    var todo = nombresCarpeta.map(function (c) { return textoDe[c]; })
+      .concat(textosDeJson(io, folderPath), [JSON.stringify(datos)]).join('\n');
+    var ids = idsDeNodos(canvases);
+    var monton = io.path.join(folderPath, 'media');
+
+    // 1. Del montón a la carpeta de su proyecto.
+    archivosDeMedia(io, monton).forEach(function (f) {
+      var duenos = nombresCarpeta.filter(function (c) { return nombra(textoDe[c], f.nombre); });
+      if (duenos.length !== 1) return;
+      var dir = io.path.join(folderPath, duenos[0], 'media');
+      var destino = io.path.join(dir, f.nombre);
+      if (io.fs.existsSync(destino)) return;
+      try {
+        io.fs.mkdirSync(dir, { recursive: true });
+        io.fs.renameSync(f.ruta, destino);
+        hecho.movidos++;
+      } catch (err) {
+        io.log && io.log('ordena-medios: no se pudo mudar ' + f.nombre + ' a "' + duenos[0] + '" (' + err.message + ')');
+      }
+    });
+
+    // 2. Lo que no nombra nadie, a .retirados.
+    var usados = [], sobran = [];
+    [monton].concat(nombresCarpeta.map(function (c) { return io.path.join(folderPath, c, 'media'); }))
+      .forEach(function (dir) {
+        archivosDeMedia(io, dir).forEach(function (f) { (nombra(todo, f.nombre) ? usados : sobran).push(f); });
+      });
+    var sello = new Date(ahora).toISOString().slice(0, 19).replace(/[:T]/g, '-');
+    var lote = io.path.join(folderPath, RETIRADOS, SIN_USAR + ' (' + sello + ')');
+    sobran.forEach(function (f) {
+      if (ahora - f.mtimeMs < edadMinima) return;
+      var copia = usados.some(function (u) { return mismoContenido(io, u, f); });
+      if (!copia && esDeNodoVivo(f.nombre, ids)) return;
+      try {
+        var destino = io.path.join(lote, io.path.relative(folderPath, f.ruta));
+        io.fs.mkdirSync(io.path.dirname(destino), { recursive: true });
+        io.fs.renameSync(f.ruta, destino);
+        hecho.apartados++;
+        hecho.bytes += f.size;
+        if (copia) hecho.repetidos++;
+      } catch (err) {
+        io.log && io.log('ordena-medios: no se pudo apartar ' + f.ruta + ' (' + err.message + ')');
+      }
+    });
+    if (hecho.apartados) {
+      try {
+        io.fs.writeFileSync(io.path.join(lote, 'LEEME.txt'), [
+          'Oddinote apartó aquí archivos de la bóveda que no usa ninguna nota:',
+          'copias repetidas y archivos de nodos que ya no existen.',
+          'Esta carpeta se borra sola a los 30 días. Si antes de eso una nota',
+          'vuelve a pedir uno de estos archivos, Oddinote lo devuelve a su sitio.',
+          'Si quieres el espacio ya, puedes borrar esta carpeta.',
+          '',
+          'Oddinote moved here vault files that no note uses: repeated copies',
+          'and files of nodes that no longer exist. This folder deletes itself',
+          'after 30 days. If a note asks for one of these files before then,',
+          'Oddinote puts it back. To get the space now, delete this folder.',
+          ''
+        ].join('\r\n'), 'utf-8');
+      } catch (err) {}
+    }
+    return hecho;
+  }
+
+  // Un archivo que se pide y no está: si se apartó (ordenaMedios), vuelve a su
+  // sitio. relativo: 'Diana/media/foto.png' o 'media/foto.png'. Devuelve la
+  // ruta donde queda, o null.
+  function rescataRetirado(io, folderPath, relativo) {
+    if (!relativo || /\.\./.test(relativo)) return null;
+    var cola = String(relativo).match(/media\/([^/]+)$/i);
+    if (!cola) return null;
+    var dir = io.path.join(folderPath, RETIRADOS);
+    var lotes;
+    try { lotes = io.fs.readdirSync(dir, { withFileTypes: true }); } catch (err) { return null; }
+    for (var i = 0; i < lotes.length; i++) {
+      if (!lotes[i].isDirectory() || lotes[i].name.indexOf(SIN_USAR) !== 0) continue;
+      var base = io.path.join(dir, lotes[i].name);
+      // Dentro del lote, lo apartado conserva dónde estaba: 'media/…' o '<carpeta>/media/…'.
+      var sitios = ['media'];
+      try {
+        io.fs.readdirSync(base, { withFileTypes: true }).forEach(function (e) {
+          if (e.isDirectory() && e.name !== 'media') sitios.push(io.path.join(e.name, 'media'));
+        });
+      } catch (err) { continue; }
+      for (var j = 0; j < sitios.length; j++) {
+        var origen = io.path.join(base, sitios[j], cola[1]);
+        if (!io.fs.existsSync(origen)) continue;
+        var destino = io.path.join(folderPath, sitios[j], cola[1]);
+        try {
+          if (io.fs.existsSync(destino)) return destino;
+          io.fs.mkdirSync(io.path.dirname(destino), { recursive: true });
+          io.fs.renameSync(origen, destino);
+          io.log && io.log('vault: ' + cola[1] + ' estaba apartado y se ha pedido; vuelve a ' + sitios[j]);
+          return destino;
+        } catch (err) {
+          return origen;
+        }
+      }
+    }
+    return null;
+  }
+
   var Boveda = {
     saneaNombre: saneaNombre,
     nombreLegible: nombreLegible,
@@ -524,6 +755,9 @@
     mediosDeLienzos: mediosDeLienzos,
     buscaMedio: buscaMedio,
     reparaMedios: reparaMedios,
+    ordenaMedios: ordenaMedios,
+    rescataRetirado: rescataRetirado,
+    SIN_USAR: SIN_USAR,
   };
 
   if (typeof module !== 'undefined' && module.exports) module.exports = Boveda;

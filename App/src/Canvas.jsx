@@ -2150,11 +2150,14 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
                 const base = parsedUrl.pathname.split('/').pop();
                 if (base && base.includes('.')) tentativeName = base;
               } catch(e) {}
-              window.electronAPI.downloadMediaToVault(vaultPath, imgUrl, tentativeName)
+              // A la carpeta del proyecto, y guardada relativa a ella como lo
+              // demás (antes: al 'media' común, con la ruta entera).
+              const carpeta = window.odiCarpetaProyecto || null;
+              window.electronAPI.downloadMediaToVault(vaultPath, imgUrl, tentativeName, carpeta)
                 .then(relativePath => {
                   const normalizedRelative = relativePath.replace(/\\/g, '/');
                   const absolutePath = `file:///${vaultPath.replace(/\\/g, '/')}/${normalizedRelative}`;
-                  applyDroppedImageSrc(absolutePath);
+                  applyDroppedImageSrc(carpeta ? normalizedRelative : absolutePath);
                 })
                 .catch(err => {
                   console.warn('Failed to download dropped image via IPC, falling back to base64 fetch:', err);
@@ -2488,11 +2491,12 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
             const base = parsedUrl.pathname.split('/').pop();
             if (base && base.includes('.')) tentativeName = base;
           } catch(e) {}
-          window.electronAPI.downloadMediaToVault(vaultPath, url, tentativeName)
+          const carpeta = window.odiCarpetaProyecto || null;
+          window.electronAPI.downloadMediaToVault(vaultPath, url, tentativeName, carpeta)
             .then(relativePath => {
               const normalizedRelative = relativePath.replace(/\\/g, '/');
               const absolutePath = `file:///${vaultPath.replace(/\\/g, '/')}/${normalizedRelative}`;
-              applyImageSrc(absolutePath);
+              applyImageSrc(carpeta ? normalizedRelative : absolutePath);
             })
             .catch(err => {
               console.warn('Failed to download image to vault directly via IPC, falling back to base64 fetch:', err);

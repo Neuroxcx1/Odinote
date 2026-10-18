@@ -31,7 +31,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   carpetaAbrir: (ruta) => ipcRenderer.invoke('carpeta-abrir', ruta),
   // Copiar las imágenes de un tablero a la carpeta del proyecto en que se convierte.
   fetchImageBase64: (url) => ipcRenderer.invoke('fetch-image-base64', url),
-  downloadMediaToVault: (folderPath, url, fileName) => ipcRenderer.invoke('download-media-to-vault', { folderPath, url, fileName }),
+  // carpeta: la del proyecto dentro de la bóveda; sin ella va al 'media' común.
+  downloadMediaToVault: (folderPath, url, fileName, carpeta) => ipcRenderer.invoke('download-media-to-vault', { folderPath, url, fileName, carpeta }),
   getCustomDictionaryWords: () => ipcRenderer.invoke('get-custom-dictionary-words'),
   removeWordFromDictionary: (word) => ipcRenderer.invoke('remove-word-from-dictionary', word),
   setWindowTheme: (theme) => ipcRenderer.invoke('set-window-theme', theme),
@@ -77,6 +78,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
     return () => ipcRenderer.removeListener('app-cerrando', listener);
   },
   listoParaCerrar: () => ipcRenderer.invoke('listo-para-cerrar'),
+  // La bóveda apartó archivos repetidos o sin usar (Boveda.ordenaMedios).
+  alOrdenarBoveda: (callback) => {
+    const listener = (event, hecho) => callback(hecho);
+    ipcRenderer.on('boveda-ordenada', listener);
+    return () => ipcRenderer.removeListener('boveda-ordenada', listener);
+  },
   onGoogleSigninCompleted: (callback) => {
     const listener = (event, profile) => callback(profile);
     ipcRenderer.on('google-signin-completed', listener);

@@ -1206,4 +1206,5 @@ window.ODI_FRASES = [
   /* 1201 */ ["Esta versión de la aplicación del móvil no trae el inicio de sesión con Google: instala la última. Todo lo demás sí va, tus notas se guardan en el teléfono y las sesiones en vivo funcionan sin cuenta, con su código.","This version of the phone app cannot sign in with Google: install the latest one. Everything else works, your notes are saved on the phone, and live sessions work without an account, with their code."],
   /* 1202 */ ["¿Seguro que quieres cerrar sesión? Tus lienzos dejarán de guardarse en tu Google Drive hasta que vuelvas a entrar. Las sesiones en vivo siguen funcionando sin cuenta.","Are you sure you want to sign out? Your canvases will stop saving to your Google Drive until you sign in again. Live sessions keep working without an account."],
   /* 1203 */ ["Abrir la carpeta del archivo","Open the file's folder"],
+  /* 1204 */ ["Bóveda ordenada: {0} archivos repetidos o sin usar ({1} MB) apartados a .retirados. Se borran solos en 30 días.","Vault tidied: {0} repeated or unused files ({1} MB) moved to .retirados. They delete themselves in 30 days."],
 ];

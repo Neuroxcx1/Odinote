@@ -1206,4 +1206,5 @@ window.ODI_IDIOMAS.pt = {
   1201: "Esta versão do app para celular não permite entrar com o Google: instale a mais recente. Todo o resto funciona, suas notas ficam salvas no celular e as sessões ao vivo funcionam sem conta, com o código delas.",
   1202: "Tem certeza de que quer sair? Suas telas deixarão de ser salvas no seu Google Drive até você entrar de novo. As sessões ao vivo continuam funcionando sem conta.",
   1203: "Abrir a pasta do arquivo",
+  1204: "Cofre organizado: {0} arquivos repetidos ou sem uso ({1} MB) movidos para .retirados. Eles se apagam sozinhos em 30 dias.",
 };

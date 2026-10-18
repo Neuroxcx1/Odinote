@@ -1206,4 +1206,5 @@ window.ODI_IDIOMAS.de = {
   1201: "Diese Version der Handy-App kann sich nicht mit Google anmelden: Installiere die neueste. Alles andere funktioniert, deine Notizen werden auf dem Handy gespeichert, und Live-Sitzungen funktionieren ohne Konto, mit ihrem Code.",
   1202: "Möchtest du dich wirklich abmelden? Deine Leinwände werden nicht mehr in deinem Google Drive gespeichert, bis du dich wieder anmeldest. Live-Sitzungen funktionieren weiterhin ohne Konto.",
   1203: "Ordner der Datei öffnen",
+  1204: "Tresor aufgeräumt: {0} doppelte oder ungenutzte Dateien ({1} MB) nach .retirados verschoben. Sie löschen sich nach 30 Tagen von selbst.",
 };

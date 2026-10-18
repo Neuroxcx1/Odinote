@@ -368,7 +368,9 @@ function createWindow() {
       // (se le copian al guardar). Ninguna imagen debe romperse por haber
       // cambiado de sitio la casa. Ver Boveda.buscaMedio.
       if (!fs.existsSync(filePath)) {
-        const encontrada = Boveda.buscaMedio({ fs, path }, activeVaultPath, relativePart);
+        const encontrada = Boveda.buscaMedio({ fs, path }, activeVaultPath, relativePart)
+          // Y si se apartó por no usarlo nadie (Boveda.ordenaMedios), vuelve.
+          || Boveda.rescataRetirado(IO, activeVaultPath, relativePart);
         if (encontrada) filePath = encontrada;
       }
       const ext = path.extname(filePath).toLowerCase();
@@ -606,6 +608,11 @@ ipcMain.handle('read-vault', async (event, folderPath) => {
         if (k !== 'projects' && k !== 'canvases') elegido.datos[k] = legacy[k];
       });
     }
+    // La limpieza de medios, también si en esta sesión no se llega a guardar
+    // nada (solo mirar no guarda): con lo leído, que es lo que tiene la app.
+    // Si antes de que salga hay un guardado, se usa ese, que es más nuevo.
+    if (!ultimoGuardado || ultimoGuardado.folderPath !== folderPath) ultimoGuardado = { folderPath, data: elegido.datos, carpetas: null };
+    programaOrdenaMedios(folderPath);
     return elegido.datos;
   } catch (err) {
     logToFile(`IPC read-vault ERROR: ${err.message}`);
@@ -615,6 +622,32 @@ ipcMain.handle('read-vault', async (event, folderPath) => {
 
 // Lo último escrito en odinote.json (ver write-vault).
 let ultimoOdinote = null;
+
+// ── Ordenar los medios de la bóveda (Boveda.ordenaMedios) ──
+// Una vez por sesión, 20 s después de leer la bóveda (o del primer guardado):
+// no al momento, para no retrasar la apertura, y con los datos del ÚLTIMO
+// guardado, que son los que tiene la app en ese momento. Lee y mueve archivos de forma síncrona,
+// pero solo compara el contenido de los que miden lo mismo: en la bóveda del
+// usuario (845 archivos) es menos de un segundo.
+let ultimoGuardado = null;
+let medioOrdenado = null;
+function programaOrdenaMedios(folderPath) {
+  if (medioOrdenado === folderPath) return;
+  medioOrdenado = folderPath;
+  setTimeout(() => {
+    const u = ultimoGuardado;
+    if (!u || u.folderPath !== folderPath || activeVaultPath !== folderPath) { medioOrdenado = null; return; }
+    try {
+      const t0 = Date.now();
+      const h = Boveda.ordenaMedios(IO, folderPath, u.data, u.carpetas);
+      logToFile(`ordena-medios: ${h.movidos} mudados a la carpeta de su proyecto, ${h.apartados} apartados a ${Boveda.RETIRADOS} ` +
+        `(${(h.bytes / 1048576).toFixed(1)} MB, ${h.repetidos} eran copias) en ${Date.now() - t0} ms`);
+      if (h.apartados && appWC()) appWC().send('boveda-ordenada', h);
+    } catch (err) {
+      logToFile(`ordena-medios falló: ${err.message}`);
+    }
+  }, 20000);
+}
 ipcMain.handle('write-vault', async (event, { folderPath, data, carpetas }) => {
   logToFile(`IPC Call: write-vault at ${folderPath}`);
   activeVaultPath = folderPath;
@@ -644,6 +677,8 @@ ipcMain.handle('write-vault', async (event, { folderPath, data, carpetas }) => {
     // 2. Y además, una carpeta por proyecto, con su nombre.
     try {
       const hecho = Boveda.escribeCarpetas(IO, folderPath, data, carpetas);
+      ultimoGuardado = { folderPath, data, carpetas };
+      programaOrdenaMedios(folderPath);
       logToFile(`write-vault: ${hecho.escritos.length} carpetas escritas (${(hecho.iguales || []).length} sin cambios), ` +
         `${hecho.renombrados.length} renombradas, ${hecho.retirados.length} retiradas` +
         (hecho.traidos ? `, ${hecho.traidos} archivos traídos de otra carpeta` : ''));
@@ -827,6 +862,14 @@ ipcMain.handle('remove-word-from-dictionary', async (event, word) => {
 function candidatasEnBoveda(src, carpeta) {
   if (!activeVaultPath) return [];
   const fuera = [];
+  // La carpeta del proyecto, la primera siempre: también para una ruta entera
+  // de las de antes ('file:///…/Oddinote/media/x.png'), que apunta al montón
+  // común aunque el archivo ya se haya mudado a su proyecto (ordenaMedios).
+  const nombre = typeof src === 'string' ? (src.match(/media\/([^/]+)$/i) || [])[1] : null;
+  if (carpeta && nombre) {
+    try { fuera.push(path.join(activeVaultPath, carpeta, 'media', decodeURIComponent(nombre))); }
+    catch (e) { fuera.push(path.join(activeVaultPath, carpeta, 'media', nombre)); }
+  }
   const relativa = Boveda.relativoEnBoveda(src, carpeta);
   if (relativa) fuera.push(path.join(activeVaultPath, relativa));
   // Y siempre, el montón de antes: 'media/loquesea.png'.
@@ -890,6 +933,15 @@ ipcMain.handle('mostrar-en-carpeta', async (event, datos) => {
         shell.showItemInFolder(limpia);
         return { ok: true, ruta: limpia };
       }
+    }
+    // En la carpeta de otro proyecto (una imagen copiada de uno a otro), o
+    // apartada por no usarla nadie: lo mismo que hace el servidor al pintarla.
+    const rel = activeVaultPath && Boveda.relativoEnBoveda(peticion.src, peticion.carpeta);
+    const otra = rel && (Boveda.buscaMedio(IO, activeVaultPath, rel) || Boveda.rescataRetirado(IO, activeVaultPath, rel));
+    if (otra) {
+      logToFile(`mostrar-en-carpeta: ${otra}`);
+      shell.showItemInFolder(otra);
+      return { ok: true, ruta: otra };
     }
     logToFile(`mostrar-en-carpeta: ninguna existe -> ${candidatas.join(' | ')}`);
     return { ok: false, motivo: 'no-esta' };
@@ -1005,14 +1057,19 @@ ipcMain.handle('fetch-image-base64', async (event, url) => {
   }
 });
 
-ipcMain.handle('download-media-to-vault', async (event, { folderPath, url, fileName }) => {
-  logToFile(`IPC Call: download-media-to-vault from ${url} to vault ${folderPath}`);
+ipcMain.handle('download-media-to-vault', async (event, { folderPath, url, fileName, carpeta }) => {
+  logToFile(`IPC Call: download-media-to-vault from ${url} to vault ${folderPath} (proyecto: ${carpeta || 'sin carpeta'})`);
   try {
     const path = require('path');
     const fs = require('fs');
     const { net } = require('electron');
     
-    const mediaDir = path.join(folderPath, 'media');
+    // En la carpeta del proyecto, como lo que se guarda con save-media. Antes
+    // iba siempre al 'media' común: «Abrir la carpeta» llevaba a la de
+    // Oddinote y no a la del proyecto. Solo un nombre de carpeta suelto: nada
+    // de subir de nivel ni de rutas enteras.
+    const carpetaValida = typeof carpeta === 'string' && carpeta && !/[\\/]|\.\./.test(carpeta);
+    const mediaDir = carpetaValida ? path.join(folderPath, carpeta, 'media') : path.join(folderPath, 'media');
     if (!fs.existsSync(mediaDir)) {
       fs.mkdirSync(mediaDir, { recursive: true });
     }
@@ -1079,6 +1136,28 @@ ipcMain.handle('download-media-to-vault', async (event, { folderPath, url, fileN
     const baseName = path.basename(fileName, path.extname(fileName)).replace(/[^a-zA-Z0-9._-]/g, '_');
     const finalName = `${baseName}_${hash}${fileExt}`;
     const destPath = path.join(mediaDir, finalName);
+
+    // ¿Ya hay un archivo con lo mismo dentro? Una imagen subida a Drive tiene
+    // su original en la carpeta del proyecto con otro nombre (media_…), y
+    // escribir esta copia la duplicaba: así acabó una bóveda con 269 MB
+    // repetidos. Solo se comparan los que miden lo mismo, que son pocos.
+    const igualEn = (dir) => {
+      let entradas;
+      try { entradas = fs.readdirSync(dir, { withFileTypes: true }); } catch (e) { return null; }
+      for (const e of entradas) {
+        if (!e.isFile() || e.name === finalName) continue;
+        const r = path.join(dir, e.name);
+        try { if (fs.statSync(r).size === buffer.length && fs.readFileSync(r).equals(buffer)) return e.name; } catch (err) {}
+      }
+      return null;
+    };
+    if (!fs.existsSync(destPath)) {
+      const gemela = igualEn(mediaDir);
+      if (gemela) {
+        logToFile(`IPC download-media-to-vault: ya estaba como media/${gemela}`);
+        return `media/${gemela}`;
+      }
+    }
     
     if (!fs.existsSync(destPath)) {
       fs.writeFileSync(destPath, buffer);

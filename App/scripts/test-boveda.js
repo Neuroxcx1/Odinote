@@ -344,6 +344,94 @@ const check = (nombre, ok, extra) => {
   }
 }
 
+// ── Ordenar los medios (18/10) ──
+//
+// El caso del usuario: cada imagen subida a Drive acababa dos veces en el
+// disco (la del proyecto, que el nodo olvidaba, y otra bajada de Drive al
+// 'media' común), y «Abrir la carpeta» llevaba a la carpeta general.
+{
+  const os = require('os');
+  const io = { fs, path, log: () => {} };
+  const raiz = fs.mkdtempSync(path.join(os.tmpdir(), 'boveda-ordena-'));
+  const pon = (rel, contenido, haceMs) => {
+    const r = path.join(raiz, rel);
+    fs.mkdirSync(path.dirname(r), { recursive: true });
+    fs.writeFileSync(r, contenido);
+    if (haceMs) { const t = new Date(Date.now() - haceMs); fs.utimesSync(r, t, t); }
+  };
+  const DIA = 86400000;
+  const h16 = (c) => c.repeat(16);
+  const pA = { id: 'pa', name: { es: 'Cliclone' } };
+  const pB = { id: 'pb', name: { es: 'Diana' } };
+  const canvases = {
+    pa: { items: [
+      // La imagen subida a Drive: su copia de este equipo es la bajada al montón.
+      { id: 'it-1', type: 'image', src: 'https://lh3.googleusercontent.com/d/x1', srcLocal: 'media/cloud_it-1_' + h16('a') + '.png' },
+      // Una imagen de las de siempre, guardada en la carpeta del proyecto.
+      { id: 'it-2', type: 'image', src: 'media/media_it-2_' + h16('b') + '.png' },
+      // Una que usan los dos proyectos, en el montón.
+      { id: 'it-3', type: 'image', src: 'media/compartida.png' },
+      // Una de Drive que olvidó su copia: el archivo lleva su id.
+      { id: 'it-4', type: 'image', src: 'https://lh3.googleusercontent.com/d/x4' },
+      // Una de las de antes, con la ruta entera y un espacio en el nombre.
+      { id: 'it-5', type: 'image', src: 'file:///D:/Odinote/media/con%20espacio.png' },
+    ] },
+    pb: { items: [{ id: 'it-6', type: 'image', src: 'media/compartida.png' }] },
+  };
+  const datos = { lang: 'es', projects: [pA, pB], canvases };
+  B.escribeCarpetas(io, raiz, datos);
+  pon('media/cloud_it-1_' + h16('a') + '.png', 'FOTO-1', 2 * DIA);
+  pon('Cliclone/media/media_it-1_' + h16('c') + '.png', 'FOTO-1', 2 * DIA);   // la gemela olvidada
+  pon('Cliclone/media/media_it-2_' + h16('b') + '.png', 'FOTO-2', 2 * DIA);
+  pon('media/compartida.png', 'COMPARTIDA', 2 * DIA);
+  pon('media/cloud_it-4_' + h16('d') + '.png', 'FOTO-4', 2 * DIA);
+  pon('media/con espacio.png', 'FOTO-5', 2 * DIA);
+  pon('media/de_un_nodo_borrado.mp4', 'VIDEO-VIEJO', 2 * DIA);
+  pon('Cliclone/media/cloud_it-99_' + h16('e') + '.png', 'NODO-BORRADO', 2 * DIA);
+  pon('media/recien_pegada.png', 'NUEVA', 60 * 1000);
+  pon('Mis cosas/media/ajeno.png', 'NO-ES-NUESTRO', 2 * DIA);
+
+  const hecho = B.ordenaMedios(io, raiz, datos, B.carpetasDeProyectos(datos.projects));
+  const esta = (rel) => fs.existsSync(path.join(raiz, rel));
+  check('la copia de Drive se muda a la carpeta de su proyecto',
+    esta('Cliclone/media/cloud_it-1_' + h16('a') + '.png') && !esta('media/cloud_it-1_' + h16('a') + '.png'), JSON.stringify(hecho));
+  check('y su gemela olvidada (mismo contenido) se aparta', !esta('Cliclone/media/media_it-1_' + h16('c') + '.png'));
+  check('la imagen de siempre no se toca', esta('Cliclone/media/media_it-2_' + h16('b') + '.png'));
+  check('la que usan dos proyectos se queda en el montón', esta('media/compartida.png'));
+  check('la de Drive que olvidó su copia NO se aparta (lleva el id de un nodo vivo)', esta('media/cloud_it-4_' + h16('d') + '.png'));
+  check('una ruta entera con el nombre codificado cuenta como usada',
+    esta('Cliclone/media/con espacio.png') || esta('media/con espacio.png'));
+  check('lo de un nodo borrado se aparta', !esta('media/de_un_nodo_borrado.mp4') && !esta('Cliclone/media/cloud_it-99_' + h16('e') + '.png'));
+  check('lo recién pegado se queda aunque nadie lo nombre todavía', esta('media/recien_pegada.png'));
+  check('lo de una carpeta ajena no se toca', esta('Mis cosas/media/ajeno.png'));
+  check('cuenta lo que hizo', hecho.movidos >= 1 && hecho.apartados === 3 && hecho.repetidos === 1 && hecho.bytes > 0, JSON.stringify(hecho));
+  const lotes = fs.readdirSync(path.join(raiz, B.RETIRADOS)).filter(n => n.indexOf(B.SIN_USAR) === 0);
+  check('lo apartado va a .retirados, en un lote con su LEEME', lotes.length === 1 && esta(path.join(B.RETIRADOS, lotes[0], 'LEEME.txt')));
+  check('y conserva dónde estaba', esta(path.join(B.RETIRADOS, lotes[0], 'media', 'de_un_nodo_borrado.mp4')));
+
+  // Una segunda pasada no mueve ni aparta nada más.
+  const otra = B.ordenaMedios(io, raiz, datos, B.carpetasDeProyectos(datos.projects));
+  check('una segunda pasada no hace nada', otra.movidos === 0 && otra.apartados === 0, JSON.stringify(otra));
+
+  // Si una nota vuelve a pedir algo apartado, vuelve a su sitio.
+  const vuelta = B.rescataRetirado(io, raiz, 'Cliclone/media/cloud_it-99_' + h16('e') + '.png');
+  check('lo apartado que se vuelve a pedir vuelve a su carpeta',
+    !!vuelta && esta('Cliclone/media/cloud_it-99_' + h16('e') + '.png'), String(vuelta));
+  check('rescataRetirado no se sale de la bóveda', B.rescataRetirado(io, raiz, '../media/x.png') === null);
+  check('y lo que nunca existió sigue sin estar', B.rescataRetirado(io, raiz, 'media/nunca.png') === null);
+
+  // Sin proyectos (una lectura fallida) no se aparta nada.
+  pon('media/otro_huerfano.png', 'H', 2 * DIA);
+  const nada = B.ordenaMedios(io, raiz, { projects: [], canvases: {} });
+  check('con la lista vacía no se aparta nada', nada.apartados === 0 && esta('media/otro_huerfano.png'));
+  // Y si lo nombra un json de la bóveda, aunque la app no lo lleve, se queda.
+  fs.mkdirSync(path.join(raiz, 'projects', 'viejo'), { recursive: true });
+  fs.writeFileSync(path.join(raiz, 'projects', 'viejo', 'project.json'), '{"src":"media/otro_huerfano.png"}');
+  B.ordenaMedios(io, raiz, datos, B.carpetasDeProyectos(datos.projects));
+  check('lo que nombra cualquier json de la bóveda se queda', esta('media/otro_huerfano.png'));
+  fs.rmSync(raiz, { recursive: true, force: true });
+}
+
 console.log('');
 console.log(fallos === 0 ? 'Todo en orden.' : fallos + ' fallo(s).');
 process.exit(fallos === 0 ? 0 : 1);

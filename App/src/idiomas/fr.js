@@ -1206,4 +1206,5 @@ window.ODI_IDIOMAS.fr = {
   1201: "Cette version de l'application mobile ne permet pas la connexion avec Google : installez la dernière. Tout le reste fonctionne, vos notes sont enregistrées sur le téléphone et les sessions en direct fonctionnent sans compte, avec leur code.",
   1202: "Voulez-vous vraiment vous déconnecter ? Vos canevas ne seront plus enregistrés dans votre Google Drive jusqu'à votre prochaine connexion. Les sessions en direct continuent de fonctionner sans compte.",
   1203: "Ouvrir le dossier du fichier",
+  1204: "Coffre rangé : {0} fichiers en double ou inutilisés ({1} Mo) déplacés vers .retirados. Ils s'effacent seuls au bout de 30 jours.",
 };

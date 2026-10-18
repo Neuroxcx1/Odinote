@@ -47,7 +47,7 @@ try {
 
 // Marcador de build: si la consola no muestra esta versión, el navegador está
 // sirviendo JS cacheado (subir ?v= en index.html invalida la caché)
-window.ODINOTE_BUILD = '1.2.0-225';
+window.ODINOTE_BUILD = '1.2.0-226';
 console.log('[ODINOTE] Código cargado: ' + window.ODINOTE_BUILD);
 
 // Global shortcuts configuration
@@ -2053,6 +2053,16 @@ function App() {
   // Devuelve true si hubo algo que aplicar. Usado por el autosave y el botón ↻.
   const applyMediaReplacements = (replaced) => {
     if (!replaced || Object.keys(replaced).length === 0) return false;
+    // La copia de la bóveda se queda como srcLocal: en este equipo sigue
+    // cargando sin internet, y en otro esa ruta no existe y se usa la de la
+    // nube. Antes solo lo hacían las fotos de la galería: una imagen, un
+    // archivo o una tarjeta de columna olvidaban su archivo, y la caché local
+    // bajaba otro igual al 'media' común (dos copias de cada una en el disco,
+    // y «Abrir la carpeta» llevaba a la carpeta de Oddinote).
+    const conCopiaLocal = (n, url) => {
+      const local = typeof n.src === 'string' && (n.src.startsWith('media/') || n.src.startsWith('file:///')) ? n.src : n.srcLocal;
+      return local ? { ...n, src: url, srcLocal: local } : { ...n, src: url };
+    };
     setCanvases(prev => {
       const next = { ...prev };
       Object.keys(replaced).forEach(cid => {
@@ -2062,25 +2072,17 @@ function App() {
           ...canv,
           items: (canv.items || []).map(it => {
             let updated = it;
-            if (replaced[cid][it.id]) updated = { ...updated, src: replaced[cid][it.id] };
+            if (replaced[cid][it.id]) updated = conCopiaLocal(updated, replaced[cid][it.id]);
             if (updated.children && updated.children.some(ch => replaced[cid][`${it.id}::${ch.id}`])) {
               updated = {
                 ...updated,
-                children: updated.children.map(ch => replaced[cid][`${it.id}::${ch.id}`] ? { ...ch, src: replaced[cid][`${it.id}::${ch.id}`] } : ch)
+                children: updated.children.map(ch => replaced[cid][`${it.id}::${ch.id}`] ? conCopiaLocal(ch, replaced[cid][`${it.id}::${ch.id}`]) : ch)
               };
             }
-            // Las fotos de una galería. La copia de la bóveda se queda como
-            // srcLocal: en este equipo siguen cargando sin internet. En otro,
-            // esa ruta no existe y la galería prueba la de la nube.
             if (Array.isArray(updated.fotos) && updated.fotos.some(f => replaced[cid][`${it.id}::${f.id}`])) {
               updated = {
                 ...updated,
-                fotos: updated.fotos.map(f => {
-                  const url = replaced[cid][`${it.id}::${f.id}`];
-                  if (!url) return f;
-                  const local = typeof f.src === 'string' && f.src.startsWith('media/') ? f.src : f.srcLocal;
-                  return local ? { ...f, src: url, srcLocal: local } : { ...f, src: url };
-                })
+                fotos: updated.fotos.map(f => replaced[cid][`${it.id}::${f.id}`] ? conCopiaLocal(f, replaced[cid][`${it.id}::${f.id}`]) : f)
               };
             }
             return updated;
@@ -2186,10 +2188,35 @@ function App() {
         });
 
         driveImportRef.current = true;
-        setCanvases(prev => ({
-          ...prev,
-          ...importedCanvases
-        }));
+        // srcLocal no viaja a Drive (es de este equipo): sin conservarlo, cada
+        // proyecto que llegaba de Drive volvía a bajar todas sus imágenes.
+        // Se queda el de aquí si el nodo sigue apuntando a lo mismo.
+        const conservaCopias = (antes, nuevo) => {
+          if (!antes || !nuevo || !Array.isArray(nuevo.items)) return nuevo;
+          const viejos = new Map((antes.items || []).map(i => [i.id, i]));
+          const una = (v, n) => (v && !n.srcLocal && v.srcLocal && v.src === n.src) ? { ...n, srcLocal: v.srcLocal } : n;
+          const lista = (vs, ns) => {
+            if (!Array.isArray(ns) || !Array.isArray(vs)) return ns;
+            const m = new Map(vs.map(x => [x.id, x]));
+            return ns.map(x => una(m.get(x.id), x));
+          };
+          return {
+            ...nuevo,
+            items: nuevo.items.map(n => {
+              const v = viejos.get(n.id);
+              if (!v) return n;
+              let out = una(v, n);
+              if (Array.isArray(n.children)) out = { ...out, children: lista(v.children, n.children) };
+              if (Array.isArray(n.fotos)) out = { ...out, fotos: lista(v.fotos, n.fotos) };
+              return out;
+            })
+          };
+        };
+        setCanvases(prev => {
+          const next = { ...prev };
+          Object.keys(importedCanvases).forEach(cid => { next[cid] = conservaCopias(prev[cid], importedCanvases[cid]); });
+          return next;
+        });
 
         window.showToast && window.showToast(window.t('¡Proyectos sincronizados desde Google Drive!', 'Projects synchronized from Google Drive!'));
       }
@@ -2944,6 +2971,7 @@ function App() {
       window._odiLocalCacheBusy = true;
       try {
         const pages = collectProjectCanvases(canvases, view.projectId);
+        const carpeta = carpetasProyecto[view.projectId] || null;
         const cached = {}; // { canvasId: { itemId | `${colId}::${childId}`: rutaLocal } }
         for (const cid of Object.keys(pages)) {
           for (const item of (pages[cid].items || [])) {
@@ -2957,10 +2985,18 @@ function App() {
               // arreglar la caché llevan `.png` aunque dentro haya un PDF, y
               // esas hay que volver a bajarlas o el nodo se queda para siempre
               // con una vista previa que no se puede pintar.
+              //
+              // Solo cuando se sabe de verdad de qué tipo es cada uno. Una
+              // imagen de Drive no lleva nombre ni extensión, fileKind('') dice
+              // 'other', y eso no casaba con el '.png' de su copia: la app
+              // volvía a bajar las setenta imágenes de un proyecto cada cuatro
+              // segundos, sin parar, mientras estaba abierto.
               if (node.srcLocal) {
-                const kLocal = window.fileKind ? window.fileKind(String(node.srcLocal).split('.').pop()) : null;
-                const kNodo = window.fileKind ? window.fileKind(node.fileType || String(node.name || '').split('.').pop()) : null;
-                if (!kLocal || !kNodo || kLocal === kNodo) continue;
+                const extDe = (s) => { const m = String(s || '').match(/\.([a-z0-9]{1,5})$/i); return m ? m[1].toLowerCase() : ''; };
+                const extNodo = String(node.fileType || '').toLowerCase().replace(/[^a-z0-9]/g, '') || extDe(node.name);
+                const kLocal = window.fileKind && extDe(node.srcLocal) ? window.fileKind(extDe(node.srcLocal)) : null;
+                const kNodo = window.fileKind && extNodo ? window.fileKind(extNodo) : null;
+                if (!kLocal || !kNodo || kLocal === 'other' || kNodo === 'other' || kLocal === kNodo) continue;
               }
               try {
                 // Se manda la extensión de verdad en el nombre. Sin ella, la
@@ -2970,8 +3006,8 @@ function App() {
                 const extNodo = (node.fileType || (node.name ? String(node.name).split('.').pop() : '') || '')
                   .toLowerCase().replace(/[^a-z0-9]/g, '');
                 const nombreCache = extNodo ? `cloud_${node.id}.${extNodo}` : `cloud_${node.id}`;
-                const localPath = await window.electronAPI.downloadMediaToVault(vaultPath, node.src, nombreCache);
-                if (localPath) (cached[cid] = cached[cid] || {})[key] = localPath;
+                const localPath = await window.electronAPI.downloadMediaToVault(vaultPath, node.src, nombreCache, carpeta);
+                if (localPath && localPath !== node.srcLocal) (cached[cid] = cached[cid] || {})[key] = localPath;
               } catch (err) {
                 // Sin internet o URL rota: se reintentará en el próximo ciclo
               }
@@ -3014,7 +3050,23 @@ function App() {
       }
     }, 3000);
     return () => clearTimeout(t);
-  }, [view.projectId, canvases, vaultPath, loading]);
+  }, [view.projectId, canvases, vaultPath, loading, carpetasProyecto]);
+
+  // La bóveda apartó a .retirados lo repetido y lo que no usa ninguna nota
+  // (Boveda.ordenaMedios, una vez por sesión): se dice, para que nadie se
+  // encuentre una carpeta nueva sin saber de dónde sale.
+  useEffectApp(() => {
+    const api = window.electronAPI;
+    if (!api || !api.alOrdenarBoveda) return;
+    return api.alOrdenarBoveda((h) => {
+      if (!h || !h.apartados) return;
+      const mb = (h.bytes / 1048576).toFixed(h.bytes >= 10 * 1048576 ? 0 : 1);
+      showToast(window.t(
+        `Bóveda ordenada: ${h.apartados} archivos repetidos o sin usar (${mb} MB) apartados a .retirados. Se borran solos en 30 días.`,
+        `Vault tidied: ${h.apartados} repeated or unused files (${mb} MB) moved to .retirados. They delete themselves in 30 days.`
+      ));
+    });
+  }, []);
 
   // Invita a un colaborador compartiendo la carpeta del proyecto en Drive con su cuenta de Google.
   // Google le envía el correo de invitación; no hay IDs inventados de por medio.
