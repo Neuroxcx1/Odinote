@@ -3060,13 +3060,20 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
     // normal, no el raro.
     //
     // Un campo de formulario (el buscador, un título) siempre manda: ahí el
-    // espacio es un espacio. Un texto de nodo solo manda si el nodo está
-    // ABIERTO para editar, que es cuando se está escribiendo.
+    // espacio es un espacio. Y cualquier texto editable también, MENOS el
+    // campo invisible de pegar imágenes, que es el que se queda con el foco al
+    // elegir un nodo. Antes un texto solo contaba si había un nodo ABIERTO
+    // para editar, y el editor de documentos y las leyendas de las imágenes
+    // (que se escriben sin abrir el nodo) se quedaban sin espacios: lo avisó
+    // alguien que usaba la 1.2.0.
     const escribiendo = () => {
       const ae = document.activeElement;
       if (!ae) return false;
       if (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA') return true;
-      if (ae.isContentEditable) return !!editingRef.current;
+      if (ae.isContentEditable) {
+        if (ae === pasteIntRef.current || (ae.closest && ae.closest('[data-paste-interceptor]'))) return false;
+        return true;
+      }
       return false;
     };
     const bajar = (e) => {
