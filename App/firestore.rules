@@ -164,6 +164,37 @@ service cloud.firestore {
       allow delete: if dueno();
     }
 
+    // ── El enlace para ver (src/vista.js) ──
+    //
+    // Una copia de UN proyecto para mirarlo sin cuenta y sin código, desde el
+    // navegador, aunque el dueño tenga la aplicación cerrada. Leer lo puede
+    // cualquiera que tenga el enlace —para eso es—, incluso sin iniciar
+    // sesión. Lo que no puede nadie es pedir la lista: el identificador del
+    // enlace (22 letras al azar) es la llave, y poder enumerarlos la anularía.
+    //
+    // Escribir, solo el dueño: crear con su propio uid, y cambiar o borrar
+    // solo lo suyo y sin cambiar de dueño. Las imágenes no van aquí, van sus
+    // direcciones de Drive; el tope de 1 MiB lo pone Firestore.
+    match /vistas/{id} {
+      allow get: if true;
+      allow list: if false;
+
+      allow create: if request.auth != null
+        && id.size() >= 16 && id.size() <= 40
+        && request.resource.data.dueno == request.auth.uid
+        && request.resource.data.keys().hasOnly(
+             ['dueno', 'raiz', 'nombre', 'emoji', 'lienzos', 'actualizadoEn', 'version']);
+
+      allow update: if request.auth != null
+        && resource.data.dueno == request.auth.uid
+        && request.resource.data.dueno == resource.data.dueno
+        && request.resource.data.keys().hasOnly(
+             ['dueno', 'raiz', 'nombre', 'emoji', 'lienzos', 'actualizadoEn', 'version']);
+
+      allow delete: if request.auth != null
+        && resource.data.dueno == request.auth.uid;
+    }
+
     // ── Quién ha invitado a un café ──
     //
     // Un documento por patrocinador, y el nombre del documento es su correo en

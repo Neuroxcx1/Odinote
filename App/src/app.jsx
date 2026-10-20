@@ -313,6 +313,51 @@ class VistaSegura extends React.Component {
 function App() {
   const [loading, setLoading]   = useStateApp(true);
 
+  // ── El enlace para ver (src/vista.js) ──
+  // Quien llega con #ver=… no entra en su Oddinote: ve el proyecto de otra
+  // persona, en solo lectura, en un lienzo aparte que no se mezcla con lo suyo
+  // ni se guarda en ningún sitio. Se sigue en vivo: si el dueño cambia algo,
+  // aquí se ve al rato sin recargar.
+  // { id, estado: 'cargando' | 'lista' | 'no-existe' | 'sin-conexion', datos }
+  const [vista, setVista] = useStateApp(() => {
+    const id = window.OdiVista && window.OdiVista.leeEnlace(location.href);
+    return id ? { id, estado: 'cargando' } : null;
+  });
+  useEffectApp(() => {
+    // Un enlace pegado en la barra con la app ya abierta solo cambia el #.
+    const alCambiar = () => {
+      const id = window.OdiVista && window.OdiVista.leeEnlace(location.href);
+      setVista(v => (id ? (v && v.id === id ? v : { id, estado: 'cargando' }) : null));
+    };
+    window.addEventListener('hashchange', alCambiar);
+    return () => window.removeEventListener('hashchange', alCambiar);
+  }, []);
+  const vistaId = vista && vista.id;
+  useEffectApp(() => {
+    if (!vistaId || !window.OdiVista) return;
+    const deja = window.OdiVista.escucha(vistaId, (doc) => {
+      const datos = window.OdiVista.paraPintar(doc);
+      setVista(v => (v && v.id === vistaId ? (datos ? { id: vistaId, estado: 'lista', datos } : { id: vistaId, estado: 'no-existe' }) : v));
+    }, (motivo) => {
+      // Si ya se estaba viendo y se corta la conexión, se sigue viendo lo que
+      // había: solo se avisa si no llegó nunca nada.
+      setVista(v => (v && v.id === vistaId && v.estado !== 'lista' ? { id: vistaId, estado: motivo } : (v && v.id === vistaId && motivo === 'no-existe' ? { id: vistaId, estado: 'no-existe' } : v)));
+    });
+    return () => { try { deja && deja(); } catch (e) {} };
+  }, [vistaId]);
+  const salDeLaVista = () => {
+    try { history.replaceState(null, '', location.pathname + location.search); } catch (e) {}
+    setVista(null);
+  };
+  useEffectApp(() => {
+    if (!vista || vista.estado !== 'lista') return;
+    const n = vista.datos.proyecto.name;
+    const nombre = n && typeof n === 'object' ? (window.pickLang ? window.pickLang(n, window.currentLang) : (n.es || n.en)) : n;
+    const antes = document.title;
+    document.title = (nombre ? nombre + ' · ' : '') + 'Oddinote';
+    return () => { document.title = antes; };
+  }, [vista && vista.estado, vista && vista.datos]);
+
   const [view, setView]         = useStateApp({ kind: 'home' });
   // La primera vez, sin nada guardado: el idioma del sistema si es uno de los
   // once (antes siempre inglés, también en un teléfono en español). Lo guardado
@@ -1254,6 +1299,118 @@ function App() {
     setSalaAnfitrion(false);
   };
   const [inviteBusy, setInviteBusy] = useStateApp(false);
+
+  // ── El enlace para ver, del lado del dueño ──
+  // Lo crea y lo quita la cuenta de Google con la que se entró (es la dueña en
+  // el servidor: con otra no se podría cambiar ni quitar). Mientras exista, lo
+  // que se cambia en el proyecto se vuelve a subir cada medio minuto como
+  // mucho, solo si cambió algo: el plan gratuito de Firestore tiene un tope
+  // diario de escrituras entre todo el mundo.
+  const [vistaOcupada, setVistaOcupada] = useStateApp(false);
+  const [vistaCopiada, setVistaCopiada] = useStateApp(false);
+  const [vistaError, setVistaError] = useStateApp(null);
+  const subidaVistaRef = React.useRef({});   // proyecto -> { firma, cuando }
+  const cuentaFirebase = () => {
+    try { const u = firebase.auth().currentUser; return u && !u.isAnonymous ? u : null; } catch (e) { return null; }
+  };
+  const firmaVista = (p, lienzos) => ({ n: p.name, e: p.emoji, l: lienzos });
+  const explicaFalloVista = (err) => {
+    const c = (err && (err.code || err.message)) || '';
+    console.warn('[VISTA] no se pudo publicar:', c);
+    if (/permission/.test(c)) return window.t(
+      'El servidor no dejó guardar el enlace (permiso denegado). Si acabas de entrar con Google, vuelve a intentarlo en un momento.',
+      'The server did not allow saving the link (permission denied). If you just signed in with Google, try again in a moment.');
+    if (/unavailable|network|offline|sin-servidor/.test(c)) return window.t(
+      'No hay conexión con el servidor. Vuelve a intentarlo cuando tengas internet.',
+      'There is no connection to the server. Try again when you are online.');
+    return window.t('No se pudo crear el enlace: ' + c, 'Could not create the link: ' + c);
+  };
+  const creaEnlaceVista = async (project) => {
+    const V = window.OdiVista;
+    if (!V || vistaOcupada) return;
+    const yo = cuentaFirebase();
+    if (!yo) {
+      setVistaError(window.t('Entra con tu cuenta de Google para crear el enlace: será la que pueda cambiarlo o quitarlo.', 'Sign in with your Google account to create the link: it will be the one able to change or remove it.'));
+      return;
+    }
+    const r = V.prepara(canvases, project.id);
+    if (!r.cabe) {
+      setVistaError(window.t('Este proyecto tiene demasiado texto para un enlace (más de 900 KB). Pásalo a varios proyectos o quita lo que no haga falta enseñar.', 'This project has too much text for a link (over 900 KB). Split it into several projects or remove what does not need showing.'));
+      return;
+    }
+    const id = project.enlaceVista || V.idNuevo();
+    setVistaOcupada(true);
+    setVistaError(null);
+    try {
+      await V.publica(id, V.documento({ uid: yo.uid, proyecto: project, lienzos: r.lienzos, raiz: project.id }));
+      subidaVistaRef.current[project.id] = { firma: firmaVista(project, r.lienzos), cuando: Date.now() };
+      setProjects(prev => prev.map(p => p.id === project.id ? { ...p, enlaceVista: id } : p));
+      window.playAudioTone && window.playAudioTone('click');
+      window.odiTrack && window.odiTrack('vista_creada', {});
+    } catch (err) {
+      setVistaError(explicaFalloVista(err));
+    } finally {
+      setVistaOcupada(false);
+    }
+  };
+  const quitaEnlaceVista = (project) => {
+    const V = window.OdiVista;
+    if (!V || !project.enlaceVista) return;
+    window.customConfirm(window.t(
+      '¿Quitar el enlace? Se borra del servidor y quien lo tenga ya no podrá abrirlo. Si luego creas otro, será un enlace distinto.',
+      'Remove the link? It is deleted from the server and whoever has it can no longer open it. If you create another one later, it will be a different link.'
+    )).then(async (acepta) => {
+      if (!acepta) return;
+      setVistaOcupada(true);
+      setVistaError(null);
+      try {
+        await V.quita(project.enlaceVista);
+      } catch (err) {
+        // Ya no estaba en el servidor: para el caso, está quitado.
+        if (!/not-found/.test((err && (err.code || err.message)) || '')) { setVistaError(explicaFalloVista(err)); setVistaOcupada(false); return; }
+      }
+      delete subidaVistaRef.current[project.id];
+      setProjects(prev => prev.map(p => {
+        if (p.id !== project.id) return p;
+        const sin = {};
+        Object.keys(p).forEach(k => { if (k !== 'enlaceVista') sin[k] = p[k]; });
+        return sin;
+      }));
+      setVistaOcupada(false);
+      window.playAudioTone && window.playAudioTone('click');
+    });
+  };
+  // Al día: cada medio minuto, del proyecto abierto si tiene enlace, y una
+  // vez más al salir de él.
+  const lienzosParaVistaRef = React.useRef(canvases);
+  lienzosParaVistaRef.current = canvases;
+  const proyectosParaVistaRef = React.useRef(projects);
+  proyectosParaVistaRef.current = projects;
+  const enlaceAbierto = (() => {
+    const p = view.kind === 'canvas' && projects.find(x => x.id === view.projectId);
+    return p && p.enlaceVista ? p.enlaceVista : null;
+  })();
+  useEffectApp(() => {
+    if (loading || !enlaceAbierto || !window.OdiVista) return;
+    const pid = view.projectId;
+    const V = window.OdiVista;
+    const mira = () => {
+      const p = proyectosParaVistaRef.current.find(x => x.id === pid);
+      const yo = cuentaFirebase();
+      if (!p || p.enlaceVista !== enlaceAbierto || !yo) return;
+      const r = V.prepara(lienzosParaVistaRef.current, pid);
+      if (!r.cabe) return;
+      const firma = firmaVista(p, r.lienzos);
+      const antes = subidaVistaRef.current[pid];
+      if (antes && !V.cambio(firma, antes.firma)) return;
+      subidaVistaRef.current[pid] = { firma, cuando: Date.now() };
+      V.publica(p.enlaceVista, V.documento({ uid: yo.uid, proyecto: p, lienzos: r.lienzos, raiz: pid }))
+        .catch(err => { console.warn('[VISTA] no se pudo poner al día:', err && (err.code || err.message)); delete subidaVistaRef.current[pid]; });
+    };
+    const primero = setTimeout(mira, 4000);
+    const cada = setInterval(mira, 30000);
+    return () => { clearTimeout(primero); clearInterval(cada); mira(); };
+  }, [loading, enlaceAbierto, view.projectId]);
 
   useEffectApp(() => {
     if (settingsOpen && window.electronAPI && window.electronAPI.getCustomDictionaryWords) {
@@ -3409,9 +3566,57 @@ function App() {
     />;
   }
 
+  // Quien llegó con un enlace para ver ve ESO, y no lo suyo, hasta que sale.
+  if (vista) {
+    if (vista.estado === 'lista') {
+      activeView = <window.Canvas
+        key={'vista-' + vista.id}
+        soloVer
+        projectId={vista.datos.raiz}
+        canvasesIn={vista.datos.lienzos}
+        setCanvases={() => {}}
+        projects={[vista.datos.proyecto]}
+        setProjects={() => {}}
+        lang={lang} setLang={setLang}
+        theme={theme} setTheme={setTheme}
+        onHome={salDeLaVista}
+        volume={volume}
+        onChangeVolume={setVolume}
+        updateAvailable={false}
+        onUpdateClick={() => {}}
+        onSettingsClick={() => {}}
+        userProfile={null}
+      />;
+    } else {
+      const textos = {
+        cargando: [window.t('Abriendo el enlace…', 'Opening the link…'), ''],
+        'no-existe': [window.t('Este enlace ya no lleva a nada', 'This link no longer leads anywhere'),
+          window.t('Quien lo compartió lo ha quitado, o no se copió entero. Pídele que te lo vuelva a mandar.', 'Whoever shared it has removed it, or it was not copied whole. Ask them to send it again.')],
+        'sin-conexion': [window.t('No se pudo abrir el enlace', 'The link could not be opened'),
+          window.t('No hay conexión con el servidor. Comprueba tu internet y vuelve a intentarlo.', 'There is no connection to the server. Check your internet and try again.')],
+        'sin-servidor': [window.t('No se pudo abrir el enlace', 'The link could not be opened'),
+          window.t('Este navegador no pudo cargar lo necesario. Prueba a recargar la página.', 'This browser could not load what is needed. Try reloading the page.')],
+      }[vista.estado] || [window.t('No se pudo abrir el enlace', 'The link could not be opened'), ''];
+      activeView = (
+        <div className="vista-espera">
+          <div className="vista-espera-tarjeta">
+            <span className="material-symbols-rounded" style={vista.estado === 'cargando' ? { animation: 'spin 1.4s linear infinite' } : undefined}>
+              {vista.estado === 'cargando' ? 'progress_activity' : 'link_off'}
+            </span>
+            <h2>{textos[0]}</h2>
+            {textos[1] && <p>{textos[1]}</p>}
+            {vista.estado !== 'cargando' && (
+              <button onClick={salDeLaVista}>{window.t('Ir a Oddinote', 'Go to Oddinote')}</button>
+            )}
+          </div>
+        </div>
+      );
+    }
+  }
+
   return (
     <>
-      <VistaSegura key={view.kind === 'canvas' ? view.projectId : 'inicio'} onHome={goHome}>{activeView}</VistaSegura>
+      <VistaSegura key={vista ? 'vista-' + vista.id : (view.kind === 'canvas' ? view.projectId : 'inicio')} onHome={vista ? salDeLaVista : goHome}>{activeView}</VistaSegura>
       <window.SearchPalette
         open={searchOpen}
         mode={searchMode}
@@ -4441,7 +4646,13 @@ function App() {
                   con sus botones al lado, no eligiendo a ciegas antes de que
                   llegue nadie. */}
               {operativo && (() => {
-                const sinAnfitrion = !!project.sincroInstantanea;
+                // «Sin anfitrión» no funcionó nunca: se añadió en agosto con
+                // Firestore apagado desde julio (ENABLE_FIRESTORE_SYNC), así
+                // que el interruptor se encendía, cerraba la sesión con código
+                // y no subía nada. Lo que prometía —verlo sin que estés— lo hace
+                // ahora el enlace para ver. Los proyectos que lo tengan puesto
+                // se tratan como si no.
+                const sinAnfitrion = false;
                 const compartiendo = !!salaCodigo || sinAnfitrion;
 
                 const enciende = () => {
@@ -4596,61 +4807,6 @@ function App() {
                         </div>
                       )}
 
-                      {/* ── El segundo interruptor: sin anfitrión ── */}
-                      <div style={{
-                        marginTop: '14px', padding: '11px', borderRadius: '8px',
-                        border: '1.5px solid ' + (sinAnfitrion ? 'var(--brand-green, #90B968)' : 'var(--line-soft, #D5D1CD)'),
-                        background: sinAnfitrion ? 'rgba(144, 185, 104, 0.10)' : 'transparent',
-                      }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <span className="material-symbols-rounded" style={{ fontSize: 18, color: sinAnfitrion ? 'var(--brand-green, #90B968)' : 'var(--text-soft)' }}>bolt</span>
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <strong style={{ fontSize: '12.5px' }}>{window.t('Sin anfitrión', 'No host')}</strong>
-                            <div style={{ fontSize: '11px', color: 'var(--text-soft)', lineHeight: 1.4 }}>
-                              {sinAnfitrion
-                                ? window.t('Está siempre abierto. No hace falta que tú estés, pero no se ven los cursores.', 'Always open. You do not need to be here, but cursors are not shown.')
-                                : window.t('Para que siga abierto aunque tú cierres Odinote. A cambio, no se ven los cursores.', 'So it stays open even when you close Odinote. In exchange, no cursors.')}
-                            </div>
-                          </div>
-                          <button
-                            className="btn lift"
-                            onClick={() => {
-                              if (sinAnfitrion) {
-                                // Vuelve a la sesión normal, con su código.
-                                setProjects(prev => prev.map(p => p.id === project.id ? { ...p, sincroInstantanea: false } : p));
-                                window.playAudioTone && window.playAudioTone('click');
-                                abreSalaEnVivo();
-                                return;
-                              }
-                              window.customConfirm(window.t(
-                                '¿Dejarlo abierto sin anfitrión?\n\n· Se cierra la sesión con código y en su lugar el proyecto queda siempre disponible.\n· El TEXTO de las notas y dónde está cada una se guardan en el servidor de Odinote, no solo en tu Drive. Es lo que permite que siga abierto sin ti.\n· Las imágenes y los audios NO: esos siguen en tu Google Drive.\n· Dejan de verse los cursores.\n· Puedes volver atrás cuando quieras.',
-                                'Leave it open with no host?\n\n· The code session closes and instead the project stays available at all times.\n· The TEXT of the notes and where each one sits are stored on Odinote\'s server, not only in your Drive. That is what keeps it open without you.\n· Images and audio are NOT: those stay in your Google Drive.\n· Cursors stop being shown.\n· You can go back whenever you like.'
-                              )).then((acepta) => {
-                                if (!acepta) return;
-                                if (salaCodigo) cierraSalaEnVivo();
-                                setProjects(prev => prev.map(p => p.id === project.id ? { ...p, sincroInstantanea: true } : p));
-                                window.playAudioTone && window.playAudioTone('click');
-                              });
-                            }}
-                            style={{
-                              padding: '6px 12px', fontSize: '11px', fontWeight: 700, borderRadius: '999px', cursor: 'pointer', flexShrink: 0,
-                              border: '1.5px solid ' + (sinAnfitrion ? 'var(--wine)' : 'var(--olive, #6A8546)'),
-                              background: sinAnfitrion ? 'transparent' : 'transparent',
-                              color: sinAnfitrion ? 'var(--wine)' : 'var(--olive, #6A8546)',
-                            }}
-                          >
-                            {sinAnfitrion ? window.t('Volver a la sesión', 'Back to session') : window.t('Encender', 'Turn on')}
-                          </button>
-                        </div>
-                        <div style={{ marginTop: '7px', fontSize: '10.5px', color: 'var(--text-soft)', lineHeight: 1.4, display: 'flex', alignItems: 'flex-start', gap: '6px' }}>
-                          <span className="material-symbols-rounded" style={{ fontSize: 14, marginTop: 1 }}>dns</span>
-                          <span>{sinAnfitrion
-                            ? window.t('El texto de este proyecto está en el servidor de Odinote. Las imágenes siguen solo en tu Drive.', 'This project\'s text is on Odinote\'s server. Images remain only in your Drive.')
-                            : window.t('Esto usa el servidor de Odinote. Sin encenderlo, nada sale de tu Drive ni de tu equipo.', 'This uses Odinote\'s server. Left off, nothing leaves your Drive or your machine.')}
-                          </span>
-                        </div>
-                      </div>
-
                       {/* ── Y por último, el acceso permanente por cuenta de Google ── */}
                       <div style={{ marginTop: '14px', paddingTop: '12px', borderTop: '1px solid var(--line-soft)' }}>
                         <div style={{ fontSize: '10.5px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-soft)', marginBottom: '7px' }}>
@@ -4723,6 +4879,102 @@ function App() {
                     <p style={{ margin: '10px 0 0 0', fontSize: '11.5px', color: 'var(--wine, #E6544F)', lineHeight: 1.4 }}>{salaError}</p>
                   )}
                 </div>
+                );
+              })()}
+
+              {/* ── El enlace para ver ──
+                  Aparte de la sesión en vivo, porque no la necesita: es para que
+                  lo vea quien sea, cuando sea, sin cuenta ni código y aunque tú
+                  tengas Oddinote cerrado. Ver src/vista.js. */}
+              {operativo && window.OdiVista && (() => {
+                const id = project.enlaceVista;
+                const url = id ? window.OdiVista.enlace(id) : '';
+                const sinSubir = window.OdiVista.prepara(canvases, project.id).sinSubir;
+                return (
+                  <div style={{
+                    marginTop: '12px', borderRadius: '10px', padding: '14px',
+                    border: '1.5px solid ' + (id ? 'var(--brand-green, #90B968)' : 'var(--line-soft, #D5D1CD)'),
+                    background: id ? 'rgba(144, 185, 104, 0.08)' : 'var(--bg-card, #FFFFFF)',
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <span className="material-symbols-rounded" style={{ fontSize: 22, color: id ? 'var(--brand-green, #90B968)' : 'var(--text-soft)' }}>link</span>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <strong style={{ fontSize: '13.5px' }}>{window.t('Enlace para ver', 'View-only link')}</strong>
+                        <div style={{ fontSize: '11.5px', color: 'var(--text-soft)', lineHeight: 1.4 }}>
+                          {id
+                            ? window.t('Quien tenga el enlace lo abre en el navegador, sin cuenta ni código, aunque tú no estés. Puede moverse y entrar en los tableros, pero no cambiar nada.', 'Whoever has the link opens it in the browser, with no account or code, even when you are not around. They can move around and open the boards, but not change anything.')
+                            : window.t('Para que alguien lo vea en el navegador sin cuenta ni código, aunque tú no estés conectado. Podrá moverse y entrar en los tableros, pero no cambiar nada.', 'So someone can see it in the browser with no account or code, even when you are offline. They can move around and open the boards, but not change anything.')}
+                        </div>
+                      </div>
+                      <button
+                        className="btn lift"
+                        disabled={vistaOcupada}
+                        onClick={() => (id ? quitaEnlaceVista(project) : creaEnlaceVista(project))}
+                        style={{
+                          padding: '7px 14px', fontSize: '11.5px', fontWeight: 700, borderRadius: '999px',
+                          cursor: 'pointer', flexShrink: 0, opacity: vistaOcupada ? 0.6 : 1,
+                          border: '1.5px solid ' + (id ? 'var(--wine)' : 'var(--olive, #6A8546)'),
+                          background: id ? 'transparent' : 'var(--olive, #6A8546)',
+                          color: id ? 'var(--wine)' : 'white',
+                        }}
+                      >
+                        {vistaOcupada ? window.t('Un momento…', 'One moment…')
+                          : id ? window.t('Quitar el enlace', 'Remove the link')
+                          : window.t('Crear enlace', 'Create link')}
+                      </button>
+                    </div>
+
+                    {id && (
+                      <div style={{ marginTop: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <input
+                          readOnly
+                          value={url}
+                          onFocus={(e) => e.target.select()}
+                          style={{
+                            flex: 1, minWidth: 0, padding: '8px 10px', fontSize: '11.5px', fontFamily: 'var(--font-mono, monospace)',
+                            border: '1.5px solid var(--line-soft, #D5D1CD)', borderRadius: '8px', background: 'var(--bg-main, #E5E1DD)', color: 'var(--ink)',
+                          }}
+                        />
+                        <button
+                          className="btn"
+                          onClick={() => {
+                            copiaAlPortapapeles(url);
+                            window.playAudioTone && window.playAudioTone('click');
+                            setVistaCopiada(true);
+                            setTimeout(() => setVistaCopiada(false), 1800);
+                          }}
+                          style={{
+                            display: 'flex', alignItems: 'center', gap: '5px', padding: '8px 12px', borderRadius: '8px', flexShrink: 0,
+                            border: '1.5px solid ' + (vistaCopiada ? 'var(--brand-green, #90B968)' : 'var(--line-soft)'),
+                            color: vistaCopiada ? 'var(--brand-green, #90B968)' : 'inherit',
+                            cursor: 'pointer', fontSize: '12px', fontWeight: 700,
+                          }}
+                        >
+                          <span className="material-symbols-rounded" style={{ fontSize: 16 }}>{vistaCopiada ? 'check' : 'content_copy'}</span>
+                          <span>{vistaCopiada ? window.t('Copiado', 'Copied') : window.t('Copiar', 'Copy')}</span>
+                        </button>
+                      </div>
+                    )}
+
+                    <div style={{ marginTop: '8px', fontSize: '10.5px', color: 'var(--text-soft)', lineHeight: 1.4, display: 'flex', alignItems: 'flex-start', gap: '6px' }}>
+                      <span className="material-symbols-rounded" style={{ fontSize: 14, marginTop: 1 }}>dns</span>
+                      <span>{id
+                        ? window.t('Se pone al día solo con lo que cambies, en menos de un minuto. Quitarlo lo borra del servidor y el enlace deja de abrir.', 'It keeps up with your changes by itself, within a minute. Removing it deletes it from the server and the link stops opening.')
+                        : window.t('El texto y la posición de los nodos se copian al servidor de Oddinote para que se pueda abrir sin ti. Las imágenes siguen en tu Drive.', 'The text and position of the nodes are copied to Oddinote\'s server so it can be opened without you. Images stay in your Drive.')}
+                      </span>
+                    </div>
+
+                    {sinSubir > 0 && (
+                      <div style={{ marginTop: '8px', fontSize: '10.5px', color: 'var(--wine, #E6544F)', lineHeight: 1.4 }}>
+                        {sinSubir === 1
+                          ? window.t('1 archivo todavía no está en tu Drive: en el enlace saldría vacío hasta que se suba.', '1 file is not in your Drive yet: it would show empty in the link until it uploads.')
+                          : window.t(`${sinSubir} archivos todavía no están en tu Drive: en el enlace saldrían vacíos hasta que se suban.`, `${sinSubir} files are not in your Drive yet: they would show empty in the link until they upload.`)}
+                      </div>
+                    )}
+                    {vistaError && (
+                      <p style={{ margin: '8px 0 0 0', fontSize: '11.5px', color: 'var(--wine, #E6544F)', lineHeight: 1.4 }}>{vistaError}</p>
+                    )}
+                  </div>
                 );
               })()}
               <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '20px', borderTop: '1px solid var(--line-soft)', paddingTop: '12px' }}>

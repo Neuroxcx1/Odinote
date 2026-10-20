@@ -8612,3 +8612,82 @@ html[data-mobile="1"][data-orient="landscape"] .plantillas-esquina { bottom: cal
   html:not([data-mobile="1"]):not([data-barra]) .topbar-tail-scrim { display: block; position: fixed; inset: 0; z-index: 310; }
   html:not([data-mobile="1"]):not([data-barra]) .topbar-more { width: 38px; height: 38px; margin-left: 6px; }
 }
+
+/* ── Solo ver (el enlace para ver, src/vista.js) ──
+   Quien abre un enlace para ver no tiene nada con lo que editar: ni la barra
+   de nodos (tampoco la del teléfono), ni deshacer, compartir, la cuenta o los
+   ajustes; ni el fondo, la cámara o la vista de conexiones (que miraría los
+   proyectos de quien lo abre, no este); ni los tiradores de los nodos. Se
+   quedan la ruta para entrar y salir de los tableros, el tema, el idioma y el
+   zoom. */
+.topbar.solo-ver .tools-fab,
+.topbar.solo-ver .tools-wrap,
+.topbar.solo-ver .solo-movil,
+.topbar.solo-ver .topbar-more,
+.topbar.solo-ver .topbar-tail-scrim,
+.topbar.solo-ver .feedback-topbar-btn,
+.topbar.solo-ver .kofi-topbar-btn,
+.topbar.solo-ver .topbar-actions > :not(.theme-btn):not(.lang-switch),
+.app.solo-ver .canvas-bg-selector,
+.app.solo-ver .canvas-shot,
+.app.solo-ver .odi-graph-btn,
+.app.solo-ver .handles,
+.app.solo-ver .anchors,
+.app.solo-ver .connect-handle,
+.app.solo-ver .fijar-lienzo,
+/* Y los «+ añadir» de dentro de los nodos: invitan a algo que aquí no se puede. */
+.app.solo-ver .todo-add,
+.app.solo-ver .ruleta-anadir,
+.app.solo-ver .cal-mb-add,
+.app.solo-ver .cal-mb-lista-add {
+  display: none !important;
+}
+.vista-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: 8px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1.5px solid var(--line-soft, #D5D1CD);
+  background: var(--bg-main, #E5E1DD);
+  color: var(--text-soft, #595459);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.vista-chip .material-symbols-rounded { font-size: 15px; }
+
+/* La pantalla de mientras llega (o de si el enlace ya no existe). */
+.vista-espera {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: var(--bg-main, #E5E1DD);
+  color: var(--ink, #1A1A1A);
+  z-index: 50;
+}
+.vista-espera-tarjeta {
+  max-width: 400px;
+  text-align: center;
+  padding: 28px 24px;
+  border-radius: 14px;
+  border: 1.5px solid var(--line, #595459);
+  background: var(--paper, #FFFFFF);
+  box-shadow: var(--pop-md, 0 6px 0 rgba(0,0,0,0.12));
+}
+.vista-espera-tarjeta h2 { margin: 10px 0 6px; font-size: 19px; }
+.vista-espera-tarjeta p { margin: 0 0 16px; font-size: 13.5px; line-height: 1.5; color: var(--text-soft, #595459); }
+.vista-espera-tarjeta .material-symbols-rounded { font-size: 34px; color: var(--text-soft, #595459); }
+.vista-espera-tarjeta button {
+  padding: 9px 16px;
+  border-radius: 8px;
+  border: 1.5px solid var(--line, #595459);
+  background: var(--paper, #FFFFFF);
+  color: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}

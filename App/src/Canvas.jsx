@@ -357,7 +357,7 @@ const defaultScale = () => (window.odiIsMobile && window.odiIsMobile()) ? 0.7 : 
 // variables de los tiradores en su caja (ver varsTiradoresRef).
 const TIPOS_CON_TIRADORES = new Set(['column', 'image', 'code']);
 
-function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn, setCanvases: setExtCanvases, updateAvailable, onUpdateClick, volume, onChangeVolume, onSettingsClick, vaultPath, userProfile, esPatrocinador, onAbrirCorona, onUserClick, projects, setProjects, onSharingClick, onManualSync, isSyncingDrive, needsDriveAuth, driveReachable, jumpTarget, onSearchClick, onGoToNode, onGraphClick, initialTrail, onTrailChange }) {
+function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn, setCanvases: setExtCanvases, updateAvailable, onUpdateClick, volume, onChangeVolume, onSettingsClick, vaultPath, userProfile, esPatrocinador, onAbrirCorona, onUserClick, projects, setProjects, onSharingClick, onManualSync, isSyncingDrive, needsDriveAuth, driveReachable, jumpTarget, onSearchClick, onGoToNode, onGraphClick, initialTrail, onTrailChange, soloVer }) {
   const currentProject = projects ? projects.find(p => p.id === projectId) : null;
   const [canvases, _setCanvases] = useStateCanvas(() => canvasesIn || JSON.parse(JSON.stringify(window.INITIAL_CANVASES)));
   // Stable ref to App's setter — avoids the infinite loop caused by it being a dep on every render
@@ -449,6 +449,104 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
     items: [],
     connectors: [],
   };
+
+  // ───── Solo ver (el enlace para ver, src/vista.js) ─────
+  //
+  // Quien abre un enlace para ver puede moverse, acercarse y entrar en los
+  // tableros, pero no cambiar nada. Que no llegue al dueño ya lo garantiza el
+  // servidor (solo el dueño puede escribir) y que no se guarde, la app (esta
+  // copia vive en la memoria de su navegador y nada la guarda). Lo de aquí es
+  // para que tampoco lo VEA cambiar: lo que edita se corta en la entrada
+  // (escribir, pegar, soltar archivos, arrastrar, el menú del clic derecho,
+  // las barras del nodo) y, si algo se cuela, se deshace al momento.
+  //
+  // Solo se deshace lo que llega justo después de un gesto suyo. Lo que la
+  // app ajusta sola (la altura de una nota que se mide al pintarse) se deja,
+  // o el lienzo se pelearía consigo mismo; y si algo se deshace más de cinco
+  // veces en un segundo es eso mismo, una medida que vuelve, y se deja estar.
+  const baseVistaRef = useRefCanvas(soloVer ? canvasesIn : null);
+  const entradaVistaRef = useRefCanvas(0);
+  const deshechosVistaRef = useRefCanvas([]);
+  const avisoVistaRef = useRefCanvas(0);
+  useEffectCanvas(() => {
+    if (soloVer && canvasesIn) baseVistaRef.current = canvasesIn;   // el dueño publicó otra versión
+  }, [soloVer, canvasesIn]);
+  useEffectCanvas(() => {
+    if (!soloVer) return;
+    const base = baseVistaRef.current;
+    if (!base || canvases === base) return;
+    const ahora = Date.now();
+    deshechosVistaRef.current = deshechosVistaRef.current.filter(t => ahora - t < 1000);
+    if (ahora - entradaVistaRef.current > 2000 || deshechosVistaRef.current.length >= 5) {
+      baseVistaRef.current = canvases;
+      return;
+    }
+    // La cámara de cada lienzo sí: el lienzo la apunta al cambiar de tablero.
+    const fijo = {};
+    Object.keys(base).forEach(cid => {
+      const a = canvases[cid];
+      fijo[cid] = (a && (a.pan !== base[cid].pan || a.scale !== base[cid].scale))
+        ? { ...base[cid], pan: a.pan, scale: a.scale } : base[cid];
+    });
+    const soloCamara = Object.keys(canvases).every(cid => base[cid]) && Object.keys(base).every(cid => {
+      const a = canvases[cid], b = base[cid];
+      return a && a.items === b.items && a.connectors === b.connectors && a.title === b.title && a.bgColor === b.bgColor;
+    });
+    baseVistaRef.current = fijo;
+    if (soloCamara) return;
+    deshechosVistaRef.current.push(ahora);
+    _setCanvases(fijo);
+    if (ahora - avisoVistaRef.current > 4000) {
+      avisoVistaRef.current = ahora;
+      window.showToast && window.showToast(window.t(
+        'Este enlace es solo para ver: aquí no se puede cambiar nada.',
+        'This link is view only: nothing can be changed here.'
+      ), 'error');
+    }
+  }, [soloVer, canvases]);
+  useEffectCanvas(() => {
+    if (!soloVer) return;
+    const marca = () => { entradaVistaRef.current = Date.now(); };
+    // Lo que escribe en un nodo (o en el editor de documentos) no llega ni a
+    // pintarse. Los campos de fuera de los nodos (el buscador del lienzo) sí.
+    const enUnNodo = (t) => !!(t && t.closest && t.closest('.canvas-wrap [data-item-id], .doc-modal, .ctx-side, .ctx-popout'));
+    const corta = (e) => {
+      const t = e.target;
+      const escribible = t && (t.isContentEditable || t.tagName === 'TEXTAREA' || t.tagName === 'INPUT');
+      if (escribible && (t.isContentEditable || enUnNodo(t))) { e.preventDefault(); e.stopPropagation(); }
+    };
+    // Pegar o soltar archivos crearía nodos.
+    const nada = (e) => { e.preventDefault(); e.stopPropagation(); };
+    const sinArchivos = (e) => { if (e.dataTransfer) { e.preventDefault(); e.stopPropagation(); } };
+    // Los atajos que cambian algo (borrar, pegar, duplicar, deshacer, agrupar,
+    // el candado...). Las flechas, Escape, el espacio para moverse y el
+    // buscador se quedan.
+    const atajos = (e) => {
+      marca();
+      const t = e.target;
+      if (t && (t.tagName === 'INPUT' && !enUnNodo(t))) return;
+      const k = e.key;
+      if (k === 'Delete' || k === 'Backspace' || ((e.ctrlKey || e.metaKey) && /^[vxdzygl]$/i.test(k))) {
+        e.preventDefault(); e.stopImmediatePropagation();
+      }
+    };
+    window.addEventListener('pointerdown', marca, true);
+    window.addEventListener('beforeinput', corta, true);
+    window.addEventListener('paste', nada, true);
+    window.addEventListener('cut', nada, true);
+    window.addEventListener('drop', sinArchivos, true);
+    window.addEventListener('dragover', sinArchivos, true);
+    window.addEventListener('keydown', atajos, true);
+    return () => {
+      window.removeEventListener('pointerdown', marca, true);
+      window.removeEventListener('beforeinput', corta, true);
+      window.removeEventListener('paste', nada, true);
+      window.removeEventListener('cut', nada, true);
+      window.removeEventListener('drop', sinArchivos, true);
+      window.removeEventListener('dragover', sinArchivos, true);
+      window.removeEventListener('keydown', atajos, true);
+    };
+  }, [soloVer]);
 
   // ───── Sesión en vivo ─────
   //
@@ -3310,7 +3408,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
 
   // Double-click on empty canvas → drop a note where the cursor is
   const onSurfaceDoubleClick = (e) => {
-    if (activeTool) return;
+    if (activeTool || soloVer) return;
     if (!surfaceRef.current || !surfaceRef.current.contains(e.target)) return;
     const isEmpty =
       e.target === surfaceRef.current ||
@@ -5914,7 +6012,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
   };
 
   return (
-    <div className="app" data-screen-label={`Canvas · ${window.pickLang(current.title, lang)}`}>
+    <div className={'app' + (soloVer ? ' solo-ver' : '')} data-screen-label={`Canvas · ${window.pickLang(current.title, lang)}`}>
       {/* Invisible paste interceptor — focused when an image node is selected, so Ctrl+V fires paste here */}
       <div
         ref={pasteIntRef}
@@ -5931,6 +6029,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
         style={{ position:'fixed', opacity:0, width:1, height:1, overflow:'hidden', top:0, left:0, zIndex:-1, outline:'none' }}
       />
       <window.Topbar
+        soloVer={soloVer}
         lang={lang} setLang={setLang}
         theme={theme} setTheme={setTheme}
         crumbs={crumbs} onCrumb={onCrumb} onCrumbRename={onCrumbRename}
@@ -5988,7 +6087,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
           deja su barra, porque ahi vive el boton de comentar. La de formato
           de texto (negrita, cursiva, colores) no pinta nada en un bloque de
           codigo, asi que no la sustituye ninguna. */}
-      {selectedItem && !captionFocusId && (editing !== selectedItem.id || selectedItem.type === 'code') && !selectedItem._editingTitle && (() => {
+      {!soloVer && selectedItem && !captionFocusId && (editing !== selectedItem.id || selectedItem.type === 'code') && !selectedItem._editingTitle && (() => {
         const isColChild = editingChild && selectedItem.id === editingChild.childId;
         return (
           <window.ContextSidebar
@@ -6212,7 +6311,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
       })()}
 
       {/* Text format sidebar (when editing a text-based item) */}
-      {((editing && editing === selected)
+      {!soloVer && ((editing && editing === selected)
         || (selectedItem && (selectedItem.type === 'map' || selectedItem.type === 'code' || selectedItem.type === 'carpeta' || selectedItem.type === 'timer') && selectedItem._editingTitle)
        ) && !captionFocusId && (() => {
         const it = selectedItem;
@@ -6250,7 +6349,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
       })()}
 
       {/* Caption ("leyenda") format sidebar — reduced option set, shown while a caption is focused */}
-      {captionFocusId && (() => {
+      {!soloVer && captionFocusId && (() => {
         const it = current.items.find(i => i.id === captionFocusId);
         if (!it) return null;
         return (
@@ -6305,7 +6404,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
         onMouseDown={onSurfaceMouseDown}
         onMouseMove={(e) => { if (sesionRef.current) mandaCursor(e.clientX, e.clientY); }}
         onDoubleClick={onSurfaceDoubleClick}
-        onContextMenu={onSurfaceContextMenu}
+        onContextMenu={soloVer ? (e) => e.preventDefault() : onSurfaceContextMenu}
       >
         <div
           className="canvas-surface"
@@ -6398,13 +6497,20 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
                     // que apartarlo para llegar a ellos. Elegido, se agarra por toda la caja.
                     pointerEvents: (item.type === 'draw' && (item.strokes || []).length && selected !== item.id && !selectedIds.includes(item.id)) ? 'none' : 'auto',
                   }}
+                  // Solo ver: un tablero se abre con un clic. Aquí no hay nada que
+                  // editar con lo que confundirlo, y quien llega con un enlace no
+                  // sabe que en Oddinote se entra con doble clic.
+                  onClick={soloVer && item.type === 'board' && item.canvasId ? (e) => { e.stopPropagation(); openBoard(item.canvasId, item.id); } : undefined}
                   onMouseDown={(e)=>{
+                    // Solo ver: el gesto sigue hasta el lienzo, que lo usa para moverse.
+                    if (soloVer) return;
                     if (croppingId === item.id) { e.stopPropagation(); return; }
                     if (activeTool === 'line') { startLineDrag(e, item.id); return; }
                     startDragItem(e, item.id);
                   }}
                   onDoubleClick={(e)=>{
                     if (item.type === 'doc') { e.stopPropagation(); setDocOpen({ id: item.id }); return; }
+                    if (soloVer) return;
                     if (item.type === 'draw') { e.stopPropagation(); enterDrawMode(item.id); return; }
                     if (item.type === 'board') return;
                     if (['note','comment','todo','column','link','board','bigtitle','frame','shape','code','separator'].includes(item.type)) {
@@ -6429,6 +6535,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
                     }
                   }}
                   onContextMenu={(e)=>{
+                    if (soloVer) { e.preventDefault(); return; }
                     if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.closest('[contenteditable="true"]')) {
                       return;
                     }
@@ -6736,7 +6843,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
 
         {/* Con varios elegidos no sale la barra lateral (es de un nodo): esta
             barrita encima de la selección agrupa y bloquea. */}
-        {selectedIds.length > 1 && !drawingId && (() => {
+        {!soloVer && selectedIds.length > 1 && !drawingId && (() => {
           const sel = current.items.filter(it => selectedIds.includes(it.id));
           if (sel.length < 2) return null;
           const tam = (it) => ({ w: it.w !== undefined ? it.w : defaultDims(it.type).w, h: it.h !== undefined ? it.h : defaultDims(it.type).h });
@@ -6812,7 +6919,9 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
               junto al volumen: no era un dato de fondo como "Guardado" o el
               número de nodos, sino el botón que abre compartir y las
               sesiones en vivo. Abajo del todo nadie lo miraba. */}
-          <div className="status-pill"><div className="dot-live"/> {window.t('Guardado', 'Saved')}</div>
+          {soloVer
+            ? <div className="status-pill"><span className="material-symbols-rounded" style={{fontSize:14}}>visibility</span> {window.t('Solo lectura', 'Read only')}</div>
+            : <div className="status-pill"><div className="dot-live"/> {window.t('Guardado', 'Saved')}</div>}
           {/* Vista de conexiones, junto al contador de nodos: es información
               sobre el lienzo, así que vive con el resto de la información. */}
           <button
@@ -6843,7 +6952,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
 
         {/* Las plantillas: abajo a la derecha, donde las pidió el usuario, a la
             izquierda de la cámara (o en su sitio, en la web, que no la tiene). */}
-        {window.OdiPlantillas && !drawingId && (
+        {window.OdiPlantillas && !drawingId && !soloVer && (
           <div className="plantillas-esquina" style={{ right: (window.electronAPI && window.electronAPI.capturarLienzo) ? 250 : 205 }}
             onMouseDown={(e) => e.stopPropagation()}>
             {plantillasAbiertas && (

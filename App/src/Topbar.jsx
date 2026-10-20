@@ -186,6 +186,7 @@ function HojaNodos({ t, activeTool, onCierra, onElige, onToca }) {
 }
 
 function Topbar({
+  soloVer,
   lang, setLang,
   theme, setTheme,
   crumbs, onCrumb, onCrumbRename,
@@ -345,7 +346,7 @@ function Topbar({
   return (
     // data-mueve-ventana: con la ventana fijada (sin barra de título), las
     // zonas vacías de esta barra la mueven. Ver Ventana.jsx.
-    <div className="topbar" data-mueve-ventana="" ref={topbarRef}>
+    <div className={'topbar' + (soloVer ? ' solo-ver' : '')} data-mueve-ventana="" ref={topbarRef}>
       <button className="brand press" onClick={onHome} title={t.home}>
         <div className="brand-mark"><window.BrandMark/></div>
       </button>
@@ -412,6 +413,15 @@ function Topbar({
           </>
         )}
       </div>
+
+      {/* Solo ver (el enlace para ver): se dice arriba, donde se mira. Lo que
+          edita (los nodos, deshacer, compartir…) lo esconde styles.css. */}
+      {soloVer && (
+        <span className="vista-chip" title={window.t('Lo estás viendo con un enlace: puedes moverte y entrar en los tableros, pero no cambiar nada.', 'You are viewing this through a link: you can move around and open the boards, but not change anything.')}>
+          <span className="material-symbols-rounded">visibility</span>
+          <span>{window.t('Solo lectura', 'Read only')}</span>
+        </span>
+      )}
 
       <div className="topbar-spacer" data-mueve-ventana=""/>
 
