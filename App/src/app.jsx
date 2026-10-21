@@ -47,7 +47,7 @@ try {
 
 // Marcador de build: si la consola no muestra esta versión, el navegador está
 // sirviendo JS cacheado (subir ?v= en index.html invalida la caché)
-window.ODINOTE_BUILD = '1.2.0-227';
+window.ODINOTE_BUILD = '1.2.0-228';
 console.log('[ODINOTE] Código cargado: ' + window.ODINOTE_BUILD);
 
 // Global shortcuts configuration
@@ -819,10 +819,17 @@ function App() {
             cancelado: window.t('Se cerró el inicio de sesión antes de terminar.', 'Sign-in was closed before it finished.'),
             tiempo: window.t('Google no volvió a tiempo. Vuelve a intentarlo.', 'Google did not come back in time. Try again.'),
             'sin-credenciales': window.t('Este APK se compiló sin las credenciales de Google, así que no puede entrar.', 'This APK was built without the Google credentials, so it cannot sign in.'),
-            red: window.t('Sin conexión con Google. Revisa tu internet.', 'No connection to Google. Check your internet.'),
+            red: window.t('Sin conexión con Google. Si tienes internet, quita el ahorro de batería o de datos para Oddinote y vuelve a intentarlo.', 'No connection to Google. If you are online, turn off battery or data saving for Oddinote and try again.'),
+            escucha: window.t('El teléfono no dejó a Oddinote esperar la vuelta de Google. Vuelve a intentarlo; si se repite, reinicia el teléfono.', 'The phone did not let Oddinote wait for Google to come back. Try again; if it keeps happening, restart the phone.'),
             navegador: window.t('No se pudo abrir el navegador del teléfono.', 'Could not open the phone browser.'),
           };
-          setLoginError(textos[codigo]
+          // El detalle técnico va detrás, entre paréntesis: con «Sin conexión
+          // con Google» a secas no había forma de saber qué falló en un
+          // teléfono que no está aquí (sin DNS, internet cortado a la app,
+          // un certificado…), y con él basta una captura.
+          const detalle = (codigo === 'red' || codigo === 'escucha') && err && typeof err.message === 'string' && err.message
+            ? ' (' + err.message + ')' : '';
+          setLoginError((textos[codigo] ? textos[codigo] + detalle : null)
             || (/^google:access_denied/.test(codigo) ? window.t('No diste permiso en Google.', 'You did not grant permission in Google.') : null)
             // Un rechazo sin mensaje salía como «[object Object]».
             || (err && typeof err.message === 'string' && err.message)

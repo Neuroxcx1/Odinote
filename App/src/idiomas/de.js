@@ -1231,4 +1231,6 @@ window.ODI_IDIOMAS.de = {
   1226: "Dieser Link ist nur zum Ansehen: Hier lässt sich nichts ändern.",
   1227: "Du siehst dies über einen Link: Du kannst dich bewegen und die Boards öffnen, aber nichts ändern.",
   1228: "1 Datei ist noch nicht in deinem Drive: Im Link wäre sie leer, bis sie hochgeladen ist.",
+  1229: "Keine Verbindung zu Google. Wenn du online bist, schalte den Energie- oder Datensparmodus für Oddinote aus und versuche es erneut.",
+  1230: "Das Telefon hat Oddinote nicht auf die Rückkehr von Google warten lassen. Versuche es erneut; wenn es wieder passiert, starte das Telefon neu.",
 };

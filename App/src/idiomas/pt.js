@@ -1231,4 +1231,6 @@ window.ODI_IDIOMAS.pt = {
   1226: "Este link é só para ver: aqui não dá para alterar nada.",
   1227: "Você está vendo isto por um link: pode se mover e entrar nos quadros, mas não alterar nada.",
   1228: "1 arquivo ainda não está no seu Drive: no link apareceria vazio até ser enviado.",
+  1229: "Sem conexão com o Google. Se você tem internet, desative a economia de bateria ou de dados para o Oddinote e tente de novo.",
+  1230: "O telefone não deixou o Oddinote esperar a volta do Google. Tente de novo; se acontecer outra vez, reinicie o telefone.",
 };

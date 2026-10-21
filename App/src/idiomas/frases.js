@@ -1231,4 +1231,6 @@ window.ODI_FRASES = [
   /* 1226 */ ["Este enlace es solo para ver: aquí no se puede cambiar nada.","This link is view only: nothing can be changed here."],
   /* 1227 */ ["Lo estás viendo con un enlace: puedes moverte y entrar en los tableros, pero no cambiar nada.","You are viewing this through a link: you can move around and open the boards, but not change anything."],
   /* 1228 */ ["1 archivo todavía no está en tu Drive: en el enlace saldría vacío hasta que se suba.","1 file is not in your Drive yet: it would show empty in the link until it uploads."],
+  /* 1229 */ ["Sin conexión con Google. Si tienes internet, quita el ahorro de batería o de datos para Oddinote y vuelve a intentarlo.","No connection to Google. If you are online, turn off battery or data saving for Oddinote and try again."],
+  /* 1230 */ ["El teléfono no dejó a Oddinote esperar la vuelta de Google. Vuelve a intentarlo; si se repite, reinicia el teléfono.","The phone did not let Oddinote wait for Google to come back. Try again; if it keeps happening, restart the phone."],
 ];

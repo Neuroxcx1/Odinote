@@ -136,9 +136,12 @@ public final class GoogleLoopback {
             throw new Fallo("tiempo", "Google no volvió a tiempo.");
         } catch (SocketException e) {
             if (cancelado) throw new Fallo("cancelado", "Se canceló el inicio de sesión.");
-            throw new Fallo("red", "Se cortó la escucha: " + e.getMessage());
+            // «escucha» y no «red»: los dos salían en la app como «Sin conexión
+            // con Google», y uno es este teléfono sin poder esperar la vuelta
+            // del navegador y el otro Google sin contestar. Se arreglan distinto.
+            throw new Fallo("escucha", "Se cortó la escucha: " + detalle(e));
         } catch (IOException e) {
-            throw new Fallo("red", "No se pudo escuchar en este teléfono: " + e.getMessage());
+            throw new Fallo("escucha", "No se pudo escuchar en este teléfono: " + detalle(e));
         } finally {
             servidor = null;
         }
@@ -151,7 +154,35 @@ public final class GoogleLoopback {
         canje.put("code_verifier", verificador);
         canje.put("grant_type", "authorization_code");
         canje.put("redirect_uri", redireccion);
-        return pideTokens(canje);
+        return pideTokensConReintentos(canje, PLAZO_CANJE_MS);
+    }
+
+    // El canje se hace justo cuando el navegador vuelve, y en ese momento
+    // Oddinote está en segundo plano: muchos teléfonos (el ahorro de batería y
+    // de datos) cortan internet a las apps de detrás, y el canje fallaba con
+    // «Sin conexión con Google» aunque hubiera internet. Así que se reintenta
+    // durante medio minuto: en cuanto se vuelve a Oddinote, entra. El código de
+    // Google vale diez minutos, y si un intento llegó a gastarlo el siguiente
+    // lo dice (invalid_grant) en vez de esperar.
+    static final long PLAZO_CANJE_MS = 30000;
+
+    Tokens pideTokensConReintentos(Map<String, String> cuerpo, long plazoMs) throws Fallo {
+        long fin = System.currentTimeMillis() + plazoMs;
+        int intento = 0;
+        while (true) {
+            intento++;
+            try {
+                return pideTokens(cuerpo);
+            } catch (Fallo f) {
+                long queda = fin - System.currentTimeMillis();
+                if (!"red".equals(f.codigo) || queda <= 0 || cancelado) {
+                    if ("red".equals(f.codigo) && intento > 1) throw new Fallo("red", f.getMessage() + " (tras " + intento + " intentos)");
+                    throw f;
+                }
+                try { Thread.sleep(Math.min(queda, Math.min(4000, 1000L * intento))); }
+                catch (InterruptedException e) { Thread.currentThread().interrupt(); throw f; }
+            }
+        }
     }
 
     /** Un permiso nuevo con el token de refresco guardado. */
@@ -248,10 +279,18 @@ public final class GoogleLoopback {
         } catch (Fallo f) {
             throw f;
         } catch (IOException e) {
-            throw new Fallo("red", "Sin conexión con Google: " + e.getMessage());
+            throw new Fallo("red", "Sin conexión con Google: " + detalle(e));
         } finally {
             if (con != null) con.disconnect();
         }
+    }
+
+    // El nombre del fallo además del mensaje: «UnknownHostException» (sin
+    // DNS, o internet cortado a esta app) no se arregla igual que
+    // «SSLHandshakeException» o un tiempo agotado, y el mensaje solo no lo dice.
+    static String detalle(Exception e) {
+        String m = e.getMessage();
+        return e.getClass().getSimpleName() + (m == null || m.isEmpty() ? "" : ": " + m);
     }
 
     // ── Pequeñas ayudas (sin bibliotecas: esto también corre fuera de Android) ──

@@ -1231,4 +1231,6 @@ window.ODI_IDIOMAS.fr = {
   1226: "Ce lien est en lecture seule : rien ne peut être modifié ici.",
   1227: "Vous le regardez via un lien : vous pouvez vous déplacer et ouvrir les tableaux, mais rien modifier.",
   1228: "1 fichier n'est pas encore dans votre Drive : il apparaîtrait vide dans le lien jusqu'à son envoi.",
+  1229: "Pas de connexion à Google. Si vous avez internet, désactivez l'économiseur de batterie ou de données pour Oddinote et réessayez.",
+  1230: "Le téléphone n'a pas laissé Oddinote attendre le retour de Google. Réessayez ; si cela se répète, redémarrez le téléphone.",
 };

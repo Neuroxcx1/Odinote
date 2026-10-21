@@ -151,6 +151,23 @@ public class PruebaGoogleLoopback {
             codigo = null;
             try { sinRed.renueva("1//r"); } catch (GoogleLoopback.Fallo f) { codigo = f.codigo; }
             ok("red".equals(codigo), "sin conexión es «red», no invalid_grant (el refresco no se tira)", codigo);
+
+            // El canje reintenta mientras el fallo es de red: aquí el «Google»
+            // no existe durante el primer segundo y luego sí.
+            {
+                java.util.Map<String, String> cuerpo = new java.util.LinkedHashMap<>();
+                cuerpo.put("grant_type", "refresh_token");
+                cuerpo.put("refresh_token", "1//r");
+                GoogleLoopback tarde = nuevo("http://127.0.0.1:" + puertoLibre() + "/token");
+                long t0 = System.currentTimeMillis();
+                String cod = null;
+                try { tarde.pideTokensConReintentos(cuerpo, 1500); } catch (GoogleLoopback.Fallo f) { cod = f.codigo; }
+                ok("red".equals(cod) && System.currentTimeMillis() - t0 >= 900, "sin Google, reintenta hasta el plazo y acaba en «red»", cod + " en " + (System.currentTimeMillis() - t0) + " ms");
+                GoogleLoopback bueno = nuevo(urlTokens);
+                GoogleLoopback.Tokens tk = null;
+                try { tk = bueno.pideTokensConReintentos(cuerpo, 1500); } catch (GoogleLoopback.Fallo f) { cod = f.codigo; }
+                ok(tk != null && tk.accessToken != null, "con Google, el canje con reintentos entra a la primera", null);
+            }
         }
 
         // ── 8. Las ayudas ──
@@ -199,5 +216,10 @@ public class PruebaGoogleLoopback {
         ByteArrayOutputStream b = new ByteArrayOutputStream();
         if (in != null) in.transferTo(b);
         return estado + " " + b.toString(StandardCharsets.UTF_8);
+    }
+
+    // Un puerto donde no escucha nadie: se abre y se cierra.
+    static int puertoLibre() throws java.io.IOException {
+        try (java.net.ServerSocket s = new java.net.ServerSocket(0, 1, java.net.InetAddress.getByName("127.0.0.1"))) { return s.getLocalPort(); }
     }
 }

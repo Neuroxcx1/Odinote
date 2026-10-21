@@ -1231,4 +1231,6 @@ window.ODI_IDIOMAS.it = {
   1226: "Questo link è di sola visione: qui non si può modificare nulla.",
   1227: "Lo stai guardando tramite un link: puoi muoverti ed entrare nelle tavole, ma non modificare nulla.",
   1228: "1 file non è ancora nel tuo Drive: nel link apparirebbe vuoto finché non viene caricato.",
+  1229: "Nessuna connessione a Google. Se hai internet, disattiva il risparmio batteria o dati per Oddinote e riprova.",
+  1230: "Il telefono non ha lasciato che Oddinote aspettasse il ritorno da Google. Riprova; se si ripete, riavvia il telefono.",
 };
