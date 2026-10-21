@@ -1692,10 +1692,25 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
     const el = surfaceRef.current;
     if (!el) return;
 
-    let mode = null;      // 'pan' | 'pinch' | null
+    let mode = null;      // 'pan' | 'pinch' | 'recuadro' | null
     let start = null;
     let moved = false;
     let longPress = null;
+    let ultimo = null;    // dónde va el dedo mientras se dibuja el recuadro
+
+    // El recuadro de selección lo lleva el mismo código que el del ratón
+    // (onSurfaceMouseDown y sus mousemove/mouseup en window): aquí solo se le
+    // mandan esos mismos eventos con la posición del dedo.
+    const raton = (tipo, x, y, destino) => (destino || window).dispatchEvent(new MouseEvent(tipo, {
+      bubbles: true, cancelable: true, view: window, clientX: x, clientY: y,
+      button: 0, buttons: tipo === 'mouseup' ? 0 : 1, detail: 1,
+    }));
+    const sueltaRecuadro = () => {
+      if (mode !== 'recuadro') return;
+      if (ultimo) raton('mouseup', ultimo.x, ultimo.y);
+      mode = null;
+      ultimo = null;
+    };
 
     const clearLong = () => { if (longPress) { clearTimeout(longPress); longPress = null; } };
     const gap = (a, b) => Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
@@ -1726,6 +1741,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
 
     const onTouchStart = (e) => {
       if (e.touches.length >= 2) {
+        sueltaRecuadro();
         beginPinch(e);
         if (e.cancelable) e.preventDefault();
         return;
@@ -1740,23 +1756,32 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
       start = { x: t.clientX, y: t.clientY, pan: { ...panRef.current }, target };
       if (e.cancelable) e.preventDefault();
 
-      // Mantener pulsado sobre el lienzo vacío abre el menú de crear nodo, que
-      // en escritorio es el clic derecho.
+      // Mantener pulsado sobre el lienzo vacío empieza un recuadro de
+      // selección: se arrastra el dedo y quedan elegidos los nodos de dentro,
+      // como al arrastrar con el ratón en el escritorio. Antes abría el menú
+      // de crear nodo (el clic derecho del escritorio), y el usuario lo quería
+      // para elegir varios: crear ya está en la barra de abajo.
       const px = t.clientX, py = t.clientY;
       clearLong();
       longPress = setTimeout(() => {
         longPress = null;
         if (mode !== 'pan' || moved) return;
-        mode = null;
-        target.dispatchEvent(new MouseEvent('contextmenu', {
-          bubbles: true, cancelable: true, view: window,
-          clientX: px, clientY: py, button: 2,
-        }));
+        mode = 'recuadro';
+        ultimo = { x: px, y: py };
+        raton('mousedown', px, py, target);
         if (navigator.vibrate) { try { navigator.vibrate(12); } catch (err) {} }
       }, 520);
     };
 
     const onTouchMove = (e) => {
+      if (mode === 'recuadro') {
+        const t = e.touches[0];
+        if (!t) return;
+        if (e.cancelable) e.preventDefault();
+        ultimo = { x: t.clientX, y: t.clientY };
+        raton('mousemove', t.clientX, t.clientY);
+        return;
+      }
       if (mode === 'pinch') {
         if (e.touches.length < 2) return;
         if (e.cancelable) e.preventDefault();
@@ -1788,6 +1813,12 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
 
     const onTouchEnd = (e) => {
       clearLong();
+      if (mode === 'recuadro') {
+        const t = e.changedTouches && e.changedTouches[0];
+        if (t) ultimo = { x: t.clientX, y: t.clientY };
+        sueltaRecuadro();
+        return;
+      }
       if (mode === 'pinch') {
         // Al soltar un dedo, el zoom termina; el que queda no debe dar un salto.
         if (e.touches.length === 1) {

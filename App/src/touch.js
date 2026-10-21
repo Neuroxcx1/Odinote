@@ -578,8 +578,9 @@
     // dedo es normal apoyarlo un instante antes de moverlo, y si ese instante
     // pasaba de medio segundo el temporizador cerraba el arrastre y el nodo ya
     // no se movía — "no puedo arrastrar" sin más pista. En un nodo no hace
-    // falta: su barra ya tiene color, editar, duplicar y eliminar. El menú de
-    // crear sobre el lienzo vacío lo lleva Canvas.jsx y no se toca.
+    // falta: su barra ya tiene color, editar, duplicar y eliminar. El lienzo
+    // vacío lo lleva Canvas.jsx (allí, mantener pulsado es el recuadro de
+    // selección) y no se toca.
     const wrap = closestEl(target, '.canvas-wrap');
     const toolActive = wrap && (wrap.classList.contains('placing') || wrap.classList.contains('linking'));
     const onItem = !!closestEl(target, '.item, .col-child-wrap');
