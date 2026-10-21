@@ -1,218 +1,62 @@
-// =====================================================
-// Odinote — reglas de seguridad de Cloud Firestore
-//
-// Pegar en: consola de Firebase → Firestore → pestaña "Reglas" → Publicar.
-//
-// Aquí pasan dos cosas muy distintas, y conviene no confundirlas:
-//
-//   salas/     — el apretón de manos de las sesiones en vivo. Solo direcciones
-//                de red para que dos Odinote se encuentren; en cuanto lo hacen,
-//                esos papelitos se borran y el trabajo va de ordenador a
-//                ordenador sin tocar ningún servidor. Aquí NO hay ni una nota.
-//
-//   proyectos/ — el modo instantáneo, que está APAGADO de fábrica y se
-//                enciende proyecto por proyecto. Este sí guarda el contenido:
-//                el texto de las notas y dónde está cada una. Es lo que permite
-//                que dos personas trabajen a la vez sin que ninguna tenga que
-//                estar de anfitrión. Las imágenes y los audios NO entran aquí:
-//                siguen en el Drive de quien comparte, y de ellos solo viaja
-//                la dirección.
-//
-// Quien no encienda ese interruptor no manda ni un byte de contenido a este
-// servidor: sus notas viven en su equipo y, si pone el proyecto online, en SU
-// Google Drive.
-//
-// Por qué está tan cerrado: el plan gratuito tiene una cuota diaria. Sin estas
-// restricciones, cualquiera podría escribir basura hasta agotarla y dejar sin
-// servicio a quien sí lo esté usando.
-//
-// ── Sobre la basura que se acumula (no hay que hacer nada) ──
-//
-// Las salas se limpian solas, por dos caminos y sin tocar ninguna consola:
-//
-//   · Al terminar la sesión, el anfitrión vacía las señales y borra la sala.
-//     Primero las señales: borrar un documento en Firestore NO borra sus
-//     subcolecciones, y si se hace al revés se quedan vivas y huérfanas (en la
-//     consola se reconocen porque el nombre sale en cursiva). Y son ellas las
-//     que ocupan: cada señal lleva hasta 8 KB y la sala entera son 150 bytes.
-//
-//   · Si la sesión no termina bien —el portátil que se cierra de golpe, la
-//     batería que se acaba—, esa sala queda suelta. No se puede barrer
-//     buscándola, porque `list` está prohibido aquí arriba a propósito: poder
-//     enumerar las salas convertiría el código de seis letras en algo que no es
-//     una llave. Pero cada uno se apunta las suyas al abrirlas, así que la
-//     próxima vez que esa persona abra una sesión recoge lo de la anterior.
-//
-// El campo `expiraEn` que llevan las salas y las señales es la red por debajo
-// de todo eso, para el caso de que alguien no vuelva nunca a abrir una sesión.
-// Se activa creando dos políticas de caducidad en la consola de Google Cloud
-// (Databases → tu base de datos → Time-to-live → Create Policy), una para el
-// grupo `salas` y otra para `senales`, las dos sobre el campo `expiraEn`. Es
-// opcional: sin ellas no se rompe nada y la limpieza de arriba cubre lo normal.
-// =====================================================
 rules_version = '2';
 
+// Oddinote — reglas de Firestore.
+// Se pegan enteras en la consola de Firebase: Firestore Database → Reglas → Publicar.
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Por defecto todo está prohibido. Lo de abajo son las ÚNICAS excepciones.
+    // Todo cerrado, salvo lo de abajo.
     match /{document=**} {
       allow read, write: if false;
     }
 
-    // ── Salas de encuentro ──
-    //
-    // El código de la sala es el que una persona comparte con otra. Hace falta
-    // haber iniciado sesión (vale la sesión anónima: no pide cuenta a nadie,
-    // solo sirve para que cada visitante tenga un identificador y no se pueda
-    // escribir en masa sin control).
+    // Sesiones en vivo: el código es la llave. Se puede abrir una sala sabiendo
+    // su código, pero nadie puede pedir la lista.
     match /salas/{codigo} {
-
-      function conSesion() {
-        return request.auth != null;
-      }
-
-      // La sala solo dice quién la abrió y cuándo. Nada más cabe dentro.
-      //
-      // `get` y no `list`: se puede consultar una sala si sabes su código,
-      // pero nadie puede pedir la lista de salas abiertas. Sin esto, el código
-      // dejaría de ser una llave — bastaría con mirar cuáles hay.
-      allow get: if conSesion();
-
-      allow create: if conSesion()
+      allow get: if request.auth != null;
+      allow create: if request.auth != null
         && codigo.size() >= 6 && codigo.size() <= 32
         && request.resource.data.keys().hasOnly(['anfitrion', 'creadaEn', 'expiraEn', 'version'])
         && request.resource.data.anfitrion == request.auth.uid;
-
-      // Solo quien abrió la sala puede cerrarla.
-      allow update, delete: if conSesion()
+      allow update, delete: if request.auth != null
         && resource.data.anfitrion == request.auth.uid;
 
-      // ── Los papelitos del apretón de manos ──
-      //
-      // Cada uno lleva la dirección de red de quien lo escribe. Se limita el
-      // tamaño porque una descripción de conexión legítima ocupa unos pocos
-      // kilobytes: quien intente meter aquí otra cosa se topa con el tope.
       match /senales/{id} {
-        allow get, list: if conSesion();
-
-        allow create: if conSesion()
+        allow get, list: if request.auth != null;
+        allow create: if request.auth != null
           && request.resource.data.de == request.auth.uid
           && request.resource.data.keys().hasOnly(['de', 'para', 'tipo', 'carga', 'creadaEn', 'expiraEn'])
           && request.resource.data.tipo in ['oferta', 'respuesta', 'candidato']
           && request.resource.data.carga is string
           && request.resource.data.carga.size() < 8000;
-
-        // Cada cual limpia lo suyo cuando la conexión ya está hecha, y también
-        // lo que le hayan dejado a él.
-        //
-        // Lo segundo faltaba, y no era un detalle: quien recibe un papel es
-        // quien sabe que ya no sirve, pero no podía tirarlo. Al segundo intento
-        // de entrar en la misma sala seguían ahí la oferta y la respuesta del
-        // primero, y una respuesta vieja NO da error —es válida, solo que de
-        // otra conversación—, así que se aceptaba y la conexión buena moría en
-        // silencio. En el móvil eso se veía como "la otra persona no respondió
-        // a tiempo" durante veinticinco segundos.
-        allow delete: if conSesion()
-          && (resource.data.de == request.auth.uid
-              || resource.data.para == request.auth.uid);
+        allow delete: if request.auth != null
+          && (resource.data.de == request.auth.uid || resource.data.para == request.auth.uid);
       }
     }
 
-    // ── Proyectos en modo instantáneo ──
-    //
-    // Un documento por proyecto, con los lienzos de ESE proyecto y de ninguno
-    // más. Esto último no es un detalle de estilo: la versión anterior de este
-    // código subía todos los proyectos de una persona dentro del documento del
-    // que estaba compartiendo, así que invitar a alguien a un tablero le
-    // entregaba el resto del trabajo. Un proyecto, un documento.
-    //
-    // Quién puede entrar: quien lo creó, y las cuentas de correo que ese dueño
-    // haya apuntado —las mismas a las que compartió la carpeta en su Drive—.
-    // Se comprueba contra el correo del token de Google, que no se puede
-    // falsear desde el navegador.
-    match /proyectos/{proyecto} {
-
-      function dueno() {
-        return request.auth != null && resource.data.dueno == request.auth.uid;
-      }
-
-      // `in` sobre una lista que podría no existir revienta la regla entera y
-      // deja fuera hasta al dueño; de ahí el rodeo con un valor por defecto.
-      function invitado() {
-        return request.auth != null
-          && request.auth.token.email != null
-          && request.auth.token.email in resource.data.get('correos', []);
-      }
-
-      allow get: if dueno() || invitado();
-
-      // Nadie puede pedir la lista de proyectos que hay: se entra sabiendo cuál.
-      allow list: if false;
-
-      allow create: if request.auth != null
-        && request.resource.data.dueno == request.auth.uid
-        && request.resource.data.keys().hasOnly(
-             ['dueno', 'correos', 'lienzos', 'raiz', 'porUid', 'actualizadoEn', 'version']);
-
-      // Un invitado puede escribir —de eso se trata, de editar sin el dueño
-      // delante— pero no puede quedarse con el proyecto ni cambiar quién entra.
-      allow update: if (dueno() || invitado())
-        && request.resource.data.dueno == resource.data.dueno
-        && (dueno() || request.resource.data.get('correos', []) == resource.data.get('correos', []));
-
-      allow delete: if dueno();
-    }
-
-    // ── El enlace para ver (src/vista.js) ──
-    //
-    // Una copia de UN proyecto para mirarlo sin cuenta y sin código, desde el
-    // navegador, aunque el dueño tenga la aplicación cerrada. Leer lo puede
-    // cualquiera que tenga el enlace —para eso es—, incluso sin iniciar
-    // sesión. Lo que no puede nadie es pedir la lista: el identificador del
-    // enlace (22 letras al azar) es la llave, y poder enumerarlos la anularía.
-    //
-    // Escribir, solo el dueño: crear con su propio uid, y cambiar o borrar
-    // solo lo suyo y sin cambiar de dueño. Las imágenes no van aquí, van sus
-    // direcciones de Drive; el tope de 1 MiB lo pone Firestore.
+    // Enlace para ver: lo lee cualquiera que tenga el enlace (también sin
+    // cuenta), nadie puede listarlos, y solo el dueño lo crea, cambia o borra.
     match /vistas/{id} {
       allow get: if true;
       allow list: if false;
-
       allow create: if request.auth != null
         && id.size() >= 16 && id.size() <= 40
         && request.resource.data.dueno == request.auth.uid
-        && request.resource.data.keys().hasOnly(
-             ['dueno', 'raiz', 'nombre', 'emoji', 'lienzos', 'actualizadoEn', 'version']);
-
+        && request.resource.data.keys().hasOnly(['dueno', 'raiz', 'nombre', 'emoji', 'lienzos', 'actualizadoEn', 'version']);
       allow update: if request.auth != null
         && resource.data.dueno == request.auth.uid
         && request.resource.data.dueno == resource.data.dueno
-        && request.resource.data.keys().hasOnly(
-             ['dueno', 'raiz', 'nombre', 'emoji', 'lienzos', 'actualizadoEn', 'version']);
-
+        && request.resource.data.keys().hasOnly(['dueno', 'raiz', 'nombre', 'emoji', 'lienzos', 'actualizadoEn', 'version']);
       allow delete: if request.auth != null
         && resource.data.dueno == request.auth.uid;
     }
 
-    // ── Quién ha invitado a un café ──
-    //
-    // Un documento por patrocinador, y el nombre del documento es su correo en
-    // minúsculas. Lo escribe SOLO el programa que recibe los avisos de Ko-fi
-    // (`functions/index.js`), que al vivir dentro de Firebase entra como
-    // administrador y no pasa por estas reglas. Desde la app no se puede
-    // escribir aquí de ninguna manera: si se pudiera, cualquiera se apuntaría
-    // solo y la corona no significaría nada.
-    //
-    // Y leer, cada uno lo suyo y nada más. `get` contra el correo del token de
-    // Google, que el navegador no puede falsear, y `list` prohibido: sin eso,
-    // cualquiera podría descargarse la lista de correos de la gente que ha
-    // pagado, que es justo el tipo de dato que no debe poder pedirse entero.
+    // La corona: cada uno lee lo suyo y nada más. Escribe solo la función de
+    // Ko-fi (functions/index.js), que no pasa por estas reglas.
     match /patrocinadores/{correo} {
       allow get: if request.auth != null
         && request.auth.token.email != null
         && request.auth.token.email.lower() == correo;
-
       allow list: if false;
       allow write: if false;
     }
