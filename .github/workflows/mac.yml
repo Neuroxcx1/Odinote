@@ -34,7 +34,8 @@ permissions:
 
 jobs:
   mac:
-    runs-on: macos-14
+    # macos-15: GitHub retira macos-14 el 2026-11-02 (y antes lo apaga a ratos).
+    runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
         with:
