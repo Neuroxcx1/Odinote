@@ -47,7 +47,7 @@ try {
 
 // Marcador de build: si la consola no muestra esta versión, el navegador está
 // sirviendo JS cacheado (subir ?v= en index.html invalida la caché)
-window.ODINOTE_BUILD = '1.2.1-232';
+window.ODINOTE_BUILD = '1.2.1-233';
 console.log('[ODINOTE] Código cargado: ' + window.ODINOTE_BUILD);
 
 // Global shortcuts configuration
@@ -3892,7 +3892,7 @@ function App() {
               )}
 
               {/* La cuadrícula del lienzo: el imán y su tamaño (discusión 12 de
-                  GitHub). El mismo panel que el botón de junto al zoom. */}
+                  GitHub). Solo aquí: el usuario no la quiso junto al zoom. */}
               {window.PanelCuadricula && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                   <div style={{ fontWeight: '600', fontSize: '14px', color: 'var(--wine, #7B2D26)', display: 'flex', alignItems: 'center', gap: '6px' }}>

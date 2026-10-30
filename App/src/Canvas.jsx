@@ -1176,19 +1176,6 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
   // enlace para ver (ahí no se mueve nada, pero por si acaso).
   const imanActivo = (ev) => !soloVer && !!window.OdiCuadricula && window.OdiCuadricula.activa(cuadriculaRef.current, ev);
   const pasoCuadricula = () => (cuadriculaRef.current && cuadriculaRef.current.paso) || 22;
-  // El panel del botón de la cuadrícula (junto al zoom). Se cierra al pulsar
-  // fuera o con Escape; el panel de color va en el body, pero aquí no hay.
-  const [rejillaAbierta, setRejillaAbierta] = useStateCanvas(false);
-  useEffectCanvas(() => {
-    if (!rejillaAbierta) return;
-    const fuera = (e) => {
-      if (!(e.target && e.target.closest && e.target.closest('.cuadricula-pop, .zoom-rejilla'))) setRejillaAbierta(false);
-    };
-    const esc = (e) => { if (e.key === 'Escape') setRejillaAbierta(false); };
-    window.addEventListener('pointerdown', fuera, true);
-    window.addEventListener('keydown', esc);
-    return () => { window.removeEventListener('pointerdown', fuera, true); window.removeEventListener('keydown', esc); };
-  }, [rejillaAbierta]);
   const alternaIman = () => {
     const C = window.OdiCuadricula;
     if (!C) return;
@@ -7070,7 +7057,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
         {/* Las plantillas: abajo a la derecha, donde las pidió el usuario, a la
             izquierda de la cámara (o en su sitio, en la web, que no la tiene). */}
         {window.OdiPlantillas && !drawingId && !soloVer && (
-          <div className="plantillas-esquina" style={{ right: (window.electronAPI && window.electronAPI.capturarLienzo) ? 284 : 239 }}
+          <div className="plantillas-esquina" style={{ right: (window.electronAPI && window.electronAPI.capturarLienzo) ? 250 : 205 }}
             onMouseDown={(e) => e.stopPropagation()}>
             {plantillasAbiertas && (
               <div className="plantillas-panel">
@@ -7099,19 +7086,6 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
 
         {/* Zoom controls */}
         <div className="zoom-ctrls">
-          {/* La cuadrícula: abre su panel (imán y tamaño). Verde con el imán
-              puesto, para saber de un vistazo por qué un nodo «salta». */}
-          {!soloVer && window.OdiCuadricula && (
-            <button
-              className={'zoom-rejilla' + (cuadricula.iman ? ' on' : '')}
-              title={window.t("Cuadrícula: pegar los nodos y cambiar su tamaño (Ctrl+')", "Grid: snap nodes and change its size (Ctrl+')")}
-              aria-pressed={cuadricula.iman}
-              aria-expanded={rejillaAbierta}
-              onClick={() => { setRejillaAbierta(v => !v); window.playAudioTone && window.playAudioTone('click'); }}
-            >
-              <span className="material-symbols-rounded">grid_4x4</span>
-            </button>
-          )}
           <button title={window.t('Alejar', 'Zoom out')} onClick={()=>setScale(s => Math.max(0.2, s - 0.1))}>
             <span className="material-symbols-rounded" style={{fontSize:15}}>remove</span>
           </button>
@@ -7142,15 +7116,6 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
             <span className="material-symbols-rounded" style={{fontSize:15}}>add</span>
           </button>
         </div>
-        {rejillaAbierta && !soloVer && window.PanelCuadricula && (
-          <div className="cuadricula-pop" role="dialog" aria-label={window.t('Cuadrícula', 'Grid')}>
-            <div className="cuadricula-pop-titulo">
-              <span className="material-symbols-rounded" style={{ fontSize: 16 }}>grid_4x4</span>
-              <span>{window.t('Cuadrícula', 'Grid')}</span>
-            </div>
-            <window.PanelCuadricula />
-          </div>
-        )}
 
         {/* La foto del lienzo. Suelta y no dentro del grupo del zoom: alli
             quedaba amontonada entre el menos y el mas, y una accion que guarda
@@ -7170,8 +7135,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
         {fogonazo && <div className="canvas-fogonazo" />}
 
         {/* Background Color Selector */}
-        {/* 194 y no 160: el grupo del zoom creció 34 px con el botón de la cuadrícula. */}
-        <div className="canvas-bg-selector" style={{ position: 'absolute', bottom: '16px', right: '194px', zIndex: 40 }}>
+        <div className="canvas-bg-selector" style={{ position: 'absolute', bottom: '16px', right: '160px', zIndex: 40 }}>
           <button 
             className="icon-btn lift" 
             style={{ 

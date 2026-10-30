@@ -262,10 +262,9 @@ function AjusteEscala({ onCambia, onArrastra }) {
 }
 
 // ── La cuadrícula del lienzo (discusión 12 de GitHub) ──
-// El mismo panel sale en Ajustes y en el botón del grupo del zoom. Los dos
-// leen y escriben por window.OdiCuadricula (src/cuadricula.js), que avisa con
-// un evento: lo que se cambia en uno se ve al momento en el otro y en el
-// fondo del lienzo, que es donde se nota el tamaño.
+// Solo en Ajustes (el usuario no lo quiso junto al zoom). Lee y escribe por
+// window.OdiCuadricula (src/cuadricula.js), que avisa con un evento: el lienzo
+// cambia el fondo al momento, que es donde se nota el tamaño.
 function PanelCuadricula() {
   const { useState, useEffect } = React;
   const C = window.OdiCuadricula;
