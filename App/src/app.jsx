@@ -47,7 +47,7 @@ try {
 
 // Marcador de build: si la consola no muestra esta versión, el navegador está
 // sirviendo JS cacheado (subir ?v= en index.html invalida la caché)
-window.ODINOTE_BUILD = '1.2.1-230';
+window.ODINOTE_BUILD = '1.2.1-232';
 console.log('[ODINOTE] Código cargado: ' + window.ODINOTE_BUILD);
 
 // Global shortcuts configuration
@@ -3888,6 +3888,24 @@ function App() {
                       </button>
                     ))}
                   </div>
+                </div>
+              )}
+
+              {/* La cuadrícula del lienzo: el imán y su tamaño (discusión 12 de
+                  GitHub). El mismo panel que el botón de junto al zoom. */}
+              {window.PanelCuadricula && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <div style={{ fontWeight: '600', fontSize: '14px', color: 'var(--wine, #7B2D26)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span className="material-symbols-rounded" style={{ fontSize: '18px' }}>grid_4x4</span>
+                    <span>{window.t('Cuadrícula del lienzo', 'Canvas grid')}</span>
+                  </div>
+                  <p style={{ fontSize: '12.5px', color: 'var(--text-soft, #595459)', margin: 0, lineHeight: '1.5' }}>
+                    {window.t(
+                      'Que los nodos caigan en los puntos del fondo al moverlos y al estirarlos, y cada cuánto van esos puntos. Se guarda en este equipo.',
+                      'Make nodes land on the background points when you move and resize them, and choose how far apart those points are. Saved on this device.'
+                    )}
+                  </p>
+                  <window.PanelCuadricula />
                 </div>
               )}
 

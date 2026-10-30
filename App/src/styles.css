@@ -98,7 +98,7 @@
 body[data-theme="dark"] { background: #2A282A; }
 [data-theme="dark"] .canvas-wrap {
   background-color: #2A282A;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='22' height='22'%3E%3Cpath d='M11 9.5L12.6 12.3H9.4Z' fill='%23F0EEF0' fill-opacity='0.18'/%3E%3C/svg%3E");
+  background-image: var(--rejilla-oscuro, url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='22' height='22'%3E%3Cpath d='M11 9.5L12.6 12.3H9.4Z' fill='%23F0EEF0' fill-opacity='0.18'/%3E%3C/svg%3E"));
   background-size: 22px 22px;
 }
 [data-theme="dark"] .topbar { background: #3A383A; border-color: #1A1A1A; }
@@ -1494,8 +1494,10 @@ html[data-ventana-fijada] [data-mueve-ventana]:active { cursor: grabbing; }
   overflow: hidden;
   overflow: clip;
   background-color: var(--bg);
-  /* Tiny triangle grid (distinct from Milanote's dot grid) */
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='22' height='22'%3E%3Cpath d='M11 9.5L12.6 12.3H9.4Z' fill='%231A1A1A' fill-opacity='0.13'/%3E%3C/svg%3E");
+  /* Tiny triangle grid (distinct from Milanote's dot grid). Con otro tamaño
+     de cuadrícula, Canvas.jsx pone su dibujo en --rejilla-claro/oscuro
+     (src/cuadricula.js); sin ellas, el de siempre. */
+  background-image: var(--rejilla-claro, url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='22' height='22'%3E%3Cpath d='M11 9.5L12.6 12.3H9.4Z' fill='%231A1A1A' fill-opacity='0.13'/%3E%3C/svg%3E"));
   background-size: 22px 22px;
 }
 .canvas-wrap.canvas-bg-default { background-color: var(--bg); }
@@ -1554,7 +1556,8 @@ html[data-ventana-fijada] [data-mueve-ventana]:active { cursor: grabbing; }
 .icon-btn.canvas-shot {
   position: absolute;
   bottom: 16px;
-  right: 205px;
+  /* 239 y no 205: el grupo del zoom lleva el botón de la cuadrícula (34 px). */
+  right: 239px;
   width: 32px;
   height: 32px;
   border-radius: 2px;
@@ -1611,6 +1614,42 @@ html[data-ventana-fijada] [data-mueve-ventana]:active { cursor: grabbing; }
 .zoom-ctrls button { padding: 6px 10px; font-size: 12.5px; font-weight: 600; border-right: 1.5px solid var(--line); display: grid; place-items: center; transition: background 100ms; }
 .zoom-ctrls button:last-child { border-right: none; }
 .zoom-ctrls button:hover { background: var(--bg); }
+/* El botón de la cuadrícula, en el grupo del zoom: verde con el imán puesto. */
+.zoom-ctrls .zoom-rejilla .material-symbols-rounded { font-size: 16px; }
+.zoom-ctrls .zoom-rejilla.on { background: var(--olive); color: #FFFFFF; }
+.zoom-ctrls .zoom-rejilla.on:hover { background: var(--olive); filter: brightness(1.06); }
+/* Su panel, encima del grupo del zoom (el grupo lleva overflow hidden: el
+   panel va fuera, de hermano). */
+.cuadricula-pop {
+  position: absolute; right: 16px; bottom: 56px; z-index: 41;
+  width: 272px; box-sizing: border-box; padding: 12px 14px;
+  background: var(--paper); color: var(--ink);
+  border: 1.5px solid var(--line); border-radius: 10px; box-shadow: var(--pop-sm);
+  transform-origin: right bottom;
+  animation: muelle-aparece 260ms var(--muelle) backwards;
+}
+[data-theme="dark"] .cuadricula-pop { background: #3A383A; color: #F0EEF0; }
+.cuadricula-pop-titulo { font-weight: 700; font-size: 13px; margin-bottom: 10px; display: flex; align-items: center; gap: 6px; }
+.ajuste-cuadricula { display: flex; flex-direction: column; gap: 10px; }
+.cuadricula-interruptor {
+  display: flex; align-items: center; gap: 9px; width: 100%;
+  background: none; border: none; padding: 0; cursor: pointer; text-align: start;
+  font-family: var(--font-body); font-size: 13px; font-weight: 600; color: inherit;
+}
+.cuadricula-carril {
+  flex: 0 0 auto; width: 32px; height: 18px; box-sizing: border-box; padding: 2px;
+  border-radius: 99px; background: var(--line); display: flex; align-items: center;
+  transition: background 140ms;
+}
+.cuadricula-carril > i {
+  display: block; width: 14px; height: 14px; border-radius: 50%; background: #FFFFFF;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.25);
+  transition: transform 220ms var(--muelle, ease);
+}
+.cuadricula-interruptor.on .cuadricula-carril { background: var(--olive); }
+.cuadricula-interruptor.on .cuadricula-carril > i { transform: translateX(14px); }
+.cuadricula-paso-icono { font-size: 15px; color: var(--ink-2); flex-shrink: 0; }
+[data-theme="dark"] .cuadricula-paso-icono { color: #CFCBCF; }
 .zoom-level { min-width: 48px; font-family: var(--font-mono); font-size: 11.5px; }
 
 /* Mini search */
@@ -6589,7 +6628,7 @@ html[data-mobile="1"] .zoom-ctrls button { padding: 9px 12px; font-size: 14px; }
    que además sigue sirviendo de botón para volver al 100%. */
 html[data-mobile="1"] .zoom-ctrls button:not(.zoom-level) { display: none; }
 html[data-mobile="1"] .zoom-ctrls .zoom-level { border-right: none; }
-/* Lleva la posición en estilo inline (right:160px), así que hace falta
+/* Lleva la posición en estilo inline (right:194px), así que hace falta
    !important para sacarlo de en medio de las pastillas. */
 /* El desplegable se abre hacia la IZQUIERDA (right:0 en su estilo), y en el
    móvil el botón está pegado al borde izquierdo: la paleta se salía de la
@@ -8234,7 +8273,7 @@ html[data-mobile="1"] .code-run .material-symbols-rounded { font-size: max(16px,
 /* Quien pide menos movimiento en el sistema no lo tiene. */
 @media (prefers-reduced-motion: reduce) {
   .modal, .doc-modal-window, .context-menu, .ctx-side, .ctx-popout,
-  .item.new-item .item-card, .panel-color, .plantillas-panel, .code-terminal { animation-duration: 1ms !important; }
+  .item.new-item .item-card, .panel-color, .plantillas-panel, .code-terminal, .cuadricula-pop { animation-duration: 1ms !important; }
   .press, .icon-btn, .tool, .ms-project-card, .ms-recent-card, .lift { transition-duration: 1ms !important; }
   /* La ruleta gira igual (es lo que hace), pero sin lo demás que se mueve. */
   .ruleta-centro-gira, .ruleta-premio, .ruleta-porcion.nueva { animation: none !important; }

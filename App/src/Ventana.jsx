@@ -261,6 +261,69 @@ function AjusteEscala({ onCambia, onArrastra }) {
   );
 }
 
+// ── La cuadrícula del lienzo (discusión 12 de GitHub) ──
+// El mismo panel sale en Ajustes y en el botón del grupo del zoom. Los dos
+// leen y escriben por window.OdiCuadricula (src/cuadricula.js), que avisa con
+// un evento: lo que se cambia en uno se ve al momento en el otro y en el
+// fondo del lienzo, que es donde se nota el tamaño.
+function PanelCuadricula() {
+  const { useState, useEffect } = React;
+  const C = window.OdiCuadricula;
+  const [c, setC] = useState(() => (C ? C.lee() : null));
+  useEffect(() => {
+    if (!C) return;
+    const al = (e) => setC((e && e.detail) || C.lee());
+    window.addEventListener(C.EVENTO, al);
+    return () => window.removeEventListener(C.EVENTO, al);
+  }, []);
+  if (!C || !c) return null;
+  const nombres = { 11: window.t('Fina', 'Fine'), 22: window.t('Normal', 'Normal'), 44: window.t('Ancha', 'Wide') };
+  return (
+    <div className="ajuste-cuadricula">
+      <button
+        type="button"
+        role="switch"
+        aria-checked={c.iman}
+        className={'cuadricula-interruptor' + (c.iman ? ' on' : '')}
+        onClick={() => { C.guarda({ iman: !c.iman }); window.playAudioTone && window.playAudioTone('click'); }}
+      >
+        <span className="cuadricula-carril" aria-hidden="true"><i /></span>
+        <span>{window.t('Pegar los nodos a la cuadrícula', 'Snap nodes to the grid')}</span>
+      </button>
+      <div className="ajuste-escala-fila">
+        <span className="material-symbols-rounded cuadricula-paso-icono" aria-hidden="true">grid_4x4</span>
+        <input
+          type="range"
+          className="ajuste-escala-barra"
+          min={C.PASO_MIN}
+          max={C.PASO_MAX}
+          step={1}
+          value={c.paso}
+          aria-label={window.t('Tamaño de la cuadrícula', 'Grid size')}
+          onChange={(e) => C.guarda({ paso: Number(e.target.value) })}
+        />
+        <span className="ajuste-escala-valor">{c.paso} px</span>
+      </div>
+      <div className="ajuste-escala-rapidos">
+        {C.PASOS_RAPIDOS.map(p => (
+          <button
+            key={p}
+            type="button"
+            className={'ajuste-escala-rapido' + (p === c.paso ? ' activo' : '')}
+            onClick={() => C.guarda({ paso: p })}
+          >
+            {nombres[p] || (p + ' px')}
+          </button>
+        ))}
+      </div>
+      <p className="ajuste-escala-nota">
+        {window.t("Mantén Alt mientras mueves para colocar un nodo libre. Atajo: Ctrl+'", "Hold Alt while moving to place a node freely. Shortcut: Ctrl+'")}
+      </p>
+    </div>
+  );
+}
+
+window.PanelCuadricula = PanelCuadricula;
 window.BotonFijar = BotonFijar;
 window.useVentana = useVentana;
 window.AjusteEscala = AjusteEscala;

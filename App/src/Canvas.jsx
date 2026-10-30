@@ -1158,6 +1158,47 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
   };
   const [selectedStrokeId, setSelectedStrokeId] = useStateCanvas(null);
 
+  // La cuadrícula: el imán y su paso (src/cuadricula.js, discusión 12 de
+  // GitHub). El estado repinta el fondo y el botón; la ref la leen los gestos,
+  // que viven en cierres hechos al pulsar y verían un valor viejo si se cambia
+  // a mitad de un arrastre (Ctrl+').
+  const [cuadricula, setCuadricula] = useStateCanvas(() => window.OdiCuadricula ? window.OdiCuadricula.lee() : { iman: false, paso: 22 });
+  const cuadriculaRef = useRefCanvas(cuadricula);
+  cuadriculaRef.current = cuadricula;
+  useEffectCanvas(() => {
+    const C = window.OdiCuadricula;
+    if (!C) return;
+    const al = (e) => setCuadricula((e && e.detail) || C.lee());
+    window.addEventListener(C.EVENTO, al);
+    return () => window.removeEventListener(C.EVENTO, al);
+  }, []);
+  // ¿Pega este gesto? Con el imán encendido y sin Alt pulsado; nunca en el
+  // enlace para ver (ahí no se mueve nada, pero por si acaso).
+  const imanActivo = (ev) => !soloVer && !!window.OdiCuadricula && window.OdiCuadricula.activa(cuadriculaRef.current, ev);
+  const pasoCuadricula = () => (cuadriculaRef.current && cuadriculaRef.current.paso) || 22;
+  // El panel del botón de la cuadrícula (junto al zoom). Se cierra al pulsar
+  // fuera o con Escape; el panel de color va en el body, pero aquí no hay.
+  const [rejillaAbierta, setRejillaAbierta] = useStateCanvas(false);
+  useEffectCanvas(() => {
+    if (!rejillaAbierta) return;
+    const fuera = (e) => {
+      if (!(e.target && e.target.closest && e.target.closest('.cuadricula-pop, .zoom-rejilla'))) setRejillaAbierta(false);
+    };
+    const esc = (e) => { if (e.key === 'Escape') setRejillaAbierta(false); };
+    window.addEventListener('pointerdown', fuera, true);
+    window.addEventListener('keydown', esc);
+    return () => { window.removeEventListener('pointerdown', fuera, true); window.removeEventListener('keydown', esc); };
+  }, [rejillaAbierta]);
+  const alternaIman = () => {
+    const C = window.OdiCuadricula;
+    if (!C) return;
+    const n = C.guarda({ iman: !(cuadriculaRef.current && cuadriculaRef.current.iman) });
+    window.playAudioTone && window.playAudioTone('click');
+    window.showToast && window.showToast(n.iman
+      ? window.t('Imán de la cuadrícula encendido. Mantén Alt para colocar libre.', 'Snap to grid on. Hold Alt to place freely.')
+      : window.t('Imán de la cuadrícula apagado.', 'Snap to grid off.'));
+  };
+
   // alignment guides and dragged task ghost
   const [guides, setGuides] = useStateCanvas(null);
   const [draggedTask, setDraggedTask] = useStateCanvas(null);
@@ -2033,6 +2074,13 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
         e.preventDefault();
         if (selectedConn && !selected && !selectedIds.length) alternaBloqueoFlecha(selectedConn);
         else alternaBloqueo();
+      }
+      // El imán de la cuadrícula (Ctrl+'), como en Excalidraw y tldraw. En el
+      // teclado español la ' está al lado del 0; se mira la letra y también la
+      // posición de la ' en el teclado inglés.
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && (e.key === "'" || e.code === 'Quote')) {
+        e.preventDefault();
+        alternaIman();
       }
       // Cortar/Copiar nodos desde el teclado. Los eventos nativos 'cut'/'copy' solo se
       // disparan cuando el foco está en un elemento editable (el interceptor oculto);
@@ -3924,22 +3972,31 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
         } else {
           targetX = startItemX;
         }
-        // Snap to 20px grid
-        targetX = Math.round(targetX / 20) * 20;
-        targetY = Math.round(targetY / 20) * 20;
+        // Shift pega al paso de la cuadrícula que se ve (antes 20, con los
+        // puntos a 22: nunca caía encima de ellos).
+        targetX = Math.round(targetX / pasoCuadricula()) * pasoCuadricula();
+        targetY = Math.round(targetY / pasoCuadricula()) * pasoCuadricula();
+      }
+      // Con el imán, la esquina del nodo cae en un punto de la cuadrícula y
+      // las guías de alinear con otros nodos se callan: si mandaran las dos
+      // cosas, el nodo saltaría entre una y otra.
+      const iman = imanActivo(ev);
+      if (iman) {
+        targetX = window.OdiCuadricula.pega(targetX, pasoCuadricula());
+        targetY = window.OdiCuadricula.pega(targetY, pasoCuadricula());
       }
 
       let activeGuidesX = [];
       let activeGuidesY = [];
 
-      // Smart alignment guides relative to other items (ALWAYS active)
+      // Smart alignment guides relative to other items (salvo con el imán)
       const snapThreshold = 12;
       const w = item.w || 200;
       const h = item.h || 120;
       let bestDiffX = snapThreshold;
       let bestDiffY = snapThreshold;
 
-      const currentItems = current.items || [];
+      const currentItems = iman ? [] : (current.items || []);
       const MAX_ALIGN_DIST = 99999; // Constante de proximidad física perpendicular
 
       for (const other of currentItems) {
@@ -4125,6 +4182,11 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
           } else {
             finalDx = 0;
           }
+        } else if (iman) {
+          // El nodo pulsado cae en la cuadrícula y los demás se mueven lo
+          // mismo: así no se descoloca lo que ya estaba ordenado entre sí.
+          finalDx = targetX - startItemX;
+          finalDy = targetY - startItemY;
         }
         _setCanvases(prev => {
           const c = prev[currentId];
@@ -4136,8 +4198,8 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
                 let nx = ms.x + finalDx;
                 let ny = ms.y + finalDy;
                 if (ev.shiftKey) {
-                  nx = Math.round(nx / 20) * 20;
-                  ny = Math.round(ny / 20) * 20;
+                  nx = Math.round(nx / pasoCuadricula()) * pasoCuadricula();
+                  ny = Math.round(ny / pasoCuadricula()) * pasoCuadricula();
                 }
                 return { ...it, x: nx, y: ny, _dragging: true };
               }
@@ -4428,8 +4490,13 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
         } else {
           nx = startItemX;
         }
-        nx = Math.round(nx / 20) * 20;
-        ny = Math.round(ny / 20) * 20;
+        nx = Math.round(nx / pasoCuadricula()) * pasoCuadricula();
+        ny = Math.round(ny / pasoCuadricula()) * pasoCuadricula();
+      }
+      const iman = imanActivo(ev);
+      if (iman) {
+        nx = window.OdiCuadricula.pega(nx, pasoCuadricula());
+        ny = window.OdiCuadricula.pega(ny, pasoCuadricula());
       }
 
       let activeGuidesX = [];
@@ -4440,7 +4507,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
       let bestDiffX = snapThreshold;
       let bestDiffY = snapThreshold;
 
-      const currentItems = current.items || [];
+      const currentItems = iman ? [] : (current.items || []);
       const MAX_ALIGN_DIST = 99999;
 
       for (const other of currentItems) {
@@ -5196,13 +5263,18 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
       let activeGuidesY = [];
       const snapThreshold = 10;
       const MAX_ALIGN_DIST = 99999;
-      const currentItems = current.items || [];
+      // Con el imán, el borde que se estira cae en la cuadrícula y las guías
+      // de otros nodos se callan (como al mover).
+      const iman = imanActivo(ev);
+      const C = window.OdiCuadricula;
+      const currentItems = iman ? [] : (current.items || []);
 
       if (ev.shiftKey || item.type === 'file' || aspectLocked) {
         const master = resizeMaster || 'x'; // default to x
         if (master === 'x') {
           if (corner.includes('r')) nw = Math.max(minW, sw + dx);
           if (corner.includes('l')) nw = Math.max(minW, sw - dx);
+          if (iman) nw = C.estiraLado(corner.includes('r') ? 'r' : 'l', { p: sx, t: sw }, dx, pasoCuadricula(), minW).t;
 
           // Snap X
           let bestDiffX = snapThreshold;
@@ -5242,6 +5314,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
         } else {
           if (corner.includes('b')) nh = Math.max(minH, sh + dy);
           if (corner.includes('t')) nh = Math.max(minH, sh - dy);
+          if (iman) nh = C.estiraLado(corner.includes('b') ? 'b' : 't', { p: sy, t: sh }, dy, pasoCuadricula(), minH).t;
 
           // Snap Y
           let bestDiffY = snapThreshold;
@@ -5289,6 +5362,12 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
         if (corner.includes('b')) nh = Math.max(minH, sh + dy);
         if (corner.includes('l')) { nw = Math.max(minW, sw - dx); nx = sx + (sw - nw); }
         if (corner.includes('t')) { nh = Math.max(minH, sh - dy); ny = sy + (sh - nh); }
+        if (iman) {
+          const ladoX = corner.includes('r') ? 'r' : (corner.includes('l') ? 'l' : null);
+          const ladoY = corner.includes('b') ? 'b' : (corner.includes('t') ? 't' : null);
+          if (ladoX) { const r = C.estiraLado(ladoX, { p: sx, t: sw }, dx, pasoCuadricula(), minW); nx = r.p; nw = r.t; }
+          if (ladoY) { const r = C.estiraLado(ladoY, { p: sy, t: sh }, dy, pasoCuadricula(), minH); ny = r.p; nh = r.t; }
+        }
 
         // Snap X
         let bestDiffX = snapThreshold;
@@ -6429,8 +6508,15 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
         ref={surfaceRef}
         className={wrapClass.join(' ')}
         style={{
-          backgroundSize: `${22 * scale}px ${22 * scale}px`,
-          backgroundPosition: `${pan.x}px ${pan.y}px`
+          backgroundSize: `${cuadricula.paso * scale}px ${cuadricula.paso * scale}px`,
+          // Medio paso hacia atrás: el triangulito va en el centro de su
+          // baldosa, y así cae en los múltiplos del paso, que es donde se
+          // pegan las esquinas de los nodos.
+          backgroundPosition: `${pan.x - cuadricula.paso * scale / 2}px ${pan.y - cuadricula.paso * scale / 2}px`,
+          ...(window.OdiCuadricula && cuadricula.paso !== window.OdiCuadricula.PASO_NORMAL ? {
+            '--rejilla-claro': window.OdiCuadricula.fondo(cuadricula.paso, false),
+            '--rejilla-oscuro': window.OdiCuadricula.fondo(cuadricula.paso, true),
+          } : null),
         }}
         onMouseDown={onSurfaceMouseDown}
         onMouseMove={(e) => { if (sesionRef.current) mandaCursor(e.clientX, e.clientY); }}
@@ -6984,7 +7070,7 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
         {/* Las plantillas: abajo a la derecha, donde las pidió el usuario, a la
             izquierda de la cámara (o en su sitio, en la web, que no la tiene). */}
         {window.OdiPlantillas && !drawingId && !soloVer && (
-          <div className="plantillas-esquina" style={{ right: (window.electronAPI && window.electronAPI.capturarLienzo) ? 250 : 205 }}
+          <div className="plantillas-esquina" style={{ right: (window.electronAPI && window.electronAPI.capturarLienzo) ? 284 : 239 }}
             onMouseDown={(e) => e.stopPropagation()}>
             {plantillasAbiertas && (
               <div className="plantillas-panel">
@@ -7013,6 +7099,19 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
 
         {/* Zoom controls */}
         <div className="zoom-ctrls">
+          {/* La cuadrícula: abre su panel (imán y tamaño). Verde con el imán
+              puesto, para saber de un vistazo por qué un nodo «salta». */}
+          {!soloVer && window.OdiCuadricula && (
+            <button
+              className={'zoom-rejilla' + (cuadricula.iman ? ' on' : '')}
+              title={window.t("Cuadrícula: pegar los nodos y cambiar su tamaño (Ctrl+')", "Grid: snap nodes and change its size (Ctrl+')")}
+              aria-pressed={cuadricula.iman}
+              aria-expanded={rejillaAbierta}
+              onClick={() => { setRejillaAbierta(v => !v); window.playAudioTone && window.playAudioTone('click'); }}
+            >
+              <span className="material-symbols-rounded">grid_4x4</span>
+            </button>
+          )}
           <button title={window.t('Alejar', 'Zoom out')} onClick={()=>setScale(s => Math.max(0.2, s - 0.1))}>
             <span className="material-symbols-rounded" style={{fontSize:15}}>remove</span>
           </button>
@@ -7043,6 +7142,15 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
             <span className="material-symbols-rounded" style={{fontSize:15}}>add</span>
           </button>
         </div>
+        {rejillaAbierta && !soloVer && window.PanelCuadricula && (
+          <div className="cuadricula-pop" role="dialog" aria-label={window.t('Cuadrícula', 'Grid')}>
+            <div className="cuadricula-pop-titulo">
+              <span className="material-symbols-rounded" style={{ fontSize: 16 }}>grid_4x4</span>
+              <span>{window.t('Cuadrícula', 'Grid')}</span>
+            </div>
+            <window.PanelCuadricula />
+          </div>
+        )}
 
         {/* La foto del lienzo. Suelta y no dentro del grupo del zoom: alli
             quedaba amontonada entre el menos y el mas, y una accion que guarda
@@ -7062,7 +7170,8 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
         {fogonazo && <div className="canvas-fogonazo" />}
 
         {/* Background Color Selector */}
-        <div className="canvas-bg-selector" style={{ position: 'absolute', bottom: '16px', right: '160px', zIndex: 40 }}>
+        {/* 194 y no 160: el grupo del zoom creció 34 px con el botón de la cuadrícula. */}
+        <div className="canvas-bg-selector" style={{ position: 'absolute', bottom: '16px', right: '194px', zIndex: 40 }}>
           <button 
             className="icon-btn lift" 
             style={{ 
