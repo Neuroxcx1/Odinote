@@ -1274,6 +1274,23 @@ function htmlDeFila(txt) {
   return t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
+// Pone el cursor en la tarea número «i» de la lista en cuanto exista. Con un
+// setTimeout fijo (10 ms tras Intro, 50 tras «Nueva tarea») la fila nueva a
+// veces aún no estaba pintada: no había dónde poner el cursor y lo que se
+// tecleaba seguía en la tarea de antes («Wind gust attacksP» + «hase music»).
+// Se espera a que haya «cuantas» filas (si no, al pulsar Intro en medio de la
+// lista el cursor iba a la fila de después, que ya existía) y se reintenta en
+// cada fotograma, medio segundo como mucho.
+function enfocaFilaTodo(lista, i, cuantas) {
+  let intentos = 0;
+  const prueba = () => {
+    const inputs = lista ? lista.querySelectorAll('.todo-input') : [];
+    if (inputs.length >= cuantas && inputs[i]) { inputs[i].focus(); return; }
+    if (++intentos < 30) requestAnimationFrame(prueba);
+  };
+  requestAnimationFrame(prueba);
+}
+
 function TodoItem({ item, lang, onUpdate, editing, callbacks }) {
   const subs = item.items || [];
   const bg = window.nodeBg(item);
@@ -1475,7 +1492,6 @@ function TodoItem({ item, lang, onUpdate, editing, callbacks }) {
             {editing ? (
               <textarea
                 className="todo-title-edit"
-                autoFocus
                 value={pickLang(item.title, lang)}
                 onChange={(e)=>{
                   onUpdate({ title: { es: e.target.value, en: e.target.value } });
@@ -1486,6 +1502,17 @@ function TodoItem({ item, lang, onUpdate, editing, callbacks }) {
                   if (el) {
                     el.style.height = 'auto';
                     el.style.height = el.scrollHeight + 'px';
+                    // El título coge el cursor al abrirse, SALVO si se está
+                    // escribiendo en una tarea: escribir en una tarea también
+                    // abre la edición de la lista (startEdit en su onFocus), y
+                    // con autoFocus el título le quitaba el cursor. Pulsabas
+                    // «Nueva tarea», escribías, y el texto acababa delante del
+                    // título. Solo una vez por apertura (el ref corre en cada pintada).
+                    if (!el.dataset.enfocado) {
+                      el.dataset.enfocado = '1';
+                      const ae = document.activeElement;
+                      if (!(ae && ae.closest && ae.closest('.todo-row'))) el.focus();
+                    }
                   }
                 }}
                 onClick={(e)=>e.stopPropagation()}
@@ -1629,10 +1656,7 @@ function TodoItem({ item, lang, onUpdate, editing, callbacks }) {
                         } else {
                           e.preventDefault();
                           addRow(idx);
-                          setTimeout(()=>{
-                            const inputs = e.target.closest('.todo-list').querySelectorAll('.todo-input');
-                            inputs[idx+1]?.focus();
-                          }, 10);
+                          enfocaFilaTodo(e.target.closest('.todo-list'), idx + 1, subs.length + 1);
                         }
                       }
                       if (e.key === 'Tab') {
@@ -1739,11 +1763,9 @@ function TodoItem({ item, lang, onUpdate, editing, callbacks }) {
             className="todo-add"
             onClick={(e)=>{
               e.stopPropagation();
+              const total = subs.length;
               addRow(subs.length - 1);
-              setTimeout(()=>{
-                const inputs = e.target.closest('.todo-list').querySelectorAll('.todo-input');
-                inputs[inputs.length - 1]?.focus();
-              }, 50);
+              enfocaFilaTodo(e.target.closest('.todo-list'), total, total + 1);
             }}
             onMouseDown={(e)=>e.stopPropagation()}
           >
