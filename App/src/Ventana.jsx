@@ -323,6 +323,23 @@ function PanelCuadricula() {
 }
 
 window.PanelCuadricula = PanelCuadricula;
+
+// ── Las estadísticas de uso: decirlas ──
+// La app manda estadísticas a Google Analytics (src/analytics.js) y eso hay
+// que contarlo. El usuario no quiere interruptor para apagarlas (vaciaría las
+// cifras) ni un aviso grande: solo que Ajustes diga que pasa. Va SOLO en
+// inglés, a propósito (lo pidió así): sin window.t, para que no entre en el
+// catálogo de frases. Si analytics.js empieza a mandar otra cosa, se cambia
+// aquí y en PRIVACY.md.
+function TextoEstadisticas() {
+  return (
+    <p>
+      Oddinote sends anonymous usage statistics to Google Analytics: when it is opened, which kinds of node are created, whether live rooms and Drive work, and the approximate country and city of the connection. Your name, your email and your notes are never sent.
+    </p>
+  );
+}
+
+window.TextoEstadisticas = TextoEstadisticas;
 window.BotonFijar = BotonFijar;
 window.useVentana = useVentana;
 window.AjusteEscala = AjusteEscala;

@@ -1615,6 +1615,9 @@ html[data-ventana-fijada] [data-mueve-ventana]:active { cursor: grabbing; }
 .zoom-ctrls button:hover { background: var(--bg); }
 /* La cuadrícula (imán y tamaño) vive solo en Ajustes: PanelCuadricula,
    Ventana.jsx. El usuario no la quiso junto al zoom. */
+
+/* El texto de las estadísticas en Ajustes (TextoEstadisticas, Ventana.jsx). */
+.ajuste-estadisticas p { margin: 0; font-size: 12.5px; line-height: 1.5; color: var(--text-soft, #595459); }
 .ajuste-cuadricula { display: flex; flex-direction: column; gap: 10px; }
 .cuadricula-interruptor {
   display: flex; align-items: center; gap: 9px; width: 100%;

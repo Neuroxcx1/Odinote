@@ -47,7 +47,7 @@ try {
 
 // Marcador de build: si la consola no muestra esta versión, el navegador está
 // sirviendo JS cacheado (subir ?v= en index.html invalida la caché)
-window.ODINOTE_BUILD = '1.2.1-233';
+window.ODINOTE_BUILD = '1.2.1-236';
 console.log('[ODINOTE] Código cargado: ' + window.ODINOTE_BUILD);
 
 // Global shortcuts configuration
@@ -3906,6 +3906,20 @@ function App() {
                     )}
                   </p>
                   <window.PanelCuadricula />
+                </div>
+              )}
+
+              {/* Las estadísticas de uso: decir que se envían (Ventana.jsx,
+                  TextoEstadisticas). Sin interruptor, a propósito. */}
+              {window.TextoEstadisticas && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <div style={{ fontWeight: '600', fontSize: '14px', color: 'var(--wine, #7B2D26)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span className="material-symbols-rounded" style={{ fontSize: '18px' }}>show_chart</span>
+                    <span>Usage statistics</span>
+                  </div>
+                  <div className="ajuste-estadisticas">
+                    <window.TextoEstadisticas />
+                  </div>
                 </div>
               )}
 

@@ -123,6 +123,10 @@ value only the running process knows, so an intercepted code is useless to
 anyone else. Keeping the file out of the repository is about not publishing it
 and being able to rotate it later, not about hiding it from users.
 
+## Privacy
+
+The app and the official web version send **anonymous usage statistics** to Google Analytics (when it is opened, which kinds of node are created, whether live rooms and Drive work, and the approximate country and city Google works out from the connection). Your name, email and notes are never sent, and your projects stay on your computer unless you connect Drive or share them. Details in [PRIVACY.md](PRIVACY.md).
+
 ## Contributing
 
 Issues and pull requests are genuinely welcome — bug reports especially.
