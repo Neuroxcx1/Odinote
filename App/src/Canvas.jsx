@@ -754,6 +754,51 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
 
   const showToastCanvas = (msg, tipo) => { window.showToast && window.showToast(msg, tipo); };
 
+  // ── Markdown: llevarse el lienzo y traerse notas (src/markdown.js) ──
+  // Para Obsidian, Notion y cualquier editor que lea .md. Exportar baja un
+  // archivo (como la copia de seguridad: en el programa, Windows pregunta
+  // dónde guardarlo). Importar convierte cada .md en un nodo Documento.
+  const importaMdRef = useRefCanvas(null);
+  const importaMdEnRef = useRefCanvas({ x: 0, y: 0 });
+  const tituloDelLienzo = () => {
+    const pick = (v) => (v && typeof v === 'object') ? (v[lang] || v.es || v.en || '') : (v || '');
+    const proy = projects ? projects.find(p => p.id === projectId) : null;
+    return pick(current.title) || pick(proy && proy.name) || 'Oddinote';
+  };
+  const exportaMarkdown = () => {
+    const M = window.OdiMarkdown;
+    if (!M) return;
+    const titulo = tituloDelLienzo();
+    const md = M.lienzoAMd(canvases, currentId, titulo, lang);
+    const url = URL.createObjectURL(new Blob([md], { type: 'text/markdown;charset=utf-8' }));
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = M.nombreArchivo(titulo);
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+  };
+  const importaMarkdown = async (archivos) => {
+    const M = window.OdiMarkdown;
+    const lista = Array.from(archivos || []).filter(f => /\.(md|markdown|txt)$/i.test(f.name));
+    if (!M || !lista.length) return;
+    const p = importaMdEnRef.current;
+    const nuevos = [];
+    for (let i = 0; i < lista.length; i++) {
+      const d = M.mdADoc(await lista[i].text(), lista[i].name);
+      const it = makeNewItem('doc', p.x + i * 30, p.y + i * 30, undefined, undefined, lang);
+      it.title = { es: d.titulo, en: d.titulo };
+      it.body = { es: d.html, en: d.html };
+      nuevos.push(it);
+    }
+    setCanvases(prev => {
+      const c = prev[currentId];
+      return { ...prev, [currentId]: { ...c, items: [...c.items, ...nuevos] } };
+    });
+    showToastCanvas(window.t(`Importados ${nuevos.length} documentos de Markdown`, `Imported ${nuevos.length} Markdown documents`));
+  };
+
   // ── Devolver lo prestado ──
   //
   // Al terminar la sesión, el proyecto de la otra persona se va de aquí: de la
@@ -7165,6 +7210,17 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
           </button>
         </div>
 
+        {/* El campo de archivo de «Importar Markdown…» (escondido). */}
+        <input
+          ref={importaMdRef}
+          type="file"
+          className="importa-md-input"
+          accept=".md,.markdown,.txt,text/markdown,text/plain"
+          multiple
+          style={{ display: 'none' }}
+          onChange={(e) => { importaMarkdown(e.target.files); e.target.value = ''; }}
+        />
+
         {/* El minimapa, encima del zoom (src/Minimapa.jsx). Fuera mientras se
             dibuja: ahí abajo van los mandos del dibujo. */}
         {window.Minimapa && !drawingId && (
@@ -7290,6 +7346,19 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
               <span className="material-symbols-rounded">select_all</span>
               {window.t('Seleccionar todo', 'Select all')} <span style={{marginLeft:'auto', fontFamily:'var(--font-mono)', fontSize:10, color:'var(--ink-3)'}}>⌘A</span>
             </button>
+            {window.OdiMarkdown && !soloVer && (
+              <>
+                <div className="ctx-sep"/>
+                <button className="ctx-md-exporta" onClick={()=>{ exportaMarkdown(); setContextMenu(null); }}>
+                  <span className="material-symbols-rounded">download</span>
+                  {window.t('Exportar a Markdown', 'Export to Markdown')}
+                </button>
+                <button className="ctx-md-importa" onClick={()=>{ importaMdEnRef.current = { x: contextMenu.cx, y: contextMenu.cy }; setContextMenu(null); importaMdRef.current && importaMdRef.current.click(); }}>
+                  <span className="material-symbols-rounded">upload_file</span>
+                  {window.t('Importar Markdown…', 'Import Markdown…')}
+                </button>
+              </>
+            )}
              <div class="ctx-sep"/>
             {(window.TOOLS || []).map(tool => (
               <button key={tool.id} onClick={()=>{ createNodeAt(tool.id, contextMenu.cx, contextMenu.cy); setContextMenu(null); }}>

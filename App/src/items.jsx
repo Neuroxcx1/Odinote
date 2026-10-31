@@ -1102,6 +1102,11 @@ function LinkItem({ item, lang, onUpdate, editing, onEndEdit }) {
   const titlePlaceholder = window.t('Título del enlace…', 'Link title…');
   const desc = fetched?.description;
   const openLink = () => item.url && window.open(item.url, '_blank', 'noopener,noreferrer');
+  // Spotify, SoundCloud y CodePen (src/incrustados.js): como
+  // YouTube, se ven dentro del nodo al pulsar ▶. El reproductor solo se carga
+  // entonces, no al abrir el lienzo.
+  const embed = !ytId && window.OdiIncrusta ? window.OdiIncrusta.incrustado(item.url) : null;
+  const srcReproductor = ytId ? `https://www.youtube.com/embed/${ytId}?autoplay=1` : (embed ? embed.src : null);
 
   return (
     <div className="link-card" style={{width:'100%', height:'100%'}}>
@@ -1117,7 +1122,7 @@ function LinkItem({ item, lang, onUpdate, editing, onEndEdit }) {
           onClick={(e)=>{ if (!ytId && (e.ctrlKey || e.metaKey)) { e.stopPropagation(); openLink(); } }}
           title={!ytId ? window.t('Ctrl+clic para abrir el enlace', 'Ctrl+click to open the link') : null}
         >
-          {!ytId && (
+          {!playing && (
             <button
               className="link-abrir"
               onClick={(e)=>{ e.stopPropagation(); openLink(); }}
@@ -1127,26 +1132,30 @@ function LinkItem({ item, lang, onUpdate, editing, onEndEdit }) {
               <span>{window.t('Abrir', 'Open')}</span>
             </button>
           )}
-          {ytId && playing ? (
+          {srcReproductor && playing ? (
             <iframe
-              src={`https://www.youtube.com/embed/${ytId}?autoplay=1`}
-              title="YouTube video"
+              src={srcReproductor}
+              title={ytId ? 'YouTube video' : (embed ? embed.tipo : '')}
               frameBorder="0"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; fullscreen; gyroscope; picture-in-picture"
               allowFullScreen
+              // YouTube (desde 2025) y Vimeo piden saber desde qué página se
+              // incrustan: sin la dirección de origen, YouTube dice «Este video
+              // no está disponible» dentro del programa.
+              referrerPolicy="strict-origin-when-cross-origin"
               style={{ position:'absolute', inset: 0, width:'100%', height:'100%', border: 0 }}
               onMouseDown={(e)=>e.stopPropagation()}
             />
           ) : (
             <>
-              {ytId && (
+              {srcReproductor && (
                 <button
                   className="link-play-btn"
                   onClick={(e)=>{ e.stopPropagation(); setPlaying(true); }}
                   onMouseDown={(e)=>e.stopPropagation()}
-                  title={window.t('Reproducir', 'Play')}
+                  title={embed && embed.tipo === 'codepen' ? window.t('Ver aquí', 'View here') : window.t('Reproducir', 'Play')}
                 >
-                  <span className="material-symbols-rounded">play_arrow</span>
+                  <span className="material-symbols-rounded">{embed && embed.tipo === 'codepen' ? 'code' : 'play_arrow'}</span>
                 </button>
               )}
               {!ytId && !thumb && (

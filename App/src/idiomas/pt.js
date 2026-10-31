@@ -1258,4 +1258,8 @@ window.ODI_IDIOMAS.pt = {
   1253: "As novas versões são baixadas sozinhas e instaladas ao fechar o Oddinote. Suas notas não são alteradas.",
   1254: "Procurando…",
   1255: "Verificar agora",
+  1256: "{0} documentos Markdown importados",
+  1257: "Exportar para Markdown",
+  1258: "Importar Markdown…",
+  1259: "Ver aqui",
 };

@@ -1258,4 +1258,8 @@ window.ODI_FRASES = [
   /* 1253 */ ["Las versiones nuevas se descargan solas y se instalan al cerrar Oddinote. Tus notas no se tocan.","New versions download by themselves and install when you close Oddinote. Your notes are not touched."],
   /* 1254 */ ["Buscando…","Checking…"],
   /* 1255 */ ["Buscar ahora","Check now"],
+  /* 1256 */ ["Importados {0} documentos de Markdown","Imported {0} Markdown documents"],
+  /* 1257 */ ["Exportar a Markdown","Export to Markdown"],
+  /* 1258 */ ["Importar Markdown…","Import Markdown…"],
+  /* 1259 */ ["Ver aquí","View here"],
 ];

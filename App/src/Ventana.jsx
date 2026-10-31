@@ -367,14 +367,15 @@ function AjusteActualizaSola() {
           ? window.t('Al abrir Oddinote mira si hay una versión nueva y te ofrece descargarla.', 'When Oddinote opens it checks for a new version and offers to download it.')
           : window.t('Las versiones nuevas se descargan solas y se instalan al cerrar Oddinote. Tus notas no se tocan.', 'New versions download by themselves and install when you close Oddinote. Your notes are not touched.')}
       </p>
+      {/* Botón propio: el blanco de los botones de tamaño desentonaba en oscuro. */}
       <button
         type="button"
-        className="ajuste-escala-rapido"
-        style={{ alignSelf: 'flex-start' }}
+        className={'boton-buscar' + (buscando ? ' buscando' : '')}
         disabled={buscando}
         onClick={async () => { setBuscando(true); try { await (window.odiBuscaActualizacion && window.odiBuscaActualizacion()); } finally { setBuscando(false); } }}
       >
-        {buscando ? window.t('Buscando…', 'Checking…') : window.t('Buscar ahora', 'Check now')}
+        <span className="material-symbols-rounded" aria-hidden="true">sync</span>
+        <span>{buscando ? window.t('Buscando…', 'Checking…') : window.t('Buscar ahora', 'Check now')}</span>
       </button>
     </div>
   );

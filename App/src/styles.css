@@ -1874,6 +1874,10 @@ body.odi-busy iframe { pointer-events: none !important; }
 }
 .link-thumb .link-abrir .material-symbols-rounded { font-size: 14px; color: #FFFFFF; }
 .item:hover .link-abrir, .item.selected .link-abrir { opacity: 1; transform: none; }
+/* El ▶ de los reproductores (YouTube, Vimeo, Spotify…) también recibe el clic
+   en un nodo sin elegir: la tarjeta de un nodo sin elegir no recibe clics
+   (.item:not(.selected) .item-card), y el ▶ solo elegía el nodo. */
+.link-play-btn { pointer-events: auto; }
 .link-abrir:hover { background: rgba(20, 18, 20, 0.88); }
 .link-thumb-placeholder { display: grid; place-items: center; gap: 8px; position: relative; }
 .link-thumb-favicon { width: calc(40px * var(--node-scale, 1)); height: calc(40px * var(--node-scale, 1)); opacity: 0.85; border-radius: 4px; }
@@ -8251,6 +8255,26 @@ body.odi-cuentagotas, body.odi-cuentagotas * { cursor: crosshair !important; }
 }
 .ajuste-escala-rapido:hover { border-color: var(--line); }
 .ajuste-escala-rapido.activo { background: var(--olive); color: #FFFFFF; border-color: var(--olive); }
+/* En oscuro, gris y no blanco: las pastillas blancas saltaban a la vista. */
+[data-theme="dark"] .ajuste-escala-rapido { background: #474447; color: #F0EEF0; border-color: #5A575A; }
+[data-theme="dark"] .ajuste-escala-rapido:hover { border-color: #8A878A; }
+[data-theme="dark"] .ajuste-escala-rapido.activo { background: var(--olive); color: #FFFFFF; border-color: var(--olive); }
+/* «Buscar ahora» (Ajustes → Actualizaciones): gris suave, con su icono, que
+   gira mientras busca. */
+.boton-buscar {
+  align-self: flex-start; display: inline-flex; align-items: center; gap: 7px;
+  padding: 7px 14px 7px 11px; border-radius: 8px; cursor: pointer;
+  background: rgba(26, 26, 26, 0.06); color: var(--ink); border: 1px solid rgba(26, 26, 26, 0.12);
+  font-family: var(--font-body); font-size: 13px; font-weight: 700;
+  transition: background 120ms, border-color 120ms;
+}
+.boton-buscar .material-symbols-rounded { font-size: 16px; color: var(--olive); }
+.boton-buscar:hover { background: rgba(26, 26, 26, 0.10); border-color: rgba(26, 26, 26, 0.2); }
+.boton-buscar:disabled { cursor: default; opacity: 0.8; }
+.boton-buscar.buscando .material-symbols-rounded { animation: boton-buscar-gira 900ms linear infinite; }
+@keyframes boton-buscar-gira { to { transform: rotate(360deg); } }
+[data-theme="dark"] .boton-buscar { background: rgba(255, 255, 255, 0.07); color: #F0EEF0; border-color: rgba(255, 255, 255, 0.14); }
+[data-theme="dark"] .boton-buscar:hover { background: rgba(255, 255, 255, 0.12); border-color: rgba(255, 255, 255, 0.24); }
 .ajuste-escala-nota { margin: 0; font-size: 12px; line-height: 1.5; color: var(--text-soft, #595459); }
 
 

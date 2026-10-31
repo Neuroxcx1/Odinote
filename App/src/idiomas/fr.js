@@ -1258,4 +1258,8 @@ window.ODI_IDIOMAS.fr = {
   1253: "Les nouvelles versions se téléchargent seules et s'installent à la fermeture d'Oddinote. Vos notes ne sont pas touchées.",
   1254: "Recherche…",
   1255: "Vérifier maintenant",
+  1256: "{0} documents Markdown importés",
+  1257: "Exporter en Markdown",
+  1258: "Importer du Markdown…",
+  1259: "Voir ici",
 };
