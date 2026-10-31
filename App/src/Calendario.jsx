@@ -673,9 +673,12 @@ function CalendarItem({ item, lang, onUpdate, editing }) {
 
   // El título de arriba, según la vista.
   let titulo;
-  if (vista === 'mes' || vista === 'agenda') titulo = <><span className="cal-mb-mes">{calNombreMes(lang, ancla.getMonth())}</span><span className="cal-mb-anio">{ancla.getFullYear()}</span></>;
+  // En un calendario estrecho no caben el mes entero, el año y los cuatro
+  // botones: el mes se quedaba en «O…». Ahí va el nombre corto («Oct»).
+  const estrecho = (item.w || 520) < 420;
+  if (vista === 'mes' || vista === 'agenda') titulo = <><span className="cal-mb-mes">{calNombreMes(lang, ancla.getMonth(), estrecho ? 'short' : 'long')}</span><span className="cal-mb-anio">{ancla.getFullYear()}</span></>;
   else if (vista === 'anio') titulo = <span className="cal-mb-mes">{ancla.getFullYear()}</span>;
-  else if (vista === 'dia') titulo = <><span className="cal-mb-mes">{calFecha(lang, ancla, { weekday: 'long', day: 'numeric', month: 'long' })}</span><span className="cal-mb-anio">{ancla.getFullYear()}</span></>;
+  else if (vista === 'dia') titulo = <><span className="cal-mb-mes">{calFecha(lang, ancla, estrecho ? { weekday: 'short', day: 'numeric', month: 'short' } : { weekday: 'long', day: 'numeric', month: 'long' })}</span><span className="cal-mb-anio">{ancla.getFullYear()}</span></>;
   else {
     const a = desdeVista, b = hastaVista;
     const mismoMes = a.getMonth() === b.getMonth();
@@ -1186,7 +1189,7 @@ function CalendarItem({ item, lang, onUpdate, editing }) {
         <div className="cal-mb-head">
           <div className="cal-mb-titulo-caja" ref={selectorRef}>
             <button
-              className="cal-mb-pick-btn cal-mb-titulo"
+              className={'cal-mb-pick-btn cal-mb-titulo' + (estrecho ? ' estrecho' : '')}
               onClick={(e) => { e.stopPropagation(); setSelector(selector == null ? ancla.getFullYear() : null); }}
               onMouseDown={quieto}
               title={window.t('Elegir mes y año', 'Pick month and year')}

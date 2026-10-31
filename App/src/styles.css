@@ -3218,6 +3218,9 @@ body.odi-busy iframe { pointer-events: none !important; }
 .cal-mb-mes::first-letter { text-transform: uppercase; }
 .cal-mb-anio { font-weight: 600; opacity: 0.5; }
 .cal-mb-titulo .material-symbols-rounded { font-size: 0.8em; opacity: 0.45; align-self: center; }
+/* En un calendario estrecho la flechita del título le quitaba el sitio al mes
+   (se quedaba en «O…»). El título se sigue abriendo al pulsarlo. */
+.cal-mb-titulo.estrecho .material-symbols-rounded { display: none; }
 .cal-mb-navs { display: flex; align-items: center; gap: calc(4px * var(--node-scale, 1)); flex-shrink: 0; }
 .cal-mb-nav {
   display: inline-flex; align-items: center; justify-content: center; gap: 0.1em;
