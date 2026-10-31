@@ -59,7 +59,7 @@ function defaultDims(type) {
     case 'todo':     return { w: 300, h: 230 };
     case 'doc':      return { w: 300, h: 210 };
     case 'image':    return { w: 300, h: 220 };
-    case 'link':     return { w: 400, h: 74 };
+    case 'link':     return { w: 400, h: 104 };
     case 'board':    return { w: 300, h: 240 };
     case 'column':   return { w: 320, h: 380 };
     case 'comment':  return { w: 280, h: 150 };
@@ -151,7 +151,7 @@ function makeNewItem(type, x, y, w, h, lang) {
     case 'image':
       return { ...base, type: 'image', ...defaultSize(300, 220) };
     case 'link':
-      return { ...base, type: 'link', ...defaultSize(400, 74), url: '', showPreview: true };
+      return { ...base, type: 'link', ...defaultSize(400, 104), url: '', showPreview: true };
     case 'board': {
       const cid = `b-${Date.now()}-${Math.floor(Math.random()*9999)}`;
       return { ...base, type: 'board', ...defaultSize(300, 240), color: 'white',
@@ -2808,7 +2808,9 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
         // Un enlace pegado nace con la altura de su vista previa (la misma que
         // coge el nodo al escribirle la dirección, LinkItem): con la de un
         // enlace vacío (74) la imagen y el título salían aplastados.
-        const def = isUrl ? { w: 400, h: 290 } : defaultDims(type);
+        // Uno de YouTube, Spotify, SoundCloud o CodePen, con el de su tarjeta.
+        const svPegado = isUrl && window.OdiIncrusta ? window.OdiIncrusta.servicio(plainText) : null;
+        const def = svPegado ? svPegado.tamano : (isUrl ? { w: 400, h: 290 } : defaultDims(type));
         const newItem = makeNewItem(type, pt.x - def.w / 2, pt.y - def.h / 2, def.w, def.h, lang);
         if (isUrl) {
           newItem.url = plainText;

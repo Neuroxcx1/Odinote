@@ -1062,14 +1062,18 @@ function LinkItem({ item, lang, onUpdate, editing, onEndEdit }) {
   React.useEffect(() => { setPlaying(false); }, [item.url]);
 
   if (!hasUrl || editing) {
+    // Vacío: la caja para pegar y, debajo, los servicios que se ven dentro del
+    // nodo (src/EnlaceServicio.jsx), para que se sepa que se puede.
+    const SERVICIOS = [['youtube', 'YouTube', 'youtube.com'], ['spotify', 'Spotify', 'spotify.com'], ['soundcloud', 'SoundCloud', 'soundcloud.com'], ['codepen', 'CodePen', 'codepen.io']];
     return (
-      <div className="link-card empty" style={{width:'100%', height:'100%'}}>
+      <div className="link-card empty enlace-vacio" style={{width:'100%', height:'100%'}}>
         <div className="item-card" style={{ background: bg, color: window.nodeInk(item) }}>
           <div className="link-edit-row">
             <span className="material-symbols-rounded link-prefix" style={{fontSize: 18, color:'var(--ink-3)'}}>link</span>
             <input
               className="link-input"
               autoFocus
+              title={window.t('Enter para guardar · Esc para salir', 'Enter to save · Esc to exit')}
               placeholder={window.t('Pega un enlace…', 'Paste a link…')}
               value={item.url || ''}
               onClick={(e)=>e.stopPropagation()}
@@ -1078,9 +1082,12 @@ function LinkItem({ item, lang, onUpdate, editing, onEndEdit }) {
               onBlur={(e)=>{
                 // Apply the link and exit edit mode automatically — no Enter required
                 const v = e.target.value.trim();
-                const grow = v
-                  ? (!item._grewForUrl ? { h: Math.max(item.h || 0, 290), _grewForUrl: true } : {})
-                  : { h: 74, _grewForUrl: false };
+                // Un enlace de YouTube, Spotify, SoundCloud o CodePen coge el
+                // tamaño de su tarjeta; uno cualquiera, el de siempre (290).
+                const sv = v && window.OdiIncrusta ? window.OdiIncrusta.servicio(v) : null;
+                const grow = !v ? { h: 104, _grewForUrl: false }
+                  : sv ? { w: sv.tamano.w, h: sv.tamano.h, _grewForUrl: true }
+                  : ((item.h || 0) < 200 ? { h: 290, _grewForUrl: true } : {});
                 onUpdate({ url: v, _editing: false, ...grow });
                 onEndEdit && onEndEdit();
               }}
@@ -1089,9 +1096,28 @@ function LinkItem({ item, lang, onUpdate, editing, onEndEdit }) {
               }}
             />
           </div>
-          <div className="link-edit-hint">
-            {window.t('Enter para guardar · Esc para salir', 'Enter to save · Esc to exit')}
+          <div className="enlace-vacio-servicios">
+            <span>{window.t('Se ven dentro:', 'Play inside:')}</span>
+            {SERVICIOS.map(([k, nombre, dominio]) => (
+              <span key={k} className={`enlace-chip chip-${k}`}>
+                <img src={`https://www.google.com/s2/favicons?domain=${dominio}&sz=64`} alt="" />
+                {nombre}
+              </span>
+            ))}
           </div>
+        </div>
+      </div>
+    );
+  }
+
+  // YouTube, Spotify, SoundCloud y CodePen: su propia tarjeta. Una web
+  // cualquiera, la de siempre (más abajo).
+  const servicioDeEnlace = showPreview && window.OdiIncrusta && window.EnlaceServicio ? window.OdiIncrusta.servicio(item.url) : null;
+  if (servicioDeEnlace) {
+    return (
+      <div className="link-card link-servicio" style={{width:'100%', height:'100%'}}>
+        <div className="item-card svc-card">
+          <window.EnlaceServicio item={item} servicio={servicioDeEnlace} onOpen={() => window.open(item.url, '_blank', 'noopener,noreferrer')} />
         </div>
       </div>
     );

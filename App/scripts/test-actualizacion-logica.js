@@ -30,6 +30,9 @@ check('un borrador no cuenta', A.hayNueva('1.2.1-236', pub('v1.2.2', 300, null, 
   check('en Windows elige el instalador', w && /Setup/.test(w.nombre) && w.sha256 === 'a'.repeat(64), JSON.stringify(w));
   const an = A.archivoPara(pub('v1.2.2', 238), 'android');
   check('en Android elige el APK', an && an.nombre === 'Oddinote.apk' && an.sha256 === null);
+  const conLinux = pub('v1.2.2', 238, [{ name: 'Oddinote-1.2.2-x86_64.AppImage', browser_download_url: 'https://x/o.AppImage' }, { name: 'Oddinote-Setup-1.2.2.exe', browser_download_url: 'https://x/s.exe' }]);
+  check('en Linux elige el AppImage, no el instalador de Windows', A.archivoPara(conLinux, 'linux').nombre === 'Oddinote-1.2.2-x86_64.AppImage');
+  check('en Windows, con AppImage al lado, sigue el instalador', A.archivoPara(conLinux, 'windows').nombre === 'Oddinote-Setup-1.2.2.exe');
   check('una publicación solo con zip no da instalador', A.archivoPara(pub('v1.2.1', 1, [{ name: 'Oddinote-1.2.1-win32-x64.zip' }]), 'windows') === null);
 }
 

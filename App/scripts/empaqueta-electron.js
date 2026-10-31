@@ -9,16 +9,16 @@ const path = require('path');
 const APP = path.join(__dirname, '..');
 const packager = require(path.join(APP, 'node_modules', 'electron-packager'));
 const precompila = require('./precompila');
-const [nombre, salida] = process.argv.slice(2);
+const [nombre, salida, plataforma] = process.argv.slice(2);
 
 packager({
   dir: APP,
   name: nombre,
-  platform: 'win32',
+  platform: plataforma || 'win32',
   arch: 'x64',
   out: salida,
   overwrite: true,
-  icon: path.join(APP, 'Icon', 'Icon.ico'),
+  icon: path.join(APP, 'Icon', plataforma === 'linux' ? 'Icon.png' : 'Icon.ico'),
   // dist/ (lo compilado) e instalador/ (el texto de su licencia) no van dentro.
   ignore: [/^\/dist($|\/)/, /^\/instalador($|\/)/],
   electronVersion: require(path.join(APP, 'node_modules', 'electron', 'package.json')).version,

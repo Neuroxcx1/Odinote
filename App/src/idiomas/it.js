@@ -1262,4 +1262,8 @@ window.ODI_IDIOMAS.it = {
   1257: "Esporta in Markdown",
   1258: "Importa Markdown…",
   1259: "Guarda qui",
+  1260: "Un pen di CodePen",
+  1261: "Su Spotify",
+  1262: "Apri in {0}",
+  1263: "Si vedono qui:",
 };

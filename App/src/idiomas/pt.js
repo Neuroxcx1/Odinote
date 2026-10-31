@@ -1262,4 +1262,8 @@ window.ODI_IDIOMAS.pt = {
   1257: "Exportar para Markdown",
   1258: "Importar Markdown…",
   1259: "Ver aqui",
+  1260: "Um pen do CodePen",
+  1261: "No Spotify",
+  1262: "Abrir no {0}",
+  1263: "Abrem aqui dentro:",
 };

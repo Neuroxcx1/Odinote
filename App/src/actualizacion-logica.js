@@ -54,8 +54,8 @@
   function archivoPara(publicacion, sistema) {
     const lista = (publicacion && Array.isArray(publicacion.assets)) ? publicacion.assets : [];
     const busca = (re) => lista.find(a => a && re.test(a.name || ''));
-    const a = sistema === 'android'
-      ? busca(/\.apk$/i)
+    const a = sistema === 'android' ? busca(/\.apk$/i)
+      : sistema === 'linux' ? busca(/\.AppImage$/i)
       : (busca(/setup.*\.exe$/i) || busca(/\.exe$/i));
     if (!a) return null;
     const d = String(a.digest || '');

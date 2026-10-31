@@ -1983,6 +1983,25 @@ ipcMain.handle('actualiza:instala', async (event, { ruta, ahora }) => {
   }
 });
 
+// ── Los datos de un enlace de YouTube, Spotify, SoundCloud o CodePen ──
+// Título, autor y portada (oEmbed) para la tarjeta del nodo de enlace
+// (src/EnlaceServicio.jsx). Desde aquí porque varios de esos servicios no
+// dejan que una página se los pida (CORS). Solo a esos cuatro: no es un
+// pasadizo para pedir cualquier dirección desde el programa.
+const PROVEEDORES_OEMBED = ['https://www.youtube.com/oembed?', 'https://open.spotify.com/oembed?', 'https://soundcloud.com/oembed?', 'https://codepen.io/api/oembed?'];
+ipcMain.handle('enlace:oembed', async (event, url) => {
+  try {
+    if (!PROVEEDORES_OEMBED.some(p => String(url).startsWith(p))) return { ok: false, error: 'proveedor no permitido' };
+    const { net } = require('electron');
+    const r = await net.fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36', Accept: 'application/json' } });
+    if (!r.ok) return { ok: false, error: 'HTTP ' + r.status };
+    const j = await r.json();
+    return { ok: true, datos: { title: j.title || '', author_name: j.author_name || '', thumbnail_url: j.thumbnail_url || '' } };
+  } catch (err) {
+    return { ok: false, error: err.message };
+  }
+});
+
 // Al cerrar: si quedó una actualización lista, se instala en silencio. Sin
 // --force-run: el usuario cerró la aplicación y no hay que abrírsela otra vez.
 app.on('will-quit', () => {

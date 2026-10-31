@@ -1,0 +1,99 @@
+# Oddinote para Linux: un AppImage (se abre con doble clic, sin instalar).
+#
+# Desde Windows no se puede hacer ni probar bien (el empaquetado de Linux de
+# electron-builder pide Linux), así que se compila aquí, como el de Mac.
+# Antes de subirlo se ARRANCA sin pantalla (xvfb) y se mira en su registro
+# que el código cargó: lo pidió el usuario («si no lo puedes testear bien,
+# no lo pones»).
+#
+# Al publicar una versión sale solo. A mano (Actions → Linux → Run workflow):
+# con una etiqueta, sube el AppImage a esa publicación; sin etiqueta, lo deja
+# para descargar en la página de la ejecución.
+name: Linux
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      etiqueta:
+        description: "Publicación a la que subir el AppImage (p. ej. v1.2.2). Vacío: solo compilar y probar."
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+
+jobs:
+  linux:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name || inputs.etiqueta || github.ref }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      # npm install y no npm ci: el package-lock.json no va en el repositorio.
+      - name: Dependencias
+        working-directory: App
+        run: npm install --no-audit --no-fund
+
+      - name: Credenciales de Google (si están)
+        working-directory: App
+        env:
+          GOOGLE_OAUTH_JSON: ${{ secrets.GOOGLE_OAUTH_JSON }}
+        run: |
+          if [ -n "$GOOGLE_OAUTH_JSON" ]; then
+            printf '%s' "$GOOGLE_OAUTH_JSON" > google-oauth.json
+            echo "google-oauth.json puesto"
+          else
+            echo "Sin GOOGLE_OAUTH_JSON: la versión de Linux saldrá sin entrar con Google"
+          fi
+
+      # Con scripts/empaqueta.js, como en Windows: el código va ya traducido.
+      - name: Empaquetar
+        working-directory: App
+        run: node scripts/empaqueta.js Odinote dist/linux linux
+
+      - name: AppImage
+        working-directory: App
+        run: |
+          npx electron-builder --linux AppImage --x64 \
+            --prepackaged dist/linux/Odinote-linux-x64 --publish never \
+            -c.directories.output=dist/linux/salida \
+            -c.executableName=Odinote \
+            -c.linux.icon=Icon/Icon.png \
+            -c.linux.category=Office \
+            -c.linux.artifactName='Oddinote-${version}-x86_64.${ext}'
+          ls -la dist/linux/salida
+
+      - name: Probar que arranca
+        working-directory: App/dist/linux/salida
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq xvfb > /dev/null
+          chmod +x Oddinote-*.AppImage
+          perfil="$RUNNER_TEMP/perfil-oddinote"
+          mkdir -p "$perfil"
+          # --appimage-extract-and-run: sin FUSE (el ejecutor no lo tiene).
+          xvfb-run -a timeout 45 ./Oddinote-*.AppImage --appimage-extract-and-run --no-sandbox --user-data-dir="$perfil" || true
+          echo "---- registro ----"
+          cat "$perfil/odinote-debug.log" | head -60 || true
+          grep -q "Código cargado" "$perfil/odinote-debug.log"
+          echo "El AppImage arranca y carga el código."
+
+      - name: Subir a la publicación
+        if: github.event_name == 'release' || inputs.etiqueta != ''
+        working-directory: App/dist/linux/salida
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload "${{ github.event.release.tag_name || inputs.etiqueta }}" Oddinote-*-x86_64.AppImage --clobber --repo "${{ github.repository }}"
+
+      - name: Dejarlo para descargar (si se lanzó a mano sin etiqueta)
+        if: github.event_name != 'release' && inputs.etiqueta == ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: oddinote-linux
+          path: App/dist/linux/salida/Oddinote-*-x86_64.AppImage

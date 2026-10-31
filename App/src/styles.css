@@ -1915,6 +1915,82 @@ body.odi-busy iframe { pointer-events: none !important; }
 .link-caption-input::placeholder { color: var(--ink-3); font-weight: 400; font-style: italic; }
 .link-desc { font-size: calc(11px * var(--node-scale, 1)); color: var(--ink-3); line-height: 1.25; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 
+/* ── El nodo de enlace vacío (items.jsx, LinkItem) ──
+   La caja para pegar, más grande y redonda, y debajo los servicios que se
+   ven dentro del nodo. */
+.enlace-vacio .item-card { padding: 12px 12px 11px; gap: 9px; justify-content: center; }
+.enlace-vacio .link-edit-row { padding: 9px 12px; border-radius: 10px; }
+.enlace-vacio-servicios { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; font-size: calc(11px * var(--node-scale, 1)); color: var(--ink-3); }
+.enlace-chip { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px 2px 4px; border-radius: 999px; background: rgba(26, 26, 26, 0.05); color: var(--ink-2); font-weight: 600; }
+.enlace-chip img { width: 14px; height: 14px; border-radius: 3px; }
+[data-theme="dark"] .enlace-chip { background: rgba(255, 255, 255, 0.07); color: #CFCBCF; }
+
+/* ── Las tarjetas de YouTube, Spotify, SoundCloud y CodePen
+   (src/EnlaceServicio.jsx) ── */
+.link-servicio .item-card.svc-card {
+  padding: 0; overflow: hidden; border: none; border-radius: 12px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.10), 0 6px 18px rgba(0, 0, 0, 0.14);
+}
+.item:hover .link-servicio .item-card.svc-card { transform: translateY(-1px); box-shadow: 0 2px 4px rgba(0, 0, 0, 0.12), 0 12px 28px rgba(0, 0, 0, 0.18); }
+.svc { width: 100%; height: 100%; display: flex; font-family: var(--font-body); }
+/* Los botones y el reproductor reciben el clic aunque el nodo no esté
+   elegido (la tarjeta de un nodo sin elegir no recibe clics). Por eso el nodo
+   se coge por la portada, el texto, la barra o el pie. */
+.svc button, .svc-iframe { pointer-events: auto; }
+.svc-iframe { width: 100%; height: 100%; border: 0; display: block; }
+.svc button { font-family: var(--font-body); cursor: pointer; }
+
+/* Música: portada cuadrada a la izquierda y, a la derecha, lo que es. */
+.svc-musica { flex-direction: row; }
+.svc-musica.suena { flex-direction: column; }
+.svc-portada { flex: 0 0 auto; height: 100%; aspect-ratio: 1; background: rgba(255, 255, 255, 0.08) center / cover no-repeat; display: grid; place-items: center; }
+.svc-portada .material-symbols-rounded { font-size: 40px; opacity: 0.6; }
+.svc-info { flex: 1; min-width: 0; padding: 14px 16px 12px; display: flex; flex-direction: column; gap: 3px; }
+.svc-marca { display: flex; align-items: center; gap: 6px; font-size: 10.5px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.07em; opacity: 0.8; }
+.svc-marca img { width: 16px; height: 16px; border-radius: 4px; }
+.svc-titulo { margin-top: 4px; font-family: var(--font-display); font-weight: 800; font-size: 17px; line-height: 1.2; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.svc-autor { font-size: 13px; opacity: 0.72; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.svc-acciones { margin-top: auto; display: flex; align-items: center; gap: 8px; }
+.svc-reproducir { display: inline-flex; align-items: center; gap: 3px; padding: 6px 15px 6px 9px; border-radius: 999px; border: none; font-weight: 800; font-size: 13px; transition: transform 160ms var(--muelle, ease), filter 120ms; }
+.svc-reproducir .material-symbols-rounded { font-size: 20px; }
+.svc-reproducir:hover { transform: scale(1.04); filter: brightness(1.06); }
+.svc-abrir, .svc-parar { width: 30px; height: 30px; flex: 0 0 auto; border-radius: 50%; display: grid; place-items: center; border: none; background: rgba(255, 255, 255, 0.12); color: inherit; transition: background 120ms; }
+.svc-abrir:hover, .svc-parar:hover { background: rgba(255, 255, 255, 0.22); }
+.svc-abrir .material-symbols-rounded, .svc-parar .material-symbols-rounded { font-size: 16px; }
+/* Sonando: barra fina por la que se coge el nodo, con Parar. */
+.svc-barra { flex: 0 0 28px; height: 28px; display: flex; align-items: center; gap: 7px; padding: 0 4px 0 9px; font-size: 12px; font-weight: 700; cursor: grab; }
+.svc-barra img { width: 14px; height: 14px; border-radius: 3px; }
+.svc-barra-titulo { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; opacity: 0.85; }
+.svc-barra .svc-parar { width: 22px; height: 22px; }
+.svc-reproductor { flex: 0 0 auto; width: 100%; }
+
+.svc-spotify { background: linear-gradient(135deg, #242424 0%, #121212 100%); color: #FFFFFF; }
+.svc-spotify .svc-reproducir { background: #1DB954; color: #0A0A0A; }
+.svc-spotify .svc-marca { color: #1DB954; opacity: 1; }
+.svc-spotify.suena { background: #121212; }
+.svc-soundcloud { background: #FFFFFF; color: #1A1A1A; }
+.svc-soundcloud .svc-marca { color: #FF5500; opacity: 1; }
+.svc-soundcloud .svc-reproducir { background: #2A2A2A; color: #FFFFFF; }
+.svc-soundcloud .svc-abrir, .svc-soundcloud .svc-parar { background: rgba(26, 26, 26, 0.07); }
+.svc-soundcloud .svc-abrir:hover, .svc-soundcloud .svc-parar:hover { background: rgba(26, 26, 26, 0.14); }
+.svc-soundcloud.suena { background: #F5F5F5; }
+
+/* Vídeo y código: miniatura 16:9 con ▶ grande y el pie con lo que es. */
+.svc-video { flex-direction: column; background: #0F0F0F; color: #FFFFFF; }
+.svc-medio { flex: 1 1 auto; min-height: 0; position: relative; background: #000000 center / cover no-repeat; display: grid; place-items: center; }
+.svc-play-grande { width: 66px; height: 46px; border-radius: 14px; border: none; display: grid; place-items: center; background: rgba(15, 15, 15, 0.72); color: #FFFFFF; transition: transform 160ms var(--muelle, ease), background 120ms; }
+.svc-play-grande .material-symbols-rounded { font-size: 32px; }
+.svc-play-grande:hover { transform: scale(1.06); }
+.svc-youtube .svc-play-grande:hover { background: #FF0033; }
+.svc-pie { flex: 0 0 56px; height: 56px; display: flex; align-items: center; gap: 10px; padding: 0 10px 0 12px; cursor: grab; }
+.svc-pie > img { width: 22px; height: 22px; border-radius: 5px; flex: 0 0 auto; }
+.svc-textos { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.svc-textos b { font-size: 14px; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.svc-textos span { font-size: 12px; opacity: 0.68; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.svc-codepen { background: #1E1F26; }
+.svc-codepen .svc-medio { background: radial-gradient(circle at 30% 20%, rgba(71, 207, 115, 0.18), transparent 55%), radial-gradient(circle at 80% 85%, rgba(174, 99, 228, 0.20), transparent 55%), #131417; }
+.svc-codepen .svc-play-grande:hover { background: #47CF73; }
+
 /* ── Captions / "leyendas" (shared rich contentEditable) ──
    Always styled like a heading (H1). Font size is FIXED (not node-scaled) so that
    auto-growing the node height can't feed back into the caption height. */
@@ -8385,6 +8461,7 @@ html[data-mobile="1"] .code-run .material-symbols-rounded { font-size: max(16px,
 @media (prefers-reduced-motion: reduce) {
   .modal, .doc-modal-window, .context-menu, .ctx-side, .ctx-popout,
   .item.new-item .item-card, .panel-color, .plantillas-panel, .code-terminal, .minimapa, .aviso-actualizacion { animation-duration: 1ms !important; }
+  .svc-reproducir, .svc-play-grande { transition-duration: 1ms !important; }
   .press, .icon-btn, .tool, .ms-project-card, .ms-recent-card, .lift { transition-duration: 1ms !important; }
   /* La ruleta gira igual (es lo que hace), pero sin lo demás que se mueve. */
   .ruleta-centro-gira, .ruleta-premio, .ruleta-porcion.nueva { animation: none !important; }

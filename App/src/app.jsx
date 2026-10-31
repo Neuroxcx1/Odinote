@@ -47,7 +47,7 @@ try {
 
 // Marcador de build: si la consola no muestra esta versión, el navegador está
 // sirviendo JS cacheado (subir ?v= en index.html invalida la caché)
-window.ODINOTE_BUILD = '1.2.2-239';
+window.ODINOTE_BUILD = '1.2.2-240';
 console.log('[ODINOTE] Código cargado: ' + window.ODINOTE_BUILD);
 
 // Global shortcuts configuration
@@ -1562,18 +1562,23 @@ function App() {
 
   const checkUpdates = async (manual = false) => {
     if (checkingUpdates) return;
-    const sistema = sistemaActualiza();
+    let sistema = sistemaActualiza();
     if (!sistema) return;
     const A = window.OdiActualiza;
     if (manual) setCheckingUpdates(true);
     try {
       const info = (window.electronAPI && window.electronAPI.actualiza) ? await window.electronAPI.actualiza.info() : { instalada: false, prueba: false };
+      // En Linux no hay instalador que ejecutar: se ofrece el AppImage y se
+      // descarga como en el teléfono. (sistemaActualiza no lo distingue: solo
+      // sabe que es el programa.)
+      if (info.so === 'linux') sistema = 'linux';
       // La pre-release no da la lata sola: solo si se pregunta a mano.
       if (info.prueba && !manual) return;
       const res = await fetch('https://api.github.com/repos/Neuroxcx1/Odinote/releases');
       if (!res.ok) { if (manual) setUpdateModal({ state: 'error' }); return; }
       const data = await res.json();
-      const pub = (A && A.eligePublicacion(data, sistema === 'android' ? 'android' : 'windows')) || eligePublicacionDeEscritorio(data);
+      const queArchivo = sistema === 'android' || sistema === 'linux' ? sistema : 'windows';
+      const pub = (A && A.eligePublicacion(data, queArchivo)) || eligePublicacionDeEscritorio(data);
       if (!pub || !A || !A.hayNueva(window.ODINOTE_BUILD, pub)) {
         setUpdateAvailable(false);
         if (manual) setUpdateModal({ state: 'uptodate', version: CURRENT_VERSION });
@@ -1581,7 +1586,7 @@ function App() {
       }
       const version = A.versionDe(pub.tag_name);
       const build = A.marcaBuild(pub.body);
-      const archivo = sistema === 'mac' ? null : A.archivoPara(pub, sistema === 'android' ? 'android' : 'windows');
+      const archivo = sistema === 'mac' ? null : A.archivoPara(pub, queArchivo);
       setUpdateAvailable(true);
       const notas = (pub.body || '').replace(A.MARCA, '').trim().slice(0, 600);
       // Windows instalado y con la opción encendida: en segundo plano.
@@ -1602,7 +1607,8 @@ function App() {
         assetUrl: archivo ? archivo.url : null,
         assetName: archivo ? archivo.nombre : null,
         sha256: archivo ? archivo.sha256 : null,
-        android: sistema === 'android',
+        // Android y Linux: se descarga el archivo y lo abre la persona.
+        android: sistema === 'android' || sistema === 'linux',
       });
     } catch (err) {
       console.error('Failed to check for updates:', err);

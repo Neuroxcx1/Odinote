@@ -53,6 +53,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
     }
     return ipcRenderer.invoke('download-and-run-update', { url, fileName });
   },
+  // Título, autor y portada de un enlace de YouTube, Spotify, SoundCloud o
+  // CodePen (main.js, enlace:oembed).
+  oembed: (url) => ipcRenderer.invoke('enlace:oembed', url),
   // Actualizarse sola (main.js, «Actualizarse sola»).
   actualiza: {
     info: () => ipcRenderer.invoke('actualiza:info'),

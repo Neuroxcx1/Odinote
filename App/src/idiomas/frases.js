@@ -1262,4 +1262,8 @@ window.ODI_FRASES = [
   /* 1257 */ ["Exportar a Markdown","Export to Markdown"],
   /* 1258 */ ["Importar Markdown…","Import Markdown…"],
   /* 1259 */ ["Ver aquí","View here"],
+  /* 1260 */ ["Un pen de CodePen","A CodePen pen"],
+  /* 1261 */ ["En Spotify","On Spotify"],
+  /* 1262 */ ["Abrir en {0}","Open in {0}"],
+  /* 1263 */ ["Se ven dentro:","Play inside:"],
 ];
