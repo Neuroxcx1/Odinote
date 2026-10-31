@@ -1411,6 +1411,26 @@ function olvidaLlave(token) {
 }
 
 // Datos de la persona, para enseñar su nombre y su foto en la aplicación.
+// Un fallo de red dicho para personas. EACCES/EPERM al conectar no es falta
+// de internet: es el cortafuegos o el antivirus negándole la conexión a ESTE
+// programa (pasó con Bitdefender, que bloqueó la copia instalada tras marcar
+// como sospechosa una desinstalación silenciosa). Sin esto, la pantalla decía
+// «connect EACCES 74.125.21.95:443» y nadie sabía qué hacer.
+function explicaFalloRed(err) {
+  const codigo = (err && err.code) || '';
+  const tecnico = err && err.message ? ` (${err.message})` : '';
+  if (codigo === 'EACCES' || codigo === 'EPERM') {
+    return 'Windows o tu antivirus no deja a Oddinote conectarse a internet. Permite Odinote.exe en el cortafuegos o en el antivirus y vuelve a intentarlo.' + tecnico;
+  }
+  if (codigo === 'ENOTFOUND' || codigo === 'EAI_AGAIN') {
+    return 'No hay conexión a internet: no se encuentra Google. Comprueba la conexión y vuelve a intentarlo.' + tecnico;
+  }
+  if (codigo === 'ECONNRESET' || codigo === 'ETIMEDOUT' || codigo === 'ECONNREFUSED') {
+    return 'La conexión con Google se cortó. Comprueba internet y vuelve a intentarlo.' + tecnico;
+  }
+  return (err && err.message) || 'Error desconocido';
+}
+
 function pidePerfil(accessToken) {
   return new Promise((resolve) => {
     const https = require('https');
@@ -1570,9 +1590,10 @@ function startAuthServer() {
         cierra('Ya está', 'Puedes cerrar esta pestaña y volver a Oddinote.', true);
         setTimeout(() => { if (authServer) { authServer.close(); authServer = null; } }, 1500);
       }).catch((err) => {
-        logToFile(`OAuth: fallo al canjear el código — ${err.message}`);
-        cierra('No se pudo completar', err.message, false);
-        if (mainWindow) appWC().send('google-signin-failed', { error: err.message });
+        logToFile(`OAuth: fallo al canjear el código — ${err.code || ''} ${err.message}`);
+        const explicado = explicaFalloRed(err);
+        cierra('No se pudo completar', explicado, false);
+        if (mainWindow) appWC().send('google-signin-failed', { error: explicado });
       });
     } else if (req.url.startsWith('/local-login.html') || req.url === '/' || req.url.startsWith('/?code=')) {
       const filePath = path.join(__dirname, 'local-login.html');
