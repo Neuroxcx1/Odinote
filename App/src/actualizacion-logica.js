@@ -77,7 +77,18 @@
     return publicaciones.find(vale) || null;
   }
 
-  const api = { MARCA, numeroBuild, versionDe, marcaBuild, versionMayor, hayNueva, archivoPara, eligePublicacion };
+  // Poner (o cambiar) la marca de build en unas notas: la usa
+  // scripts/publica.js, para que ninguna publicación ni sustitución salga sin
+  // ella (sin marca, una mini actualización de la misma versión no avisa).
+  function ponMarca(notas, build) {
+    const n = numeroBuild(build) || parseInt(build, 10) || 0;
+    if (!n) throw new Error('build sin número: ' + build);
+    const linea = `<!-- odinote-build: ${n} -->`;
+    const t = String(notas || '');
+    return MARCA.test(t) ? t.replace(MARCA, linea) : t.replace(/\s*$/, '') + '\n\n' + linea + '\n';
+  }
+
+  const api = { MARCA, numeroBuild, versionDe, marcaBuild, versionMayor, hayNueva, archivoPara, eligePublicacion, ponMarca };
   if (typeof window !== 'undefined') window.OdiActualiza = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })();

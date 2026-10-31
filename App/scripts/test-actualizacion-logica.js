@@ -47,5 +47,11 @@ check('un borrador no cuenta', A.hayNueva('1.2.1-236', pub('v1.2.2', 300, null, 
   check('Android coge la que trae APK', A.eligePublicacion(lista, 'android').tag_name === 'v1.2.2');
 }
 
+// La marca la pone el script de publicar (scripts/publica.js).
+check('pone la marca al final de unas notas sin ella', A.ponMarca('Notas\n', '1.2.2-240') === 'Notas\n\n<!-- odinote-build: 240 -->\n');
+check('cambia la de antes en una sustitución (y queda una sola)', (() => { const r = A.ponMarca('Notas\n<!-- odinote-build: 236 -->\nmás', '1.2.2-240'); return r.includes('odinote-build: 240') && !r.includes('236') && (r.match(/odinote-build/g) || []).length === 1; })());
+check('lo marcado lo lee hayNueva', A.hayNueva('1.2.2-239', { tag_name: 'v1.2.2', body: A.ponMarca('x', '1.2.2-240'), assets: [] }) === true);
+check('sin número de build no se publica', (() => { try { A.ponMarca('x', 'raro'); return false; } catch (e) { return true; } })());
+
 console.log(fallos ? `\n${fallos} FALLAN` : '\nTodo bien');
 process.exit(fallos ? 1 : 0);
