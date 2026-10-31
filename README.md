@@ -17,13 +17,22 @@ Nested boards, unlimited notes, offline-first. A [Milanote](https://oddinote-web
 
 </div>
 
-<!--
-  ⬇ SCREENSHOT / GIF GOES HERE ⬇
-  This is the single most important element on this page for converting visitors.
-  Edit this file in the GitHub web editor and drag a PNG or GIF right into it —
-  GitHub uploads it and generates the link for you. A short GIF (5-10s) showing
-  nodes being dragged onto the canvas and a nested board being opened works best.
--->
+<p align="center">
+  <img src="docs/capturas/tableros-anidados.gif" width="800" alt="Double-clicking a board in Oddinote opens a whole canvas inside it; the back arrow returns to the parent board" />
+</p>
+
+<table>
+  <tr>
+    <td width="33%"><img src="docs/capturas/lienzo.png" alt="A studio hub canvas with notes, a photo, a calendar, a to-do list and a frame holding nested boards" /></td>
+    <td width="33%"><img src="docs/capturas/tablero.png" alt="Inside a game project board: design pillars, key art, a core-loop diagram with connectors, a dependency map, a table and a milestone checklist" /></td>
+    <td width="33%"><img src="docs/capturas/oscuro.png" alt="The same game board in dark mode" /></td>
+  </tr>
+  <tr>
+    <td align="center"><sub>A whole studio on one canvas</sub></td>
+    <td align="center"><sub>Double-click a board to go inside</sub></td>
+    <td align="center"><sub>Dark mode</sub></td>
+  </tr>
+</table>
 
 ---
 
