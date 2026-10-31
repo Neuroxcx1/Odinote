@@ -20,6 +20,10 @@ on:
         description: "Publicación a la que subir el AppImage (p. ej. v1.2.2). Vacío: solo compilar y probar."
         required: false
         default: ""
+      version:
+        description: "Etiqueta o commit que compilar si no es el de la publicación (vacío = el de la publicación o main)"
+        required: false
+        default: ""
 
 permissions:
   contents: write
@@ -30,7 +34,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.release.tag_name || inputs.etiqueta || github.ref }}
+          ref: ${{ inputs.version || github.event.release.tag_name || inputs.etiqueta || github.ref }}
 
       - uses: actions/setup-node@v4
         with:

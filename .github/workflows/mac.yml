@@ -1,10 +1,16 @@
-# Oddinote para Mac, compilado en un Mac de GitHub.
+# Oddinote para Mac, compilado en un Mac de GitHub: un .dmg por procesador
+# (arm64 para los chips de Apple, x64 para Intel).
 #
 # No hay un Mac a mano y la licencia de Apple no deja usar macOS fuera de sus
 # ordenadores, así que la versión de Mac la compila GitHub en uno de los
-# suyos cada vez que se publica una versión, y sube los .zip a esa misma
-# publicación junto al de Windows y el APK. También se puede lanzar a mano
-# (pestaña Actions → Mac → Run workflow) y deja los .zip para descargar.
+# suyos cada vez que se publica una versión, y sube los .dmg a esa misma
+# publicación junto al instalador de Windows, el APK y el AppImage. Desde la
+# 1.2.2 no se reparten zips (lo pidió el usuario): un .dmg se abre y se
+# arrastra a Aplicaciones, como cualquier programa de Mac.
+#
+# Antes de empaquetarlo, el código se deja ya traducido (scripts/precompila.js,
+# como en Windows y Linux) y la app se ARRANCA aquí mismo para mirar en su
+# registro que carga: si no carga, no se sube nada.
 #
 # Sale SIN FIRMAR: al abrirla, el Mac avisa de que es de un desarrollador no
 # identificado y se abre con clic derecho → Abrir. Firmarla pide la cuenta de
@@ -18,14 +24,18 @@ name: Mac
 on:
   release:
     types: [published]
-  # A mano (Actions → Mac → Run workflow): con una etiqueta, sube los .zip a
-  # esa publicación (sirve si la publicación se creó antes de que este flujo
-  # estuviera en main, como pasó con la v1.2.0); sin etiqueta, los deja para
-  # descargar.
+  # A mano (Actions → Mac → Run workflow). `etiqueta`: la publicación a la que
+  # subir los .dmg (vacío = solo compilar, probar y dejarlos para descargar).
+  # `version`: qué código compilar si no es el de la etiqueta (una etiqueta de
+  # prueba, para probar antes de publicar sin subir main).
   workflow_dispatch:
     inputs:
       etiqueta:
-        description: "Etiqueta de la publicación (p. ej. v1.2.0); vacío = solo compilar"
+        description: "Publicación a la que subir los .dmg (p. ej. v1.2.2); vacío = solo compilar y probar"
+        required: false
+        default: ""
+      version:
+        description: "Etiqueta o commit que compilar si no es el de la publicación (vacío = el de la publicación o main)"
         required: false
         default: ""
 
@@ -39,7 +49,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.release.tag_name || inputs.etiqueta || github.ref }}
+          ref: ${{ inputs.version || github.event.release.tag_name || inputs.etiqueta || github.ref }}
 
       - uses: actions/setup-node@v4
         with:
@@ -76,30 +86,55 @@ jobs:
 
       - name: Compilar (Apple y Intel)
         working-directory: App
-        run: npx electron-packager . Oddinote --platform=darwin --arch=arm64,x64 --out=dist/mac --overwrite --icon=Icon/Icon.icns --ignore="^/dist($|/)"
+        run: npx electron-packager . Oddinote --platform=darwin --arch=arm64,x64 --out=dist/mac --overwrite --icon=Icon/Icon.icns --ignore="^/dist($|/)" --ignore="^/instalador($|/)"
 
-      - name: Comprimir
+      # El código ya traducido, como en Windows y Linux: arranca antes.
+      - name: Código ya traducido
+        working-directory: App
+        run: |
+          for d in dist/mac/Oddinote-darwin-*; do
+            node scripts/precompila.js "$d/Oddinote.app/Contents/Resources/app"
+          done
+
+      # Se arranca la de este Mac (arm64) y se mira en su registro que carga.
+      - name: Probar que arranca
+        working-directory: App/dist/mac
+        run: |
+          perfil="$RUNNER_TEMP/perfil-oddinote"
+          mkdir -p "$perfil"
+          ./Oddinote-darwin-arm64/Oddinote.app/Contents/MacOS/Oddinote --user-data-dir="$perfil" &
+          pid=$!
+          sleep 40
+          kill $pid 2>/dev/null || true
+          echo "---- registro ----"
+          head -60 "$perfil/odinote-debug.log" || true
+          grep -q "Código cargado" "$perfil/odinote-debug.log"
+          echo "La versión de Mac arranca y carga el código."
+
+      - name: Un .dmg por procesador
         working-directory: App/dist/mac
         env:
           ETIQUETA: ${{ github.event.release.tag_name || inputs.etiqueta || 'prueba' }}
         run: |
+          version="$(node -p "require('../../package.json').version")"
           for d in Oddinote-darwin-*; do
             arq="${d#Oddinote-darwin-}"
-            nombre="Oddinote-${ETIQUETA#v}-mac-${arq}.zip"
-            ditto -c -k --keepParent "$d/Oddinote.app" "$nombre"
+            nombre="Oddinote-${version}-mac-${arq}.dmg"
+            hdiutil create -volname "Oddinote" -srcfolder "$d/Oddinote.app" -ov -format UDZO "$nombre"
             echo "$nombre"
           done
+          ls -la *.dmg
 
       - name: Subir a la publicación
         if: github.event_name == 'release' || inputs.etiqueta != ''
         working-directory: App/dist/mac
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release upload "${{ github.event.release.tag_name || inputs.etiqueta }}" Oddinote-*-mac-*.zip --clobber --repo "${{ github.repository }}"
+        run: gh release upload "${{ github.event.release.tag_name || inputs.etiqueta }}" Oddinote-*-mac-*.dmg --clobber --repo "${{ github.repository }}"
 
       - name: Dejarlos para descargar (si se lanzó a mano sin etiqueta)
         if: github.event_name != 'release' && inputs.etiqueta == ''
         uses: actions/upload-artifact@v4
         with:
           name: oddinote-mac
-          path: App/dist/mac/Oddinote-*-mac-*.zip
+          path: App/dist/mac/Oddinote-*-mac-*.dmg
