@@ -962,7 +962,8 @@ function CalendarItem({ item, lang, onUpdate, editing }) {
                     </button>
                     {/* El número lleva a ese día en la vista de día, como en Google. */}
                     <span className="cal-mb-day" onClick={(e) => { e.stopPropagation(); ponVista('dia', f); }} title={window.t('Ver este día', 'Show this day')}>
-                      {f.getDate() === 1 ? `${f.getDate()} ${calNombreMes(lang, f.getMonth(), 'short')}` : f.getDate()}
+                      {/* En un calendario estrecho «1 Nov» no cabe en la casilla y salía «1 No». */}
+                      {f.getDate() === 1 && (item.w || 520) >= 420 ? `${f.getDate()} ${calNombreMes(lang, f.getMonth(), 'short')}` : f.getDate()}
                     </span>
                   </div>
                   {visibles.map(o => pintaEvento(o, f))}
