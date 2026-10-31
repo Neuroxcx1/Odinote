@@ -47,7 +47,7 @@ try {
 
 // Marcador de build: si la consola no muestra esta versión, el navegador está
 // sirviendo JS cacheado (subir ?v= en index.html invalida la caché)
-window.ODINOTE_BUILD = '1.2.1-236';
+window.ODINOTE_BUILD = '1.2.2-237';
 console.log('[ODINOTE] Código cargado: ' + window.ODINOTE_BUILD);
 
 // Global shortcuts configuration
@@ -1544,42 +1544,66 @@ function App() {
     return false;
   };
 
+  // ── Las actualizaciones (src/actualizacion-logica.js y main.js) ──
+  //
+  // Cada publicación lleva escondido su número de build: así también avisa una
+  // sustitución de la misma versión (lo pidió el usuario). En Windows, con
+  // «Actualizar automáticamente» en Ajustes (encendido de fábrica) y la copia
+  // instalada con el instalador, se descarga sola y se instala al cerrar,
+  // con un aviso pequeño para reiniciar ya. Si no, la ventana de siempre. En
+  // Android no se puede instalar sin Google Play: se avisa y se abre la
+  // descarga del APK. La web no se actualiza: siempre es la última.
+  const sistemaActualiza = () => window.ODINOTE_PLATFORM === 'android' ? 'android'
+    : (window.electronAPI ? (window.odiEsMac ? 'mac' : 'windows') : null);
+  const actualizaSola = () => { try { return localStorage.getItem('odinote.actualiza_sola') !== '0'; } catch (e) { return true; } };
+  const [actualizacionLista, setActualizacionLista] = useStateApp(null);
+  const descargandoSolaRef = React.useRef(false);
+  const listaYaRef = React.useRef(false);   // el intervalo vería un estado viejo
+
   const checkUpdates = async (manual = false) => {
     if (checkingUpdates) return;
+    const sistema = sistemaActualiza();
+    if (!sistema) return;
+    const A = window.OdiActualiza;
     if (manual) setCheckingUpdates(true);
     try {
+      const info = (window.electronAPI && window.electronAPI.actualiza) ? await window.electronAPI.actualiza.info() : { instalada: false, prueba: false };
+      // La pre-release no da la lata sola: solo si se pregunta a mano.
+      if (info.prueba && !manual) return;
       const res = await fetch('https://api.github.com/repos/Neuroxcx1/Odinote/releases');
-      if (!res.ok) {
-        if (manual) setUpdateModal({ state: 'error' });
-        return;
-      }
+      if (!res.ok) { if (manual) setUpdateModal({ state: 'error' }); return; }
       const data = await res.json();
-      const latestRelease = eligePublicacionDeEscritorio(data);
-      const latestVersion = latestRelease && latestRelease.tag_name;
-      if (!latestVersion) {
-        if (manual) setUpdateModal({ state: 'uptodate', version: CURRENT_VERSION });
-        return;
-      }
-      const cleanLatest = latestVersion.replace(/^v/, '');
-
-      if (isNewerVersion(cleanLatest, CURRENT_VERSION)) {
-        // Buscar el instalador .exe entre los archivos del release para poder
-        // auto-descargarlo; si no hay, se ofrecerá abrir la página del release.
-        // En un Mac no hay instalador que valga (el .exe es de Windows): se abre
-        // la página de la versión, donde están los .zip de Mac.
-        const asset = window.odiEsMac ? null : (latestRelease.assets || []).find(a => /\.exe$/i.test(a.name));
-        setUpdateAvailable(true);
-        setUpdateModal({
-          state: 'available',
-          version: cleanLatest,
-          notes: (latestRelease.body || '').slice(0, 600),
-          assetUrl: asset ? asset.browser_download_url : null,
-          assetName: asset ? asset.name : null,
-        });
-      } else {
+      const pub = (A && A.eligePublicacion(data, sistema === 'android' ? 'android' : 'windows')) || eligePublicacionDeEscritorio(data);
+      if (!pub || !A || !A.hayNueva(window.ODINOTE_BUILD, pub)) {
         setUpdateAvailable(false);
         if (manual) setUpdateModal({ state: 'uptodate', version: CURRENT_VERSION });
+        return;
       }
+      const version = A.versionDe(pub.tag_name);
+      const build = A.marcaBuild(pub.body);
+      const archivo = sistema === 'mac' ? null : A.archivoPara(pub, sistema === 'android' ? 'android' : 'windows');
+      setUpdateAvailable(true);
+      const notas = (pub.body || '').replace(A.MARCA, '').trim().slice(0, 600);
+      // Windows instalado y con la opción encendida: en segundo plano.
+      if (!manual && sistema === 'windows' && actualizaSola() && info.instalada && archivo && window.electronAPI.actualiza) {
+        if (descargandoSolaRef.current || listaYaRef.current) return;
+        descargandoSolaRef.current = true;
+        const r = await window.electronAPI.actualiza.descarga(archivo.url, archivo.nombre, archivo.sha256);
+        descargandoSolaRef.current = false;
+        if (!r || !r.ok) { console.warn('[actualiza] la descarga en segundo plano falló:', r && r.error); return; }
+        const q = await window.electronAPI.actualiza.instala(r.ruta, false);
+        if (q && q.ok) { listaYaRef.current = true; setActualizacionLista({ version, build, ruta: r.ruta }); }
+        return;
+      }
+      setUpdateModal({
+        state: 'available',
+        version: build ? `${version} (build ${build})` : version,
+        notes: notas,
+        assetUrl: archivo ? archivo.url : null,
+        assetName: archivo ? archivo.nombre : null,
+        sha256: archivo ? archivo.sha256 : null,
+        android: sistema === 'android',
+      });
     } catch (err) {
       console.error('Failed to check for updates:', err);
       if (manual) setUpdateModal({ state: 'error' });
@@ -1587,40 +1611,43 @@ function App() {
       if (manual) setCheckingUpdates(false);
     }
   };
+  // Para el botón «Buscar ahora» de Ajustes, que vive en otro archivo.
+  window.odiBuscaActualizacion = () => checkUpdates(true);
 
-  // Comprobar al arrancar (auto: si hay versión nueva, abre el modal directamente)
+  // Al arrancar y luego cada tres horas: quien deja Oddinote abierto días
+  // seguidos también se entera.
   useEffectApp(() => {
-    if (window.electronAPI) {
-      checkUpdates(false);
-    }
+    if (!sistemaActualiza()) return;
+    checkUpdates(false);
+    const t = setInterval(() => checkUpdates(false), 3 * 60 * 60 * 1000);
+    return () => clearInterval(t);
   }, []);
 
-  // Descarga el instalador y lo ejecuta (auto-actualización). Si no hay instalador
-  // en el release, abre la página de descargas como respaldo.
-  const runAutoUpdate = () => {
+  // «Actualizar ahora» de la ventana: descarga con su barra y lo instala ya
+  // (en Android, abre la descarga del APK).
+  const runAutoUpdate = async () => {
     if (!updateModal) return;
-    if (!updateModal.assetUrl || !window.electronAPI || !window.electronAPI.downloadAndRunUpdate) {
+    if (updateModal.android && updateModal.assetUrl) {
+      window.open(updateModal.assetUrl, '_blank');
+      setUpdateModal(null);
+      return;
+    }
+    if (!updateModal.assetUrl || !window.electronAPI || !window.electronAPI.actualiza) {
       window.open('https://github.com/Neuroxcx1/Odinote/releases/latest', '_blank');
       return;
     }
     setUpdateProgress(0);
     setUpdateModal(m => ({ ...m, state: 'downloading' }));
-    window.electronAPI.downloadAndRunUpdate(updateModal.assetUrl, updateModal.assetName, (pct) => setUpdateProgress(pct))
-      .then(result => {
-        if (!result || !result.ok) {
-          setUpdateModal(m => ({ ...m, state: 'error' }));
-        }
-        // Si ok, main.js relanza el instalador y cierra la app
-      });
+    const r = await window.electronAPI.actualiza.descarga(updateModal.assetUrl, updateModal.assetName, updateModal.sha256, (pct) => setUpdateProgress(pct));
+    if (!r || !r.ok) { setUpdateModal(m => ({ ...m, state: 'error' })); return; }
+    const q = await window.electronAPI.actualiza.instala(r.ruta, true);
+    if (!q || !q.ok) setUpdateModal(m => ({ ...m, state: 'error' }));
+    // Si ok, main.js lanza el instalador y cierra la aplicación.
   };
 
   const handleUpdateClick = () => {
     if (updateModal) return; // ya abierto
-    if (updateAvailable) {
-      checkUpdates(true); // reabre el modal con los datos frescos del release
-    } else {
-      checkUpdates(true);
-    }
+    checkUpdates(true);
   };
 
   // Prevent Ctrl + Mousewheel zoom & Sanitize rich text paste in all contentEditables
@@ -3909,6 +3936,28 @@ function App() {
                 </div>
               )}
 
+              {/* Las actualizaciones (Ventana.jsx, AjusteActualizaSola). */}
+              {window.AjusteActualizaSola && (window.electronAPI || window.ODINOTE_PLATFORM === 'android') && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <div style={{ fontWeight: '600', fontSize: '14px', color: 'var(--wine, #7B2D26)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span className="material-symbols-rounded" style={{ fontSize: '18px' }}>sync</span>
+                    <span>{window.t('Actualizaciones', 'Updates')}</span>
+                  </div>
+                  <window.AjusteActualizaSola />
+                </div>
+              )}
+
+              {/* El minimapa del lienzo (src/Minimapa.jsx). */}
+              {window.AjusteMinimapa && !(window.odiIsMobile && window.odiIsMobile()) && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <div style={{ fontWeight: '600', fontSize: '14px', color: 'var(--wine, #7B2D26)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span className="material-symbols-rounded" style={{ fontSize: '18px' }}>map</span>
+                    <span>{window.t('Minimapa', 'Minimap')}</span>
+                  </div>
+                  <window.AjusteMinimapa />
+                </div>
+              )}
+
               {/* Las estadísticas de uso: decir que se envían (Ventana.jsx,
                   TextoEstadisticas). Sin interruptor, a propósito. */}
               {window.TextoEstadisticas && (
@@ -5270,6 +5319,23 @@ function App() {
           </div>
         </div>
       )}
+      {/* Actualización descargada en segundo plano: se instala al cerrar. */}
+      {actualizacionLista && (
+        <div className="aviso-actualizacion" role="status">
+          <span className="material-symbols-rounded" aria-hidden="true">rocket_launch</span>
+          <div className="aviso-actualizacion-texto">
+            <b>{window.t(`Oddinote ${actualizacionLista.version} está lista`, `Oddinote ${actualizacionLista.version} is ready`)}</b>
+            <span>{window.t('Se instalará al cerrar Oddinote.', 'It will install when you close Oddinote.')}</span>
+          </div>
+          <button className="aviso-actualizacion-boton" onClick={() => window.electronAPI.actualiza.instala(actualizacionLista.ruta, true)}>
+            {window.t('Reiniciar ahora', 'Restart now')}
+          </button>
+          <button className="aviso-actualizacion-cierra" title={window.t('Más tarde', 'Later')} onClick={() => setActualizacionLista(null)}>
+            <span className="material-symbols-rounded">close</span>
+          </button>
+        </div>
+      )}
+
       {updateModal && (
         <div className="doc-modal-overlay" style={{ zIndex: 10001, display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(3px)' }} onClick={() => { if (updateModal.state !== 'downloading') setUpdateModal(null); }}>
           <div style={{ width: '420px', maxWidth: '92vw', background: 'var(--paper, #FAF9F6)', border: '1.5px solid var(--line, #595459)', borderRadius: '14px', boxShadow: 'var(--pop-md)', overflow: 'hidden' }} onClick={(e) => e.stopPropagation()}>
@@ -5295,7 +5361,9 @@ function App() {
               {updateModal.state === 'available' && (
                 <>
                   <p style={{ margin: '0 0 12px 0', fontSize: '13.5px', color: 'var(--ink, #1A1A1A)' }}>
-                    {updateModal.assetUrl
+                    {updateModal.android
+                      ? window.t('Se descargará el APK nuevo: ábrelo y pulsa Instalar. Tus notas se quedan como están.', 'The new APK will download: open it and tap Install. Your notes stay as they are.')
+                      : updateModal.assetUrl
                       ? window.t('Se descargará e instalará automáticamente. La app se reiniciará al terminar.', 'It will download and install automatically. The app will restart when finished.')
                       : window.t('Abre la página de descargas para obtener la nueva versión.', 'Open the downloads page to get the new version.')}
                   </p>

@@ -1,0 +1,34 @@
+ODDINOTE - PLEASE READ BEFORE INSTALLING
+
+By installing and using Oddinote you agree to the following.
+
+1. Usage statistics
+
+Oddinote sends anonymous usage statistics to Google Analytics: when the app
+is opened and for how long, which kinds of node are created, whether live
+rooms, view-only links and Google Drive work, and the approximate country and
+city that Google works out from your internet connection. Google also gives
+this device a random identifier.
+
+Your name, your email, the names of your projects and anything you write or
+put in your notes are never sent.
+
+Details: https://github.com/Neuroxcx1/Odinote/blob/main/PRIVACY.md
+
+2. Automatic updates
+
+Oddinote checks GitHub for new versions. If "Update automatically" is on in
+Settings (it is by default), new versions download by themselves and install
+when you close the app. You can turn this off in Settings at any time.
+
+3. Your projects
+
+Your projects stay on your computer. They only leave it if you connect Google
+Drive, open a live room or create a view-only link.
+
+4. License
+
+Oddinote is open source under the Apache License 2.0, reproduced below.
+
+--------------------------------------------------------------------------
+

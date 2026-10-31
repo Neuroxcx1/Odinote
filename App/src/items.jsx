@@ -791,13 +791,27 @@ function ImageItem({ item, lang, onUpdate, callbacks }) {
       } else if (handle === 'br') {
         newW = Math.max(10, Math.min(100 - initialCrop.x, initialCrop.w + dpX));
         newH = Math.max(10, Math.min(100 - initialCrop.y, initialCrop.h + dpY));
+      } else if (handle === 't') {
+        newY = Math.max(0, Math.min(initialCrop.y + initialCrop.h - 10, initialCrop.y + dpY));
+        newH = initialCrop.y + initialCrop.h - newY;
+      } else if (handle === 'b') {
+        newH = Math.max(10, Math.min(100 - initialCrop.y, initialCrop.h + dpY));
+      } else if (handle === 'l') {
+        newX = Math.max(0, Math.min(initialCrop.x + initialCrop.w - 10, initialCrop.x + dpX));
+        newW = initialCrop.x + initialCrop.w - newX;
+      } else if (handle === 'r') {
+        newW = Math.max(10, Math.min(100 - initialCrop.x, initialCrop.w + dpX));
       } else if (handle === 'move') {
         // Arrastrar el área completa de recorte sin cambiar su tamaño
         newX = Math.max(0, Math.min(100 - initialCrop.w, initialCrop.x + dpX));
         newY = Math.max(0, Math.min(100 - initialCrop.h, initialCrop.y + dpY));
       }
 
-      onUpdate({
+      // En silencio: dentro del recorte nada es todavía un paso del deshacer.
+      // El paso entero (zona elegida y caja) lo apunta Canvas al pulsar Listo;
+      // si no, Ctrl+Z dejaba la caja vieja con el recorte nuevo y la foto
+      // estirada.
+      (cb.resizeItemSilent && !item._inColumn ? (p) => cb.resizeItemSilent(item.id, p) : onUpdate)({
         crop: {
           x: parseFloat(newX.toFixed(2)),
           y: parseFloat(newY.toFixed(2)),
@@ -878,90 +892,35 @@ function ImageItem({ item, lang, onUpdate, callbacks }) {
                 <div style={{ position: 'absolute', top: `${crop.y}%`, left: 0, width: `${crop.x}%`, height: `${crop.h}%`, background: 'rgba(0,0,0,0.45)', pointerEvents: 'none' }} />
                 <div style={{ position: 'absolute', top: `${crop.y}%`, left: `${crop.x + crop.w}%`, right: 0, height: `${crop.h}%`, background: 'rgba(0,0,0,0.45)', pointerEvents: 'none' }} />
 
-                {/* Rectángulo punteado del área visible — arrastrable para mover
-                    el recorte completo sin cambiar su tamaño */}
+                {/* El área que se queda: se arrastra para mover el recorte sin
+                    cambiar su tamaño. Con la cuadrícula de tercios dentro, como
+                    en el editor de fotos del teléfono. */}
                 <div
+                  className="crop-area"
                   onMouseDown={(e) => startCropDrag(e, 'move')}
                   title={window.t('Arrastra para mover el recorte', 'Drag to move the crop area')}
-                  style={{
-                    position: 'absolute',
-                    left: `${crop.x}%`,
-                    top: `${crop.y}%`,
-                    width: `${crop.w}%`,
-                    height: `${crop.h}%`,
-                    border: '1.5px dashed var(--olive, #6A8546)',
-                    boxSizing: 'border-box',
-                    cursor: 'move',
-                    pointerEvents: 'auto',
-                    zIndex: 14
-                  }}
-                />
+                  style={{ left: `${crop.x}%`, top: `${crop.y}%`, width: `${crop.w}%`, height: `${crop.h}%` }}
+                >
+                  <i className="crop-tercio v1" /><i className="crop-tercio v2" />
+                  <i className="crop-tercio h1" /><i className="crop-tercio h2" />
+                </div>
 
-                {/* Tiradores de recorte interactivos */}
-                <div 
-                  className="crop-handle tl" 
-                  onMouseDown={(e) => startCropDrag(e, 'tl')}
-                  style={{
-                    position: 'absolute',
-                    left: `calc(${crop.x}% - 6px)`,
-                    top: `calc(${crop.y}% - 6px)`,
-                    width: '12px',
-                    height: '12px',
-                    background: '#FFFFFF',
-                    border: '2px solid var(--olive, #6A8546)',
-                    borderRadius: '2px',
-                    cursor: 'nwse-resize',
-                    zIndex: 15
-                  }}
-                />
-                <div 
-                  className="crop-handle tr" 
-                  onMouseDown={(e) => startCropDrag(e, 'tr')}
-                  style={{
-                    position: 'absolute',
-                    left: `calc(${crop.x + crop.w}% - 6px)`,
-                    top: `calc(${crop.y}% - 6px)`,
-                    width: '12px',
-                    height: '12px',
-                    background: '#FFFFFF',
-                    border: '2px solid var(--olive, #6A8546)',
-                    borderRadius: '2px',
-                    cursor: 'nesw-resize',
-                    zIndex: 15
-                  }}
-                />
-                <div 
-                  className="crop-handle bl" 
-                  onMouseDown={(e) => startCropDrag(e, 'bl')}
-                  style={{
-                    position: 'absolute',
-                    left: `calc(${crop.x}% - 6px)`,
-                    top: `calc(${crop.y + crop.h}% - 6px)`,
-                    width: '12px',
-                    height: '12px',
-                    background: '#FFFFFF',
-                    border: '2px solid var(--olive, #6A8546)',
-                    borderRadius: '2px',
-                    cursor: 'nesw-resize',
-                    zIndex: 15
-                  }}
-                />
-                <div 
-                  className="crop-handle br" 
-                  onMouseDown={(e) => startCropDrag(e, 'br')}
-                  style={{
-                    position: 'absolute',
-                    left: `calc(${crop.x + crop.w}% - 6px)`,
-                    top: `calc(${crop.y + crop.h}% - 6px)`,
-                    width: '12px',
-                    height: '12px',
-                    background: '#FFFFFF',
-                    border: '2px solid var(--olive, #6A8546)',
-                    borderRadius: '2px',
-                    cursor: 'nwse-resize',
-                    zIndex: 15
-                  }}
-                />
+                {/* Los tiradores: esquinas en L y barras en los lados. Antes eran
+                    cuatro cuadraditos de 12 px que casi no se veían. El aspecto,
+                    en styles.css (.crop-handle). */}
+                {[
+                  ['tl', crop.x, crop.y], ['tr', crop.x + crop.w, crop.y],
+                  ['bl', crop.x, crop.y + crop.h], ['br', crop.x + crop.w, crop.y + crop.h],
+                  ['t', crop.x + crop.w / 2, crop.y], ['b', crop.x + crop.w / 2, crop.y + crop.h],
+                  ['l', crop.x, crop.y + crop.h / 2], ['r', crop.x + crop.w, crop.y + crop.h / 2],
+                ].map(([h, px, py]) => (
+                  <div
+                    key={h}
+                    className={`crop-handle ${h}`}
+                    onMouseDown={(e) => startCropDrag(e, h)}
+                    style={{ left: `${px}%`, top: `${py}%` }}
+                  />
+                ))}
 
               </>
             )}
@@ -1151,9 +1110,23 @@ function LinkItem({ item, lang, onUpdate, editing, onEndEdit }) {
         <div
           className="link-thumb"
           style={ thumb && !playing ? { backgroundImage: `url(${thumb})` } : null }
-          onClick={(e)=>{ if (!ytId) { e.stopPropagation(); openLink(); } }}
-          title={!ytId ? (window.t('Abrir enlace', 'Open link')) : null}
+          // Un clic ya NO abre la página: era el mismo clic que elige o empieza
+          // a arrastrar el nodo, y «medio pasarle el clic» te sacaba de la app.
+          // Se abre con el botón «Abrir» (sale al pasar el ratón), con el ↗ de
+          // abajo o con Ctrl+clic, como un enlace en un editor de texto.
+          onClick={(e)=>{ if (!ytId && (e.ctrlKey || e.metaKey)) { e.stopPropagation(); openLink(); } }}
+          title={!ytId ? window.t('Ctrl+clic para abrir el enlace', 'Ctrl+click to open the link') : null}
         >
+          {!ytId && (
+            <button
+              className="link-abrir"
+              onClick={(e)=>{ e.stopPropagation(); openLink(); }}
+              onMouseDown={(e)=>e.stopPropagation()}
+            >
+              <span className="material-symbols-rounded">open_in_new</span>
+              <span>{window.t('Abrir', 'Open')}</span>
+            </button>
+          )}
           {ytId && playing ? (
             <iframe
               src={`https://www.youtube.com/embed/${ytId}?autoplay=1`}

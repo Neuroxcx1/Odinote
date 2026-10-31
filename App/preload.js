@@ -53,6 +53,17 @@ contextBridge.exposeInMainWorld('electronAPI', {
     }
     return ipcRenderer.invoke('download-and-run-update', { url, fileName });
   },
+  // Actualizarse sola (main.js, «Actualizarse sola»).
+  actualiza: {
+    info: () => ipcRenderer.invoke('actualiza:info'),
+    descarga: (url, nombre, sha256, alProgreso) => {
+      const oyente = (e, pct) => { try { alProgreso && alProgreso(pct); } catch (err) {} };
+      ipcRenderer.on('actualiza:progreso', oyente);
+      return ipcRenderer.invoke('actualiza:descarga', { url, nombre, sha256 })
+        .finally(() => ipcRenderer.removeListener('actualiza:progreso', oyente));
+    },
+    instala: (ruta, ahora) => ipcRenderer.invoke('actualiza:instala', { ruta, ahora: !!ahora }),
+  },
   // La ventana: "siempre encima" sin bordes (la chincheta de arriba a la
   // izquierda, ver src/Ventana.jsx) y moverla cuando está fijada, que ya no
   // tiene barra de título de donde agarrarla.

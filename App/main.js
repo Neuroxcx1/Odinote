@@ -1275,8 +1275,15 @@ function nuevoPkce() {
   return { challenge, state: pkceState };
 }
 
-function urlDeAutorizacion() {
+// Con `pedirPermisos` Google enseña otra vez la pantalla de permisos; sin él,
+// solo la de elegir cuenta. Esa pantalla salía SIEMPRE y al usuario le
+// molestaba («si ya di permisos una vez, que no lo pida siempre»). Ahora solo
+// se pide cuando de verdad hace falta: la primera vez que una cuenta entra en
+// este equipo (ver el canje del código, más abajo).
+let pedirPermisosEnCurso = false;
+function urlDeAutorizacion(pedirPermisos) {
   const { challenge, state } = nuevoPkce();
+  pedirPermisosEnCurso = !!pedirPermisos;
   const params = new URLSearchParams({
     client_id: GOOGLE_CLIENT_ID,
     redirect_uri: `http://127.0.0.1:${authPort}/oauth`,
@@ -1287,9 +1294,11 @@ function urlDeAutorizacion() {
     state,
     // Sin esto Google no da token de refresco, que es justo lo que buscamos.
     access_type: 'offline',
-    // Y sin esto solo lo da la PRIMERA vez que el usuario acepta: si ya había
-    // aceptado antes, las siguientes veces volvería sin él y estaríamos igual.
-    prompt: 'consent',
+    // Google solo da el token de refresco la primera vez que se aceptan los
+    // permisos, salvo que se le obligue con 'consent'. Por eso: elegir cuenta
+    // y, si no llega el token y no lo tenemos guardado de esa cuenta, se
+    // repite una vez con 'consent'.
+    prompt: pedirPermisos ? 'consent' : 'select_account',
   });
   return 'https://accounts.google.com/o/oauth2/v2/auth?' + params.toString();
 }
@@ -1363,6 +1372,42 @@ function leeRefresco() {
 
 function borraRefresco() {
   try { fs.unlinkSync(rutaRefresco()); } catch (e) {}
+}
+
+// ── La llave de cada cuenta que ya dio permiso en este equipo ──
+// Cerrar sesión quita la llave activa, pero la de esa cuenta se queda aquí
+// (cifrada igual): así, al volver a entrar con ella, Google no tiene que
+// enseñar otra vez los permisos. Un archivo aparte para no tocar el de la
+// llave activa, que es el que lee el resto del programa.
+function rutaLlaves() {
+  return path.join(app.getPath('userData'), 'google-cuentas.bin');
+}
+function leeLlaves() {
+  try {
+    const { safeStorage } = require('electron');
+    if (!fs.existsSync(rutaLlaves()) || !safeStorage.isEncryptionAvailable()) return {};
+    return JSON.parse(safeStorage.decryptString(fs.readFileSync(rutaLlaves()))) || {};
+  } catch (e) { return {}; }
+}
+function guardaLlaves(llaves) {
+  try {
+    const { safeStorage } = require('electron');
+    if (!safeStorage.isEncryptionAvailable()) return;
+    fs.writeFileSync(rutaLlaves(), safeStorage.encryptString(JSON.stringify(llaves)));
+  } catch (e) { logToFile(`No se pudieron guardar las llaves de las cuentas: ${e.message}`); }
+}
+function apuntaLlave(correo, token) {
+  if (!correo || !token) return;
+  const llaves = leeLlaves();
+  llaves[String(correo).toLowerCase()] = token;
+  guardaLlaves(llaves);
+}
+function olvidaLlave(token) {
+  if (!token) return;
+  const llaves = leeLlaves();
+  let cambio = false;
+  Object.keys(llaves).forEach(k => { if (llaves[k] === token) { delete llaves[k]; cambio = true; } });
+  if (cambio) guardaLlaves(llaves);
 }
 
 // Datos de la persona, para enseñar su nombre y su foto en la aplicación.
@@ -1491,8 +1536,20 @@ function startAuthServer() {
         grant_type: 'authorization_code',
         redirect_uri: `http://127.0.0.1:${authPort}/oauth`,
       }).then(async (tok) => {
-        const guardado = guardaRefresco(tok.refresh_token);
         const perfil = await pidePerfil(tok.access_token);
+        // Sin token de refresco (la cuenta ya había dado permiso antes): se usa
+        // el que guardamos de ella. Si no lo hay, se repite UNA vez pidiendo
+        // los permisos, que es lo único que hace a Google darlo otra vez.
+        let refresco = tok.refresh_token || null;
+        if (!refresco) refresco = leeLlaves()[String(perfil.email || '').toLowerCase()] || null;
+        if (!refresco && !pedirPermisosEnCurso) {
+          logToFile(`OAuth: ${perfil.email || '?'} no trae token de refresco ni lo teníamos; se piden los permisos.`);
+          cierra('Un paso más', 'Google te pedirá una vez los permisos de Oddinote en esta pestaña nueva.', true);
+          shell.openExternal(urlDeAutorizacion(true));
+          return;
+        }
+        const guardado = guardaRefresco(refresco);
+        if (guardado) apuntaLlave(perfil.email, refresco);
         logToFile(`OAuth: sesión iniciada para ${perfil.email || '?'} (refresco ${guardado ? 'guardado' : 'NO guardado'})`);
         if (mainWindow) {
           appWC().send('google-signin-completed', {
@@ -1709,7 +1766,7 @@ ipcMain.handle('start-google-login', async () => {
   startAuthServer();
   // Se va directo a Google en vez de pasar por la página de Firebase: ese
   // rodeo era justo lo que impedía obtener el token de refresco.
-  shell.openExternal(urlDeAutorizacion());
+  shell.openExternal(urlDeAutorizacion(false));
   return { ok: true };
 });
 
@@ -1735,7 +1792,7 @@ ipcMain.handle('google-refresh-access', async () => {
     logToFile(`OAuth: no se pudo renovar — ${err.message}`);
     // Si Google dice que el papel ya no vale (revocado, contraseña cambiada, o
     // caducado por tener la app en modo de prueba), se tira y se pedirá sesión.
-    if (/invalid_grant|expired|revoked/i.test(err.message)) borraRefresco();
+    if (/invalid_grant|expired|revoked/i.test(err.message)) { olvidaLlave(refresco); borraRefresco(); }
     return { ok: false, reason: err.message };
   }
 });
@@ -1833,6 +1890,110 @@ ipcMain.handle('download-and-run-update', async (event, { url, fileName }) => {
   }
 });
 
+
+// ── Actualizarse sola (1.2.2) ──
+//
+// Lo pidió el usuario: que Oddinote se actualice sin ir a GitHub. Desde la
+// 1.2.2 Windows se reparte con un instalador (Oddinote-Setup-….exe, NSIS de
+// electron-builder, por usuario y sin pedir administrador). La aplicación
+// mira GitHub (app.jsx, con src/actualizacion-logica.js), y aquí:
+//   · actualiza:descarga baja el instalador a userData/actualizaciones y
+//     comprueba su huella sha256 con la que publica GitHub: si no cuadra, se
+//     tira. Nunca se ejecuta algo que no sea exactamente lo publicado.
+//   · actualiza:instala lo lanza en silencio (/S) al momento con
+//     --force-run, que vuelve a abrir Oddinote al terminar, o lo deja para
+//     cuando se cierre la aplicación (will-quit, abajo). Si esta copia no se
+//     instaló con el instalador (el zip de antes), se abre el instalador
+//     normal: así se pasa de una vez al sistema nuevo.
+// Las notas no se tocan: viven en userData, fuera de la carpeta del programa.
+let actualizacionPendiente = null;
+const esInstalada = () => fs.existsSync(path.join(path.dirname(process.execPath), 'Uninstall Odinote.exe'));
+// La pre-release y el código suelto no se actualizan: son para probar.
+const esDePrueba = () => !app.isPackaged || /-pre/i.test(path.basename(process.execPath));
+
+ipcMain.handle('actualiza:info', async () => ({ instalada: esInstalada(), prueba: esDePrueba(), so: process.platform }));
+
+ipcMain.handle('actualiza:descarga', async (event, { url, nombre, sha256 }) => {
+  try {
+    if (!String(url).startsWith('https://github.com/Neuroxcx1/Odinote/releases/download/')) {
+      throw new Error('dirección que no es de las publicaciones de Oddinote');
+    }
+    const { net } = require('electron');
+    const crypto = require('crypto');
+    const carpeta = path.join(app.getPath('userData'), 'actualizaciones');
+    fs.mkdirSync(carpeta, { recursive: true });
+    // Lo de veces anteriores sobra: cada instalador pesa más de cien megas.
+    for (const f of fs.readdirSync(carpeta)) { try { fs.unlinkSync(path.join(carpeta, f)); } catch (e) {} }
+    const destino = path.join(carpeta, String(nombre || 'Oddinote-Setup.exe').replace(/[^a-zA-Z0-9._-]/g, '_'));
+    const resp = await net.fetch(url, { redirect: 'follow' });
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const total = Number(resp.headers.get('content-length')) || 0;
+    const huella = crypto.createHash('sha256');
+    const salida = fs.createWriteStream(destino);
+    const lector = resp.body.getReader();
+    let recibido = 0, ultimo = -1;
+    for (;;) {
+      const { done, value } = await lector.read();
+      if (done) break;
+      const b = Buffer.from(value);
+      huella.update(b);
+      if (!salida.write(b)) await new Promise(r => salida.once('drain', r));
+      recibido += b.length;
+      const pct = total ? Math.round(recibido / total * 100) : 0;
+      if (pct !== ultimo && mainWindow) { ultimo = pct; try { appWC().send('actualiza:progreso', pct); } catch (e) {} }
+    }
+    await new Promise((r, m) => salida.end(err => err ? m(err) : r()));
+    const hecha = huella.digest('hex');
+    if (sha256 && hecha !== String(sha256).toLowerCase()) {
+      try { fs.unlinkSync(destino); } catch (e) {}
+      throw new Error('la descarga no coincide con lo publicado (huella distinta)');
+    }
+    logToFile(`Actualización descargada: ${destino} (${recibido} bytes, huella ${sha256 ? 'comprobada' : 'sin comprobar'})`);
+    return { ok: true, ruta: destino };
+  } catch (err) {
+    logToFile(`actualiza:descarga ERROR: ${err.message}`);
+    return { ok: false, error: err.message };
+  }
+});
+
+ipcMain.handle('actualiza:instala', async (event, { ruta, ahora }) => {
+  try {
+    const carpeta = path.join(app.getPath('userData'), 'actualizaciones');
+    if (!ruta || path.dirname(path.resolve(ruta)) !== path.resolve(carpeta) || !fs.existsSync(ruta)) throw new Error('instalador no encontrado');
+    const { spawn } = require('child_process');
+    if (!esInstalada()) {
+      // El zip de antes: el instalador normal, que se ve, y se cierra esta copia.
+      logToFile('Actualización: esta copia no viene del instalador; se abre el instalador normal.');
+      spawn(ruta, [], { detached: true, stdio: 'ignore' }).unref();
+      setTimeout(() => app.quit(), 800);
+      return { ok: true };
+    }
+    if (ahora) {
+      logToFile('Actualización: se instala ya y se vuelve a abrir.');
+      spawn(ruta, ['/S', '--updated', '--force-run'], { detached: true, stdio: 'ignore' }).unref();
+      setTimeout(() => app.quit(), 500);
+      return { ok: true };
+    }
+    actualizacionPendiente = ruta;
+    logToFile('Actualización: lista; se instalará al cerrar Oddinote.');
+    return { ok: true, alCerrar: true };
+  } catch (err) {
+    logToFile(`actualiza:instala ERROR: ${err.message}`);
+    return { ok: false, error: err.message };
+  }
+});
+
+// Al cerrar: si quedó una actualización lista, se instala en silencio. Sin
+// --force-run: el usuario cerró la aplicación y no hay que abrírsela otra vez.
+app.on('will-quit', () => {
+  if (!actualizacionPendiente) return;
+  try {
+    const { spawn } = require('child_process');
+    spawn(actualizacionPendiente, ['/S', '--updated'], { detached: true, stdio: 'ignore' }).unref();
+    logToFile('Actualización: instalándose al cerrar.');
+  } catch (e) { logToFile(`Actualización al cerrar ERROR: ${e.message}`); }
+  actualizacionPendiente = null;
+});
 
 app.whenReady().then(() => {
   logToFile('App whenReady triggered.');

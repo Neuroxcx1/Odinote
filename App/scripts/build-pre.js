@@ -33,11 +33,9 @@ console.log(`\n  Compilando prueba de la ${pkg.version} en dist/pre-release/ …
 // demás que hubiera en dist/ —la compilación buena y su zip— se colaba DENTRO
 // del ejecutable de prueba. Salían 1 GB en vez de 260 MB, y el zip para
 // repartir pesaba cinco veces lo que debía.
-execSync(
-  `npx electron-packager . Odinote-pre --platform=win32 --arch=x64 --out="${OUT_DIR}" ` +
-  `--overwrite --icon=Icon/Icon.ico --ignore="^/dist($|/)"`,
-  { cwd: APP_DIR, stdio: 'inherit' }
-);
+// Desde la 1.2.2 por scripts/empaqueta.js: con Node 26 el empaquetador se
+// colgaba en silencio, y además deja el código ya traducido (arranca antes).
+require('./empaqueta')({ nombre: 'Odinote-pre', salida: OUT_DIR });
 
 const PACK_DIR = path.join(OUT_DIR, 'Odinote-pre-win32-x64');
 const exe = path.join(PACK_DIR, 'Odinote-pre.exe');

@@ -1616,6 +1616,45 @@ html[data-ventana-fijada] [data-mueve-ventana]:active { cursor: grabbing; }
 /* La cuadrícula (imán y tamaño) vive solo en Ajustes: PanelCuadricula,
    Ventana.jsx. El usuario no la quiso junto al zoom. */
 
+/* ── El minimapa (src/Minimapa.jsx) ──
+   Encima del grupo del zoom, con su mismo borde: es de la misma familia. */
+.minimapa {
+  position: absolute; right: 16px; bottom: 56px; z-index: 40;
+  background: var(--paper); border: 1.5px solid var(--line); border-radius: 6px;
+  box-shadow: var(--pop-sm); overflow: hidden; line-height: 0;
+  animation: muelle-aparece 260ms var(--muelle) backwards;
+}
+.minimapa canvas { display: block; cursor: pointer; }
+.minimapa-cierra {
+  position: absolute; top: 4px; right: 4px; width: 20px; height: 20px;
+  display: grid; place-items: center; border-radius: 50%; border: none; cursor: pointer;
+  background: var(--paper); color: var(--ink-2); opacity: 0; transition: opacity 120ms;
+}
+.minimapa-cierra .material-symbols-rounded { font-size: 14px; }
+.minimapa:hover .minimapa-cierra { opacity: 1; }
+html[data-mobile="1"] .minimapa { display: none; }
+
+/* ── «Actualización lista» (app.jsx): pequeño, abajo a la izquierda, sin velo ── */
+.aviso-actualizacion {
+  position: fixed; left: 16px; bottom: 16px; z-index: 9000;
+  display: flex; align-items: center; gap: 10px; padding: 10px 12px 10px 14px;
+  max-width: calc(100vw - 32px); box-sizing: border-box;
+  background: var(--paper); color: var(--ink);
+  border: 1.5px solid var(--line); border-radius: 10px; box-shadow: var(--pop-sm);
+  animation: muelle-aparece 300ms var(--muelle) backwards;
+}
+[data-theme="dark"] .aviso-actualizacion { background: #3A383A; color: #F0EEF0; }
+.aviso-actualizacion > .material-symbols-rounded { font-size: 20px; color: var(--olive); }
+.aviso-actualizacion-texto { display: flex; flex-direction: column; font-size: 12.5px; line-height: 1.35; }
+.aviso-actualizacion-texto b { font-size: 13px; }
+.aviso-actualizacion-texto span { opacity: 0.75; }
+.aviso-actualizacion-boton {
+  padding: 6px 12px; border-radius: 6px; border: none; cursor: pointer; white-space: nowrap;
+  background: var(--olive); color: #FFFFFF; font-family: var(--font-body); font-size: 12.5px; font-weight: 700;
+}
+.aviso-actualizacion-cierra { display: grid; place-items: center; width: 24px; height: 24px; border: none; background: none; cursor: pointer; color: inherit; opacity: 0.6; }
+.aviso-actualizacion-cierra .material-symbols-rounded { font-size: 16px; }
+
 /* El texto de las estadísticas en Ajustes (TextoEstadisticas, Ventana.jsx). */
 .ajuste-estadisticas p { margin: 0; font-size: 12.5px; line-height: 1.5; color: var(--text-soft, #595459); }
 .ajuste-cuadricula { display: flex; flex-direction: column; gap: 10px; }
@@ -1755,6 +1794,23 @@ body.dragging-task .item-card { pointer-events: auto !important; }
 .note.c-olive .item-card  { background: var(--c-olive); color: white; }
 .note.c-wine  .item-card  { background: var(--c-wine);  color: white; }
 
+/* ── Las notas, más bonitas (1.2.2) ──
+   El usuario: «de normal es un recuadro blanco feo y no como Milanote». Las
+   demás tarjetas siguen con el borde oscuro y la sombra dura de la casa; la
+   nota pasa a tarjeta suave: borde casi invisible, esquinas de 6 px, sombra
+   difusa en dos capas y más aire dentro. Al pasar el ratón sube un poco y la
+   sombra crece, en vez de saltar la sombra dura. */
+.note .item-card {
+  border: 1px solid rgba(26, 26, 26, 0.07);
+  border-radius: 6px;
+  box-shadow: 0 1px 2px rgba(26, 26, 26, 0.06), 0 4px 14px rgba(26, 26, 26, 0.07);
+}
+.item:hover .note .item-card { transform: translateY(-1px); box-shadow: 0 2px 4px rgba(26, 26, 26, 0.07), 0 10px 24px rgba(26, 26, 26, 0.10); }
+.item.dragging .note .item-card { box-shadow: 0 6px 12px rgba(26, 26, 26, 0.10), 0 18px 40px rgba(26, 26, 26, 0.16); }
+.note .note-inner, .note .note-edit { padding: calc(14px * var(--node-scale, 1)) calc(16px * var(--node-scale, 1)); }
+[data-theme="dark"] .note .item-card { border-color: rgba(255, 255, 255, 0.06); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.35), 0 4px 14px rgba(0, 0, 0, 0.30); }
+[data-theme="dark"] .item:hover .note .item-card { box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4), 0 10px 24px rgba(0, 0, 0, 0.38); }
+
 /* Image */
 .image-card .item-card {
   padding: 0 !important;
@@ -1804,6 +1860,21 @@ body.odi-busy iframe { pointer-events: none !important; }
 .link-card .link-prefix { color: var(--ink-3); display: flex; align-items: center; flex-shrink: 0; }
 .link-thumb { flex: 1 1 auto; min-height: 50%; background: var(--olive-l); display: grid; place-items: center; border-bottom: 1.5px solid var(--line); position: relative; background-size: cover; background-position: center; cursor: pointer; }
 .link-thumb .material-symbols-rounded { font-size: 36px; color: var(--ink); }
+/* La imagen ya no abre la página con un clic (items.jsx, LinkItem): se abre
+   con este botón, que sale al pasar el ratón por el nodo elegido o no. */
+.link-thumb { cursor: inherit; }
+.link-abrir {
+  position: absolute; top: 8px; right: 8px; z-index: 2;
+  display: flex; align-items: center; gap: 4px; padding: 4px 10px 4px 8px;
+  border-radius: 999px; border: none; cursor: pointer;
+  background: rgba(20, 18, 20, 0.72); color: #FFFFFF;
+  font-family: var(--font-body); font-size: 12px; font-weight: 700;
+  opacity: 0; transform: translateY(-2px); transition: opacity 140ms var(--e-out), transform 140ms var(--e-out);
+  pointer-events: auto;
+}
+.link-thumb .link-abrir .material-symbols-rounded { font-size: 14px; color: #FFFFFF; }
+.item:hover .link-abrir, .item.selected .link-abrir { opacity: 1; transform: none; }
+.link-abrir:hover { background: rgba(20, 18, 20, 0.88); }
 .link-thumb-placeholder { display: grid; place-items: center; gap: 8px; position: relative; }
 .link-thumb-favicon { width: calc(40px * var(--node-scale, 1)); height: calc(40px * var(--node-scale, 1)); opacity: 0.85; border-radius: 4px; }
 .link-thumb-spinner {
@@ -4356,15 +4427,43 @@ html[data-mobile="1"] .connector-hit { stroke-width: 40; }
    pantalla: un punto que hay que acertar con el ratón. Crecen con el zoom igual
    que el de girar, y además llevan una zona de agarre invisible alrededor,
    porque un tirador de recorte se busca a ojo y no con precisión. */
+/* El área que se queda: blanca y con sombra para verse sobre cualquier foto. */
+.crop-area {
+  position: absolute; box-sizing: border-box; cursor: move; z-index: 14;
+  border: 1.5px solid rgba(255, 255, 255, 0.95);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35);
+}
+.crop-tercio { position: absolute; background: rgba(255, 255, 255, 0.45); pointer-events: none; }
+.crop-tercio.v1, .crop-tercio.v2 { top: 0; bottom: 0; width: 1px; }
+.crop-tercio.h1, .crop-tercio.h2 { left: 0; right: 0; height: 1px; }
+.crop-tercio.v1 { left: 33.333%; } .crop-tercio.v2 { left: 66.666%; }
+.crop-tercio.h1 { top: 33.333%; } .crop-tercio.h2 { top: 66.666%; }
+
+/* Los tiradores: esquinas en L de 30 px con trazo de 6 y barras en los lados,
+   blancos con borde oscuro para verse sobre cualquier foto. Miden lo mismo en
+   pantalla a cualquier zoom (--handle-libre) y llevan zona de agarre invisible
+   alrededor: un tirador de recorte se busca a ojo. Cada uno se coloca con
+   left/top en el punto exacto (items.jsx) y aquí se desplaza para que la
+   esquina de la L o el centro de la barra caiga encima. */
 .crop-handle {
-  transform: scale(var(--handle-libre, 1));
-  transform-origin: center;
+  position: absolute; z-index: 15; box-sizing: border-box;
+  filter: drop-shadow(0 0 1px rgba(0, 0, 0, 0.75)) drop-shadow(0 1px 3px rgba(0, 0, 0, 0.35));
 }
-.crop-handle::before {
-  content: '';
-  position: absolute;
-  top: -9px; left: -9px; right: -9px; bottom: -9px;
-}
+.crop-handle::before { content: ''; position: absolute; top: -10px; left: -10px; right: -10px; bottom: -10px; }
+.crop-handle.tl, .crop-handle.tr, .crop-handle.bl, .crop-handle.br { width: 30px; height: 30px; border: 0 solid #FFFFFF; }
+.crop-handle.tl { border-top-width: 6px; border-left-width: 6px; transform-origin: 3px 3px; transform: translate(-3px, -3px) scale(var(--handle-libre, 1)); cursor: nwse-resize; }
+.crop-handle.tr { border-top-width: 6px; border-right-width: 6px; transform-origin: 27px 3px; transform: translate(-27px, -3px) scale(var(--handle-libre, 1)); cursor: nesw-resize; }
+.crop-handle.bl { border-bottom-width: 6px; border-left-width: 6px; transform-origin: 3px 27px; transform: translate(-3px, -27px) scale(var(--handle-libre, 1)); cursor: nesw-resize; }
+.crop-handle.br { border-bottom-width: 6px; border-right-width: 6px; transform-origin: 27px 27px; transform: translate(-27px, -27px) scale(var(--handle-libre, 1)); cursor: nwse-resize; }
+/* Por DENTRO del borde: el marco de la imagen corta lo que se sale (overflow
+   hidden), y centradas en el borde la mitad de fuera no se podía coger. */
+.crop-handle.t, .crop-handle.b, .crop-handle.l, .crop-handle.r { background: #FFFFFF; border-radius: 3px; }
+.crop-handle.t { transform-origin: 50% 0; transform: translate(-50%, 2px) scale(var(--handle-libre, 1)); }
+.crop-handle.b { transform-origin: 50% 100%; transform: translate(-50%, calc(-100% - 2px)) scale(var(--handle-libre, 1)); }
+.crop-handle.l { transform-origin: 0 50%; transform: translate(2px, -50%) scale(var(--handle-libre, 1)); }
+.crop-handle.r { transform-origin: 100% 50%; transform: translate(calc(-100% - 2px), -50%) scale(var(--handle-libre, 1)); }
+.crop-handle.t, .crop-handle.b { width: 34px; height: 6px; cursor: ns-resize; }
+.crop-handle.l, .crop-handle.r { width: 6px; height: 34px; cursor: ew-resize; }
 
 /* ============================================
    Subtle enter animation (only the incoming page)
@@ -8261,7 +8360,7 @@ html[data-mobile="1"] .code-run .material-symbols-rounded { font-size: max(16px,
 /* Quien pide menos movimiento en el sistema no lo tiene. */
 @media (prefers-reduced-motion: reduce) {
   .modal, .doc-modal-window, .context-menu, .ctx-side, .ctx-popout,
-  .item.new-item .item-card, .panel-color, .plantillas-panel, .code-terminal { animation-duration: 1ms !important; }
+  .item.new-item .item-card, .panel-color, .plantillas-panel, .code-terminal, .minimapa, .aviso-actualizacion { animation-duration: 1ms !important; }
   .press, .icon-btn, .tool, .ms-project-card, .ms-recent-card, .lift { transition-duration: 1ms !important; }
   /* La ruleta gira igual (es lo que hace), pero sin lo demás que se mueve. */
   .ruleta-centro-gira, .ruleta-premio, .ruleta-porcion.nueva { animation: none !important; }

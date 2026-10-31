@@ -1130,7 +1130,11 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
   // undo stack
   const [history, setHistory] = useStateCanvas([]);
   const [historyIdx, setHistoryIdx] = useStateCanvas(-1);
-  const [croppingId, setCroppingId] = useStateCanvas(null);
+  // El estado de verdad; para cambiarlo, setCroppingId (más abajo, tras
+  // updateItem), que además abre y ciñe la caja de la imagen.
+  const [croppingId, setCroppingIdEstado] = useStateCanvas(null);
+  const croppingIdRef = useRefCanvas(null);
+  croppingIdRef.current = croppingId;
 
   // ── Modo dibujo ──
   //
@@ -2756,10 +2760,14 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
         const pt = screenToCanvas(m.x, m.y);
         const isUrl = /^https?:\/\/\S+$/i.test(plainText);
         const type = isUrl ? 'link' : 'note';
-        const def = defaultDims(type);
+        // Un enlace pegado nace con la altura de su vista previa (la misma que
+        // coge el nodo al escribirle la dirección, LinkItem): con la de un
+        // enlace vacío (74) la imagen y el título salían aplastados.
+        const def = isUrl ? { w: 400, h: 290 } : defaultDims(type);
         const newItem = makeNewItem(type, pt.x - def.w / 2, pt.y - def.h / 2, def.w, def.h, lang);
         if (isUrl) {
           newItem.url = plainText;
+          newItem._grewForUrl = true;
         } else {
           // Respetar los saltos de línea del texto copiado
           const html = plainText
@@ -2950,6 +2958,45 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
       return next;
     });
   };
+
+  // ── Entrar y salir del recorte (src/recorte-logica.js) ──
+  // Al entrar, la caja se abre a la foto entera con su forma de verdad; al
+  // salir, se ciñe a la parte elegida. Así la imagen no se queda deformada (lo
+  // vio el usuario). Entrar es silencioso (no es un cambio todavía) y salir es
+  // un paso normal del deshacer. Busca el nodo en todos los lienzos: si se
+  // cambia de tablero a mitad, la imagen de antes también se ciñe.
+  // Un nodo girado se queda como antes: mover su caja sin contar el giro lo
+  // descolocaría.
+  const cambiaCajaDe = (id, calcula, silencioso) => {
+    const aplica = (prev) => {
+      for (const cid of Object.keys(prev)) {
+        const c = prev[cid];
+        const it = c && (c.items || []).find(x => x.id === id);
+        if (!it) continue;
+        const caja = it.rot ? null : calcula(it);
+        if (!caja) return prev;
+        return { ...prev, [cid]: { ...c, items: c.items.map(x => x.id === id ? { ...x, ...caja } : x) } };
+      }
+      return prev;
+    };
+    if (silencioso) { skipHistory.current = true; _setCanvases(aplica); } else setCanvases(aplica);
+  };
+  const setCroppingId = (id) => {
+    const R = window.OdiRecorte;
+    const antes = croppingIdRef.current;
+    if (antes === id) return;
+    if (R && antes) cambiaCajaDe(antes, (it) => it.type === 'image' ? R.redondea(R.cierra(it, R.recorteDe(it))) : null, false);
+    if (R && id) cambiaCajaDe(id, (it) => it.type === 'image' ? R.abre(it) : null, true);
+    croppingIdRef.current = id;
+    setCroppingIdEstado(id);
+  };
+  // Elegir otro nodo (o ninguno) mientras se recorta cierra el recorte: si no,
+  // la imagen se quedaba abierta a tamaño completo y con sus tiradores debajo
+  // de lo que se eligiera después.
+  useEffectCanvas(() => {
+    if (croppingIdRef.current && selected !== croppingIdRef.current) setCroppingId(null);
+  // eslint-disable-next-line
+  }, [selected]);
 
   // Move several items together (used when dragging a connector to translate its attached nodes)
   const dragItemsSilent = (updates) => {
@@ -6679,7 +6726,8 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
                   )}
                   {/* Puntos de conexión estilo Miro en los cuatro lados del nodo.
                       Aparecen al pasar el cursor; arrastra cualquiera hasta otro nodo. */}
-                  {!isEditing && !activeTool && item.type !== 'line' && (
+                  {/* Fuera mientras se recorta: tapaban los tiradores de los lados. */}
+                  {!isEditing && !activeTool && item.type !== 'line' && croppingId !== item.id && (
                     <div className="anchors" style={varsTiradoresRef.current}>
                       {['top', 'right', 'bottom', 'left'].map(pos => (
                         <div
@@ -7116,6 +7164,18 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
             <span className="material-symbols-rounded" style={{fontSize:15}}>add</span>
           </button>
         </div>
+
+        {/* El minimapa, encima del zoom (src/Minimapa.jsx). Fuera mientras se
+            dibuja: ahí abajo van los mandos del dibujo. */}
+        {window.Minimapa && !drawingId && (
+          <window.Minimapa
+            items={current.items}
+            pan={pan}
+            scale={scale}
+            medida={() => surfaceRef.current ? surfaceRef.current.getBoundingClientRect() : null}
+            onPan={setPan}
+          />
+        )}
 
         {/* La foto del lienzo. Suelta y no dentro del grupo del zoom: alli
             quedaba amontonada entre el menos y el mas, y una accion que guarda

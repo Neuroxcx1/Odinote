@@ -35,8 +35,17 @@ check('el reto no lleva caracteres que haya que escapar en una URL',
 // ── main.js pide lo que hace falta ──
 check('se pide access_type=offline (sin esto NO hay token de refresco)',
   /access_type:\s*'offline'/.test(main));
-check('se pide prompt=consent (sin esto solo lo daría la primera vez)',
-  /prompt:\s*'consent'/.test(main));
+// Desde la 1.2.2: la pantalla de permisos solo cuando hace falta (al usuario
+// le molestaba verla siempre). Se pide elegir cuenta, y 'consent' solo si
+// Google no da token de refresco y no lo teníamos guardado de esa cuenta.
+check('normalmente solo se pide elegir cuenta, no los permisos',
+  /prompt:\s*pedirPermisos\s*\?\s*'consent'\s*:\s*'select_account'/.test(main));
+check('el primer intento va sin pantalla de permisos',
+  /urlDeAutorizacion\(false\)/.test(main));
+check('sin token de refresco ni llave guardada, se repite pidiendo los permisos',
+  /urlDeAutorizacion\(true\)/.test(main) && /leeLlaves\(\)\[/.test(main));
+check('cerrar sesión no tira la llave de la cuenta (para no volver a pedir permisos)',
+  /ipcMain\.handle\('google-sign-out', async \(\) => \{ borraRefresco\(\); return/.test(main));
 check('el método del reto es S256, no "plain"',
   /code_challenge_method:\s*'S256'/.test(main));
 check('se manda el verificador al canjear el código',

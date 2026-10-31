@@ -340,6 +340,47 @@ function TextoEstadisticas() {
 }
 
 window.TextoEstadisticas = TextoEstadisticas;
+
+// ── Las actualizaciones automáticas (Ajustes) ──
+// localStorage `odinote.actualiza_sola`, encendido de fábrica. En Windows:
+// descargar e instalar solas al cerrar (app.jsx, checkUpdates). En Android no
+// se puede instalar sin Google Play: ahí solo decide si avisa al abrir.
+function AjusteActualizaSola() {
+  const { useState } = React;
+  const [si, setSi] = useState(() => { try { return localStorage.getItem('odinote.actualiza_sola') !== '0'; } catch (e) { return true; } });
+  const [buscando, setBuscando] = useState(false);
+  const android = window.ODINOTE_PLATFORM === 'android';
+  const cambia = () => {
+    const v = !si;
+    setSi(v);
+    try { localStorage.setItem('odinote.actualiza_sola', v ? '1' : '0'); } catch (e) {}
+    window.playAudioTone && window.playAudioTone('click');
+  };
+  return (
+    <div className="ajuste-cuadricula">
+      <button type="button" role="switch" aria-checked={si} className={'cuadricula-interruptor' + (si ? ' on' : '')} onClick={cambia}>
+        <span className="cuadricula-carril" aria-hidden="true"><i /></span>
+        <span>{android ? window.t('Avisarme de las versiones nuevas', 'Tell me about new versions') : window.t('Actualizar automáticamente', 'Update automatically')}</span>
+      </button>
+      <p className="ajuste-escala-nota">
+        {android
+          ? window.t('Al abrir Oddinote mira si hay una versión nueva y te ofrece descargarla.', 'When Oddinote opens it checks for a new version and offers to download it.')
+          : window.t('Las versiones nuevas se descargan solas y se instalan al cerrar Oddinote. Tus notas no se tocan.', 'New versions download by themselves and install when you close Oddinote. Your notes are not touched.')}
+      </p>
+      <button
+        type="button"
+        className="ajuste-escala-rapido"
+        style={{ alignSelf: 'flex-start' }}
+        disabled={buscando}
+        onClick={async () => { setBuscando(true); try { await (window.odiBuscaActualizacion && window.odiBuscaActualizacion()); } finally { setBuscando(false); } }}
+      >
+        {buscando ? window.t('Buscando…', 'Checking…') : window.t('Buscar ahora', 'Check now')}
+      </button>
+    </div>
+  );
+}
+
+window.AjusteActualizaSola = AjusteActualizaSola;
 window.BotonFijar = BotonFijar;
 window.useVentana = useVentana;
 window.AjusteEscala = AjusteEscala;
