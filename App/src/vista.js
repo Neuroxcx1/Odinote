@@ -135,6 +135,34 @@
     return v;
   }
 
+  // Firestore tampoco admite una lista DENTRO de otra lista (los puntos de un
+  // dibujo a mano, los codos de una flecha…): set() lanza «Nested arrays are
+  // not supported». Cada lista que está dentro de otra se guarda envuelta en
+  // { __lista: [...] } y paraPintar la desenvuelve al llegar.
+  function sinListasAnidadas(v, enLista) {
+    if (Array.isArray(v)) {
+      const lista = v.map(x => sinListasAnidadas(x, true));
+      return enLista ? { __lista: lista } : lista;
+    }
+    if (v && typeof v === 'object') {
+      const out = {};
+      Object.keys(v).forEach(k => { out[k] = sinListasAnidadas(v[k], false); });
+      return out;
+    }
+    return v;
+  }
+  function conListasAnidadas(v) {
+    if (Array.isArray(v)) return v.map(conListasAnidadas);
+    if (v && typeof v === 'object') {
+      const claves = Object.keys(v);
+      if (claves.length === 1 && claves[0] === '__lista' && Array.isArray(v.__lista)) return v.__lista.map(conListasAnidadas);
+      const out = {};
+      claves.forEach(k => { out[k] = conListasAnidadas(v[k]); });
+      return out;
+    }
+    return v;
+  }
+
   // Lo que se sube: el documento entero de `vistas/{id}`. `cuando` lo pone el
   // que llama (el sello del servidor en la app, una fecha en las pruebas).
   function documento({ uid, proyecto, lienzos, raiz, cuando }) {
@@ -144,7 +172,7 @@
       raiz,
       nombre: nombre && typeof nombre === 'object' ? nombre : String(nombre || ''),
       emoji: (proyecto && proyecto.emoji) || '',
-      lienzos,
+      lienzos: sinListasAnidadas(lienzos, false),
       version: 1,
     });
     // Fuera de sinIndefinidos a propósito: en la app es el sello de hora del
@@ -180,8 +208,15 @@
     const d = db();
     if (!d) return Promise.reject(new Error('sin-servidor'));
     const fb = window.firebase;
-    const conSello = Object.assign({}, doc, { actualizadoEn: fb.firestore.FieldValue.serverTimestamp() });
-    return d.collection('vistas').doc(id).set(conSello);
+    // set() LANZA si los datos no le valen (no rechaza): se convierte en
+    // promesa rechazada para que quien llama lo recoja con .catch y nunca
+    // tumbe la app.
+    try {
+      const conSello = Object.assign({}, doc, { actualizadoEn: fb.firestore.FieldValue.serverTimestamp() });
+      return d.collection('vistas').doc(id).set(conSello);
+    } catch (e) {
+      return Promise.reject(e);
+    }
   }
 
   function quita(id) {
@@ -202,12 +237,12 @@
     if (!doc || !doc.raiz || !doc.lienzos || !doc.lienzos[doc.raiz]) return null;
     return {
       proyecto: { id: doc.raiz, name: doc.nombre || '', emoji: doc.emoji || '', vistaPublica: true },
-      lienzos: doc.lienzos,
+      lienzos: conListasAnidadas(doc.lienzos),
       raiz: doc.raiz,
     };
   }
 
-  const OdiVista = { TOPE, BASE_WEB, idNuevo, enlace, leeEnlace, limpiaNodo, prepara, documento, cambio, paraPintar, sinIndefinidos, escucha, publica, quita };
+  const OdiVista = { TOPE, BASE_WEB, idNuevo, enlace, leeEnlace, limpiaNodo, prepara, documento, cambio, paraPintar, sinIndefinidos, sinListasAnidadas, conListasAnidadas, escucha, publica, quita };
   if (typeof window !== 'undefined') window.OdiVista = OdiVista;
   if (typeof module !== 'undefined' && module.exports) module.exports = OdiVista;
 })();

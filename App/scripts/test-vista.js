@@ -100,7 +100,22 @@ const check = (nombre, ok, extra) => {
 
   const p = V.paraPintar(doc);
   check('paraPintar da el proyecto y sus lienzos', p && p.proyecto.id === 'raiz' && p.lienzos.tab1 && p.proyecto.vistaPublica === true);
-  check('paraPintar con un documento roto da null', V.paraPintar({ raiz: 'x', lienzos: {} }) === null && V.paraPintar(null) === null);
+  // Listas dentro de listas (puntos de un dibujo, codos de una flecha): Firestore
+// no las admite y set() lanzaba, dejando la app en negro al salir del proyecto.
+{
+  const hayAnidadas = (v, enLista) => Array.isArray(v) ? (enLista || v.some(x => hayAnidadas(x, true))) : (v && typeof v === 'object' ? Object.values(v).some(x => hayAnidadas(x, false)) : false);
+  const lienzos = { raiz: { items: [
+    { id: 'dibujo', type: 'draw', strokes: [{ points: [[1, 2], [3, 4]], color: '#000' }], raro: [[[5]], [6, [7, 8]]] },
+    { id: 'flecha', ortho: [[10, 20], [30, 40]] },
+  ] } };
+  const doc = V.documento({ uid: 'u', proyecto: { name: 'P' }, lienzos, raiz: 'raiz', cuando: 1 });
+  check('lo que se sube no lleva listas dentro de listas', !hayAnidadas(doc.lienzos, false), JSON.stringify(doc.lienzos).slice(0, 120));
+  const vuelta = V.paraPintar(doc);
+  check('y al abrir el enlace vuelven a ser las mismas listas', JSON.stringify(vuelta.lienzos) === JSON.stringify(lienzos), JSON.stringify(vuelta.lienzos).slice(0, 120));
+  check('un objeto normal con __lista y más campos no se toca', JSON.stringify(V.conListasAnidadas({ __lista: [1], b: 2 })) === '{"__lista":[1],"b":2}');
+}
+
+check('paraPintar con un documento roto da null', V.paraPintar({ raiz: 'x', lienzos: {} }) === null && V.paraPintar(null) === null);
 }
 
 console.log('');

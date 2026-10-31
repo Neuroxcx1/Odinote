@@ -47,7 +47,7 @@ try {
 
 // Marcador de build: si la consola no muestra esta versión, el navegador está
 // sirviendo JS cacheado (subir ?v= en index.html invalida la caché)
-window.ODINOTE_BUILD = '1.2.2-243';
+window.ODINOTE_BUILD = '1.2.2-244';
 console.log('[ODINOTE] Código cargado: ' + window.ODINOTE_BUILD);
 
 // Global shortcuts configuration
@@ -1401,7 +1401,11 @@ function App() {
     if (loading || !enlaceAbierto || !window.OdiVista) return;
     const pid = view.projectId;
     const V = window.OdiVista;
-    const mira = () => {
+    // Nunca puede tumbar la app: corre también al SALIR del proyecto (abajo,
+    // en la limpieza del efecto), y un error ahí dejaba la pantalla en negro
+    // sin poder salir.
+    const mira = () => { try { miraSinProteger(); } catch (err) { console.warn('[VISTA] no se pudo poner al día:', err && (err.code || err.message)); delete subidaVistaRef.current[pid]; } };
+    const miraSinProteger = () => {
       const p = proyectosParaVistaRef.current.find(x => x.id === pid);
       const yo = cuentaFirebase();
       if (!p || p.enlaceVista !== enlaceAbierto || !yo) return;
