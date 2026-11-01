@@ -8921,3 +8921,26 @@ html[data-mobile="1"][data-orient="landscape"] .plantillas-esquina { bottom: cal
   font-weight: 700;
   cursor: pointer;
 }
+
+/* ── Título en edición: un marco visible ──
+   Al escribir el nombre de un nodo solo se veía el texto seleccionado en
+   azul, y parecía que solo se había seleccionado texto, no que se pudiera
+   cambiar el título. Todos los campos de título llevan un marco verde algo
+   más grande que el texto mientras tienen el foco. Va al final para ganar a
+   los «outline: none» de cada campo; lleva !important porque varios (marco,
+   enlace, tareas, tablero, título, mapa) traen outline y fondo en su style
+   en línea, que si no ganaría. Un nodo nuevo con título editable tiene que
+   añadir su campo aquí. */
+:is(.link-title-input, .todo-title-edit, .board-col-title-edit, .tbl-title, .audio-name-input,
+    .timer-title-input, .code-title-input, .frame-title-input, .map-title-input,
+    .carpeta-nombre-campo):focus,
+.column-card .column-strip textarea:focus,
+.board-foot .board-foot-title[contenteditable="true"]:focus,
+.sep-titulo[contenteditable="true"]:focus,
+.bigtitle-edit:focus {
+  outline: 2px solid var(--olive, #90B968) !important;
+  outline-offset: 3px !important;
+  border-radius: 5px !important;
+  background-color: rgba(144, 185, 104, 0.10) !important;
+  box-shadow: 0 0 0 7px rgba(144, 185, 104, 0.16) !important;
+}
