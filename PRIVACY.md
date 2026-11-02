@@ -23,6 +23,10 @@ Copies of Oddinote that are run from the source code (or a fork) send nothing.
 
 Your projects stay on your computer (in your vault folder or in the app's data). They only leave it if **you** connect Google Drive, open a live room, or create a view-only link, and then only to do that.
 
+## Children
+
+Oddinote is **not directed at children under 13**, and it does not knowingly collect information from them. If you are under 16, or under the age of digital consent where you live, use Oddinote only with the permission of a parent or guardian. The app never asks for your age, name or email, so it cannot tell who is using it or how old they are.
+
 ## Contact
 
 Questions: open an issue or a discussion at [github.com/Neuroxcx1/Odinote](https://github.com/Neuroxcx1/Odinote).

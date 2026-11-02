@@ -26,7 +26,14 @@ when you close the app. You can turn this off in Settings at any time.
 Your projects stay on your computer. They only leave it if you connect Google
 Drive, open a live room or create a view-only link.
 
-4. License
+4. Age
+
+Oddinote is not directed at children under 13. If you are under 16, or under
+the age of digital consent where you live, install and use it only with the
+permission of a parent or guardian. The app never asks for your age, name or
+email, so it cannot tell who is using it.
+
+5. License
 
 Oddinote is open source under the Apache License 2.0, reproduced below.
 
