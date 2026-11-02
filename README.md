@@ -152,7 +152,7 @@ and being able to rotate it later, not about hiding it from users.
 
 ## Privacy
 
-The app and the official web version send **anonymous usage statistics** to Google Analytics (when it is opened, which kinds of node are created, whether live rooms and Drive work, and the approximate country and city Google works out from the connection). Your name, email and notes are never sent, and your projects stay on your computer unless you connect Drive or share them. Details in [PRIVACY.md](PRIVACY.md).
+The app (Windows, macOS, Linux, Android) and the official web version send **pseudonymous usage statistics** to Google Analytics (when it is opened, which kinds of node are created, whether live sessions and Drive work, and the approximate country and city Google works out from the connection). In the EU/EEA, the UK and Switzerland nothing is stored on the device. Your name, email, project names and notes are never sent, and your projects stay on your computer unless you connect Drive or share them. Summary in [PRIVACY.md](PRIVACY.md); full policy at https://oddinote-web.vercel.app/privacy.html.
 
 ## Contributing
 

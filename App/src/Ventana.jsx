@@ -331,10 +331,23 @@ window.PanelCuadricula = PanelCuadricula;
 // inglés, a propósito (lo pidió así): sin window.t, para que no entre en el
 // catálogo de frases. Si analytics.js empieza a mandar otra cosa, se cambia
 // aquí y en PRIVACY.md.
+//
+// «Pseudonymous» y no «anonymous»: hay un identificador por dispositivo y la
+// ciudad sale de la IP, y para el RGPD eso son datos seudónimos; llamarlos
+// anónimos sería engañoso. En la UE/EEE, Reino Unido y Suiza no se guarda
+// ese identificador (Consent Mode en index.html). El enlace a la política se
+// abre con window.open, como los demás enlaces externos: en el escritorio lo
+// recoge setWindowOpenHandler de main.js y va al navegador.
+const URL_PRIVACIDAD = 'https://oddinote-web.vercel.app/privacy.html';
 function TextoEstadisticas() {
+  const abrePolitica = (e) => {
+    e.preventDefault();
+    window.open(URL_PRIVACIDAD, '_blank', 'noopener,noreferrer');
+  };
   return (
     <p>
-      Oddinote sends anonymous usage statistics to Google Analytics: when it is opened, which kinds of node are created, whether live rooms and Drive work, and the approximate country and city of the connection. Your name, your email and your notes are never sent.
+      Oddinote sends pseudonymous usage statistics to Google Analytics: when it is opened and for how long it is used, which kinds of node are created, whether live rooms and Drive work, and the approximate country and city of the connection. In the EU/EEA, the UK and Switzerland no statistics identifier is stored on your device. Your name, your email and your notes are never sent.{' '}
+      <a href={URL_PRIVACIDAD} target="_blank" rel="noopener noreferrer" onClick={abrePolitica}>Privacy policy</a>
     </p>
   );
 }

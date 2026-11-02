@@ -79,13 +79,78 @@
     typeof window.gtag === 'function' &&
     !excluido();
 
+  // ── Que no se cuele nada del usuario ──
+  //
+  // Los parámetros de los eventos son tipos, números y códigos, pero alguno
+  // viene de un mensaje de error (el «motivo» de los fallos de sala lleva
+  // err.message), y un error de Firebase o de red puede traer un correo, una
+  // URL con su llave, una IP o una ruta con el nombre del usuario de Windows.
+  // Mandar eso incumpliría lo que promete la política y el §7 de las
+  // condiciones de Google Analytics. Se limpia AQUÍ, en el único sitio por
+  // donde pasa todo, para no depender de que cada llamada se acuerde.
+  const RE_CORREO = /[^\s@<>()"',;:]+@[^\s@<>()"',;:]+\.[a-z]{2,}/gi;
+  const RE_URL = /\b(?:[a-z][a-z0-9+.-]*):\/\/\S+/gi;
+  const RE_RUTA = /(?:\b[a-z]:[\\/]|\\\\|~\/|\/(?:Users|home|mnt|var|tmp|private|data|storage|sdcard)\/)\S*/gi;
+  const RE_IP4 = /\b\d{1,3}(?:\.\d{1,3}){3}\b/g;
+  const RE_IP6 = /\b(?:[0-9a-f]{1,4}:){2,7}[0-9a-f]{0,4}\b/gi;
+  const RE_NUMERO_LARGO = /\d{6,}/g;   // ids, teléfonos, códigos de transacción
+
+  function limpiaTexto(v, tope) {
+    return String(v)
+      .replace(RE_CORREO, '[correo]')
+      .replace(RE_URL, '[url]')
+      .replace(RE_RUTA, '[ruta]')
+      .replace(RE_IP4, '[ip]')
+      .replace(RE_IP6, '[ip]')
+      .replace(RE_NUMERO_LARGO, '[n]')
+      .slice(0, tope);
+  }
+
+  // El motivo de un fallo se reduce a una lista CERRADA: o es uno de los
+  // códigos propios de la app (sala-no-existe, bloqueador, sin-respuesta…,
+  // todos en minúsculas y con guiones), o se clasifica en unos pocos cajones.
+  // Así nunca viaja texto libre, que es lo que pedía la revisión.
+  function limpiaMotivo(v) {
+    const s = String(v == null ? '' : v).trim();
+    if (/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(s) && s.length <= 40) return s;
+    if (/permission|permiso|denied|denegad|unauthori[sz]ed|forbidden/i.test(s)) return 'permiso';
+    if (/network|offline|unavailable|failed to fetch|timeout|timed out|conexi[oó]n|\bred\b/i.test(s)) return 'sin-conexion';
+    if (/not[- ]found|no existe|missing/i.test(s)) return 'no-existe';
+    return 'otro';
+  }
+
+  function limpiaParams(params) {
+    const fuera = {};
+    if (!params) return fuera;
+    for (const k of Object.keys(params)) {
+      const v = params[k];
+      if (k === 'motivo') fuera[k] = limpiaMotivo(v);
+      // 100 caracteres es lo más que guarda GA4 por valor de parámetro.
+      else if (typeof v === 'string') fuera[k] = limpiaTexto(v, 100);
+      else if (typeof v === 'number' || typeof v === 'boolean') fuera[k] = v;
+      // Objetos, listas o funciones no tienen nada que hacer aquí: fuera.
+    }
+    return fuera;
+  }
+
+  // Título y dirección neutros en CADA evento (lo mismo que fija index.html):
+  // document.title lleva el nombre del proyecto en la página de un enlace para
+  // ver, y el #ver=<id> de la dirección es la llave de ese enlace.
+  function paginaNeutra() {
+    try {
+      return { page_title: 'Oddinote', page_location: location.origin + location.pathname };
+    } catch (e) {
+      return { page_title: 'Oddinote' };
+    }
+  }
+
   function odiTrack(nombre, params) {
     if (!activo()) return;
     try {
       window.gtag('event', nombre, Object.assign({
         odi_platform: window.ODINOTE_PLATFORM,
         odi_version: window.ODINOTE_BUILD || '',
-      }, params || {}));
+      }, limpiaParams(params), paginaNeutra()));
     } catch (e) {}
   }
   window.odiTrack = odiTrack;
@@ -165,5 +230,5 @@
     setTimeout(esperaALaApp, 500);
   })();
 
-  if (typeof module !== 'undefined' && module.exports) module.exports = { odiTrack };
+  if (typeof module !== 'undefined' && module.exports) module.exports = { odiTrack, limpiaParams, limpiaMotivo, limpiaTexto };
 })();

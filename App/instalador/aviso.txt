@@ -4,16 +4,17 @@ By installing and using Oddinote you agree to the following.
 
 1. Usage statistics
 
-Oddinote sends anonymous usage statistics to Google Analytics: when the app
-is opened and for how long, which kinds of node are created, whether live
-rooms, view-only links and Google Drive work, and the approximate country and
-city that Google works out from your internet connection. Google also gives
-this device a random identifier.
+Oddinote sends pseudonymous usage statistics to Google Analytics: when the
+app is opened and for how long, which kinds of node are created, whether live
+sessions and Google Drive work, and the approximate country and city that
+Google works out from your internet connection. Outside the EU/EEA, the UK
+and Switzerland, Google also gives this device a random identifier; in those
+countries nothing is stored on the device.
 
 Your name, your email, the names of your projects and anything you write or
 put in your notes are never sent.
 
-Details: https://github.com/Neuroxcx1/Odinote/blob/main/PRIVACY.md
+Full privacy policy: https://oddinote-web.vercel.app/privacy.html
 
 2. Automatic updates
 
@@ -24,7 +25,8 @@ when you close the app. You can turn this off in Settings at any time.
 3. Your projects
 
 Your projects stay on your computer. They only leave it if you connect Google
-Drive, open a live room or create a view-only link.
+Drive, open a live session or create a view-only link. If you sign in with
+Google, the app receives your name, email and profile picture.
 
 4. Age
 

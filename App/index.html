@@ -78,6 +78,50 @@
       window.dataLayer = window.dataLayer || [];
       function gtag(){dataLayer.push(arguments);}
 
+      // Google Consent Mode, ANTES de cargar gtag.js y de cualquier 'config'.
+      //
+      // En la UE/EEE, el Reino Unido y Suiza la ley (art. 5.3 de la Directiva
+      // ePrivacy y sus copias en GB y CH) pide un consentimiento previo para
+      // GUARDAR o LEER algo en el equipo, y la analítica no está exenta. El
+      // autor no quiere ni interruptor ni aviso grande, así que allí no se
+      // guarda nada: con analytics_storage 'denied' Google no pone la cookie
+      // _ga ni guarda ningún identificador, y solo recibe avisos sueltos sin
+      // cookie (Google decide el país por la IP de cada visita).
+      // No vale «client_storage: 'none'»: eso era de Universal Analytics y en
+      // GA4 no está documentado; lo que funciona en GA4 es esto.
+      //
+      // Los anuncios se niegan en TODO el mundo: Oddinote no tiene anuncios ni
+      // remarketing, así que no hay por qué mandar ninguna señal para anuncios.
+      // Google aplica la regla de la región cuando el país coincide y la
+      // general en el resto. Los códigos son ISO 3166-1:
+      // los 27 de la UE, Islandia, Liechtenstein y Noruega (EEE), las regiones
+      // de la UE que tienen código propio (Åland, Guayana Francesa, Guadalupe,
+      // Martinica, Reunión, Mayotte, San Martín), Reino Unido y Suiza.
+      var _gaRegionSinGuardar = [
+        'AT', 'BE', 'BG', 'HR', 'CY', 'CZ', 'DK', 'EE', 'FI', 'FR', 'DE', 'GR',
+        'HU', 'IE', 'IT', 'LV', 'LT', 'LU', 'MT', 'NL', 'PL', 'PT', 'RO', 'SK',
+        'SI', 'ES', 'SE',
+        'IS', 'LI', 'NO',
+        'AX', 'GF', 'GP', 'MQ', 'RE', 'YT', 'MF',
+        'GB', 'CH'
+      ];
+      gtag('consent', 'default', {
+        analytics_storage: 'denied',
+        ad_storage: 'denied',
+        ad_user_data: 'denied',
+        ad_personalization: 'denied',
+        region: _gaRegionSinGuardar
+      });
+      gtag('consent', 'default', {
+        analytics_storage: 'granted',
+        ad_storage: 'denied',
+        ad_user_data: 'denied',
+        ad_personalization: 'denied'
+      });
+      // Con ad_storage negado, que tampoco viajen los identificadores de clic
+      // de anuncios en las URL.
+      gtag('set', 'ads_data_redaction', true);
+
       if (window.ODINOTE_PLATFORM !== 'dev') {
         var _gaTag = document.createElement('script');
         _gaTag.async = true;
@@ -89,7 +133,29 @@
         // los informes (hay que darla de alta como dimensión personalizada en
         // GA4 con el nombre odi_platform para que aparezca en los paneles).
         gtag('set', 'user_properties', { odi_platform: window.ODINOTE_PLATFORM });
-        var _gaCfg = { odi_platform: window.ODINOTE_PLATFORM };
+        // Título y dirección FIJOS. gtag manda por su cuenta document.title y
+        // la URL entera, y en la página de un enlace para ver el título pasa a
+        // ser «<nombre del proyecto> · Oddinote» y la dirección lleva
+        // #ver=<id>, que es la LLAVE del enlace (quien la tenga lee la copia).
+        // La política promete no mandar nunca nombres de proyectos ni nada
+        // escrito por el usuario. Se fijan con 'set' (para todos los eventos
+        // que vengan después) y otra vez en cada 'config'; analytics.js los
+        // repite en cada evento por si acaso.
+        var _gaPagina = {
+          page_title: 'Oddinote',
+          page_location: location.origin + location.pathname
+        };
+        gtag('set', _gaPagina);
+        // Signals y personalización de anuncios apagados también desde aquí,
+        // aunque no estén encendidos en la consola: así no dependen de que
+        // alguien los encienda allí sin pensarlo.
+        var _gaCfg = {
+          odi_platform: window.ODINOTE_PLATFORM,
+          page_title: _gaPagina.page_title,
+          page_location: _gaPagina.page_location,
+          allow_google_signals: false,
+          allow_ad_personalization_signals: false
+        };
         gtag('config', 'G-2HTKF0DZCW', _gaCfg);
         gtag('config', 'G-YT66TPQGQE', _gaCfg);
       } else {

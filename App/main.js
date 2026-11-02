@@ -71,7 +71,21 @@ let activeVaultPath = '';
 // Setup a logging path in the app's persistent user data directory
 const logPath = path.join(app.getPath('userData'), 'odinote-debug.log');
 
+// El registro de depuración (odinote-debug.log) es local y se borra en cada
+// arranque, pero la gente lo pega ENTERO en los issues públicos de GitHub al
+// pedir ayuda. Un correo ahí acaba publicado por el propio usuario. Por eso
+// todo lo que entra (también lo que llega de la consola del renderer) pasa por
+// aquí y los correos se quedan en «j***@gmail.com»: basta para saber que hay
+// una cuenta y de qué tipo, sin decir cuál.
+function tapaCorreos(texto) {
+  return String(texto).replace(
+    /([A-Za-z0-9])[A-Za-z0-9._%+-]*@([A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,})/g,
+    '$1***@$2'
+  );
+}
+
 function logToFile(msg) {
+  msg = tapaCorreos(msg);
   const line = `[${new Date().toISOString()}] ${msg}\n`;
   try {
     fs.appendFileSync(logPath, line, 'utf-8');
@@ -1493,7 +1507,7 @@ function startAuthServer() {
             picture: payload.picture,
             accessToken: payload.accessToken,
           };
-          logToFile(`Received auth-success via POST for ${profile.email}`);
+          logToFile('Received auth-success via POST (cuenta conectada)');
           if (mainWindow) {
             appWC().send('google-signin-completed', profile);
           }
@@ -1563,14 +1577,14 @@ function startAuthServer() {
         let refresco = tok.refresh_token || null;
         if (!refresco) refresco = leeLlaves()[String(perfil.email || '').toLowerCase()] || null;
         if (!refresco && !pedirPermisosEnCurso) {
-          logToFile(`OAuth: ${perfil.email || '?'} no trae token de refresco ni lo teníamos; se piden los permisos.`);
+          logToFile('OAuth: la cuenta no trae token de refresco ni lo teníamos; se piden los permisos.');
           cierra('Un paso más', 'Google te pedirá una vez los permisos de Oddinote en esta pestaña nueva.', true);
           shell.openExternal(urlDeAutorizacion(true));
           return;
         }
         const guardado = guardaRefresco(refresco);
         if (guardado) apuntaLlave(perfil.email, refresco);
-        logToFile(`OAuth: sesión iniciada para ${perfil.email || '?'} (refresco ${guardado ? 'guardado' : 'NO guardado'})`);
+        logToFile(`OAuth: sesión iniciada (refresco ${guardado ? 'guardado' : 'NO guardado'})`);
         if (mainWindow) {
           appWC().send('google-signin-completed', {
             name: perfil.name || 'Google User',
