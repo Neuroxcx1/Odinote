@@ -7192,6 +7192,11 @@ html[data-touch="1"] .col-child-wrap:not(.selected) > .anchors > .connect-handle
    encima, el interior del nodo es siempre para moverlo y a los tiradores les
    queda su mitad de fuera, que es la que sobresale del borde y la que se ve. */
 html[data-touch="1"] .item-drag-shield { z-index: 12; }
+/* Mientras se escribe dentro del nodo (la leyenda, por ejemplo), la lámina se
+   aparta: si no, cada toque para mover el cursor caería en ella. */
+html[data-touch="1"] .item:has(input:focus, textarea:focus, [contenteditable="true"]:focus) > .item-drag-shield {
+  display: none;
+}
 
 /* ── Orientación horizontal: el raíl derecho se queda, pero la barra
       superior se encoge para no comerse el poco alto disponible. ─────── */

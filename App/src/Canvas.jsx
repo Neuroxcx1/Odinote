@@ -357,6 +357,82 @@ const defaultScale = () => (window.odiIsMobile && window.odiIsMobile()) ? 0.7 : 
 // variables de los tiradores en su caja (ver varsTiradoresRef).
 const TIPOS_CON_TIRADORES = new Set(['column', 'image', 'code']);
 
+// ── Lo que hay debajo de la lámina de arrastre (ver .item-drag-shield) ──
+//
+// En un aparato táctil, el nodo elegido lleva encima una lámina invisible para
+// poder arrastrarlo desde cualquier punto. Pero la lámina se comía TODOS los
+// toques: con el nodo elegido no había forma de llegar a lo de dentro. Lo
+// avisó alguien en la issue 13 de GitHub: en el teléfono no se podía subir
+// una imagen ni un audio (la zona de «toca para subir» y el botón de cambiar
+// quedaban debajo), no se podía escribir la leyenda, y un tablero no se abría
+// con dos toques (el segundo toque caía en la lámina y el doble clic no
+// llegaba al tablero de dentro). Ni con un ratón Bluetooth: la lámina sale
+// según lo que ADMITE el aparato, no según con qué se toca. En el PC no pasaba
+// porque allí no hay lámina.
+//
+// Ahora un toque sin arrastre se le pasa a lo que hay debajo, como habría
+// hecho un clic de ratón. Va en el mismo gesto (dentro del touchend o del
+// clic de verdad), así que el navegador sigue dejando abrir el selector de
+// archivos, que sin un gesto del usuario no se abre.
+
+// Lo que se toca aunque el nodo sea de los que entran a escribir con un toque
+// (nota, tareas, comentario…): botones, casillas, enlaces y la leyenda.
+const ESCUDO_CONTROLES = 'input, textarea, select, button, a[href], label, [role="button"], [role="checkbox"], .node-caption';
+const ESCUDO_EDITABLES = '[contenteditable="true"], [contenteditable=""]';
+
+// El elemento del nodo que hay bajo el punto, mirando A TRAVÉS de la lámina y
+// de los tiradores. Los tiradores no cuentan (ya tienen su gesto: estirar,
+// conectar), pero tampoco pueden tapar: en táctil son grandes, y el punto de
+// conexión de abajo cae justo encima de la leyenda.
+function bajoElEscudo(escudo, x, y) {
+  const nodo = escudo.parentElement;
+  if (!nodo) return null;
+  for (const el of document.elementsFromPoint(x, y)) {
+    if (el === nodo) return null;
+    if (el === escudo || !nodo.contains(el)) continue;
+    if (el.closest('.handles, .anchors, .nodo-candado')) continue;
+    return el;
+  }
+  return null;
+}
+
+// El control que se quiere tocar, si lo hay. En los nodos que entran a escribir
+// con un toque, un texto editable suelto NO cuenta: tocarlo sigue siendo
+// «entrar a editar», como hasta ahora.
+function controlBajoEscudo(debajo, editaAlTocar) {
+  if (!debajo) return null;
+  return debajo.closest(ESCUDO_CONTROLES) || (!editaAlTocar && debajo.closest(ESCUDO_EDITABLES)) || null;
+}
+
+function esCampoDeTexto(el) {
+  return el.isContentEditable || el.tagName === 'TEXTAREA' ||
+    (el.tagName === 'INPUT' && !/^(button|submit|reset|checkbox|radio|file|range|color|image)$/i.test(el.type));
+}
+
+// Enfoca un campo con el cursor donde cayó el dedo. focus() dentro del gesto
+// es lo que hace salir el teclado del teléfono.
+// Si encima hay un tirador y no se puede saber el punto exacto, el cursor va al
+// final, que es donde uno sigue escribiendo.
+function enfocaBajoEscudo(escudo, campo, x, y) {
+  campo.focus({ preventScroll: true });
+  if (!campo.isContentEditable) return;
+  const antes = escudo.style.pointerEvents;
+  escudo.style.pointerEvents = 'none';
+  let r = document.caretRangeFromPoint ? document.caretRangeFromPoint(x, y) : null;
+  escudo.style.pointerEvents = antes;
+  if (!r || !campo.contains(r.startContainer)) {
+    r = document.createRange();
+    r.selectNodeContents(campo);
+    r.collapse(false);
+  }
+  const s = window.getSelection();
+  s.removeAllRanges();
+  s.addRange(r);
+}
+
+// Los nodos en los que un toque limpio sobre el nodo ya elegido entra a editar.
+const TIPOS_EDITAN_AL_TOCAR = ['calendar', 'table', 'todo', 'column', 'map', 'note', 'document', 'title', 'comment'];
+
 function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn, setCanvases: setExtCanvases, updateAvailable, onUpdateClick, volume, onChangeVolume, onSettingsClick, vaultPath, userProfile, esPatrocinador, onAbrirCorona, onUserClick, projects, setProjects, onSharingClick, onManualSync, isSyncingDrive, needsDriveAuth, driveReachable, jumpTarget, onSearchClick, onGoToNode, onGraphClick, initialTrail, onTrailChange, soloVer }) {
   const currentProject = projects ? projects.find(p => p.id === projectId) : null;
   const [canvases, _setCanvases] = useStateCanvas(() => canvasesIn || JSON.parse(JSON.stringify(window.INITIAL_CANVASES)));
@@ -366,6 +442,9 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
 
   // Track canvases we sent to App to avoid circular updates and old echoes overwriting local state
   const sentCanvasesRef = useRefCanvas(new Set());
+  // El último gesto sobre la lámina de arrastre: si el dedo se movió, el clic
+  // que llega después no se pasa a lo de debajo (era un arrastre).
+  const escudoGestoRef = useRefCanvas({ movido: false });
 
   // Sync canvas state up to the App (for persistence). Skipped during an active drag/resize
   // (body.odi-busy) so we don't trigger a full App+Canvas re-render on every mouse-move frame.
@@ -6809,30 +6888,68 @@ function Canvas({ projectId, lang, setLang, theme, setTheme, onHome, canvasesIn,
                       Un toque limpio sin arrastrar entra a editar, pero solo en
                       los nodos donde eso significaba algo desde siempre; en los
                       demás no hace nada, que es lo correcto sobre un nodo que
-                      ya está seleccionado. El doble toque no se pierde: la
-                      lámina no lo escucha, así que sube al nodo como siempre y
-                      un tablero se sigue abriendo con dos toques. */}
+                      ya está seleccionado.
+
+                      Y lo de dentro sigue a mano: un toque sin arrastre y el
+                      doble toque se le pasan a lo que hay debajo (ver
+                      bajoElEscudo, arriba del todo). Antes la lámina se los
+                      quedaba y en el teléfono no se podía subir una imagen,
+                      escribir una leyenda ni abrir un tablero (issue 13). */}
                   {window.odiIsTouch && window.odiIsTouch() &&
                    selected === item.id && !isEditing && croppingId !== item.id && (
                     <div
                       className="item-drag-shield"
                       onMouseDown={(e) => {
                         const x0 = e.clientX, y0 = e.clientY;
-                        let movido = false;
+                        const editaAlTocar = TIPOS_EDITAN_AL_TOCAR.includes(item.type);
+                        const control = controlBajoEscudo(bajoElEscudo(e.currentTarget, x0, y0), editaAlTocar);
+                        const gesto = { movido: false };
+                        escudoGestoRef.current = gesto;
                         const alMover = (ev) => {
-                          if (Math.hypot(ev.clientX - x0, ev.clientY - y0) > 6) movido = true;
+                          if (Math.hypot(ev.clientX - x0, ev.clientY - y0) > 6) gesto.movido = true;
                         };
                         const alSoltar = () => {
                           window.removeEventListener('mousemove', alMover);
                           window.removeEventListener('mouseup', alSoltar);
-                          if (movido) return;
-                          if (['calendar', 'table', 'todo', 'column', 'map', 'note', 'document', 'title', 'comment'].includes(item.type)) {
-                            setEditing(item.id);
-                          }
+                          if (gesto.movido) return;
+                          // Sobre un botón, una casilla o la leyenda, el toque es
+                          // para ellos (lo pasa el onClick de abajo), no para
+                          // abrir el nodo.
+                          if (editaAlTocar && !control) setEditing(item.id);
                         };
                         window.addEventListener('mousemove', alMover);
                         window.addEventListener('mouseup', alSoltar);
                         startDragItem(e, item.id);
+                      }}
+                      onClick={(e) => {
+                        if (escudoGestoRef.current.movido) return;
+                        const escudo = e.currentTarget;
+                        const debajo = bajoElEscudo(escudo, e.clientX, e.clientY);
+                        const control = controlBajoEscudo(debajo, TIPOS_EDITAN_AL_TOCAR.includes(item.type));
+                        // En los nodos que se abren con un toque, solo los
+                        // controles: lo demás ya lo hizo alSoltar.
+                        if (!debajo || (TIPOS_EDITAN_AL_TOCAR.includes(item.type) && !control)) return;
+                        e.stopPropagation();
+                        if (control && esCampoDeTexto(control)) {
+                          enfocaBajoEscudo(escudo, control, e.clientX, e.clientY);
+                          return;
+                        }
+                        debajo.dispatchEvent(new MouseEvent('click', {
+                          bubbles: true, cancelable: true, view: window, detail: 1,
+                          clientX: e.clientX, clientY: e.clientY, screenX: e.screenX, screenY: e.screenY,
+                        }));
+                      }}
+                      onDoubleClick={(e) => {
+                        // El doble toque, a lo de debajo: así llega al tablero
+                        // (lo abre BoardItem, no el nodo) y sigue subiendo al
+                        // nodo como antes para todo lo demás.
+                        const debajo = bajoElEscudo(e.currentTarget, e.clientX, e.clientY);
+                        if (!debajo) return;
+                        e.stopPropagation();
+                        debajo.dispatchEvent(new MouseEvent('dblclick', {
+                          bubbles: true, cancelable: true, view: window, detail: 2,
+                          clientX: e.clientX, clientY: e.clientY, screenX: e.screenX, screenY: e.screenY,
+                        }));
                       }}
                     />
                   )}
