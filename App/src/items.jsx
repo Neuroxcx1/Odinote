@@ -968,6 +968,16 @@ function ImageItem({ item, lang, onUpdate, callbacks }) {
 }
 
 // ──────────────── LINK ────────────────
+// La dirección tal como se escribió puede no llevar «https://» («example.com»).
+// La tarjeta ya se pintaba bien (parseLink se lo pone), pero «Abrir» le pasaba
+// el texto tal cual a window.open, que lo toma por una ruta de la propia app:
+// en el teléfono abría https://localhost/example.com y en el PC el servidor
+// local. Con esquema propio (https:, mailto:…) se deja como está.
+function urlParaAbrir(url) {
+  const u = String(url || '').trim();
+  return /^[a-z][a-z0-9+.-]*:/i.test(u) ? u : 'https://' + u;
+}
+
 function parseLink(url) {
   if (!url) return null;
   let u = url.trim();
@@ -1117,7 +1127,7 @@ function LinkItem({ item, lang, onUpdate, editing, onEndEdit }) {
     return (
       <div className="link-card link-servicio" style={{width:'100%', height:'100%'}}>
         <div className="item-card svc-card">
-          <window.EnlaceServicio item={item} servicio={servicioDeEnlace} onOpen={() => window.open(item.url, '_blank', 'noopener,noreferrer')} />
+          <window.EnlaceServicio item={item} servicio={servicioDeEnlace} onOpen={() => window.open(urlParaAbrir(item.url), '_blank', 'noopener,noreferrer')} />
         </div>
       </div>
     );
@@ -1127,7 +1137,7 @@ function LinkItem({ item, lang, onUpdate, editing, onEndEdit }) {
   const titleVal = item.title != null ? item.title : (fetched?.title || meta?.title || '');
   const titlePlaceholder = window.t('Título del enlace…', 'Link title…');
   const desc = fetched?.description;
-  const openLink = () => item.url && window.open(item.url, '_blank', 'noopener,noreferrer');
+  const openLink = () => item.url && window.open(urlParaAbrir(item.url), '_blank', 'noopener,noreferrer');
   // Spotify, SoundCloud y CodePen (src/incrustados.js): como
   // YouTube, se ven dentro del nodo al pulsar ▶. El reproductor solo se carga
   // entonces, no al abrir el lienzo.

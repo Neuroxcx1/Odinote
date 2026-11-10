@@ -376,8 +376,11 @@ const TIPOS_CON_TIRADORES = new Set(['column', 'image', 'code']);
 // archivos, que sin un gesto del usuario no se abre.
 
 // Lo que se toca aunque el nodo sea de los que entran a escribir con un toque
-// (nota, tareas, comentario…): botones, casillas, enlaces y la leyenda.
-const ESCUDO_CONTROLES = 'input, textarea, select, button, a[href], label, [role="button"], [role="checkbox"], .node-caption';
+// (nota, tareas, comentario…): botones, casillas, enlaces y la leyenda. La
+// casilla de una tarea y «Nueva tarea» son divs con su onClick: sin nombrarlos
+// aquí, tocarlos con la lista elegida entraba a escribir (con el teclado en el
+// título) en vez de marcar la tarea o añadir una.
+const ESCUDO_CONTROLES = 'input, textarea, select, button, a[href], label, [role="button"], [role="checkbox"], .node-caption, .todo-check, .todo-add';
 const ESCUDO_EDITABLES = '[contenteditable="true"], [contenteditable=""]';
 
 // El elemento del nodo que hay bajo el punto, mirando A TRAVÉS de la lámina y

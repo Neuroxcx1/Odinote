@@ -7197,6 +7197,13 @@ html[data-touch="1"] .item-drag-shield { z-index: 12; }
 html[data-touch="1"] .item:has(input:focus, textarea:focus, [contenteditable="true"]:focus) > .item-drag-shield {
   display: none;
 }
+/* Ni sobre un reproductor incrustado (YouTube, Spotify…): es otra página, y un
+   toque no se le puede pasar desde fuera. Con la lámina encima, el vídeo
+   que sonaba no se podía pausar sin soltar antes el nodo. Sin ella, el nodo se
+   sigue arrastrando desde lo que no es el reproductor. */
+html[data-touch="1"] .item:has(iframe) > .item-drag-shield {
+  display: none;
+}
 
 /* ── Orientación horizontal: el raíl derecho se queda, pero la barra
       superior se encoge para no comerse el poco alto disponible. ─────── */
